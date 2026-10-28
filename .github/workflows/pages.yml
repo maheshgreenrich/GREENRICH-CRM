@@ -9,6 +9,7 @@ on:
       - 'greenrich-one.js'
       - 'greenrich-one.css'
       - 'demo.html'
+      - 'secure.html'
       - 'demo.js'
       - 'attendance-ui.js'
       - 'legacy.html'
@@ -39,6 +40,7 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          test -s secure.html
           test -s demo.html
           node --check demo.js
           node --check attendance-ui.js
