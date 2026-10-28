@@ -98,7 +98,7 @@ returns uuid language plpgsql security definer set search_path=public as $$
 declare cfg public.gr_attendance_settings%rowtype; existing public.gr_attendance%rowtype;
  actor uuid:=auth.uid(); v_admin boolean:=public.gr_attendance_is_admin(); new_id uuid; existed boolean:=false;
  local_day date:=(now() at time zone 'Asia/Kolkata')::date;
- local_time time:=(now() at time zone 'Asia/Kolkata')::time;
+ local_time time:=date_trunc('minute',now() at time zone 'Asia/Kolkata')::time;
 begin
  if actor is null then raise exception 'Login required';end if;
  select * into cfg from public.gr_attendance_settings where id=1;
