@@ -8,6 +8,8 @@ on:
       - 'app.js'
       - 'greenrich-one.js'
       - 'greenrich-one.css'
+      - 'demo.html'
+      - 'demo.js'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
@@ -35,6 +37,8 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          test -s demo.html
+          node --check demo.js
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload site
