@@ -1,0 +1,77 @@
+'use strict';
+window.GreenRichAttendance=(()=>{
+const K='gr-att-config-v3',A='gr-att-audit-v3';
+const defaults={cutoff:'23:59',half:0.5,weekdays:[1,2,3,4,5,6],holidays:[],location:true,lock:''};
+const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}};
+const config={...defaults,...read(K,{})},audit=read(A,[]);
+const save=()=>{localStorage.setItem(K,JSON.stringify(config));localStorage.setItem(A,JSON.stringify(audit))};
+const istDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).split('/').join('-');
+const format=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+const e=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const validDay=d=>config.weekdays.includes(new Date(d+'T12:00:00').getDay()||7)&&!config.holidays.includes(d);
+const dateList=(from,to)=>{let out=[],d=new Date(from+'T12:00:00'),end=new Date(to+'T12:00:00');while(d<=end&&out.length<370){out.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));d.setDate(d.getDate()+1)}return out};
+const perms=(ctx)=>({all:['Admin','Director','Accounts'].includes(ctx.current.role)||ctx.state.perm[ctx.current.role+'|Attendance|View All']===true,admin:ctx.current.role==='Admin'||ctx.state.perm[ctx.current.role+'|Attendance|Mark Others']===true});
+const val=(ctx,id,day)=>ctx.state.attendance.find(a=>a.id===id&&a.day===day);
+function mark(ctx,id,day,status){
+ const {state,current}=ctx,access=perms(ctx),person=state.users.find(u=>u.id===id);
+ if(!person?.active)return ctx.message('Inactive or missing employee');
+ if(!['Present','Absent','Half Day'].includes(status))return ctx.message('Invalid attendance status');
+ if(day>istDate())return ctx.message('Future dates cannot be marked');
+ if(id!==current.id&&!access.admin)return ctx.message('Only Admin can mark another person');
+ if(config.lock&&day<=config.lock)return ctx.message('Attendance month locked');
+ const time=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+ if(!access.admin&&(day!==istDate()||time>config.cutoff))return ctx.message('Self attendance cut-off passed');
+ const old=val(ctx,id,day);
+ if(old&&!access.admin)return ctx.message('Already marked. Ask Admin to correct.');
+ let reason='Initial marking';
+ if(old){reason=prompt('Reason for correction (required):')||'';if(reason.trim().length<3)return ctx.message('A correction reason is required')}
+ let latitude=null,longitude=null;
+ if(config.location&&id===current.id&&!old&&navigator.geolocation&&confirm('Optional: share location for this attendance? Press Cancel to continue without location.')){
+ navigator.geolocation.getCurrentPosition(p=>{const row=val(ctx,id,day);if(row){row.location={lat:p.coords.latitude,lng:p.coords.longitude,consent:true};ctx.save()}},()=>{}, {timeout:6000});
+ }
+ audit.push({id,day,previous:old?.status||'',status,actor:current.username,time:new Date().toISOString(),reason,action:old?'Correct':'Mark'});
+ if(old){old.status=status;old.markedBy=current.username;old.at=new Date().toISOString();old.remark=reason}
+ else state.attendance.push({id,day,status,markedBy:current.username,at:new Date().toISOString(),source:id===current.id?'Self':'Admin',remark:''});
+ save();ctx.save();ctx.refresh();ctx.message('Attendance recorded');
+}
+function bar(name,value,max,color=''){return '<div class="gr-bar-line"><span>'+e(name)+'</span><div class="gr-bar-track"><div class="gr-bar-fill '+color+'" style="width:'+Math.max(0,Math.min(100,max?value/max*100:0))+'%"></div></div><b>'+value+'</b></div>'}
+function render(el,ctx){
+ const {state,current}=ctx,access=perms(ctx),now=istDate();
+ const persons=state.users.filter(u=>u.active&&(access.all||u.id===current.id));
+ el.innerHTML='<div class="panel"><div class="row"><h2>Daily Attendance</h2><label>Mark date<input id="att-date" type="date" max="'+now+'" value="'+now+'"></label></div>'+
+ (access.admin?'<div class="row"><button class="secondary" id="att-bulk-present">Mark all unmarked Present</button><button class="secondary" id="att-bulk-absent">Mark selected Absent</button><button class="secondary" id="att-bulk-half">Mark selected Half Day</button></div>':'')+
+ '<div class="tablewrap"><table><thead><tr><th>Select</th><th>Employee</th><th>Role</th><th>Status</th><th>Present</th><th>Absent</th><th>Half Day</th></tr></thead><tbody id="att-rows"></tbody></table></div></div>'+
+ '<div class="panel"><div class="row"><h2>Attendance Reports</h2><button class="blue" id="att-export">Export Excel-compatible CSV</button></div><div class="fields">'+
+ '<label>Period<select id="att-period"><option value="month">Monthly</option><option value="week">Weekly</option><option value="day">Daily</option><option value="custom">Custom range</option></select></label>'+
+ '<label>From<input id="att-from" type="date" value="'+now.slice(0,7)+'-01"></label><label>To<input id="att-to" type="date" value="'+now+'"></label>'+
+ '<label>Employee<select id="att-person"><option value="all">All accessible</option>'+persons.map(u=>'<option value="'+e(u.id)+'">'+e(u.name)+'</option>').join('')+'</select></label>'+
+ '<label>Role<select id="att-role"><option value="all">All roles</option>'+[...new Set(persons.map(u=>u.role))].map(r=>'<option>'+e(r)+'</option>').join('')+'</select></label>'+
+ '<label>Status<select id="att-status"><option value="all">All statuses</option><option>Present</option><option>Absent</option><option>Half Day</option></select></label></div>'+
+ '<div id="att-summary" class="cards"></div><h2>Person-wise attendance</h2><div id="att-people"></div><h2>Daily trend</h2><div id="att-trend"></div><h2>Status split</h2><div id="att-split"></div><h2>Calendar / Daily Matrix</h2><div id="att-matrix" class="tablewrap"></div><h2>Daily Details</h2><div id="att-detail" class="tablewrap"></div>'+(current.role==='Admin'?'<h2>Attendance Audit</h2><div id="att-history" class="tablewrap"></div>':'')+'</div>';
+ const q=x=>el.querySelector(x),all=x=>[...el.querySelectorAll(x)];
+ function daily(){const day=q('#att-date').value;q('#att-rows').innerHTML=persons.filter(u=>access.admin||u.id===current.id).map(u=>{let record=val(ctx,u.id,day);return '<tr><td>'+(access.admin?'<input data-att-select="'+e(u.id)+'" type="checkbox">':'')+'</td><td>'+e(u.name)+'</td><td>'+e(u.role)+'</td><td>'+e(record?.status||'Not marked')+'</td>'+['Present','Absent','Half Day'].map(s=>'<td><button class="'+(record?.status===s?'blue':'secondary')+'" data-att-user="'+e(u.id)+'" data-att-status="'+s+'">'+s+'</button></td>').join('')+'</tr>'}).join('');all('[data-att-user]').forEach(b=>b.onclick=()=>mark(ctx,b.dataset.attUser,day,b.dataset.attStatus))}
+ let last;
+ function report(){let from=q('#att-from').value,to=q('#att-to').value;if(!from||!to||from>to){ctx.message('Invalid reporting dates');return}
+ const days=dateList(from,to).filter(d=>d<=now),working=days.filter(validDay);
+ const us=persons.filter(u=>(q('#att-person').value==='all'||q('#att-person').value===u.id)&&(q('#att-role').value==='all'||q('#att-role').value===u.role));
+ const records=state.attendance.filter(r=>us.some(u=>u.id===r.id)&&r.day>=from&&r.day<=to&&(q('#att-status').value==='all'||r.status===q('#att-status').value));
+ const count=s=>records.filter(r=>r.status===s).length, total=working.length*us.length;
+ const percentage=total?Math.round((count('Present')+config.half*count('Half Day'))/total*1000)/10:0;
+ last={from,to,days,working,us,records,percentage,filters:{period:q('#att-period').value,person:q('#att-person').value,role:q('#att-role').value,status:q('#att-status').value}};
+ q('#att-summary').innerHTML=[['Working days',working.length],['Present',count('Present')],['Absent',count('Absent')],['Half Day',count('Half Day')],['Attendance %',percentage+'%']].map(([k,v])=>'<div class="card"><small>'+k+'</small><strong>'+v+'</strong></div>').join('');
+ q('#att-people').innerHTML='<div class="gr-bars">'+us.map(u=>{let v=records.filter(r=>r.id===u.id);let pct=working.length?Math.round((v.filter(r=>r.status==='Present').length+config.half*v.filter(r=>r.status==='Half Day').length)/working.length*100):0;return bar(u.name,pct,100)+'<small>Present '+v.filter(r=>r.status==='Present').length+' · Absent '+v.filter(r=>r.status==='Absent').length+' · Half '+v.filter(r=>r.status==='Half Day').length+'</small>'}).join('')+'</div>';
+ q('#att-trend').innerHTML='<div class="gr-bars">'+days.map(d=>bar(format(d),records.filter(r=>r.day===d&&r.status==='Present').length,us.length)).join('')+'</div>';
+ q('#att-split').innerHTML='<div class="gr-bars">'+['Present','Absent','Half Day'].map((s,i)=>bar(s,count(s),records.length,'gr-c'+i)).join('')+'</div>';
+ q('#att-matrix').innerHTML='<table><thead><tr><th>User</th>'+days.map(d=>'<th>'+format(d)+'</th>').join('')+'<th>P</th><th>A</th><th>H</th></tr></thead><tbody>'+us.map(u=>{let own=records.filter(r=>r.id===u.id);return '<tr><td>'+e(u.name)+'</td>'+days.map(d=>{let st=own.find(r=>r.day===d)?.status;return '<td style="background:'+(st==='Present'?'#dcfae7':st==='Absent'?'#ffe2e9':st==='Half Day'?'#fff3d6':'transparent')+'">'+(st?st==='Half Day'?'H':st[0]:'—')+'</td>'}).join('')+['Present','Absent','Half Day'].map(s=>'<td>'+own.filter(r=>r.status===s).length+'</td>').join('')+'</tr>'}).join('')+'</tbody></table>';
+ q('#att-detail').innerHTML='<table><thead><tr><th>Date</th><th>User</th><th>Status</th><th>Marked by</th><th>Time</th><th>Remark</th></tr></thead><tbody>'+records.map(r=>'<tr><td>'+format(r.day)+'</td><td>'+e(state.users.find(u=>u.id===r.id)?.name)+'</td><td>'+e(r.status)+'</td><td>'+e(r.markedBy)+'</td><td>'+e(r.at)+'</td><td>'+e(r.remark)+'</td></tr>').join('')+'</tbody></table>';
+ if(current.role==='Admin')q('#att-history').innerHTML='<table><thead><tr><th>Date</th><th>User</th><th>Old</th><th>New</th><th>Changed by</th><th>Reason</th></tr></thead><tbody>'+audit.filter(a=>a.day>=from&&a.day<=to).map(a=>'<tr><td>'+format(a.day)+'</td><td>'+e(state.users.find(u=>u.id===a.id)?.name)+'</td><td>'+e(a.previous)+'</td><td>'+e(a.status)+'</td><td>'+e(a.actor)+'</td><td>'+e(a.reason)+'</td></tr>').join('')+'</tbody></table>';
+ }
+ daily();report();q('#att-date').onchange=daily;
+ q('#att-period').onchange=()=>{let p=q('#att-period').value,d=new Date(now+'T12:00:00'),from=now;if(p==='custom')return;if(p==='month')from=now.slice(0,7)+'-01';if(p==='week'){d.setDate(d.getDate()-((d.getDay()+6)%7));from=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}q('#att-from').value=from;q('#att-to').value=now;report()};
+ ['att-from','att-to','att-person','att-role','att-status'].forEach(id=>q('#'+id).onchange=report);
+ if(access.admin){const bulk=status=>{let ids=status==='Present'?persons.filter(u=>!val(ctx,u.id,q('#att-date').value)).map(u=>u.id):all('[data-att-select]:checked').map(e=>e.dataset.attSelect);if(!ids.length)return ctx.message('No matching unmarked users');if(!confirm('Mark '+ids.length+' unmarked users '+status+'?'))return;let day=q('#att-date').value;if(day>now||(config.lock&&day<=config.lock))return ctx.message('Date is locked or in the future');ids.forEach(id=>{if(val(ctx,id,day))return;state.attendance.push({id,day,status,markedBy:current.username,at:new Date().toISOString(),source:'Admin'});audit.push({id,day,previous:'',status,actor:current.username,time:new Date().toISOString(),reason:'Bulk marking',action:'Mark'})});save();ctx.save();ctx.refresh()};q('#att-bulk-present').onclick=()=>bulk('Present');q('#att-bulk-absent').onclick=()=>bulk('Absent');q('#att-bulk-half').onclick=()=>bulk('Half Day')}
+ q('#att-export').onclick=()=>{if(!last)return;let rows=[['GreenRich ONE Attendance Report'],['Export user',current.username],['Export date',new Date().toISOString()],['Date range',format(last.from)+' to '+format(last.to)],['Filters',JSON.stringify(last.filters)],[],['Daily Details'],['Date','Employee','Status','Marked By','Time','Remark'],...last.records.map(r=>[format(r.day),state.users.find(u=>u.id===r.id)?.name,r.status,r.markedBy,r.at,r.remark]),[],['Summary'],['Employee','Present','Absent','Half Day','Percent'],...last.us.map(u=>{let arr=last.records.filter(r=>r.id===u.id),p=arr.filter(r=>r.status==='Present').length,h=arr.filter(r=>r.status==='Half Day').length;return [u.name,p,arr.filter(r=>r.status==='Absent').length,h,last.working.length?Math.round((p+config.half*h)/last.working.length*100):0]})];if(current.role==='Admin'){rows.push([],['Audit Log'],['Date','User','Old','New','Changed By','Reason'],...audit.filter(a=>a.day>=last.from&&a.day<=last.to).map(a=>[format(a.day),state.users.find(u=>u.id===a.id)?.name,a.previous,a.status,a.actor,a.reason]))}ctx.exportCSV('greenrich-attendance-'+last.from+'-'+last.to+'.csv',rows);audit.push({id:current.id,day:now,previous:'',status:'',actor:current.username,time:new Date().toISOString(),reason:'Report export',action:'Export'});save()};
+}
+function settings(el,ctx){if(ctx.current.role!=='Admin')return;el.innerHTML='<div class="panel"><h2>Attendance Settings</h2><div class="fields"><label>Self cut-off (IST)<input type="time" id="cutoff" value="'+config.cutoff+'"></label><label>Half-day value<input type="number" id="half" min="0" max="1" step=".05" value="'+config.half+'"></label><label>Lock through date<input type="date" id="lock" value="'+config.lock+'"></label><label>Location optional and consent-based<select id="location"><option value="yes">Enabled</option><option value="no" '+(!config.location?'selected':'')+'>Disabled</option></select></label><label>Working weekdays<select id="weekdays"><option value="mon-sat">Monday–Saturday</option><option value="mon-fri">Monday–Friday</option></select></label><label>Additional holiday date<input id="holiday" type="date"></label></div><button class="blue" id="att-save">Save attendance rules</button><button class="secondary" id="add-holiday">Add holiday</button><p id="holidays">Holidays: '+config.holidays.map(format).join(', ')+'</p></div>';el.querySelector('#weekdays').value=config.weekdays.length===5?'mon-fri':'mon-sat';el.querySelector('#att-save').onclick=()=>{config.cutoff=el.querySelector('#cutoff').value;config.half=Number(el.querySelector('#half').value);config.lock=el.querySelector('#lock').value;config.location=el.querySelector('#location').value==='yes';config.weekdays=el.querySelector('#weekdays').value==='mon-fri'?[1,2,3,4,5]:[1,2,3,4,5,6];save();ctx.message('Attendance settings saved')};el.querySelector('#add-holiday').onclick=()=>{let d=el.querySelector('#holiday').value;if(d&&!config.holidays.includes(d)){config.holidays.push(d);save();settings(el,ctx)}}}
+return {render,mark,settings,config};
+})();
