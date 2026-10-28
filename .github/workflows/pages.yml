@@ -10,6 +10,7 @@ on:
       - 'greenrich-one.css'
       - 'demo.html'
       - 'demo.js'
+      - 'legacy.html'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
