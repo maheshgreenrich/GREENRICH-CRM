@@ -1,0 +1,2 @@
+Date,Order ID,Channel,Customer,Product,SKU,Quantity,Unit Price,Tax %,Tax Inclusive,Taxable Amount,Tax Amount,Total Amount,Order Status,Notes
+2026-10-28,AMZ-1001,Amazon,,SAMPLE PRODUCT,SAMPLE-001,2,250,5,Yes,,,,Completed,Replace product with your product master name before importing
