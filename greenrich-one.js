@@ -15,10 +15,20 @@ async function dashboard(c){let a=await query('gr_attendance');let todays=a.filt
 async function attendance(c){let admin=roleName()==='Admin';let a=await query('gr_attendance');let mine=a.filter(x=>admin||x.user_id===user.id);let d=new Date(),month=d.toISOString().slice(0,7);c.innerHTML='<div class="panel"><div class="row"><h2>Employee attendance</h2><div class="row"><input id="attMonth" type="month" value="'+month+'"><button id="exportAttendance" class="secondary">Export CSV / Excel</button></div></div><div id="attStats"></div><div id="attCalendar"></div></div>'+(admin?'<div class="panel"><div class="row"><h2>Daily attendance marking</h2><input id="markDate" type="date" value="'+today()+'"></div><div class="tablewrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Attendance</th></tr></thead><tbody id="attPeople"></tbody></table></div></div>':'');function draw(){let m=$('#attMonth').value,list=mine.filter(x=>x.attendance_date.startsWith(m));$('#attStats').innerHTML='<div class="cards">'+card('Present',list.filter(x=>x.status==='present').length)+card('Absent',list.filter(x=>x.status==='absent').length)+card('Half Day',list.filter(x=>x.status==='half_day').length)+card('Total records',list.length)+'</div>';let [y,mo]=m.split('-').map(Number),days=new Date(y,mo,0).getDate();$('#attCalendar').innerHTML='<h3>Monthly calendar</h3><div class="monthgrid">'+Array.from({length:days},(_,i)=>{let date=m+'-'+String(i+1).padStart(2,'0'),r=list.find(x=>x.attendance_date===date&&x.user_id===user.id);return '<div class="day '+(r?.status||'')+'"><b>'+String(i+1)+'</b><br><small>'+esc(r?.status?.replace('_',' ')||'—')+'</small></div>'}).join('')+'</div>'}draw();$('#attMonth').onchange=draw;$('#exportAttendance').onclick=()=>{let m=$('#attMonth').value;exportCSV('attendance-'+m+'.csv',['date','employee','role','status','marked_at','remark'],mine.filter(x=>x.attendance_date.startsWith(m)).map(r=>[r.attendance_date,people.find(p=>p.id===r.user_id)?.full_name||r.user_id,roles.find(x=>x.id===people.find(p=>p.id===r.user_id)?.role_id)?.name,r.status,r.marked_at,r.remark]))};if(admin){const drawPeople=()=>{let date=$('#markDate').value;$('#attPeople').innerHTML=people.filter(p=>p.active).map(p=>{let r=a.find(x=>x.user_id===p.id&&x.attendance_date===date);return '<tr><td>'+esc(p.full_name)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+['present','absent','half_day'].map(s=>'<button class="'+(r?.status===s?'blue':'secondary')+'" data-uid="'+p.id+'" data-status="'+s+'">'+s.replace('_',' ')+'</button>').join(' ')+'</td></tr>'}).join('');$('#attPeople').querySelectorAll('button').forEach(b=>b.onclick=()=>mark(b.dataset.uid,b.dataset.status,date))};drawPeople();$('#markDate').onchange=drawPeople}}
 function exportCSV(filename,cols,rows){let csv=[cols,...rows].map(r=>r.map(x=>{let v=String(x??'');if(/^[=+@\-\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}).join(',')).join('\r\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href)}
 async function employeeAction(data){
- const token=(await db.auth.getSession()).data.session?.access_token;
- if(!token)throw Error('Please sign in again');
- const {data:result,error}=await db.functions.invoke('greenrich-admin-users',{body:data,headers:{Authorization:'Bearer '+token}});
- if(error){let detail=result?.error||error.message||'Unknown error';if(/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(detail))detail='User creation service is not deployed or reachable in Supabase. Open the one-time setup guide below.';throw Error(detail)}
+ const session=(await db.auth.getSession()).data.session;
+ if(!session?.access_token)throw Error('Please sign in again');
+ const {data:result,error}=await db.functions.invoke('greenrich-admin-users',{body:data,headers:{Authorization:'Bearer '+session.access_token}});
+ if(error){
+  let details=result?.error||'';
+  let status=error.context?.status;
+  if(error.context && typeof error.context.clone==='function'){
+   try{const payload=await error.context.clone().json();details=payload?.error||payload?.message||details}catch(_){}
+  }
+  if(!details)details=error.message||'Unknown server error';
+  if(/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(details))details='The Supabase employee service is unreachable. Confirm function deployment and browser network access.';
+  if(/non-2xx status code/i.test(details))details='The server rejected this request'+(status?' (HTTP '+status+')':'')+'. Check Supabase Edge Functions > greenrich-admin-users > Logs.';
+  throw Error(details);
+ }
  if(result?.error)throw Error(result.error);
  return result;
 }
