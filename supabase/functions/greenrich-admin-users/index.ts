@@ -19,20 +19,20 @@ Deno.serve(async req=>{
   const {data:profile,error:pe}=await admin.from('gr_profiles').select('active,gr_roles(name)').eq('id',user.id).single();
   if(pe||!profile?.active||profile?.gr_roles?.name!=='Admin')return response({error:'Admin permission required'},403);
   const body=await req.json(),action=body.action;
-  if(action==='invite'){
-   const email=String(body.email||'').trim().toLowerCase(),username=String(body.username||'').trim(),name=String(body.name||'').trim(),role=String(body.role||'');
-   if(!/^\S+@\S+\.\S+$/.test(email)||username.length<3||name.length<2)return response({error:'Enter valid name, username and email'},400);
+  if(action==='create'){
+   const email=String(body.email||'').trim().toLowerCase(),username=String(body.username||'').trim(),name=String(body.name||'').trim(),role=String(body.role||''),password=String(body.password||'');
+   if(!/^\S+@\S+\.\S+$/.test(email)||username.length<3||name.length<2||password.length<10)return response({error:'Enter valid name, username, email and a password of at least 10 characters'},400);
    const {data:roleRecord}=await admin.from('gr_roles').select('id').eq('name',role).maybeSingle();
    if(!roleRecord)return response({error:'Invalid role'},400);
    const {data:exists}=await admin.from('gr_profiles').select('id').eq('username',username).maybeSingle();
    if(exists)return response({error:'Username already exists'},409);
-   const invited=await admin.auth.admin.inviteUserByEmail(email,{redirectTo:'https://maheshgreenrich.github.io/GREENRICH-CRM/secure.html'});
-   if(invited.error)return response({error:invited.error.message},400);
-   const id=invited.data.user.id;
+   const created=await admin.auth.admin.createUser({email,password,email_confirm:true});
+   if(created.error)return response({error:created.error.message},400);
+   const id=created.data.user.id;
    const inserted=await admin.from('gr_profiles').insert({id,username,full_name:name,email,role_id:roleRecord.id,active:true});
-   if(inserted.error)return response({error:'Invitation sent, but profile creation failed: '+inserted.error.message},409);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'INVITE',new_value:{username,email,role}});
-   return response({message:'Invitation sent; employee must set their password using the email link'});
+   if(inserted.error){await admin.auth.admin.deleteUser(id);return response({error:'Employee profile could not be created: '+inserted.error.message},409);}
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'CREATE',new_value:{username,email,role}});
+   return response({message:'Employee created. They can sign in using their email and password.'});
   }
   const id=String(body.userId||'');
   if(!/^[0-9a-f-]{36}$/i.test(id))return response({error:'Invalid employee identifier'},400);
