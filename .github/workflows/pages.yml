@@ -10,6 +10,7 @@ on:
       - 'greenrich-one.css'
       - 'demo.html'
       - 'demo.js'
+      - 'attendance-ui.js'
       - 'legacy.html'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -40,6 +41,7 @@ jobs:
           node --check greenrich-one.js
           test -s demo.html
           node --check demo.js
+          node --check attendance-ui.js
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload site
