@@ -5,7 +5,7 @@ const defaults={cutoff:'23:59',half:0.5,weekdays:[1,2,3,4,5,6],holidays:[],locat
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}};
 const config={...defaults,...read(K,{})},audit=read(A,[]);
 const save=()=>{localStorage.setItem(K,JSON.stringify(config));localStorage.setItem(A,JSON.stringify(audit))};
-const istDate=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).split('/').join('-');
+const istDate=()=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));return p.year+'-'+p.month+'-'+p.day};
 const format=d=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 const e=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const validDay=d=>config.weekdays.includes(new Date(d+'T12:00:00').getDay()||7)&&!config.holidays.includes(d);
