@@ -19,6 +19,21 @@ Deno.serve(async req=>{
   const {data:profile,error:pe}=await admin.from('gr_profiles').select('active,gr_roles(name)').eq('id',user.id).single();
   if(pe||!profile?.active||profile?.gr_roles?.name!=='Admin')return response({error:'Admin permission required'},403);
   const body=await req.json(),action=body.action;
+  if(action==='deleteRole'){
+   const roleId=String(body.roleId||'');
+   if(!/^[0-9a-f-]{36}$/i.test(roleId))return response({error:'Invalid role ID'},400);
+   const roleResult=await admin.from('gr_roles').select('id,name').eq('id',roleId).maybeSingle();
+   if(roleResult.error||!roleResult.data)return response({error:'Role not found'},404);
+   const builtIn=['Admin','Director','Sales','Telecaller','Marketing','Operation','Accounts','Developer'];
+   if(builtIn.includes(roleResult.data.name))return response({error:'Built-in roles cannot be deleted'},403);
+   const assigned=await admin.from('gr_profiles').select('id',{count:'exact',head:true}).eq('role_id',roleId);
+   if(assigned.error)return response({error:assigned.error.message},500);
+   if(assigned.count>0)return response({error:'Move employees out of this role first'},409);
+   const removed=await admin.from('gr_roles').delete().eq('id',roleId);
+   if(removed.error)return response({error:removed.error.message},400);
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_roles',entity_id:roleId,operation:'DELETE',old_value:{name:roleResult.data.name}});
+   return response({message:'Custom role deleted'});
+  }
   if(action==='create'){
    const email=String(body.email||'').trim().toLowerCase(),username=String(body.username||'').trim(),name=String(body.name||'').trim(),role=String(body.role||''),password=String(body.password||'');
    if(!/^\S+@\S+\.\S+$/.test(email)||username.length<3||name.length<2||password.length<10)return response({error:'Enter valid name, username, email and a password of at least 10 characters'},400);
