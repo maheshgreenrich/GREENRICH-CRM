@@ -41,3 +41,17 @@ Open `index.html` in a browser with an internet connection (fonts / Chart.js / S
 - Order statuses are recorded; dashboard currently includes all statuses, including returns/cancelled orders, in gross order totals. Filter/export before interpreting as net realized revenue. Add returns/refunds, shipping, marketplace fees, payment settlement and tax invoice workflows before using numbers as audited financial reports.
 - Browser storage can be cleared by the browser/user. Export backups regularly.
 - No activity timeline, attachments, permission roles, server backups, deduplicated customer merge, or automated follow-up notification yet.
+
+
+## GreenRich ONE employee portal (new homepage)
+The root `index.html` now loads the new royal-blue Phase 1 employee portal (`greenrich-one.js`, `greenrich-one.css`). The former sales app remains at `legacy.html` and still uses `app.js` + `styles.css` in browser localStorage.
+
+### Connect before using
+1. Create a GreenRich-owned Supabase project, run `phase1/schema.sql` in its SQL editor.
+2. In Supabase Auth, create the first Admin user and copy UUID; run the commented admin-profile bootstrap SQL from the bottom of `phase1/schema.sql` with that UUID.
+3. Open the Pages site, enter your **Supabase project URL** and **publishable/anon public key**. Never enter service-role secret keys or passwords in the repository.
+4. Log in using the administrator's email and password.
+5. Test attendance for a user and role permissions before inviting any staff.
+
+### Current scope & limitations
+Actual screens: Supabase email/password login, self attendance, Admin attendance marking, monthly calendar and CSV export (Excel-compatible), Admin permission matrix, employee directory, company name/logo URL settings. Authentication must be connected to Supabase to run; static GitHub Pages alone is insufficient. User provisioning, username alias login, bulk attendance, comprehensive audit logging, and complete ERP/CRM backend are **not done**. Existing sales data remains isolated in browser localStorage; the former tracker is not protected by login. Do not load confidential customer information until migration, comprehensive authorization tests and backend controls are complete.
