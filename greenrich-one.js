@@ -41,7 +41,49 @@ async function users(c){
  c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;if(!confirm('Send a password reset email to '+p.email+'?'))return;try{const out=await employeeAction({action:'reset',userId:p.id});toast(out.message)}catch(e){toast(e.message)}});
  c.querySelectorAll('[data-emp-toggle]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empToggle);if(!p)return;const action=p.active?'disable':'enable';if(!confirm((p.active?'Deactivate':'Reactivate')+' '+p.username+'?'))return;try{const out=await employeeAction({action,userId:p.id});toast(out.message);await refresh()}catch(e){toast(e.message)}});
 }
-async function permissionPage(c){if(roleName()!=='Admin')throw Error('Admin only');let selected=roles[0]?.id;c.innerHTML='<div class="panel"><div class="row"><h2>Role permission matrix</h2><select id="roleSelect">'+roles.map(r=>'<option value="'+r.id+'">'+esc(r.name)+'</option>').join('')+'</select></div><p>Changes are saved to database permissions and apply to subsequent requests. Preview permissions by selecting each role.</p><div class="tablewrap"><table><thead><tr><th>Module</th>'+act.map(x=>'<th>'+x+'</th>').join('')+'<th>Data scope</th></tr></thead><tbody id="permBody"></tbody></table></div></div>';function draw(){selected=$('#roleSelect').value;$('#permBody').innerHTML=modules.map(m=>{let p=permissions.find(x=>x.role_id===selected&&x.module===m);return '<tr><td>'+labels[m]+'</td>'+act.map(a=>{let r=permissions.find(x=>x.role_id===selected&&x.module===m&&x.action===a);return '<td><input type="checkbox" data-module="'+m+'" data-action="'+a+'" '+(r?.allowed?'checked':'')+' '+(roles.find(x=>x.id===selected)?.name==='Admin'?'disabled':'')+'></td>'}).join('')+'<td><select data-scope="'+m+'">'+['own','team','all'].map(s=>'<option '+(p?.data_scope===s?'selected':'')+'>'+s+'</option>').join('')+'</select></td></tr>'}).join('');$('#permBody').querySelectorAll('input').forEach(el=>el.onchange=async()=>{let p=permissions.find(x=>x.role_id===selected&&x.module===el.dataset.module&&x.action===el.dataset.action);let r=await db.from('gr_role_permissions').update({allowed:el.checked}).eq('role_id',selected).eq('module',el.dataset.module).eq('action',el.dataset.action);if(r.error)toast(r.error.message);else{p.allowed=el.checked;toast('Permission updated')}});$('#permBody').querySelectorAll('select').forEach(el=>el.onchange=async()=>{let r=await db.from('gr_role_permissions').update({data_scope:el.value}).eq('role_id',selected).eq('module',el.dataset.scope);if(r.error)toast(r.error.message);else{permissions.filter(x=>x.role_id===selected&&x.module===el.dataset.scope).forEach(x=>x.data_scope=el.value);toast('Data scope updated')}})}$('#roleSelect').onchange=draw;draw()}
+async function permissionPage(c){
+ if(roleName()!=='Admin')throw Error('Admin only');
+ c.innerHTML='<div class="panel"><div class="row"><h2>Manage User Roles</h2><button class="blue" id="addRole">+ Add New Role</button></div><p>Create custom roles, edit their capabilities, and remove unused custom roles. Built-in roles cannot be deleted.</p><div class="row"><label>Choose role <select id="roleSelect">'+roles.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select></label><button class="secondary" id="deleteRole">Delete Selected Role</button></div><div id="roleFeedback" class="notice" hidden></div></div><div class="panel"><h2>Capabilities & Record Access</h2><p>Each action has its own access scope: Own, Team or All. Scope applies to data access only where the module has server-side rules. Unconnected ERP modules are not secure yet.</p><div class="tablewrap"><table><thead><tr><th>Module</th>'+act.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody id="permBody"></tbody></table></div></div>';
+ const select=$('#roleSelect'),feedback=$('#roleFeedback');
+ const note=msg=>{feedback.hidden=false;feedback.textContent=msg;toast(msg)};
+ const builtin=new Set(['Admin','Director','Sales','Telecaller','Marketing','Operation','Accounts','Developer']);
+ function draw(){
+  const selected=select.value,role=roles.find(x=>x.id===selected);$('#deleteRole').disabled=!role||builtin.has(role.name)||people.some(p=>p.role_id===selected);
+  $('#permBody').innerHTML=modules.map(m=>'<tr><td>'+esc(labels[m])+'</td>'+act.map(action=>{
+   const p=permissions.find(x=>x.role_id===selected&&x.module===m&&x.action===action);
+   const locked=role?.name==='Admin';
+   return '<td><label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-module="'+m+'" data-action="'+action+'" '+(p?.allowed?'checked':'')+' '+(locked?'disabled':'')+'> Allow</label><select data-module="'+m+'" data-action="'+action+'" '+(locked?'disabled':'')+'>'+['own','team','all'].map(v=>'<option value="'+v+'" '+((p?.data_scope||'own')===v?'selected':'')+'>'+v+'</option>').join('')+'</select></td>'
+  }).join('')+'</tr>').join('');
+  $('#permBody').querySelectorAll('input,select').forEach(el=>el.onchange=async()=>{
+   const selectedRole=select.value,module=el.dataset.module,action=el.dataset.action;
+   const existing=permissions.find(x=>x.role_id===selectedRole&&x.module===module&&x.action===action);
+   const values=el.tagName==='SELECT'?{data_scope:el.value}:{allowed:el.checked};
+   el.disabled=true;
+   const res=await db.from('gr_role_permissions').upsert({role_id:selectedRole,module,action,allowed:existing?.allowed||false,data_scope:existing?.data_scope||'own',...values},{onConflict:'role_id,module,action'}).select().single();
+   el.disabled=false;
+   if(res.error){note('Could not save: '+res.error.message);draw();return}
+   const ix=permissions.findIndex(x=>x.role_id===selectedRole&&x.module===module&&x.action===action);
+   if(ix<0)permissions.push(res.data);else permissions[ix]=res.data;
+   note('Saved '+labels[module]+' / '+action+': '+(res.data.allowed?'Allowed':'Not allowed')+', '+res.data.data_scope.toUpperCase());
+  });
+ }
+ $('#addRole').onclick=async()=>{
+  const raw=prompt('Enter new role name (example: Supervisor)');if(raw===null)return;
+  const name=raw.trim();if(name.length<2||name.length>50)return note('Role name must be 2–50 characters');
+  if(roles.some(x=>x.name.toLowerCase()===name.toLowerCase()))return note('That role already exists');
+  const result=await db.from('gr_roles').insert({name,description:'Custom GreenRich company role'}).select().single();
+  if(result.error)return note('Create failed: '+result.error.message);
+  roles.push(result.data);select.innerHTML=roles.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('');select.value=result.data.id;
+  note('Role created. All capabilities are disabled until you enable them.');draw();
+ };
+ $('#deleteRole').onclick=async()=>{
+  const r=roles.find(x=>x.id===select.value);if(!r||builtin.has(r.name))return note('Built-in roles cannot be deleted');
+  if(people.some(p=>p.role_id===r.id))return note('Move employees to another role before deleting it');
+  if(!confirm('Permanently delete custom role '+r.name+' and its permissions?'))return;
+  try{const response=await employeeAction({action:'deleteRole',roleId:r.id});roles=roles.filter(x=>x.id!==r.id);permissions=permissions.filter(x=>x.role_id!==r.id);select.innerHTML=roles.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');note(response.message||'Role deleted');draw()}catch(error){note('Delete failed: '+error.message)}
+ };
+ select.onchange=draw;draw();
+}
 async function settings(c){if(!can('settings','view'))throw Error('Permission denied');c.innerHTML='<div class="panel"><h2>Company profile</h2><form id="companyForm" class="fields"><label>Company name<input id="companyName" required value="'+esc(company?.company_name||'GreenRich')+'"></label><label>Company logo URL<input type="url" id="logoUrl" value="'+esc(company?.logo_url||'')+'"></label><div style="align-self:end"><button class="blue">Save company settings</button></div></form><p>Use an image URL hosted on your own approved domain. Company logo uploads and document storage will need a configured secure Storage bucket.</p>'+(company?.logo_url?'<img alt="Company logo" style="max-height:90px;max-width:200px" src="'+esc(company.logo_url)+'">':'')+'</div>';$('#companyForm').onsubmit=async e=>{e.preventDefault();let values={company_name:$('#companyName').value,logo_url:$('#logoUrl').value||null,updated_at:new Date().toISOString()};let r=await db.from('gr_company_settings').update(values).eq('id',1);if(r.error)toast(r.error.message);else{company={...company,...values};toast('Company settings saved');render()}}}
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. The previous sales tracker is available separately; do not use the public browser-only tracker for confidential customer records.</div><a href="legacy.html" target="_blank">Open existing Sales & CRM interface ↗</a></div>'}
 $('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{await db.auth.signOut();show('login')};$('#hamburger').onclick=()=>$('#sidebar').classList.toggle('open');start().catch(e=>{show('setup');toast(e.message)});
