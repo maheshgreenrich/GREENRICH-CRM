@@ -21,6 +21,8 @@ create table if not exists public.gr_attendance_holidays (
  id uuid primary key default gen_random_uuid(), day date unique not null,
  label text not null, deleted_at timestamptz
 );
+alter table public.gr_attendance drop constraint if exists gr_attendance_status_check;
+alter table public.gr_attendance add constraint gr_attendance_status_check check(status in ('present','absent','half_day','leave','holiday','week_off'));
 alter table public.gr_attendance add column if not exists source text default 'Admin';
 alter table public.gr_attendance add column if not exists locked boolean not null default false;
 alter table public.gr_attendance add column if not exists deleted_at timestamptz;
@@ -94,7 +96,7 @@ create policy gr_attendance_select_v2 on public.gr_attendance for select to auth
 create or replace function public.gr_mark_attendance(p_user uuid,p_date date,p_status text,p_remark text default '',p_reason text default '',p_location jsonb default null)
 returns uuid language plpgsql security definer set search_path=public as $$
 declare cfg public.gr_attendance_settings%rowtype; existing public.gr_attendance%rowtype;
- actor uuid:=auth.uid(); v_admin boolean:=public.gr_attendance_is_admin(); new_id uuid;
+ actor uuid:=auth.uid(); v_admin boolean:=public.gr_attendance_is_admin(); new_id uuid; existed boolean:=false;
  local_day date:=(now() at time zone 'Asia/Kolkata')::date;
  local_time time:=(now() at time zone 'Asia/Kolkata')::time;
 begin
@@ -115,6 +117,7 @@ begin
  if p_location is not null and (not cfg.allow_location or not coalesce((p_location->>'consent')::boolean,false)) then raise exception 'Location consent required';end if;
  select * into existing from public.gr_attendance where user_id=p_user and attendance_date=p_date for update;
  if found then
+  existed:=true;
   if not v_admin then raise exception 'Already marked today; ask Admin to correct';end if;
   if length(trim(coalesce(p_reason,'')))<3 then raise exception 'Reason required for correction';end if;
   if existing.locked and cfg.month_lock_through is not null and p_date<=cfg.month_lock_through then raise exception 'Month locked; unlock first';end if;
@@ -125,8 +128,8 @@ begin
   values(p_user,p_date,p_status,p_remark,actor,case when actor=p_user and not v_admin then 'Self' else 'Admin' end,p_location) returning id into new_id;
  end if;
  insert into public.gr_attendance_audit(attendance_id,user_id,attendance_date,old_status,new_status,changed_by,reason,operation,source)
- values(new_id,p_user,p_date,case when found then existing.status else null end,p_status,actor,
- case when found then p_reason else coalesce(p_remark,'Initial mark') end,case when found then 'CORRECT' else 'MARK' end,
+ values(new_id,p_user,p_date,case when existed then existing.status else null end,p_status,actor,
+ case when existed then p_reason else coalesce(p_remark,'Initial mark') end,case when existed then 'CORRECT' else 'MARK' end,
  case when actor=p_user and not v_admin then 'Self' else 'Admin' end);
  return new_id;
 end $$;
