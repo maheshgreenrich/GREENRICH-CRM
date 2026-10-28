@@ -2,3 +2,6 @@
 /* Shared Sales & CRM module inside GreenRich ONE */
 #salesWorkspace{display:block;max-width:100%;box-shadow:0 8px 24px rgba(23,65,150,.07)}
 @media(max-width:760px){#salesWorkspace{min-height:760px;height:calc(100vh - 170px)}}
+
+/* GreenRich ONE attendance chart and integrated ERP data */
+.gr-bars{display:grid;gap:12px;padding:12px 0}.gr-bar-line{display:grid;grid-template-columns:95px minmax(0,1fr) 95px;gap:12px;align-items:center;font-size:12px}.gr-bar-track{height:14px;background:#e9eff9;border-radius:20px;overflow:hidden}.gr-bar-fill{height:100%;border-radius:20px;background:#194bdf}.gr-c1{background:#e24b71}.gr-c2{background:#efae35}.gr-bar-line b{text-align:right}#demoNav{scrollbar-width:thin;scrollbar-color:#6076ac transparent}#demoContent iframe{height:calc(100vh - 160px)!important;min-height:650px!important}#demoContent .panel iframe{border:0}@media(max-width:760px){.gr-bar-line{grid-template-columns:72px minmax(0,1fr) 64px;gap:5px;font-size:10px}#demoContent iframe{min-height:620px!important}}
