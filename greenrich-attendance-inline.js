@@ -110,7 +110,7 @@ window.GreenRichAttendance=(function(){
   });
   $('#monthlyEmployeeClose').onclick=()=>$('#monthlyEmployeeDialog').close();
   $('#monthlyEmployeeMonth').onchange=()=>safe(loadSelectedMonthlyEmployee);
-  $('[data-monthly-export]').forEach(button=>{
+  $$('[data-monthly-export]').forEach(button=>{
    button.disabled=!canAdmin('export');
    button.onclick=()=>safe(async()=>{
     if(!selectedMonthlyEmployeeId)throw Error('Select an employee first');
@@ -301,7 +301,7 @@ window.GreenRichAttendance=(function(){
  function renderMonthlyEmployeeList(){
   const area=$('#monthlyEmployeeList');if(!area)return;
   area.innerHTML=staff.map(person=>'<button class="av-report-employee" type="button" data-monthly-person="'+esc(person.id)+'"><span class="av-report-employee-icon" aria-hidden="true">👤</span><span class="av-report-employee-name">'+esc(person.full_name)+'</span><span class="av-report-employee-action">View Calendar & Report →</span></button>').join('')||'<p class="av-empty">No active employees found.</p>';
-  $('#monthlyEmployeeList [data-monthly-person]').forEach(button=>button.onclick=()=>safe(async()=>{
+  $$('#monthlyEmployeeList [data-monthly-person]').forEach(button=>button.onclick=()=>safe(async()=>{
    selectedMonthlyEmployeeId=button.dataset.monthlyPerson;
    $('#monthlyEmployeeMonth').value=$('#allMonthlyReportMonth').value||today.slice(0,7);
    const name=staff.find(person=>person.id===selectedMonthlyEmployeeId)?.full_name||'Employee';
