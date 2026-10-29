@@ -97,10 +97,11 @@ window.GreenRichAttendance=(function(){
    notify('Updated '+result.updated+' employee attendance records.');await loadAdmin();
   })};
   $$('[data-export]').forEach(b=>b.onclick=()=>safe(async()=>{
-   const ext=b.dataset.export,m=$('#reportMonth').value;
-   const response=await request('/admin/reports/monthly?'+params({month:m,format:ext}),'GET',null,true);
+   const ext=b.dataset.export,f=$('#adminFilters');
+   const filters={from:input(f,'from'),to:input(f,'to'),userId:input(f,'userId'),department:input(f,'department'),status:input(f,'status'),format:ext};
+   const response=await request('/admin/reports/range?'+params(filters),'GET',null,true);
    const blob=await response.blob(),link=document.createElement('a'),url=URL.createObjectURL(blob);
-   link.href=url;link.download='greenrich-attendance-'+m+'.'+ext;link.click();setTimeout(()=>URL.revokeObjectURL(url),500);
+   link.href=url;link.download='greenrich-attendance-'+filters.from+'-to-'+filters.to+'.'+ext;link.click();setTimeout(()=>URL.revokeObjectURL(url),500);
   }));
   $('#launchForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
   if(actorRole!=='Admin')throw Error('Built-in Admin permission required');
@@ -235,6 +236,7 @@ window.GreenRichAttendance=(function(){
   ])).join('')||'<tr><td colspan="6">No records match these filters.</td></tr>';
   $('#adminPager').textContent='Page '+result.page+' of '+Math.max(1,result.pages)+' · '+result.total+' records';
   $('#adminPrev').disabled=adminPage<=1;$('#adminNext').disabled=adminPage>=result.pages;
+  await Promise.all([drawAdminChart(),drawDailyRoster()]);
   $$('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
    const r=adminItems.find(x=>x.id===b.dataset.edit);if(!r)return;
    const f=$('#adminMark');f.dataset.recordId=r.id;
@@ -259,7 +261,12 @@ window.GreenRichAttendance=(function(){
     notify('Request '+b.dataset.decision.toLowerCase()+'.');await loadAdmin();
    }));
   }
-  approveRows('#adminCorrections',corrections.items,'corrections');approveRows('#adminLeaves',leaves.items,'leaves');
+  const pending=(corrections.total||0)+(leaves.total||0);
+  $('#pendingBadge').textContent=pending?pending+' pending approval request'+(pending===1?'':'s'):'All requests reviewed';
+  $('#adminTab').textContent='Employee Attendance'+(pending?' · '+pending+' pending':'');
+  $('#approvalPreview').innerHTML=pending?'<div class="av-pending-links"><button type="button" class="secondary" data-go-approval="adminCorrections">'+corrections.total+' attendance corrections</button><button type="button" class="secondary" data-go-approval="adminLeaves">'+leaves.total+' leave requests</button></div>':'<p>There are no pending requests at the moment.</p>';
+  $('#approvalPreview [data-go-approval]').forEach(b=>b.onclick=()=>$('#'+b.dataset.goApproval).scrollIntoView({behavior:'smooth',block:'center'}));
+ approveRows('#adminCorrections',corrections.items,'corrections');approveRows('#adminLeaves',leaves.items,'leaves');
  }
  async function loadConfiguration(){
   if(!manager())return;
