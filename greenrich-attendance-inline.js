@@ -94,7 +94,7 @@ window.GreenRichAttendance=(function(){
    $('.av-period-tabs button').forEach(x=>x.classList.toggle('av-period-active',x===b));adminPage=1;safe(loadAdmin);
   });
   $('#bulkForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
-   const f=e.currentTarget,ids=$$('#bulkUsers input:checked').map(el=>el.value);
+   const f=e.currentTarget,ids=$('#bulkUsers input.av-employee-check:not(:disabled):checked').map(el=>el.value);
    if(!ids.length)throw Error('Select at least one employee.');
    if(!confirm('Mark '+ids.length+' employee(s)?'))return;
    const result=await request('/admin/attendance/bulk','POST',{userIds:ids,date:input(f,'date'),status:input(f,'status'),reason:input(f,'reason')});
@@ -182,7 +182,7 @@ window.GreenRichAttendance=(function(){
   $('#filterEmployee').innerHTML='<option value="">All Employees</option>'+users;
   $('#filterDepartment').innerHTML='<option value="">All Departments</option>'+departments.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('');
   $('#filterEmployee').value=oldFilter;$('#filterDepartment').value=oldDepartment;
-  $('#bulkUsers').innerHTML=staff.map(p=>'<div class="av-staff-row" data-staff="'+esc(p.id)+'"><label><input class="av-employee-check" type="checkbox" value="'+esc(p.id)+'"><span>'+esc(p.full_name)+'</span></label><small data-current="'+esc(p.id)+'">Not marked</small><div class="av-row-quick"><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="PRESENT">P</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="ABSENT">A</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="HALF_DAY">½</button></div></div>').join('')||'<p>No active employee accounts found.</p>';
+  $('#bulkUsers').innerHTML=staff.map(p=>'<div class="av-staff-row" data-staff="'+esc(p.id)+'"><label><input class="av-employee-check" type="checkbox" value="'+esc(p.id)+'" '+(p.id===ownId?'disabled title="Use My Attendance for your own check-in"':'')+'><span>'+esc(p.full_name)+'</span></label><small data-current="'+esc(p.id)+'">Not marked</small><div class="av-row-quick"><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="PRESENT">P</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="ABSENT">A</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="HALF_DAY">½</button></div></div>').join('')||'<p>No active employee accounts found.</p>';
   $$('#bulkUsers .av-employee-check').forEach(b=>b.onchange=updateSelected);
   $$('#bulkUsers [data-quick-id]').forEach(b=>b.onclick=()=>safe(async()=>{
    const form=$('#bulkForm'),date=input(form,'date'),reason=input(form,'reason')?.trim();
@@ -193,7 +193,7 @@ window.GreenRichAttendance=(function(){
   updateSelected();
  }
  function updateSelected(){
-  const checkboxes=$$('#bulkUsers .av-employee-check'),selected=checkboxes.filter(b=>b.checked);
+  const checkboxes=$('#bulkUsers .av-employee-check:not(:disabled)'),selected=checkboxes.filter(b=>b.checked);
   $('#selectedStaffCount').textContent=selected.length+' / '+checkboxes.length+' selected';
   $('#selectAllEmployees').checked=checkboxes.length>0&&selected.length===checkboxes.length;
   $('#selectAllEmployees').indeterminate=selected.length>0&&selected.length<checkboxes.length;
@@ -212,7 +212,7 @@ window.GreenRichAttendance=(function(){
   for(const el of $$('#bulkUsers [data-current]')){
    const record=map.get(el.dataset.current);el.textContent=record?record.status.replace('_',' ')+(record.check_in?' · In '+shortDate(record.check_in):''):'Not marked';
    const row=el.closest('.av-staff-row');
-   row?.querySelectorAll('[data-quick-status]').forEach(b=>{b.classList.toggle('av-quick-active',record?.status===b.dataset.quickStatus);b.disabled=!!record?.check_in&&record?.source==='SELF';b.title=b.disabled?'Employee has already checked in. Use Edit with a reason to correct this record.':'Quick attendance marking';});
+   row?.querySelectorAll('[data-quick-status]').forEach(b=>{b.classList.toggle('av-quick-active',record?.status===b.dataset.quickStatus);b.disabled=b.dataset.quickId===ownId||(!!record?.check_in&&record?.source==='SELF');b.title=b.dataset.quickId===ownId?'Mark your own attendance from My Attendance':b.disabled?'Employee has already checked in. Use Edit with a reason to correct this record.':'Quick attendance marking';});
   }
  }
  async function drawAdminChart(){
