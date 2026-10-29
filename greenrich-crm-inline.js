@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
-let root=null,allowedTabs=[],adminMode=false;
+let root=null,allowedTabs=[],adminMode=false,allowDashboardExport=false;
 const $=s=>root?.querySelector(s), all=s=>root?[...root.querySelectorAll(s)]:[], legacyKey='greenrich-crm-v2';
 let activeCompany='grow-india',activeCompanyName='GreenRich Grow India Pvt Ltd';
 const storageKey=()=>activeCompany==='grow-india'?legacyKey:legacyKey+'::'+activeCompany;
@@ -58,10 +58,286 @@ function el(tag,props={}){let e=document.createElement(tag);Object.entries(props
 const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales & Orders','Track sales across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Capture enquiries, opportunities and deal stages.','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
 function navigate(p){if(!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#page-heading').textContent=titles[p][0];$('#page-subtitle').textContent=titles[p][1];$('#primary-action').textContent=titles[p][2];$('#primary-action').hidden=p==='reports'||(adminMode&&p==='dashboard');render();root?.scrollIntoView({block:'start'})}
 function fillSelect(sel,rows,emptyLabel='None'){let old=sel.value;sel.replaceChildren();sel.append(el('option',{value:'',text:emptyLabel}));rows.forEach(r=>sel.append(el('option',{value:r.id,text:r.name||r.title})));if([...sel.options].some(o=>o.value===old))sel.value=old}
-function channelFilters(){for(let id of ['#filter-channel','#sales-channel-filter']){const e=$(id),v=e.value;e.replaceChildren(el('option',{value:'all',text:'All channels'}));data.channels.forEach(c=>e.append(el('option',{value:c.id,text:c.name})));if([...e.options].some(o=>o.value===v))e.value=v}}
-function inPeriod(s){const p=$('#period').value,now=new Date(),d=s.date;if(p==='all')return true;if(p==='custom')return (!$('#filter-from').value||d>=$('#filter-from').value)&&(!$('#filter-to').value||d<=$('#filter-to').value);if(p==='today')return d===date();if(p==='month')return d.slice(0,7)===date().slice(0,7);if(p==='week'){let start=new Date(now);start.setDate(now.getDate()-((now.getDay()+6)%7));let st=`${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`;return d>=st&&d<=date()}if(p==='last30'){let start=new Date(now);start.setDate(now.getDate()-29);return d>=`${start.getFullYear()}-${String(start.getMonth()+1).padStart(2,'0')}-${String(start.getDate()).padStart(2,'0')}`&&d<=date()}return true}
-function filteredSales(){return data.sales.filter(s=>inPeriod(s)&&($('#filter-channel').value==='all'||s.channel_id===$('#filter-channel').value))}
-function renderDashboard(){const rows=filteredSales(),total=rows.reduce((s,r)=>s+saleGross(r),0),tax=rows.reduce((s,r)=>s+Number(r.tax_amount||0),0),qty=rows.reduce((s,r)=>s+Number(r.qty||0),0),uniqueOrders=new Set(rows.map(r=>r.internal_order_id||r.id)).size;$('#metrics').innerHTML=[['Total revenue',fmt(total),'₹','Net sales including GST'],['Orders',num(uniqueOrders),'▤','Unique orders in period'],['Units sold',num(qty),'◈','Products sold'],['Tax collected',fmt(tax),'%','Calculated GST amount']].map(a=>`<div class="metric"><span class="badge">${a[2]}</span><small>${a[0]}</small><strong>${a[1]}</strong><small>${a[3]}</small></div>`).join('');charts.forEach(c=>c.destroy());charts=[];const byDate={},byChannel={},byProduct={};rows.forEach(r=>{byDate[r.date]=(byDate[r.date]||0)+saleGross(r);const c=channelName(r);byChannel[c]=(byChannel[c]||0)+saleGross(r);const p=productName(r);byProduct[p]=(byProduct[p]||0)+saleGross(r)});if(window.Chart){let keys=Object.keys(byDate).sort(),ch=Object.keys(byChannel),palette=['#1749d4','#5f81ed','#12aaae','#f8a545','#956ce4','#ee7292'];charts.push(new Chart($('#trend-chart'),{type:'line',data:{labels:keys,datasets:[{data:keys.map(k=>byDate[k]),borderColor:'#1749d4',backgroundColor:'#e4eaff',fill:true,tension:.32,pointRadius:3}]},options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));charts.push(new Chart($('#channel-chart'),{type:'doughnut',data:{labels:ch.length?ch:['No sales'],datasets:[{data:ch.length?ch.map(k=>byChannel[k]):[1],backgroundColor:ch.length?palette:'#e5eaf5',borderWidth:0}]},options:{maintainAspectRatio:false,cutout:'68%',plugins:{legend:{position:'bottom'}}}}))}else{console.warn('Chart.js unavailable. Connect to the internet to enable charts.')}$('#top-products').innerHTML=Object.entries(byProduct).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([n,v])=>`<div class="mini-row"><span>${esc(n)}</span><strong>${fmt(v)}</strong></div>`).join('')||'<div class="empty">No sales for this period</div>';const open=data.tasks.filter(t=>t.status!=='Done').length;$('#crm-overview').innerHTML=`<div class="mini-row"><span>Customers</span><strong>${data.customers.length}</strong></div><div class="mini-row"><span>Active leads</span><strong>${data.leads.filter(l=>!['Won','Lost'].includes(l.stage)).length}</strong></div><div class="mini-row"><span>Open follow-ups</span><strong>${open}</strong></div><div class="mini-row"><span>Overdue follow-ups</span><strong>${data.tasks.filter(t=>t.status!=='Done'&&t.due&&t.due<date()).length}</strong></div>`}
+
+function channelFilters(){
+ const selector=$('#sales-channel-filter');
+ if(!selector)return;
+ const selected=selector.value;
+ selector.replaceChildren(el('option',{value:'all',text:'All channels'}));
+ data.channels.forEach(c=>selector.append(el('option',{value:c.id,text:c.name})));
+ if([...selector.options].some(o=>o.value===selected))selector.value=selected;
+}
+const companyForSale=s=>s._companyId||s.company_id||activeCompany;
+const overviewSales=()=>companyChoices.flatMap(company=>loadCompanyData(company.id).sales.map(s=>({...s,_companyId:company.id})));
+const channelForSale=s=>s.channel_name||loadCompanyData(companyForSale(s)).channels.find(c=>c.id===s.channel_id)?.name||'Unknown channel';
+const productForSale=s=>s.product_name||loadCompanyData(companyForSale(s)).products.find(p=>p.id===s.product_id)?.name||'Unknown product';
+const customerForSale=s=>data.customers.find(c=>c.id===s.customer_id)?.name||s.customer_name||'Unknown customer';
+const productKey=s=>companyForSale(s)+'|'+(s.product_id||s.product_name||s.id);
+const palette=['#2058d8','#5c83f1','#14a5ab','#f6a13e','#9068dd','#ef6b8f','#2d966f','#6e8097'];
+const currencyShort=n=>{
+ const amount=Number(n)||0;
+ return amount>=10000000?'₹'+(amount/10000000).toFixed(1)+'Cr':amount>=100000?'₹'+(amount/100000).toFixed(1)+'L':amount>=1000?'₹'+(amount/1000).toFixed(1)+'k':fmt(amount)
+};
+const sortedPairs=object=>Object.entries(object).sort((a,b)=>Number(b[1])-Number(a[1]));
+function setOverviewOptions(id,items){
+ const select=$(id);if(!select)return;
+ const selected=select.value;
+ select.replaceChildren(el('option',{value:'all',text:items.label}));
+ items.values.forEach(item=>select.append(el('option',{value:item.value,text:item.text})));
+ if([...select.options].some(option=>option.value===selected))select.value=selected;
+}
+function overviewFilterOptions(){
+ const company=$('#filter-company')?.value||'all';
+ setOverviewOptions('#filter-company',{label:'Both companies',values:companyChoices.map(c=>({value:c.id,text:companyLabel(c.id)}))});
+ const customerList=[...data.customers].sort((a,b)=>a.name.localeCompare(b.name));
+ setOverviewOptions('#filter-customer',{label:'All customers',values:customerList.map(c=>({value:c.id,text:c.name+(c.mobile?' · '+c.mobile:'')}))});
+ const stores=companyChoices.filter(c=>company==='all'||company===c.id).map(c=>({id:c.id,store:loadCompanyData(c.id)}));
+ const sales=stores.flatMap(c=>c.store.sales.map(s=>({...s,_companyId:c.id})));
+ const channels=new Set(stores.flatMap(c=>c.store.channels.map(ch=>ch.name)).concat(sales.map(channelForSale)));
+ setOverviewOptions('#filter-channel',{label:'All channels',values:[...channels].filter(Boolean).sort((a,b)=>a.localeCompare(b)).map(c=>({value:c,text:c}))});
+ const products=new Map();
+ for(const entry of stores){
+  for(const p of entry.store.products)products.set(entry.id+'|'+p.id,{value:entry.id+'|'+p.id,text:p.name+' · '+companyLabel(entry.id)});
+ }
+ for(const s of sales){
+  const key=productKey(s);
+  if(!products.has(key))products.set(key,{value:key,text:productForSale(s)+' · '+companyLabel(companyForSale(s))});
+ }
+ setOverviewOptions('#filter-product',{label:'All products',values:[...products.values()].sort((a,b)=>a.text.localeCompare(b.text))});
+}
+function inPeriod(s){
+ const p=$('#period').value,d=s.date,now=new Date();
+ if(p==='all')return true;
+ if(p==='custom')return (!$('#filter-from').value||d>=$('#filter-from').value)&&(!$('#filter-to').value||d<=$('#filter-to').value);
+ if(p==='today')return d===date();
+ if(p==='month')return d.slice(0,7)===date().slice(0,7);
+ if(p==='week'){
+  const start=new Date(now);start.setDate(now.getDate()-((now.getDay()+6)%7));
+  const from=start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
+  return d>=from&&d<=date();
+ }
+ if(p==='last30'){
+  const start=new Date(now);start.setDate(now.getDate()-29);
+  const from=start.getFullYear()+'-'+String(start.getMonth()+1).padStart(2,'0')+'-'+String(start.getDate()).padStart(2,'0');
+  return d>=from&&d<=date();
+ }
+ return true;
+}
+function filteredSales(){
+ const company=$('#filter-company')?.value||'all',channel=$('#filter-channel')?.value||'all';
+ const customer=$('#filter-customer')?.value||'all',product=$('#filter-product')?.value||'all';
+ return overviewSales().filter(s=>inPeriod(s)
+  &&(company==='all'||companyForSale(s)===company)
+  &&(channel==='all'||channelForSale(s)===channel)
+  &&(customer==='all'||s.customer_id===customer)
+  &&(product==='all'||productKey(s)===product));
+}
+function overviewStats(rows){
+ const channels={},companies=Object.fromEntries(companyChoices.map(c=>[c.id,0])),products=new Map(),byDate={};
+ let total=0,tax=0,qty=0;
+ for(const sale of rows){
+  const amount=saleGross(sale),count=Number(sale.qty)||0,name=channelForSale(sale),id=companyForSale(sale),key=productKey(sale);
+  total+=amount;tax+=Number(sale.tax_amount)||0;qty+=count;
+  byDate[sale.date]=(byDate[sale.date]||0)+amount;
+  channels[name]=(channels[name]||0)+amount;
+  companies[id]=(companies[id]||0)+amount;
+  const item=products.get(key)||{key,name:productForSale(sale),companyId:id,revenue:0,qty:0,orders:0};
+  item.revenue+=amount;item.qty+=count;item.orders++;products.set(key,item);
+ }
+ return {total,tax,qty,orders:new Set(rows.map(s=>s.internal_order_id||companyForSale(s)+'|'+s.id)).size,
+  byDate,channels,companies,products:[...products.values()].sort((a,b)=>b.revenue-a.revenue)};
+}
+const progressMarkup=(items,max,unit)=>{
+ if(!items.length)return '<p class="empty">No sales for the selected filters</p>';
+ return items.map(([name,value],index)=>{
+  const percentage=max>0?(Number(value)/max*100):0;
+  return '<div class="gr-progress-item"><div class="gr-progress-info"><span>'+esc(name)+'</span><strong>'+fmt(value)+'</strong></div>'+
+   '<div class="gr-progress-track"><div class="gr-progress-bar" style="width:'+percentage.toFixed(2)+'%;background:'+palette[index%palette.length]+'"></div></div>'+
+   '<small>'+percentage.toFixed(1)+'% '+unit+'</small></div>';
+ }).join('');
+};
+function renderDashboard(){
+ overviewFilterOptions();
+ const rows=filteredSales(),stats=overviewStats(rows),total=stats.total;
+ $('#filter-context').textContent=rows.length+' sale line(s) · '+stats.orders+' orders · '+($('#filter-company').selectedOptions[0]?.textContent||'Both companies')+
+  ' · '+($('#period').selectedOptions[0]?.textContent||'This month')+
+  (rows.length?' · Updated from available records in this browser':' · No matching records');
+ $('#metrics').innerHTML=[
+  ['Total revenue',fmt(stats.total),'₹','Sales including GST and shipping'],
+  ['Orders',num(stats.orders),'▤','Orders in selected filters'],
+  ['Units sold',num(stats.qty),'◈','Products ordered'],
+  ['Tax collected',fmt(stats.tax),'%','Calculated GST amount']
+ ].map(x=>'<div class="metric"><span class="badge">'+x[2]+'</span><small>'+x[0]+'</small><strong>'+x[1]+'</strong><small>'+x[3]+'</small></div>').join('');
+ charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
+ const days=Object.keys(stats.byDate).sort(),channelPairs=sortedPairs(stats.channels),totalChannels=channelPairs.reduce((n,row)=>n+row[1],0);
+ $('#channel-breakdown').innerHTML=channelPairs.length?channelPairs.map(([name,amount],index)=>'<div class="gr-visible-legend-row"><span class="gr-legend-swatch" style="background:'+palette[index%palette.length]+'"></span><span>'+esc(name)+' · '+(totalChannels?((amount/totalChannels)*100).toFixed(1):0)+'%</span><strong>'+fmt(amount)+'</strong></div>').join(''):'<p class="empty">No channels in this period</p>';
+ $('#channel-progress').innerHTML=progressMarkup(channelPairs,Math.max(0,...channelPairs.map(x=>x[1])),'of largest channel');
+ const companyPairs=companyChoices.map(c=>[companyLabel(c.id),stats.companies[c.id]||0]);
+ $('#company-comparison').innerHTML=progressMarkup(companyPairs,Math.max(0,...companyPairs.map(x=>x[1])),'of leading company');
+ const top=stats.products.slice(0,8);
+ $('#top-products').innerHTML=top.length?'<div class="gr-top-products-head"><span>Product</span><span>Revenue</span><span>Order quantity</span></div>'+
+  top.map(p=>'<div class="gr-top-product"><div><strong>'+esc(p.name)+'</strong><small>'+esc(companyLabel(p.companyId))+' · '+p.orders+' sale line(s)</small><div class="gr-product-bar-track"><div class="gr-product-bar" style="width:'+(stats.products[0].revenue?100*p.revenue/stats.products[0].revenue:0).toFixed(1)+'%"></div></div></div><strong>'+fmt(p.revenue)+'</strong><button type="button" class="gr-quantity-drill" data-product-drill="'+esc(p.key)+'" title="View customers and orders for '+esc(p.name)+'">'+num(p.qty)+' units ↗</button></div>').join(''):'<p class="empty">No products for the selected filters</p>';
+ const open=data.tasks.filter(t=>t.status!=='Done').length;
+ $('#crm-overview').innerHTML='<div class="mini-row"><span>Shared customers</span><strong>'+num(data.customers.length)+'</strong></div>'+
+  '<div class="mini-row"><span>Active leads in current company</span><strong>'+num(data.leads.filter(l=>!['Won','Lost'].includes(l.stage)).length)+'</strong></div>'+
+  '<div class="mini-row"><span>Open follow-ups in current company</span><strong>'+num(open)+'</strong></div>'+
+  '<div class="mini-row"><span>Overdue follow-ups in current company</span><strong>'+num(data.tasks.filter(t=>t.status!=='Done'&&t.due&&t.due<date()).length)+'</strong></div>';
+ if(window.Chart){
+  const labelPlugin={id:'grVisibleValues',afterDatasetsDraw(chart){
+   if(chart.canvas?.id!=='trend-chart')return;
+   const chartCtx=chart.ctx;chartCtx.save();chartCtx.textAlign='center';chartCtx.font='600 10px Inter, sans-serif';chartCtx.fillStyle='#173f91';
+   const step=Math.max(1,Math.ceil(days.length/9));
+   chart.getDatasetMeta(0).data.forEach((point,index)=>{if(index%step===0||index===days.length-1)chartCtx.fillText(currencyShort(stats.byDate[days[index]]),point.x,Math.max(chart.chartArea.top+12,point.y-10))});
+   chartCtx.restore();
+  }};
+  charts.push(new Chart($('#trend-chart'),{
+   type:'line',data:{labels:days,datasets:[{label:'Revenue (₹)',data:days.map(d=>stats.byDate[d]),borderColor:'#2058d8',backgroundColor:'#e4eaff',fill:true,tension:.25,pointRadius:days.length>15?2:4,pointHoverRadius:5}]},
+   options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22,right:10}},plugins:{legend:{display:false},tooltip:{enabled:true}},scales:{y:{beginAtZero:true,ticks:{callback:v=>currencyShort(v)}},x:{ticks:{maxTicksLimit:8}}}},
+   plugins:[labelPlugin]
+  }));
+  charts.push(new Chart($('#channel-chart'),{
+   type:'doughnut',data:{labels:channelPairs.length?channelPairs.map(c=>c[0]):['No sales'],
+    datasets:[{data:channelPairs.length?channelPairs.map(c=>c[1]):[1],backgroundColor:channelPairs.length?channelPairs.map((_,i)=>palette[i%palette.length]):['#e4eaf3'],borderWidth:0}]},
+   options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{enabled:true}}}
+  }));
+ }
+ $('#trend-values').innerHTML=days.length?'<div class="gr-visible-legend-row"><span>First sale: '+esc(days[0])+' · Last sale: '+esc(days[days.length-1])+'</span><strong>'+fmt(total)+'</strong></div>':'<p class="empty">No sales to chart in this period</p>';
+}
+function showProductOrders(key){
+ const rows=filteredSales().filter(s=>productKey(s)===key);
+ if(!rows.length)return toast('No matching orders for this product');
+ const name=productForSale(rows[0]),amount=rows.reduce((n,s)=>n+saleGross(s),0),qty=rows.reduce((n,s)=>n+Number(s.qty||0),0);
+ const byCustomer=new Map();
+ for(const s of rows){
+  const id=s.customer_id||'unknown:'+customerForSale(s),person=data.customers.find(c=>c.id===s.customer_id),label=customerForSale(s);
+  const item=byCustomer.get(id)||{label,person,qty:0,revenue:0,orders:0};
+  item.qty+=Number(s.qty)||0;item.revenue+=saleGross(s);item.orders++;byCustomer.set(id,item);
+ }
+ const list=[...byCustomer.values()].sort((a,b)=>b.qty-a.qty),max=Math.max(0,...list.map(x=>x.qty));
+ $('#product-orders-title').textContent=name+' · Customer orders';
+ $('#product-orders-subtitle').textContent=companyLabel(companyForSale(rows[0]))+' · Based on the current dashboard filters';
+ $('#product-orders-details').innerHTML='<div class="gr-product-order-meta"><span><strong>'+num(qty)+'</strong> units ordered</span><span><strong>'+num(rows.length)+'</strong> sale lines</span><span><strong>'+num(list.length)+'</strong> customers</span><span><strong>'+fmt(amount)+'</strong> revenue</span></div>'+
+  '<h3>Quantity ordered by customer</h3><div class="gr-customer-orders">'+list.map((item,index)=>'<div class="gr-customer-order"><div><strong>'+esc(item.label)+'</strong><span>'+num(item.qty)+' units · '+fmt(item.revenue)+'</span></div><div class="gr-progress-track"><div class="gr-progress-bar" style="width:'+(max?100*item.qty/max:0).toFixed(1)+'%;background:'+palette[index%palette.length]+'"></div></div></div>').join('')+'</div>'+
+  '<h3>Customer order details</h3><div class="gr-order-table-wrap"><table><thead><tr><th>Order date / ID</th><th>Customer</th><th>Phone / Email</th><th>Company</th><th>Quantity</th><th>Sale value</th></tr></thead><tbody>'+
+  rows.map(s=>{const person=data.customers.find(c=>c.id===s.customer_id);return '<tr><td><strong>'+esc(s.date)+'</strong><small>'+esc(s.internal_order_id||s.order_id||'—')+'</small></td><td><strong>'+esc(customerForSale(s))+'</strong><small>'+esc(person?.address1||'')+'</small></td><td>'+esc(person?.mobile||'—')+'<small>'+esc(person?.email||'—')+'</small></td><td>'+esc(companyLabel(companyForSale(s)))+'</td><td>'+num(s.qty)+'</td><td>'+fmt(saleGross(s))+'</td></tr>'}).join('')+'</tbody></table></div>';
+ $('#product-orders-dialog').showModal();
+}
+
+
+const reportFilename=()=>('greenrich-sales-overview-'+date());
+const safeExcel=v=>typeof v==='string'&&/^[\s]*[=+@-]/.test(v)?"'"+v:v;
+const summaryForExcel=(rows,stats)=>{
+ const names=[
+  ['Report','GreenRich ONE · Sales & CRM Overview'],
+  ['Generated on',new Date().toLocaleString('en-IN')],
+  ['Period',$('#period').selectedOptions[0]?.textContent||''],
+  ['From',$('#filter-from').value||'—'],
+  ['To',$('#filter-to').value||'—'],
+  ['Company',$('#filter-company').selectedOptions[0]?.textContent||'Both companies'],
+  ['Channel',$('#filter-channel').selectedOptions[0]?.textContent||'All channels'],
+  ['Customer',$('#filter-customer').selectedOptions[0]?.textContent||'All customers'],
+  ['Product',$('#filter-product').selectedOptions[0]?.textContent||'All products'],
+  ['Sales lines',rows.length],
+  ['Orders',stats.orders],
+  ['Units sold',stats.qty],
+  ['Sales revenue (INR)',round(stats.total)],
+  ['Tax collected (INR)',round(stats.tax)]
+ ];return names;
+};
+const ensureLibrary=(url,available)=>new Promise((resolve,reject)=>{
+ if(available())return resolve();
+ const script=document.createElement('script');
+ script.src=url;script.async=true;
+ script.onload=()=>available()?resolve():reject(Error('The report library did not load. Try again with an internet connection.'));
+ script.onerror=()=>reject(Error('Unable to load the report library. Check your internet connection.'));
+ document.head.appendChild(script);
+});
+const runExport=async(button,fn)=>{
+ if(!allowDashboardExport)return toast('Your role does not have permission to export Sales reports.');
+ if(button.disabled)return;
+ button.disabled=true;const label=button.textContent;button.textContent='Preparing report...';
+ try{await fn()}catch(error){console.error('Sales export failed:',error);toast('Export failed: '+error.message)}
+ finally{button.disabled=false;button.textContent=label}
+};
+async function exportOverviewExcel(){
+ await ensureLibrary('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX);
+ const rows=filteredSales(),stats=overviewStats(rows),book=window.XLSX.utils.book_new();
+ const createSheet=(name,headers,records)=>{
+  const cells=[headers,...records.map(item=>headers.map(h=>safeExcel(item[h]??'')))];
+  const sheet=window.XLSX.utils.aoa_to_sheet(cells);
+  sheet['!cols']=headers.map(h=>({wch:Math.min(48,Math.max(15,h.length+5))}));
+  window.XLSX.utils.book_append_sheet(book,sheet,name);
+ };
+ const sheet=window.XLSX.utils.aoa_to_sheet(summaryForExcel(rows,stats));
+ sheet['!cols']=[{wch:29},{wch:52}];window.XLSX.utils.book_append_sheet(book,sheet,'Report Summary');
+ const sales=rows.map(s=>({
+  'Date':s.date,'Company':companyLabel(companyForSale(s)),
+  'Internal Order ID':s.internal_order_id||'Legacy','Platform Order ID':s.order_id||'',
+  'Sales Channel':channelForSale(s),'Customer':customerForSale(s),
+  'Customer Phone':data.customers.find(c=>c.id===s.customer_id)?.mobile||'',
+  'Customer Email':data.customers.find(c=>c.id===s.customer_id)?.email||'',
+  'Product':productForSale(s),'SKU':s.sku||'','Quantity':Number(s.qty)||0,
+  'Unit Price (INR)':Number(s.unit_price)||0,'GST (%)':Number(s.tax_rate)||0,
+  'Taxable (INR)':Number(s.taxable)||0,'GST Amount (INR)':Number(s.tax_amount)||0,
+  'Shipping (INR)':Number(s.shipping_charge)||0,'Total (INR)':saleGross(s),
+  'Order Status':s.status||'','Notes':s.notes||''
+ }));
+ const headers=['Date','Company','Internal Order ID','Platform Order ID','Sales Channel','Customer','Customer Phone','Customer Email','Product','SKU','Quantity','Unit Price (INR)','GST (%)','Taxable (INR)','GST Amount (INR)','Shipping (INR)','Total (INR)','Order Status','Notes'];
+ createSheet('Filtered Sales',headers,sales);
+ createSheet('Sales Channels',['Channel','Revenue (INR)','Share (%)'],sortedPairs(stats.channels).map(([name,value])=>({
+  'Channel':name,'Revenue (INR)':round(value),'Share (%)':stats.total?round(value/stats.total*100):0
+ })));
+ createSheet('Companies',['Company','Revenue (INR)','Orders','Units'],companyChoices.map(c=>({
+  'Company':companyLabel(c.id),'Revenue (INR)':round(stats.companies[c.id]||0),
+  'Orders':new Set(rows.filter(s=>companyForSale(s)===c.id).map(s=>s.internal_order_id||s.id)).size,
+  'Units':rows.filter(s=>companyForSale(s)===c.id).reduce((total,s)=>total+Number(s.qty||0),0)
+ })));
+ createSheet('Top Products',['Product','Company','Quantity Ordered','Sales Revenue (INR)','Sale Lines'],stats.products.map(p=>({
+  'Product':p.name,'Company':companyLabel(p.companyId),'Quantity Ordered':p.qty,
+  'Sales Revenue (INR)':round(p.revenue),'Sale Lines':p.orders
+ })));
+ window.XLSX.writeFile(book,reportFilename()+'.xlsx');
+ toast('Filtered Excel report exported: '+rows.length+' sale lines');
+}
+async function exportOverviewPdf(){
+ await Promise.all([
+  ensureLibrary('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',()=>!!window.html2canvas),
+  ensureLibrary('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF)
+ ]);
+ const section=$('#dashboard');if(!section)throw Error('Sales dashboard is unavailable');
+ if(document.fonts?.ready)await document.fonts.ready;
+ // Capture the full visible dashboard, including the actual Chart.js canvases,
+ // progress bars, visible labels, filter values, top products and KPI cards.
+ const canvas=await window.html2canvas(section,{
+  backgroundColor:'#f5f7fd',scale:Math.min(2,Math.max(1.4,window.devicePixelRatio||1.5)),
+  useCORS:true,logging:false,scrollX:0,scrollY:-window.scrollY,
+  windowWidth:Math.max(document.documentElement.clientWidth,section.scrollWidth+40),
+  onclone:doc=>{
+   const actions=doc.querySelector('#dashboard-export-actions');
+   if(actions)actions.style.visibility='hidden';
+   const reset=doc.querySelector('#clear-filters');if(reset)reset.style.visibility='hidden';
+  }
+ });
+ if(!canvas.width||!canvas.height)throw Error('The visual report could not be rendered');
+ const {jsPDF}=window.jspdf,pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+ const pageWidth=297,pageHeight=210,margin=10,printWidth=pageWidth-margin*2,printHeight=pageHeight-margin*2;
+ const scale=printWidth/canvas.width,chunkHeight=Math.max(1,Math.floor(printHeight/scale));
+ let page=0;
+ for(let top=0;top<canvas.height;top+=chunkHeight){
+  if(page)pdf.addPage();
+  const height=Math.min(chunkHeight,canvas.height-top),part=document.createElement('canvas');
+  part.width=canvas.width;part.height=height;
+  const context=part.getContext('2d');
+  if(!context)throw Error('Cannot prepare visual PDF canvas');
+  context.drawImage(canvas,0,top,canvas.width,height,0,0,canvas.width,height);
+  pdf.addImage(part.toDataURL('image/png'),'PNG',margin,margin,printWidth,height*scale,undefined,'FAST');
+  pdf.setFontSize(8);pdf.setTextColor(113,130,157);
+  pdf.text('GreenRich ONE · Sales overview · Page '+(++page),pageWidth-margin,pageHeight-3,{align:'right'});
+ }
+ pdf.save(reportFilename()+'.pdf');
+ toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
+}
+
 const act=(k,id)=>`<button class="action-button" data-edit="${k}:${id}">Edit</button><button class="action-button delete" data-delete="${k}:${id}">Delete</button>`;
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
 function renderTables(){let q=$('#sales-search').value.toLowerCase(),ch=$('#sales-channel-filter').value;let sales=[...data.sales].filter(s=>(ch==='all'||s.channel_id===ch)&&[s.internal_order_id,s.order_id,productName(s),customerName(s),channelName(s)].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));$('#sales-count').textContent=sales.length+' sales · '+new Set(sales.map(x=>x.internal_order_id||x.id)).size+' internal orders';$('#sales-table').innerHTML=sales.map(s=>'<tr><td>'+esc(s.date)+'</td><td><strong>'+esc(s.internal_order_id||'Legacy')+'</strong><small>'+esc(s.order_id||'No platform ID')+'</small></td><td>'+esc(companyLabel(s.company_id||activeCompany))+'</td><td>'+esc(customerName(s))+'</td><td><strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small></td><td><span class="pill">'+esc(channelName(s))+'</span></td><td>'+esc(s.qty)+'</td><td>'+fmt(s.taxable)+'</td><td>'+fmt(s.tax_amount)+'</td><td>'+fmt(s.shipping_charge||0)+'</td><td><strong>'+fmt(s.total)+'</strong></td><td>'+act('sales',s.id)+'</td></tr>').join('')||empty(12);
@@ -284,12 +560,24 @@ async function importSales(file){
  }catch(error){toast('Import error: '+error.message)}
  finally{$('#upload-sales').value=''}
 }
-function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update]');if(!b||!root.contains(b))return;if(b.dataset.stockUpdate){const current=data.products.find(p=>p.id===b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const copy=JSON.parse(JSON.stringify(data));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(activeCompany,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-from','filter-to'].forEach(id=>$('#'+id).onchange=renderDashboard);$('#clear-filters').onclick=()=>{$('#period').value='month';$('#filter-channel').value='all';$('#filter-from').value='';$('#filter-to').value='';renderDashboard()};$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
+function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update]');if(!b||!root.contains(b))return;if(b.dataset.stockUpdate){const current=data.products.find(p=>p.id===b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const copy=JSON.parse(JSON.stringify(data));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(activeCompany,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
+ ['filter-from','filter-to'].forEach(id=>$('#'+id).onchange=()=>{if($('#filter-from').value||$('#filter-to').value)$('#period').value='custom';renderDashboard()});
+ $('#clear-filters').onclick=()=>{
+  $('#period').value='month';['filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).value='all');
+  $('#filter-from').value='';$('#filter-to').value='';renderDashboard();
+ };
+ $('#dashboard-export-excel').onclick=()=>runExport($('#dashboard-export-excel'),exportOverviewExcel);
+ $('#dashboard-export-pdf').onclick=()=>runExport($('#dashboard-export-pdf'),exportOverviewPdf);
+ $('#close-product-orders').onclick=()=>$('#product-orders-dialog').close();
+ root.addEventListener('click',event=>{
+  const button=event.target.closest('[data-product-drill]');
+  if(button&&root.contains(button))showProductOrders(button.dataset.productDrill);
+ });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
- mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false)=>{
+ mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false)=>{
   if(!/^[a-z0-9][a-z0-9_-]{2,48}$/.test(companyId))throw Error('Invalid company selection');
   if(!client||!window.GreenRichSharedCustomers)throw Error('Shared customer service is unavailable. Refresh the page.');
-  activeCompany=companyId;activeCompanyName=companyName;adminMode=adminTools===true;
+  activeCompany=companyId;activeCompanyName=companyName;adminMode=adminTools===true;allowDashboardExport=exportAllowed===true||isAdmin===true;
   if(!container||!document.getElementById('grCrmTemplate'))throw Error('CRM workspace template is missing');
   charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
   allowedTabs=(Array.isArray(allowed)?allowed:Object.keys(titles)).filter(x=>Object.hasOwn(titles,x)&&(adminMode||!['channels','reports'].includes(x)));
@@ -305,6 +593,7 @@ window.GreenRichCRM={
   await window.GreenRichSharedCustomers.ready({client,admin:isAdmin===true});
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   attachSharedCustomers(data);
+  $('#dashboard-export-actions').hidden=!allowDashboardExport;
   $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
   bind();navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
   return root;

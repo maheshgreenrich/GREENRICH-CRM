@@ -314,3 +314,77 @@
 #grCrmWorkspace .gr-crm-help{font-size:12px;color:#6d7b92}
 #grCrmWorkspace #f-internal_order_id{background:#f0f4fc;color:#35527b}
 @media(max-width:650px){#grCrmWorkspace .gr-new-customer-grid{grid-template-columns:minmax(0,1fr)}}
+
+
+/* Filterable multi-company Sales & CRM dashboard; no styles affect Attendance. */
+#grCrmWorkspace .gr-dashboard-filters{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+ gap:14px;align-items:end;padding:18px 20px;
+}
+#grCrmWorkspace .gr-dashboard-filters label{min-width:0;width:100%;font-size:12px}
+#grCrmWorkspace .gr-dashboard-filters select,
+#grCrmWorkspace .gr-dashboard-filters input{width:100%;height:44px;max-width:none}
+#grCrmWorkspace .gr-dashboard-filter-actions{display:flex;align-items:end;height:44px}
+#grCrmWorkspace .gr-dashboard-filter-actions .btn{height:44px}
+#grCrmWorkspace .gr-dashboard-export-actions{
+ grid-column:2/-1;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;align-items:center
+}
+#grCrmWorkspace .gr-dashboard-export-actions .btn{height:42px}
+#grCrmWorkspace .gr-filter-context{margin:-4px 0 18px;color:#526783;font-size:12px;line-height:1.5}
+#grCrmWorkspace .gr-visible-legend{display:grid;gap:7px;margin-top:17px}
+#grCrmWorkspace .gr-visible-legend-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #edf1f7;color:#3d5071;font-size:12px}
+#grCrmWorkspace .gr-visible-legend-row .gr-legend-swatch{width:10px;height:10px;border-radius:3px;flex:none}
+#grCrmWorkspace .gr-visible-legend-row strong{margin-left:auto;font-size:12.5px;color:#203e7b;white-space:nowrap}
+#grCrmWorkspace .gr-donutbox{height:258px}
+#grCrmWorkspace .gr-channel-company-grid{grid-template-columns:1fr 1fr}
+#grCrmWorkspace .gr-progress-group{display:grid;gap:18px;margin-top:20px}
+#grCrmWorkspace .gr-progress-item{display:grid;gap:7px;min-width:0}
+#grCrmWorkspace .gr-progress-info{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:12px;color:#344866}
+#grCrmWorkspace .gr-progress-info strong{font-size:13px;color:#1744ad;font-variant-numeric:tabular-nums}
+#grCrmWorkspace .gr-progress-track{width:100%;height:12px;border-radius:20px;overflow:hidden;background:#edf2fa}
+#grCrmWorkspace .gr-progress-bar{height:100%;border-radius:20px;min-width:0;transition:width .25s ease}
+#grCrmWorkspace .gr-progress-item small{font-size:11px;color:#73839d}
+#grCrmWorkspace .gr-top-products{margin-top:12px}
+#grCrmWorkspace .gr-top-products-head,#grCrmWorkspace .gr-top-product{
+ display:grid;grid-template-columns:minmax(0,2fr) 110px 110px;align-items:center;gap:10px
+}
+#grCrmWorkspace .gr-top-products-head{color:#7a8ba5;font-size:11px;font-weight:600;padding:10px 0;border-bottom:1px solid #e9eef7}
+#grCrmWorkspace .gr-top-product{border-bottom:1px solid #e9eef7;padding:13px 0;font-size:12px;color:#344c6e}
+#grCrmWorkspace .gr-top-product:last-child{border-bottom:0}
+#grCrmWorkspace .gr-top-product strong{color:#1b3670;font-weight:600;display:block;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-top-product small{color:#7d8eaa;font-size:11px}
+#grCrmWorkspace .gr-top-product .gr-product-bar-track{background:#edf2fa;width:100%;height:5px;margin-top:7px;border-radius:10px;overflow:hidden}
+#grCrmWorkspace .gr-product-bar{height:100%;background:#547af1;border-radius:10px}
+#grCrmWorkspace .gr-quantity-drill{border:1px solid #c7d9ff;background:#eef4ff;color:#1c50bb;padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;white-space:nowrap}
+#grCrmWorkspace .gr-quantity-drill:hover,#grCrmWorkspace .gr-quantity-drill:focus-visible{background:#dbe9ff;border-color:#83a8ff}
+#grCrmWorkspace .gr-product-orders-dialog{width:min(830px,calc(100vw - 28px));max-width:830px;padding:24px;box-sizing:border-box}
+#grCrmWorkspace .gr-product-orders-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+#grCrmWorkspace .gr-product-orders-heading h2{font-size:21px;margin:0 0 4px;color:#1e355e}
+#grCrmWorkspace .gr-product-orders-heading p{font-size:12px;color:#687d9c;margin:0 0 15px}
+#grCrmWorkspace .gr-product-order-meta{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+#grCrmWorkspace .gr-product-order-meta span{font-size:12px;background:#edf3ff;color:#264c93;border-radius:8px;padding:9px 12px}
+#grCrmWorkspace .gr-product-orders-dialog .gr-customer-orders{display:grid;gap:14px;margin:16px 0}
+#grCrmWorkspace .gr-product-orders-dialog .gr-customer-order{display:grid;gap:5px}
+#grCrmWorkspace .gr-product-orders-dialog .gr-customer-order > div{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:12px}
+#grCrmWorkspace .gr-product-orders-dialog .gr-order-table-wrap{overflow:auto;max-height:40vh}
+#grCrmWorkspace .gr-product-orders-dialog table{min-width:650px}
+#grCrmWorkspace .gr-product-orders-dialog th,#grCrmWorkspace .gr-product-orders-dialog td{padding:10px;font-size:11.5px}
+@media(max-width:1150px){
+ #grCrmWorkspace .gr-dashboard-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #grCrmWorkspace .gr-dashboard-export-actions{grid-column:1/-1}
+ #grCrmWorkspace .gr-top-products-head,#grCrmWorkspace .gr-top-product{grid-template-columns:minmax(0,2fr) 85px 105px}
+}
+@media(max-width:760px){
+ #grCrmWorkspace .gr-dashboard-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ #grCrmWorkspace .gr-channel-company-grid{grid-template-columns:1fr}
+ #grCrmWorkspace .gr-dashboard-export-actions{justify-content:flex-start}
+}
+@media(max-width:510px){
+ #grCrmWorkspace .gr-dashboard-filters{grid-template-columns:1fr}
+ #grCrmWorkspace .gr-dashboard-filter-actions{height:auto}
+ #grCrmWorkspace .gr-top-products-head,#grCrmWorkspace .gr-top-product{grid-template-columns:minmax(0,1fr) 80px 95px;gap:6px}
+ #grCrmWorkspace .gr-top-product{font-size:11px}
+ #grCrmWorkspace .gr-quantity-drill{padding:7px}
+}
+
+#grCrmWorkspace #dashboard-export-actions[hidden]{display:none!important}

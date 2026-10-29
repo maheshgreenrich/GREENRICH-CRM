@@ -1,0 +1,48 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
+const app=fs.readFileSync('greenrich-one.js','utf8');
+const crm=fs.readFileSync('greenrich-crm-inline.js','utf8');
+const html=fs.readFileSync('secure.html','utf8');
+const css=fs.readFileSync('greenrich-crm-inline.css','utf8');
+new vm.Script(crm,{filename:'greenrich-crm-inline.js'});
+new vm.Script(app,{filename:'greenrich-one.js'});
+const dashboard=html.slice(html.indexOf('<section id="dashboard"'),html.indexOf('</section><section id="sales"'));
+assert.ok(dashboard,'CRM dashboard template exists');
+for(const id of ['filter-company','filter-channel','filter-customer','filter-product','period','filter-from','filter-to','clear-filters'])
+ assert.ok(dashboard.includes('id="'+id+'"'),'Missing filter '+id);
+for(const id of ['metrics','trend-chart','channel-chart','channel-breakdown','channel-progress','company-comparison','top-products','crm-overview'])
+ assert.ok(dashboard.includes('id="'+id+'"'),'Missing visible dashboard section '+id);
+for(const id of ['dashboard-export-excel','dashboard-export-pdf','product-orders-dialog','product-orders-details'])
+ assert.ok(html.includes('id="'+id+'"'),'Missing dashboard action/dialog '+id);
+assert.ok(html.includes('greenrich-crm-inline.js?v=20261029-overview-2'),'CRM cache version should refresh');
+assert.ok(crm.includes('const overviewSales=()=>companyChoices.flatMap'),'Comparison must include both companies');
+assert.ok(crm.includes('loadCompanyData(company.id).sales'),'Never invent cross-company sales data');
+assert.ok(crm.includes("companyForSale(s)===company"),'Company filter should filter rows');
+assert.ok(crm.includes("s.customer_id===customer"),'Customer filter should filter rows');
+assert.ok(crm.includes("productKey(s)===product"),'Product filter should filter rows');
+assert.ok(crm.includes("channelForSale(s)===channel"),'Channel filter should filter rows');
+assert.ok(crm.includes('inPeriod(s)'),'Date period filter must remain');
+assert.ok(crm.includes('companyLabel(c.id)'),'Company totals should show company names');
+assert.ok(crm.includes('progressMarkup(channelPairs'),'Channel progress bars should be drawn');
+assert.ok(crm.includes('progressMarkup(companyPairs'),'Company comparison should be drawn');
+assert.ok(crm.includes('channel-breakdown'),'Donut values must appear below chart');
+assert.ok(crm.includes('afterDatasetsDraw(chart)'),'Trend chart values should be drawn on canvas');
+assert.ok(crm.includes('gr-quantity-drill'),'Product quantity should be clickable');
+assert.ok(crm.includes('showProductOrders(button.dataset.productDrill)'),'Click quantity must display customer order information');
+assert.ok(crm.includes('data.customers.find(c=>c.id===s.customer_id)'),'Customer order details should use shared contacts');
+assert.ok(crm.includes('const rows=filteredSales(),stats=overviewStats(rows),book='),'Excel must use exactly filtered rows');
+for(const part of ["'Filtered Sales'","'Sales Channels'","'Companies'","'Top Products'","'Report Summary'"])assert.ok(crm.includes(part),'Excel sheet missing: '+part);
+assert.ok(crm.includes('window.XLSX.writeFile(book,reportFilename()'),'Excel file should be exported');
+assert.ok(crm.includes('window.html2canvas(section'),'PDF must capture the dashboard visually');
+assert.ok(crm.includes("const section=$('#dashboard')"),'PDF must use actual rendered dashboard');
+assert.ok(crm.includes("new jsPDF({orientation:'landscape'"),'PDF should be landscape to preserve dashboard layout');
+assert.ok(crm.includes("pdf.addImage(part.toDataURL('image/png')"),'PDF must preserve chart canvases visually');
+assert.ok(crm.includes("pdf.save(reportFilename()+'.pdf')"),'PDF should save download');
+assert.ok(crm.includes("allowDashboardExport=exportAllowed===true||isAdmin===true"),'Export permissions must be applied');
+assert.ok(app.includes("can('sales','export')||can('orders','export')"),'Export permissions must come from role grants');
+assert.ok(css.includes('#grCrmWorkspace .gr-dashboard-filters'),'Dashboard filters should be styled');
+assert.ok(css.includes('#grCrmWorkspace .gr-progress-group'),'Progress charts should be styled');
+const periods=['month','week','today','last30','all','custom'];
+for(const p of periods)assert.ok(dashboard.includes('value="'+p+'"'),'Existing date filter removed: '+p);
+for(const forbidden of ['attendance-v3.css','attendance-v3.js','greenrich-attendance-inline.js'])assert.ok(!crm.includes(forbidden),'CRM should not modify Attendance: '+forbidden);
+console.log('PASS Sales Overview: company/customer/product/date/channel filters, visible charts, customer drill-down and visual exports');
