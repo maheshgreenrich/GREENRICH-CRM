@@ -22,7 +22,7 @@ for(const needle of ["'date','Date'","'order','Order ID'","'customer','Customer'
  assert.ok(ops.includes(needle),'Default column settings missing '+needle);
 for(const phrase of ['Awaiting approval','Approved orders',"Today's orders",'Sales value','Cancelled / returned','Dispatched'])
  assert.ok(ops.includes(phrase),'Status report missing '+phrase);
-assert.ok(ops.includes('function filterPeriod'),'Order date filtering needs live logic');
+assert.ok(ops.includes('const filterPeriod='),'Order date filtering needs live logic');
 assert.ok(ops.includes('customer(s)?.name')||ops.includes('const customer=s=>'),'Search must use shared customer data');
 assert.ok(ops.includes('c.mobile2,c.email,c.gstin,c.address1'),'Search must cover contact details');
 assert.ok(ops.includes('const rows=filteredSales()')||ops.includes('const sales=filteredSales()'),'Reports must use filtered orders');
