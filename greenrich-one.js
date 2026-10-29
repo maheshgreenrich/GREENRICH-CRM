@@ -12,8 +12,35 @@ function navigation(){
  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();render()});
 }
 async function attendanceQuick(){
- $('#attendanceQuick').innerHTML='<button type="button" class="secondary" id="attQuickOpen">My Attendance</button>';
- $('#attQuickOpen').onclick=()=>{page='attendance';navigation();render()};
+ const area=$('#attendanceQuick');
+ area.innerHTML='<div class="gr-header-clock" role="group" aria-label="Daily attendance"><button id="grHeaderIn" class="gr-clock-in" type="button">Check In</button><button id="grHeaderOut" class="gr-clock-out" type="button">Check Out</button><span id="grClockInfo" aria-live="polite">Checking...</span></div>';
+ const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');
+ const session=(await db.auth.getSession()).data.session;
+ if(!session){$('#grClockInfo').textContent='Sign in required';return}
+ const headers={Authorization:'Bearer '+session.access_token,apikey:key};
+ const nowParts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date());
+ const getPart=t=>nowParts.find(x=>x.type===t)?.value,day=getPart('year')+'-'+getPart('month')+'-'+getPart('day');
+ const api=url.replace(/\/$/,'')+'/functions/v1/attendance-api';
+ const send=async(path,method='GET')=>{
+  const response=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?'{}':undefined,cache:'no-store'});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(result?.error?.message||'Attendance request failed');
+  return result.data;
+ };
+ try{
+  const history=await send('/attendance/me?from='+day+'&to='+day+'&pageSize=1');
+  const record=history?.items?.[0];
+  const inButton=$('#grHeaderIn'),outButton=$('#grHeaderOut');
+  if(!inButton||!outButton)return;
+  inButton.disabled=!!record;outButton.disabled=!record?.check_in||!!record?.check_out;
+  $('#grClockInfo').textContent=record?.check_out?'Checked out':record?.check_in?'Checked in':record?'Already marked':'Not checked in';
+  const action=async(mode)=>{
+   inButton.disabled=true;outButton.disabled=true;
+   try{await send('/attendance/check-'+mode,'POST');toast(mode==='in'?'Check-in recorded':'Check-out recorded');await attendanceQuick();if(page==='attendance')await render();}
+   catch(e){toast(e.message);await attendanceQuick();}
+  };
+  inButton.onclick=()=>action('in');outButton.onclick=()=>action('out');
+ }catch(e){const info=$('#grClockInfo');if(info)info.textContent='Clock unavailable';}
 }
 let attendancePeople=[];
 function scopeAllows(module,action,id,staff=people){
