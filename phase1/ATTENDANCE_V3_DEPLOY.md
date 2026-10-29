@@ -2,7 +2,7 @@
 
 ## Verified live deployment — 29 October 2026
 
-The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 3**, with JWT verification enabled.
+The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 5**, with JWT verification enabled.
 
 The scheduled job `greenrich-v3-daily-absence` is installed at **19:30 UTC / 01:00 IST**, but its required `grm_settings.enabled_from` launch date is **NULL** until the built-in Admin explicitly activates daily absences from the Attendance V3 → Holidays & Shifts screen. A test confirmed the guarded job inserts **0** rows while disabled. Do not change this guard without a rollout plan.
 
@@ -30,7 +30,18 @@ The V3 schema is **isolated** from the old `gr_attendance` and browser-local dem
 - `Office Admin` → **OFFICE_ADMIN** (all attendance, correction/leave reviews, shifts, departments, holidays, exports).
 - Every other active GreenRich role → **EMPLOYEE** for V3 attendance.
 
-**Important:** Attendance V3 uses this explicit role policy. The legacy role-matrix `own/team/all` settings are separate and do **not** override the V3 Office Admin/Employee access policy. The backend checks the active Auth user and database role for *every* request. Merely assigning a role name does not create a login.
+**Updated role delegation:** Besides the built-in `Admin` and `Office Admin` roles, a custom role can receive company-wide Attendance control through the Roles & Permissions matrix. The `All` scope is checked individually for `View`, `Create`, `Edit`, `Delete`, `Approve`, and `Export` in the Edge API and protected PostgreSQL functions. `Own` and `Team` do not grant company-wide admin rights. An approver handling attendance corrections should also receive Create/Edit All, because approving a correction writes the employee's attendance. Employees without All-scope grants can still use the personal attendance features. The backend checks the active Auth identity and live database permissions on every request.
+
+## Single-page attendance experience
+
+**Main portal:** `secure.html`, with the Attendance module rendered inside its existing sidebar and content area. No navigation to a separate HTML page is required.
+
+- **My Attendance (all active users):** server-time Check In / Check Out, clock timestamps, personal monthly color-coded calendar, status summary, detailed check-in/out data sheet, and correction/leave request boxes below the calendar.
+- **Employee Attendance (authorised roles):** active employee list from `/admin/staff`, individual quick Present / Absent / Half Day buttons, checkbox Select All bulk attendance with required audit reason, daily/weekly/monthly date filters, individual employee filtering, chart, pending leave and correction approval inbox, and CSV/Excel/PDF reports using `/admin/reports/range`.
+- **Safety:** bulk marking skips existing genuine SELF check-in/out entries and doesn't include the signed-in manager's own account in Select All. Managers mark their own clock from My Attendance.
+- **Approval notifications:** requests are visible in the authorised approvers' in-app approval inbox; the pending count refreshes while the Attendance module is open. External WhatsApp/email alerts are not configured.
+- **Automatic absences:** the scheduled job is installed but stays inactive until Admin sets the go-live date. Missing working-day records remain unmarked until processing is enabled.
+- **Test status:** source JavaScript, static DOM selectors and feature regressions checked; rollback-only SQL role grants and safe bulk checks passed. Real signed-in multi-browser acceptance and PDF/Excel output still require manual testing.
 
 ## One-time deployment (developer/administrator)
 
@@ -133,4 +144,4 @@ The GitHub Actions workflow `Attendance V3 checks` runs `deno check`, API route 
 - Audit rows contain actor, action, reason and record changes.
 - Test desktop and mobile browsers.
 
-**Status:** Database migrations, Edge API v3 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
+**Status:** Database migrations, Edge API v5 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
