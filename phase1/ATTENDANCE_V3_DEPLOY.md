@@ -1,5 +1,18 @@
 # GreenRich ONE — Attendance V3
 
+## Verified live deployment — 29 October 2026
+
+The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 3**, with JWT verification enabled.
+
+The scheduled job `greenrich-v3-daily-absence` is installed at **19:30 UTC / 01:00 IST**, but its required `grm_settings.enabled_from` launch date is **NULL** until the built-in Admin explicitly activates daily absences from the Attendance V3 → Holidays & Shifts screen. A test confirmed the guarded job inserts **0** rows while disabled. Do not change this guard without a rollout plan.
+
+Database checks completed: all eight V3 tables have RLS enabled, privileged write RPCs are denied to anonymous and employee DB roles, Office Admin create/edit/soft-delete and audit tests passed in rolled-back transactions, approval of leave generated ON_LEAVE records in a rolled-back transaction, employee row isolation passed, duplicate check-in and check-out were rejected, and all temporary test rows were rolled back. The five original `gr_attendance` records remain unchanged. There are no V3 live attendance records yet.
+
+**Still required before production sign-off:** live browser testing with actual Employee, Office Admin and built-in Admin sessions, integration verification of REST endpoints and CSV/XLS/PDF downloads, monitoring of the first Cron run after activation, resolution/review of existing Supabase security-advisor warnings, and employee rollout communications. Do not call browser end-to-end testing completed based on database-only tests.
+
+**Do not run `supabase db push` indiscriminately:** migrations were applied through the management interface and have remote-generated history versions, which may differ from repository file timestamps. Reconcile migration history before any future CLI-based push.
+
+
 ## Stack and integration
 
 - **Frontend:** GreenRich ONE static HTML/CSS/JavaScript on GitHub Pages.
@@ -120,4 +133,4 @@ The GitHub Actions workflow `Attendance V3 checks` runs `deno check`, API route 
 - Audit rows contain actor, action, reason and record changes.
 - Test desktop and mobile browsers.
 
-**Status:** Repository implementation only; do not call this deployed or production-verified until the migration, function, Cron, CI and manual security tests pass against your own Supabase project.
+**Status:** Database migrations, Edge API v3 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
