@@ -10,6 +10,9 @@ on:
       - 'greenrich-one.css'
       - 'demo.html'
       - 'secure.html'
+      - 'roles.html'
+      - 'roles-manager.js'
+      - 'roles-manager.css'
       - 'demo.js'
       - 'attendance-ui.js'
       - 'legacy.html'
@@ -41,6 +44,10 @@ jobs:
           test -s greenrich-one.css
           node --check greenrich-one.js
           test -s secure.html
+          test -s roles.html
+          test -s roles-manager.js
+          test -s roles-manager.css
+          node --check roles-manager.js
           test -s demo.html
           node --check demo.js
           node --check attendance-ui.js
