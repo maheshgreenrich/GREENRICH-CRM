@@ -78,14 +78,17 @@
  <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
  <section class="panel av-monthly-reports" id="monthlyReportsSection">
  <div class="row"><div><h2>Monthly Attendance Reports</h2><p>Select an employee to open their monthly attendance calendar and download their report.</p></div></div>
- <div class="av-monthly-selector-row">
-  <label>Report Month<input id="allMonthlyReportMonth" type="month" aria-label="Month for all employees summary"></label>
-  <button id="downloadAllMonthlyExcel" type="button" class="blue"><span>Download All Employees Summary · Excel</span></button>
- </div>
- <p class="av-report-helper">The company Excel summary contains employee names and attendance counts only — no daily check-in/out log.</p>
- <div id="allMonthlyReportInfo" class="av-report-info" aria-live="polite"></div>
  <h3 class="av-employee-list-title">Employee List</h3>
  <div id="monthlyEmployeeList" class="av-monthly-employee-list" aria-label="Employees for monthly attendance reports"></div>
+ <div class="av-summary-download">
+  <h3>All Employees · Monthly Summary</h3>
+  <p class="av-report-helper">Download one Excel sheet containing each employee's monthly Present, Absent, Leave, Late, Permission and other attendance counts. No daily log details.</p>
+  <div class="av-monthly-selector-row">
+   <label>Report Month<input id="allMonthlyReportMonth" type="month" aria-label="Month for all employees summary"></label>
+   <button id="downloadAllMonthlyExcel" type="button" class="blue"><span>Download All Employees Summary · Excel</span></button>
+  </div>
+  <div id="allMonthlyReportInfo" class="av-report-info" aria-live="polite"></div>
+ </div>
 </section>
 <div class="av-grid">
  <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
