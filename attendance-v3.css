@@ -263,3 +263,62 @@
 #v3Content .av-status-btn{font-weight:600}
 #v3Content .av-summary-cards strong,.av-monthly-dialog .av-report-count strong{font-weight:600}
 .av-monthly-dialog h2{font-size:20px}
+
+
+/* Header order: attendance switch first, signed-in user information last on the right */
+#app header #attendanceQuick{
+ order:2;
+ display:flex !important;
+ align-items:center;
+ justify-content:flex-end;
+ margin-left:auto !important;
+ margin-right:0 !important;
+ width:auto !important;
+ min-width:0;
+ flex:0 0 auto;
+}
+#app header .profile{
+ order:3;
+ display:grid;
+ gap:2px;
+ align-content:center;
+ justify-items:end;
+ text-align:right;
+ margin:0 !important;
+ padding-left:12px;
+ border-left:1px solid #e1e8f2;
+ flex:0 1 auto;
+ min-width:0;
+ max-width:250px;
+}
+#app header .profile b{
+ display:block;
+ max-width:230px;
+ text-overflow:ellipsis;
+ overflow:hidden;
+ white-space:nowrap;
+}
+#app header .profile small{justify-self:end;text-align:right}
+#app header #grClockInfo{max-width:95px}
+#app header #grAttendanceSwitch{flex-shrink:0}
+@media(max-width:760px){
+ #app header{gap:10px}
+ #app header #attendanceQuick{
+  width:auto !important;
+  margin-left:auto !important;
+  order:2;
+ }
+ #app header .profile{
+  order:3;
+  padding-left:9px;
+  max-width:min(44vw,190px);
+ }
+ #app header .profile b{max-width:100%;font-size:12px}
+ #app header #grClockInfo{display:none}
+}
+@media(max-width:480px){
+ #app header #attendanceQuick{margin-left:0 !important}
+ #app header .gr-switch-label{display:none}
+ #app header #grAttendanceSwitch{min-width:auto}
+ #app header .profile{margin-left:auto !important}
+}
