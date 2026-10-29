@@ -72,7 +72,7 @@
    '</div>'+
    '<div class="panel gr-hsn-settings" id="gr-hsn-settings">'+
    '<div class="gr-hsn-heading"><div><h2>Product HSN / SAC Codes</h2><p>Enter a separate HSN or SAC code for each product in the selected company. These codes are used for its draft invoices.</p></div><span class="gr-hsn-count" id="gr-hsn-count"></span></div>'+
-   '<p class="gr-hsn-browser-note">Product and sales records are still saved in this browser. HSN/SAC changes here apply to products and unissued drafts in this browser; issued invoices are not changed.</p>'+
+   '<p class="gr-hsn-browser-note">Product and sales records are shared through GreenRich cloud. HSN/SAC changes apply to products and unissued invoice drafts across employee devices. Issued invoices stay unchanged.</p>'+
    '<form id="gr-hsn-form"><label class="gr-hsn-search-label">Search products<input id="gr-hsn-search" type="search" placeholder="Search product name or SKU"></label><div class="gr-hsn-table-wrap"><table class="gr-hsn-table"><thead><tr><th>Product</th><th>SKU</th><th>GST %</th><th>HSN / SAC code</th></tr></thead><tbody id="gr-hsn-list"></tbody></table></div>'+
    '<div class="gr-hsn-actions"><button type="submit" class="blue" id="gr-hsn-save">Save Product HSN / SAC Codes</button><small id="gr-hsn-summary"></small></div></form>'+
    '</div>';
@@ -146,11 +146,11 @@
     row.hidden=!row.textContent.toLowerCase().includes(needle);
    });
   };
-  host.querySelector('#gr-hsn-form').onsubmit=event=>{
+  host.querySelector('#gr-hsn-form').onsubmit=async event=>{
    event.preventDefault();const company=select.value,form=event.currentTarget;
    const button=form.querySelector('button[type="submit"]');button.disabled=true;
    try{
-    const existing=getProducts(company),inputs=[...form.querySelectorAll('[data-product-id]')];
+    const existing=getProducts(company),before=JSON.parse(JSON.stringify(existing)),inputs=[...form.querySelectorAll('[data-product-id]')];
     const values=new Map();
     for(const input of inputs){
      const value=blank(input.value);
@@ -159,6 +159,8 @@
     }
     const changed=applyProductCodes(existing,values);
     if(changed.length){
+     if(!window.GreenRichCRMCloud)throw Error('Cloud synchronization is not available. Refresh the page.');
+     await window.GreenRichCRMCloud.externalSave(company,before,existing,db);
      localStorage.setItem(keyFor(company),JSON.stringify(existing));
     }
     tell(changed.length?'HSN/SAC saved for '+changed.length+' product(s) in '+companyTitle(company):'No HSN/SAC changes to save.');
