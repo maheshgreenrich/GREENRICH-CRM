@@ -174,6 +174,7 @@
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
  function showCustomer(id,sourceSaleId){
+  if(adapter?.showCustomerProfile){adapter.showCustomerProfile(id,sourceSaleId);return}
   const c=adapter.getCustomers().find(item=>item.id===id);
   const source=getRows().find(s=>s.id===sourceSaleId);
   const name=c?.name||source?.customer_name||'Customer details';
@@ -322,5 +323,5 @@
   renderColumns();connect();
   try{await delayedRefresh()}catch(error){actionMessage(error.message);renderSales();renderDispatch()}
  }
- window.GreenRichSalesOps={mount,renderSales,renderDispatch,refresh:delayedRefresh,filterPeriod,isApproved:(companyId,id)=>dispatchRows.some(r=>r.company_id===companyId&&r.source_sale_id===id)};
+ window.GreenRichSalesOps={mount,renderSales,renderDispatch,getDispatchRows:()=>dispatchRows.slice(),refresh:delayedRefresh,filterPeriod,isApproved:(companyId,id)=>dispatchRows.some(r=>r.company_id===companyId&&r.source_sale_id===id)};
 })();

@@ -12,7 +12,7 @@ const num=n=>new Intl.NumberFormat('en-IN').format(Number(n)||0);
 const round=n=>Math.round((Number(n)||0)*100)/100;
 const initial=()=>({version:4,orderSequence:0,invoiceSequences:{},tags:[],products:[],channels:[{id:uid(),name:'Amazon',type:'Marketplace',active:true},{id:uid(),name:'Flipkart',type:'Marketplace',active:true},{id:uid(),name:'Website',type:'E-commerce',active:true}],customers:[],leads:[],tasks:[],sales:[]});
 let data;try{data=JSON.parse(localStorage.getItem(storageKey()))||initial();if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Invalid database')}catch{data=initial()}
-let page='dashboard',editId='',editing='',charts=[];
+let page='dashboard',editId='',editing='',charts=[],currentCustomerId='',currentSourceSaleId='';
 const persist=()=>saveCompanyData(activeCompany,data);
 const toast=s=>{let n=$('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.remove('show'),4300)};
 const scopedCompanyIds=()=>companyScope==='all'?permittedCompanies:[companyScope];
@@ -425,10 +425,51 @@ const act=(k,id)=>`<button class="action-button" data-edit="${k}:${id}">Edit</bu
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
 
+function customerProfileBack(){
+ currentCustomerId='';currentSourceSaleId='';
+ $('#gr-customer-profile').hidden=true;$('#gr-customer-directory').hidden=false;
+ $('#primary-action').hidden=false;
+ $('#page-heading').textContent='Customers';$('#page-subtitle').textContent=titles.customers[1];
+ const title=document.querySelector('#app #title');if(title)title.textContent='Customers';
+ root?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function renderCustomerProfile(){
+ if(!currentCustomerId&&!currentSourceSaleId)return;
+ if(!window.GreenRichCustomerProfile)return toast('Customer 360 profile is unavailable. Refresh this page.');
+ const customer=data.customers.find(c=>c.id===currentCustomerId)||null;
+ const source=scopeRows('sales').find(s=>s.id===currentSourceSaleId)||null;
+ if(!customer&&!source){customerProfileBack();return}
+ const area=$('#gr-customer-profile'),list=$('#gr-customer-directory');
+ if(!area||!list)return;
+ list.hidden=true;area.hidden=false;
+ $('#primary-action').hidden=true;
+ $('#page-heading').textContent='Customer profile';
+ $('#page-subtitle').textContent='Contact information, order history, invoices and customer activity';
+ const title=document.querySelector('#app #title');if(title)title.textContent='Customer profile';
+ window.GreenRichCustomerProfile.render(area,{
+  customer,sourceSale:source,sales:scopeRows('sales'),leads:scopeRows('leads'),tasks:scopeRows('tasks'),
+  dispatch:window.GreenRichSalesOps?.getDispatchRows?.()||[],
+  tags:data.tags,companyLabel,
+  onBack:customerProfileBack,
+  onEdit:id=>{if(id)openEditor('customers',id)},
+  onInvoice:(id,owner)=>void openSaleInvoice(id,owner),
+  onRefresh:()=>renderCustomerProfile()
+ });
+}
+function openCustomerProfile(customerId='',saleId=''){
+ const customer=data.customers.find(c=>c.id===customerId);
+ const sale=scopeRows('sales').find(s=>s.id===saleId);
+ if(!customer&&!sale)return toast('Customer record was not found in your authorized companies.');
+ currentCustomerId=customer?.id||'';currentSourceSaleId=saleId||'';
+ navigate('customers');
+ window.GreenRichShell?.setPageWithoutRemount?.('customers');
+ renderCustomerProfile();
+}
+
 function renderTables(){
  window.GreenRichSalesOps?.renderSales();
  let q=$('#customers-search').value.toLowerCase();
- $('#customers-table').innerHTML=data.customers.filter(c=>[c.name,c.mobile,c.mobile2,c.email,c.city,c.company].some(v=>String(v||'').toLowerCase().includes(q))).map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(c.gstin||'')+'</small></td><td>'+esc(c.mobile)+'<small>'+esc(c.mobile2||'')+' · '+esc(c.email)+'</small></td><td>'+esc(c.city)+'<small>'+esc(c.state)+'</small></td><td>'+esc(c.company)+'</td><td>'+esc(c.type)+'</td><td>'+(c.tag_ids||[]).map(id=>'<span class="gr-customer-tag">'+esc(data.tags.find(t=>t.id===id)?.name||'')+'</span>').join('')+'</td><td>'+new Set(scopeRows('sales').filter(s=>s.customer_id===c.id).map(s=>s.internal_order_id||s._companyId+'|'+s.id)).size+'</td><td>'+act('customers',c.id)+'</td></tr>').join('')||empty(8);
+ $('#customers-table').innerHTML=data.customers.filter(c=>[c.name,c.mobile,c.mobile2,c.email,c.city,c.company].some(v=>String(v||'').toLowerCase().includes(q))).map(c=>'<tr><td><button type="button" class="gr-customer-name-link" data-customer-profile="'+esc(c.id)+'">'+esc(c.name)+'</button><small>'+esc(c.gstin||'')+'</small></td><td>'+esc(c.mobile)+'<small>'+esc(c.mobile2||'')+' · '+esc(c.email)+'</small></td><td>'+esc(c.city)+'<small>'+esc(c.state)+'</small></td><td>'+esc(c.company)+'</td><td>'+esc(c.type)+'</td><td>'+(c.tag_ids||[]).map(id=>'<span class="gr-customer-tag">'+esc(data.tags.find(t=>t.id===id)?.name||'')+'</span>').join('')+'</td><td>'+new Set(scopeRows('sales').filter(s=>s.customer_id===c.id).map(s=>s.internal_order_id||s._companyId+'|'+s.id)).size+'</td><td>'+act('customers',c.id)+'</td></tr>').join('')||empty(8);
  q=$('#leads-search').value.toLowerCase();
  const stage=$('#lead-stage-filter').value;
  $('#leads-table').innerHTML=scopeRows('leads').filter(l=>(stage==='all'||l.stage===stage)&&[l.title,l.contact,l.notes,l.owner,companyLabel(l._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(l=>'<tr><td><strong>'+esc(l.title)+'</strong><small>'+esc(l.contact)+' · '+esc(companyLabel(l._companyId))+'</small></td><td>'+esc(l.source)+'</td><td><span class="pill '+(l.stage==='Won'?'good':l.stage==='Lost'?'warn':'')+'">'+esc(l.stage)+'</span></td><td>'+fmt(l.value)+'</td><td>'+esc(l.owner)+'</td><td>'+esc(l.followup||'—')+'</td><td>'+act('leads',l.id)+'</td></tr>').join('')||empty(7);
@@ -438,7 +479,7 @@ function renderTables(){
  $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(p.active?'good':'warn')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
  $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
 }
-function render(){if(page==='dashboard')renderDashboard();else if(page==='dispatch')window.GreenRichSalesOps?.renderDispatch();else renderTables()}
+function render(){if(page==='dashboard')renderDashboard();else if(page==='dispatch')window.GreenRichSalesOps?.renderDispatch();else {renderTables();if(page==='customers'&&(currentCustomerId||currentSourceSaleId))renderCustomerProfile()}}
 const specs={
  products:[['company_id','Company','companies',true],['name','Product name','text',true],['sku','SKU / code','text',true],['hsn','HSN / SAC code (for invoice)','text'],['brand','Brand','text'],['category','Category','text'],['price','Default unit price (₹)','number',true],['tax','Default GST / tax %','number',true],['stock','Current stock quantity','number',true],['inclusive','Price includes GST?','select','',[['true','Yes – inclusive'],['false','No – exclusive']]],['active','Status','select','',[['true','Active'],['false','Inactive']]],['description','Description / notes','textarea']],
  channels:[['company_id','Company','companies',true],['name','Channel name','text',true],['type','Channel type','select','',[['Marketplace','Marketplace'],['E-commerce','E-commerce'],['Retail','Retail'],['Distributor','Distributor'],['Wholesale','Wholesale'],['Other','Other']]],['active','Status','select','',[['true','Active'],['false','Inactive']]]],
@@ -628,9 +669,9 @@ async function saveEditor(event){
  toast((editing==='sales'?'Sales order '+row.internal_order_id+' saved. Draft invoice '+row.invoice_number+' created.':'Saved successfully')+(targetId!==activeCompany?' Switch to '+companyLabel(targetId)+' to view it.':''));
 }
 
-async function openSaleInvoice(id){
+async function openSaleInvoice(id,ownerOverride=''){
  if(!window.GreenRichInvoices)return toast('Invoice module not loaded. Refresh the page.');
- const owner=ownerOf('sales',id);
+ const owner=ownerOverride&&permittedCompanies.includes(ownerOverride)?ownerOverride:ownerOf('sales',id);
  if(!owner||!permittedCompanies.includes(owner))return toast('You cannot access this company order.');
  const copy=JSON.parse(JSON.stringify(loadCompanyData(owner))),sale=copy.sales.find(s=>s.id===id);
  if(!sale)return toast('Sales order not found.');
@@ -714,7 +755,7 @@ async function importSales(file){
  }catch(error){toast('Import error: '+error.message)}
  finally{$('#upload-sales').value=''}
 }
-function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update],[data-sale-invoice]');if(!b||!root.contains(b))return;if(b.dataset.saleInvoice){void openSaleInvoice(b.dataset.saleInvoice);return}if(b.dataset.stockUpdate){const current=find('products',b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const owner=ownerOf('products',current.id),copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(owner,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
+function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{const customer=e.target.closest('[data-customer-profile]');if(customer){openCustomerProfile(customer.dataset.customerProfile);return}let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update],[data-sale-invoice]');if(!b||!root.contains(b))return;if(b.dataset.saleInvoice){void openSaleInvoice(b.dataset.saleInvoice);return}if(b.dataset.stockUpdate){const current=find('products',b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const owner=ownerOf('products',current.id),copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(owner,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
  ['filter-from','filter-to'].forEach(id=>$('#'+id).onchange=()=>{if($('#filter-from').value||$('#filter-to').value)$('#period').value='custom';renderDashboard()});
  $('#clear-filters').onclick=()=>{
   $('#period').value='month';['filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).value='all');
@@ -773,7 +814,7 @@ window.GreenRichCRM={
   if(!window.GreenRichSalesOps)throw Error('Sales and Dispatch module not loaded. Refresh GreenRich ONE.');
   await window.GreenRichSalesOps.mount(root,{client,companies:scopedCompanyIds(),approve:approveAllowed===true||isAdmin===true,dispatch:dispatchAllowed===true||isAdmin===true,source:{
    getSales:()=>scopeRows('sales'),getCustomers:()=>data.customers,getTags:()=>data.tags,
-   getLeads:()=>scopeRows('leads'),productName,channelName,companyLabel,
+   getLeads:()=>scopeRows('leads'),showCustomerProfile:(customerId,saleId)=>openCustomerProfile(customerId,saleId),productName,channelName,companyLabel,
    invoiceAction,actions:act,toast,
    saveApproved:(companyId,saleId,record)=>{
     const copy=JSON.parse(JSON.stringify(loadCompanyData(companyId))),row=copy.sales.find(s=>s.id===saleId);
@@ -782,9 +823,11 @@ window.GreenRichCRM={
     return saveCompanyData(companyId,copy);
    }
   }});
+  currentCustomerId='';currentSourceSaleId='';
   navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
   return root;
  },
+ openCustomerProfile:(id,saleId='')=>openCustomerProfile(id,saleId),
  refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
  unmount:()=>{window.GreenRichCRMCloud?.stop?.();charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
 };

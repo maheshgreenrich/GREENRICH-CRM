@@ -286,7 +286,7 @@
   await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=url;script.onload=resolve;script.onerror=()=>reject(Error('Unable to load PDF library. Check internet connection.'));document.head.append(script)});
   if(!check())throw Error('PDF library was not loaded.');
  }
- async function savePdf(paper,filename){
+ async function buildPdf(paper){
   await Promise.all([
    loadLibrary('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',()=>!!window.html2canvas),
    loadLibrary('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF)
@@ -301,7 +301,21 @@
    part.getContext('2d').drawImage(canvas,0,y,part.width,part.height,0,0,part.width,part.height);
    pdf.addImage(part.toDataURL('image/png'),'PNG',10,10,maxWidth,part.height*scale,undefined,'FAST');
   }
-  pdf.save(filename.replace(/[^\w.-]/g,'_')+'.pdf');
+  return pdf;
+ }
+ async function savePdf(paper,filename){
+  const pdf=await buildPdf(paper);pdf.save(filename.replace(/[^\w.-]/g,'_')+'.pdf');
+ }
+ async function sharePdf(paper,filename){
+  const pdf=await buildPdf(paper);
+  const title=filename.replace(/[^\w.-]/g,'_')+'.pdf';
+  const file=new File([pdf.output('blob')],title,{type:'application/pdf'});
+  if(typeof navigator!=='undefined'&&navigator.share&&navigator.canShare?.({files:[file]})){
+   try{await navigator.share({files:[file],title:'GreenRich invoice '+filename,text:'GreenRich invoice PDF. Please verify the customer before sending.'});return 'shared'}
+   catch(error){if(error?.name==='AbortError')return 'cancelled';throw error}
+  }
+  pdf.save(title);
+  return 'downloaded';
  }
  async function open({root,companyId,sale,product,customer,onIssue,canIssue=false}){
   if(!companyIds.includes(companyId))throw Error('Unknown company');
@@ -311,13 +325,21 @@
   const current= status==='Issued'&&sale.invoice_snapshot ?sale.invoice_snapshot:modelFor({companyId,sale,product,customer});
   const missingFields=missing(current);
   const banner=missingFields.length?'<div class="gr-invoice-warning">Before issuing, complete: '+e(missingFields.join(', '))+'.</div>':'<div class="gr-invoice-ready">Company and tax information is ready for review.</div>';
-  dialog.innerHTML='<div class="gr-invoice-tools"><div><h2>Invoice · '+e(sale.invoice_number||'Draft')+'</h2><p>'+e(companyTitle(companyId))+' · '+e(status==='Issued'?'Issued':'Automatic draft, not issued')+'</p></div><div class="gr-invoice-tool-actions"><button class="btn soft" type="button" id="gr-invoice-close">Close</button><button class="btn soft" type="button" id="gr-invoice-pdf">↓ Download PDF</button><button class="btn primary" type="button" id="gr-invoice-issue" '+(status==='Issued'||missingFields.length||!canIssue?'disabled':'')+'>'+(status==='Issued'?'Already issued':'Issue Invoice')+'</button></div></div>'+banner+'<div class="gr-invoice-paper-scroll">'+renderDocument(current,status)+'</div>'+
+  dialog.innerHTML='<div class="gr-invoice-tools"><div><h2>Invoice · '+e(sale.invoice_number||'Draft')+'</h2><p>'+e(companyTitle(companyId))+' · '+e(status==='Issued'?'Issued':'Automatic draft, not issued')+'</p></div><div class="gr-invoice-tool-actions"><button class="btn soft" type="button" id="gr-invoice-close">Close</button><button class="btn soft" type="button" id="gr-invoice-pdf">↓ Download PDF</button><button class="btn soft" type="button" id="gr-invoice-share">Share PDF</button><button class="btn primary" type="button" id="gr-invoice-issue" '+(status==='Issued'||missingFields.length||!canIssue?'disabled':'')+'>'+(status==='Issued'?'Already issued':'Issue Invoice')+'</button></div></div>'+banner+'<div class="gr-invoice-paper-scroll">'+renderDocument(current,status)+'</div>'+
    '<p class="gr-invoice-note">Sales records are shared in GreenRich cloud. Invoice numbering still needs a centrally allocated series before simultaneous statutory issuance from multiple devices. This document does not generate a GST e-invoice IRN or e-way bill.</p>';
   dialog.querySelector('#gr-invoice-close').onclick=()=>dialog.close();
   dialog.querySelector('#gr-invoice-pdf').onclick=async event=>{
    const button=event.currentTarget;button.disabled=true;
    try{await savePdf(dialog.querySelector('#gr-invoice-paper'),sale.invoice_number||'GreenRich-Invoice')}
    catch(error){window.alert('Unable to export invoice PDF: '+error.message)}
+   finally{button.disabled=false}
+  };
+  dialog.querySelector('#gr-invoice-share').onclick=async event=>{
+   const button=event.currentTarget;button.disabled=true;
+   try{
+    const result=await sharePdf(dialog.querySelector('#gr-invoice-paper'),sale.invoice_number||'GreenRich-Invoice');
+    if(result==='downloaded')window.alert('PDF downloaded. Attach it manually to WhatsApp or email. This browser does not support direct PDF file sharing.');
+   }catch(error){window.alert('Unable to share invoice PDF: '+error.message)}
    finally{button.disabled=false}
   };
   dialog.querySelector('#gr-invoice-issue').onclick=async event=>{

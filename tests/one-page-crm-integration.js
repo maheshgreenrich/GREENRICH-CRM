@@ -35,5 +35,6 @@ assert.doesNotMatch(demo,/legacy\.html/);
 assert.match(css,/#grCrmWorkspace/);
 assert.doesNotMatch(css,/(^|\n)\s*body\s*\{/);
 assert.match(html,/Shared customers/,'Customer master must be shared across employees');
-assert.match(html,/Sales, products and stock remain browser-local/,'Do not mislabel local sales and stock as synced');
+assert.match(html,/Sales, products, stock and order history are shared through GreenRich cloud/,'CRM notice must describe shared cloud data');
+assert.ok(html.includes('greenrich-customer-profile.js'),'Customer 360 page must load its own module');
 console.log('PASS: One HTML CRM, permission-aware module routing, local data compatibility, import/export, no legacy iframe');

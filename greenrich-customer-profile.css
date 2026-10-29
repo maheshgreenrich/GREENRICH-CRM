@@ -1,0 +1,91 @@
+/* Customer 360 — distinct, responsive GreenRich design, scoped to CRM only. */
+#grCrmWorkspace #gr-customer-profile[hidden],#grCrmWorkspace #gr-customer-directory[hidden]{display:none!important}
+#grCrmWorkspace .gr360-page{display:flex;flex-direction:column;gap:18px;color:#172e55;min-width:0}
+#grCrmWorkspace .gr360-breadcrumb{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#7a8da8;margin:0 0 -3px}
+#grCrmWorkspace .gr360-breadcrumb button{border:0!important;color:#2452af!important;background:none!important;padding:7px 0!important;font-size:12px!important;font-weight:650!important}
+#grCrmWorkspace .gr360-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;background:linear-gradient(116deg,#112b62 0%,#1e4893 52%,#2a63c9 100%);color:white;border-radius:19px;padding:24px 25px;box-shadow:0 12px 30px #0e326625}
+#grCrmWorkspace .gr360-hero-main{display:flex;align-items:center;gap:17px;min-width:0;flex:1}
+#grCrmWorkspace .gr360-avatar{width:67px;height:67px;flex:0 0 67px;border-radius:18px;display:grid;place-items:center;background:#ffffff2a;border:1px solid #ffffff65;color:white;font-weight:800;font-size:22px;letter-spacing:-.03em}
+#grCrmWorkspace .gr360-identity{min-width:0}
+#grCrmWorkspace .gr360-identity .gr360-eyebrow{display:block;font-size:10px;font-weight:750;letter-spacing:.13em;color:#b8d7ff}
+#grCrmWorkspace .gr360-identity h2{color:#fff!important;font-size:25px!important;line-height:1.2!important;font-weight:750!important;letter-spacing:-.035em;margin:4px 0!important;overflow-wrap:anywhere}
+#grCrmWorkspace .gr360-identity p{font-size:12px!important;color:#d5e4ff!important;line-height:1.45;margin:4px 0 0}
+#grCrmWorkspace .gr360-tags{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:10px}
+#grCrmWorkspace .gr360-tags span{border:1px solid #ffffff55;background:#ffffff1f;color:#e9f1ff;font-size:10px;font-weight:650;padding:4px 8px;border-radius:999px}
+#grCrmWorkspace .gr360-tags .repeat{color:#b9fad4;border-color:#7ccba9}
+#grCrmWorkspace .gr360-hero-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px}
+#grCrmWorkspace .gr360-btn{width:auto!important;max-width:100%;font-size:11.5px!important;line-height:1.35!important;padding:9px 12px!important;border-radius:9px!important;background:#f0f5ff!important;border:1px solid #d5e3fb!important;color:#2050a5!important;font-weight:650!important;white-space:normal}
+#grCrmWorkspace .gr360-btn:hover{background:#dfebff!important}
+#grCrmWorkspace .gr360-btn:disabled{opacity:.5;cursor:not-allowed}
+#grCrmWorkspace .gr360-hero .gr360-btn{background:#ffffff17!important;color:#fff!important;border:1px solid #ffffff66!important}
+#grCrmWorkspace .gr360-hero .gr360-btn.main{background:#fff!important;color:#1a468f!important;border-color:#fff!important}
+#grCrmWorkspace .gr360-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+#grCrmWorkspace .gr360-stat{min-width:0;border:1px solid #e0e8f6;background:#fff;border-radius:13px;padding:15px 17px;box-shadow:0 4px 17px #113a7508}
+#grCrmWorkspace .gr360-stat small{display:block;font-size:11px!important;color:#68809f!important;font-weight:600!important;line-height:1.4}
+#grCrmWorkspace .gr360-stat strong{display:block;margin:7px 0 4px!important;font-size:20px!important;letter-spacing:-.03em;font-variant-numeric:tabular-nums;font-weight:750!important;line-height:1.25!important;color:#163c86!important;overflow-wrap:anywhere}
+#grCrmWorkspace .gr360-stat span{font-size:10.5px;line-height:1.45;color:#8898b1}
+#grCrmWorkspace .gr360-main-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(290px,.9fr);gap:16px;align-items:start}
+#grCrmWorkspace .gr360-primary,#grCrmWorkspace .gr360-aside{display:grid;gap:16px;min-width:0}
+#grCrmWorkspace .gr360-panel{padding:21px 22px;background:#fff;border:1px solid #e1e8f6;border-radius:16px;min-width:0;box-shadow:0 5px 19px #13356406}
+#grCrmWorkspace .gr360-panel-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+#grCrmWorkspace .gr360-kicker{display:block;font-size:9.5px;font-weight:800;letter-spacing:.11em;color:#3b68b6;margin-bottom:5px}
+#grCrmWorkspace .gr360-panel h3{margin:0!important;color:#203b66!important;font-size:16px!important;line-height:1.35!important;font-weight:750!important;letter-spacing:-.02em}
+#grCrmWorkspace .gr360-panel-heading p{margin:5px 0 0;color:#7990aa!important;font-size:11.5px!important;line-height:1.5}
+#grCrmWorkspace .gr360-hint{font-size:10px;color:#8798b2}
+#grCrmWorkspace .gr360-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:7px;align-items:end;height:240px;overflow-x:auto;padding:12px 2px 0;border-bottom:1px solid #e6eefa}
+#grCrmWorkspace .gr360-chart-month{display:flex;flex-direction:column;align-items:center;min-width:40px;height:100%;gap:5px}
+#grCrmWorkspace .gr360-chart-value{font-size:8.5px;color:#4c6893;line-height:1.25;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+#grCrmWorkspace .gr360-chart-track{width:100%;flex:1;display:flex;align-items:end;justify-content:center;min-height:0;background:repeating-linear-gradient(to top,#eef3fc 0,#eef3fc 1px,transparent 1px,transparent 46px);border-radius:2px}
+#grCrmWorkspace .gr360-chart-bar{width:66%;max-width:39px;min-height:2px;border-radius:7px 7px 1px 1px;background:linear-gradient(180deg,#93b4ff,#507ce8)}
+#grCrmWorkspace .gr360-chart-bar.recent{background:linear-gradient(180deg,#5296f7,#2257c9)}
+#grCrmWorkspace .gr360-chart-label{font-size:9.5px;font-weight:650;color:#778ba7;padding:3px 0 8px}
+#grCrmWorkspace .gr360-chart-foot{font-size:10.5px;color:#7b8ca4;margin-top:12px}
+#grCrmWorkspace .gr360-product{margin:0 0 17px}
+#grCrmWorkspace .gr360-product:last-child{margin-bottom:0}
+#grCrmWorkspace .gr360-product-line{display:flex;justify-content:space-between;align-items:start;gap:12px;min-width:0}
+#grCrmWorkspace .gr360-product-line>div{min-width:0}
+#grCrmWorkspace .gr360-product-line strong{display:block;font-size:12px!important;color:#233d69!important;font-weight:700!important;line-height:1.45;overflow-wrap:anywhere}
+#grCrmWorkspace .gr360-product-line small{display:block;font-size:10.5px!important;color:#7f8ea6!important;line-height:1.5;margin:3px 0}
+#grCrmWorkspace .gr360-product-line b{font-size:12px;white-space:nowrap;font-weight:750;color:#2252a4}
+#grCrmWorkspace .gr360-product-track{height:8px;border-radius:999px;background:#eaf0fa;overflow:hidden;margin-top:8px}
+#grCrmWorkspace .gr360-product-track span{height:100%;background:linear-gradient(90deg,#3164d6,#6395f7);border-radius:999px;display:block}
+#grCrmWorkspace .gr360-contact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0}
+#grCrmWorkspace .gr360-contact{padding:11px 8px;border-bottom:1px solid #f0f3f9;min-width:0}
+#grCrmWorkspace .gr360-contact span{display:block;font-size:10px;color:#8395af;font-weight:600;margin-bottom:6px}
+#grCrmWorkspace .gr360-contact strong,#grCrmWorkspace .gr360-contact a{display:block;font-size:11.5px!important;color:#25416d!important;line-height:1.45!important;font-weight:650!important;overflow-wrap:anywhere;text-decoration:none}
+#grCrmWorkspace .gr360-contact a{color:#2260c7!important}
+#grCrmWorkspace .gr360-contact-footer{padding:13px 8px 2px}
+#grCrmWorkspace .gr360-contact-footer strong{font-size:11px!important;color:#45618a}
+#grCrmWorkspace .gr360-contact-footer p{font-size:11.5px!important;color:#627899!important;line-height:1.6!important;overflow-wrap:anywhere;margin:7px 0 10px}
+#grCrmWorkspace .gr360-notes{font-size:12px!important;color:#627995!important;line-height:1.65!important;white-space:pre-wrap;margin:0}
+#grCrmWorkspace .gr360-wide{width:100%}
+#grCrmWorkspace .gr360-tablewrap{max-width:100%;overflow-x:auto;border:1px solid #ebf0f8;border-radius:10px}
+#grCrmWorkspace .gr360-table{width:100%;min-width:880px;table-layout:auto}
+#grCrmWorkspace .gr360-table thead th{font-size:10px!important;padding:11px!important;text-transform:uppercase;color:#7b8ca4!important;background:#f7faff!important;white-space:nowrap!important}
+#grCrmWorkspace .gr360-table tbody td{font-size:11.5px!important;padding:13px 11px!important;color:#314766!important;white-space:normal;vertical-align:top;line-height:1.5!important}
+#grCrmWorkspace .gr360-table tbody td strong{font-size:11.5px!important;line-height:1.45!important;color:#20406f!important}
+#grCrmWorkspace .gr360-table tbody td small{display:block;font-size:10px!important;color:#8191a7!important;line-height:1.5!important;margin-top:3px}
+#grCrmWorkspace .gr360-row-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px}
+#grCrmWorkspace .gr360-row-actions .gr360-btn{font-size:10px!important;padding:6px 8px!important}
+#grCrmWorkspace .gr360-status{display:inline-block;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700;color:#345fa1;background:#eef3fc;white-space:nowrap}
+#grCrmWorkspace .gr360-status.delivered{background:#e5f8ee;color:#22764b}
+#grCrmWorkspace .gr360-bottom-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+#grCrmWorkspace .gr360-bottom-grid>.gr360-panel:last-child{grid-column:1/-1}
+#grCrmWorkspace .gr360-event{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid #eef2f9;font-size:11px;color:#647b9d}
+#grCrmWorkspace .gr360-event:last-child{border-bottom:0}
+#grCrmWorkspace .gr360-event-dot{flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:#4976d8;margin-top:5px;box-shadow:0 0 0 4px #e8f0ff}
+#grCrmWorkspace .gr360-event-dot.purple{background:#7e64c6;box-shadow:0 0 0 4px #f0eaff}
+#grCrmWorkspace .gr360-event-dot.green{background:#26a67a;box-shadow:0 0 0 4px #e2f8ed}
+#grCrmWorkspace .gr360-event>div{flex:1;min-width:0}
+#grCrmWorkspace .gr360-event-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+#grCrmWorkspace .gr360-event-top strong{font-size:12px!important;color:#21416f!important;line-height:1.4!important;overflow-wrap:anywhere}
+#grCrmWorkspace .gr360-event p{font-size:11.5px!important;color:#5d7391!important;line-height:1.6!important;margin:6px 0}
+#grCrmWorkspace .gr360-event small{font-size:10.5px;color:#8596ac;line-height:1.5}
+#grCrmWorkspace .gr360-event a{display:block;font-size:11px;margin-top:8px;color:#245fbe}
+#grCrmWorkspace .gr360-empty{padding:23px 16px;background:#f7faff;border:1px dashed #dae5f5;border-radius:11px;text-align:center;color:#7890b0;font-size:11.5px;line-height:1.55}
+#grCrmWorkspace .gr360-disclaimer{padding:12px 15px;background:#edf3fc;border:1px solid #dbe5f5;border-radius:10px;color:#647b9c;font-size:11px;line-height:1.65}
+#grCrmWorkspace .gr-customer-name-link{display:inline-block!important;width:auto!important;border:0!important;padding:0!important;text-align:left!important;color:#1b4cad!important;background:transparent!important;font-size:12.5px!important;font-weight:700!important;line-height:1.4!important;white-space:normal!important}
+#grCrmWorkspace .gr-customer-name-link:hover{text-decoration:underline}
+@media(max-width:1200px){#grCrmWorkspace .gr360-main-grid{grid-template-columns:1fr}#grCrmWorkspace .gr360-aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){#grCrmWorkspace .gr360-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#grCrmWorkspace .gr360-aside{grid-template-columns:1fr}#grCrmWorkspace .gr360-bottom-grid{grid-template-columns:1fr}#grCrmWorkspace .gr360-bottom-grid>.gr360-panel:last-child{grid-column:1}}
+@media(max-width:600px){#grCrmWorkspace .gr360-hero{padding:18px}#grCrmWorkspace .gr360-hero-main{align-items:flex-start}#grCrmWorkspace .gr360-avatar{width:52px;height:52px;flex-basis:52px;font-size:18px;border-radius:14px}#grCrmWorkspace .gr360-identity h2{font-size:20px!important}#grCrmWorkspace .gr360-hero-actions{justify-content:flex-start}#grCrmWorkspace .gr360-stats{gap:9px}#grCrmWorkspace .gr360-stat{padding:12px}#grCrmWorkspace .gr360-stat strong{font-size:17px!important}#grCrmWorkspace .gr360-panel{padding:16px}#grCrmWorkspace .gr360-contact-grid{grid-template-columns:1fr}#grCrmWorkspace .gr360-chart{gap:4px}#grCrmWorkspace .gr360-chart-month{min-width:40px}}
