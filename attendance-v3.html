@@ -16,7 +16,7 @@
  <div class="panel"><div class="row"><div><h2>My Daily Attendance</h2><p>Check-in and check-out use server time in the company timezone.</p></div><span class="pill" id="todayLabel"></span></div>
  <div class="av-actions"><button type="button" class="blue" id="checkIn">Check In</button><button type="button" class="secondary" id="checkOut">Check Out</button><span id="clockStatus"></span></div></div>
  <div class="panel"><div class="row"><h2>Monthly Attendance</h2><label>Month<input id="myMonth" type="month"></label></div><div id="mySummary" class="cards"></div>
- <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (UTC)</th><th>Check Out (UTC)</th><th>Hours</th></tr></thead><tbody id="myRows"></tbody></table></div><div class="av-pager"><button id="myPrev" type="button">Previous</button><span id="myPager"></span><button id="myNext" type="button">Next</button></div></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (IST)</th><th>Check Out (IST)</th><th>Hours</th></tr></thead><tbody id="myRows"></tbody></table></div><div class="av-pager"><button id="myPrev" type="button">Previous</button><span id="myPager"></span><button id="myNext" type="button">Next</button></div></div>
 </section>
 <section id="tab-requests" class="av-section" hidden>
 <div class="av-grid"><div class="panel"><h2>Request Attendance Correction</h2><p>For a previous date only. An Office Admin must approve.</p>
@@ -40,7 +40,7 @@
  <label>From<input name="from" id="adminFrom" type="date"></label><label>To<input name="to" id="adminTo" type="date"></label>
  <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
  <button class="blue">Apply Filters</button></form>
- <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (UTC)</th><th>Out (UTC)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (IST)</th><th>Out (IST)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
  <div class="av-grid">
  <div class="panel"><h2>Mark / Correct Attendance</h2><form id="adminMark" class="av-form">
  <label>Employee<select name="userId" id="markEmployee" required></select></label><label>Date<input name="date" type="date" required></label>
