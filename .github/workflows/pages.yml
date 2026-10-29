@@ -13,6 +13,10 @@ on:
       - 'roles.html'
       - 'roles-manager.js'
       - 'roles-manager.css'
+      - 'attendance-control.html'
+      - 'attendance-control.js'
+      - 'attendance-control.css'
+      - 'phase1/office-admin-attendance.sql'
       - 'demo.js'
       - 'attendance-ui.js'
       - 'legacy.html'
@@ -48,6 +52,10 @@ jobs:
           test -s roles-manager.js
           test -s roles-manager.css
           node --check roles-manager.js
+          test -s attendance-control.html
+          test -s attendance-control.js
+          test -s attendance-control.css
+          node --check attendance-control.js
           test -s demo.html
           node --check demo.js
           node --check attendance-ui.js
