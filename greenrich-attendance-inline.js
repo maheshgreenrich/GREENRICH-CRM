@@ -165,21 +165,36 @@ window.GreenRichAttendance=(function(){
  }
  async function loadStaff(){
   if(!manager())return;
-  const [employees,depts]=await Promise.all([request('/admin/staff'),request('/admin/departments')]);
-  staff=employees||[];departments=depts||[];
+  const [employees,rolesResponse]=await Promise.all([request('/admin/staff'),db.from('gr_roles').select('id,name').order('name')]);
+  if(rolesResponse.error)throw Error('Unable to load user roles: '+rolesResponse.error.message);
+  staff=employees||[];
+  const userRoles=rolesResponse.data||[],roleName=id=>userRoles.find(r=>r.id===id)?.name||'Employee';
   const users=staff.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.full_name)+'</option>').join('');
   $('#markEmployee').innerHTML=users;
-  const oldFilter=$('#filterEmployee').value,oldDepartment=$('#filterDepartment').value;
+  const previousEmployee=$('#filterEmployee').value,previousRole=$('#filterRole').value;
   $('#filterEmployee').innerHTML='<option value="">All Employees</option>'+users;
-  $('#filterDepartment').innerHTML='<option value="">All Departments</option>'+departments.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('');
-  $('#filterEmployee').value=oldFilter;$('#filterDepartment').value=oldDepartment;
-  $('#bulkUsers').innerHTML=staff.map(p=>'<div class="av-staff-row" data-staff="'+esc(p.id)+'"><label><input class="av-employee-check" type="checkbox" value="'+esc(p.id)+'" '+(p.id===ownId?'disabled title="Use My Attendance for your own check-in"':'')+'><span>'+esc(p.full_name)+'</span></label><small data-current="'+esc(p.id)+'">Not marked</small><div class="av-row-quick"><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="PRESENT">P</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="ABSENT">A</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="HALF_DAY">½</button></div></div>').join('')||'<p>No active employee accounts found.</p>';
+  $('#filterRole').innerHTML='<option value="">All Roles</option>'+userRoles.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('');
+  $('#filterEmployee').value=previousEmployee;$('#filterRole').value=previousRole;
+  const actions=[
+   {status:'PRESENT',text:'Present',color:'present'},
+   {status:'ABSENT',text:'Absent',color:'absent'},
+   {status:'HALF_DAY',text:'Half Day',color:'half'},
+   {status:'WEEKEND',text:'Weekend',color:'weekend'},
+   {status:'HOLIDAY',text:'Holiday',color:'holiday'},
+   {status:'PAID_LEAVE',text:'Paid Leave',color:'leave'}
+  ];
+  $('#bulkUsers').innerHTML=staff.map(p=>'<div class="av-staff-row" data-staff="'+esc(p.id)+'"><label class="av-staff-identity"><input class="av-employee-check" type="checkbox" value="'+esc(p.id)+'" '+(p.id===ownId?'disabled title="Use the Check In / Check Out buttons for your own attendance"':'')+'><span><strong>'+esc(p.full_name)+'</strong><small>'+esc(roleName(p.role_id))+'</small></span></label><small data-current="'+esc(p.id)+'">Not marked</small><div class="av-row-quick">'+actions.map(a=>'<button type="button" class="av-status-btn av-status-'+a.color+'" data-quick-id="'+esc(p.id)+'" data-quick-status="'+a.status+'" title="'+a.text+'">'+a.text+'</button>').join('')+'</div></div>').join('')||'<p>No active employee accounts found.</p>';
   $$('#bulkUsers .av-employee-check').forEach(b=>b.onchange=updateSelected);
   $$('#bulkUsers [data-quick-id]').forEach(b=>b.onclick=()=>safe(async()=>{
-   const form=$('#bulkForm'),date=input(form,'date'),reason=input(form,'reason')?.trim();
-   if(!date||!reason||reason.length<3)throw Error('Select date and enter a reason before marking.');
-   if(!confirm('Mark '+staff.find(p=>p.id===b.dataset.quickId)?.full_name+' as '+b.dataset.quickStatus+' on '+date+'?'))return;
-   b.disabled=true;try{await request('/admin/attendance','POST',{userId:b.dataset.quickId,date,status:b.dataset.quickStatus,reason});notify('Employee attendance saved and audited.');await loadAdmin();}finally{b.disabled=false}
+    const form=$('#bulkForm'),date=input(form,'date'),reason=input(form,'reason').trim();
+    if(!date)throw Error('Select an attendance date');
+    if(!confirm('Mark '+staff.find(p=>p.id===b.dataset.quickId)?.full_name+' as '+b.dataset.quickStatus.replace('_',' ')+' on '+date+'?'))return;
+    b.disabled=true;
+    try{
+     await request('/admin/attendance','POST',{userId:b.dataset.quickId,date,status:b.dataset.quickStatus,reason});
+     notify('Attendance updated. Changes are saved immediately.');
+     await loadAdmin();
+    }finally{b.disabled=false}
   }));
   updateSelected();
  }
