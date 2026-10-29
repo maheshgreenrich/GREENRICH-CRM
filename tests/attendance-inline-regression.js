@@ -12,7 +12,7 @@ const singleSelectorIterations=[...inline.matchAll(/(?<!\$)\$\([^)]*\)\.(?:forEa
 assert.equal(singleSelectorIterations.length,0,'Single DOM elements cannot be iterated as arrays: '+singleSelectorIterations.map(m=>m[0]).join(', '));
 assert.match(inline,/\$\$\('\.av-tab'\)\.forEach/,'Office Admin tabs must use querySelectorAll');
 assert.match(inline,/\$\$\('\.av-section'\)\.forEach/,'Office Admin sections must use querySelectorAll');
-assert.match(inline,/\$\$\('#assignmentRows \[data-assign\]'\)\.forEach/,'Employee assignment buttons must use querySelectorAll');
+assert.match(inline,/\$\$\('#bulkUsers \[data-quick-id\]'\)\.forEach/,'Employee quick attendance buttons must use querySelectorAll');
 assert.match(inline,/await loadAdmin\(\)/,'Office Admin attendance should open employee table');
 assert.match(inline,/request\('\/admin\/staff'\)/,'Employees must load through the protected staff API');
 assert.match(main,/GreenRichAttendance\.mount\(c\)/,'Attendance must render inside GreenRich ONE');
