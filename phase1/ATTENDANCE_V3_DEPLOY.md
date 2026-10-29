@@ -1,0 +1,123 @@
+# GreenRich ONE — Attendance V3
+
+## Stack and integration
+
+- **Frontend:** GreenRich ONE static HTML/CSS/JavaScript on GitHub Pages.
+- **Authentication:** existing Supabase Auth (email/password).
+- **Employee records:** existing `public.gr_profiles` and `public.gr_roles`.
+- **API:** Supabase Edge Function `attendance-api` (Deno/TypeScript), organized into controllers, services and repositories.
+- **Database:** new PostgreSQL `grm_*` tables with RLS and service-role-only transactional RPCs.
+- **Office timezone:** Asia/Kolkata (UTC timestamps in Postgres). The UI date/time inputs assume IST. **If you change the timezone**, update the frontend conversion function and Cron schedule together.
+
+The V3 schema is **isolated** from the old `gr_attendance` and browser-local demo, so deploying it does not migrate, replace or delete previous attendance. Do not run the older Office Admin attendance SQL and the V3 SQL interchangeably.
+
+### Role mapping
+
+- `Admin` → **SUPER_ADMIN** (all attendance and user management via existing Admin workflow).
+- `Office Admin` → **OFFICE_ADMIN** (all attendance, correction/leave reviews, shifts, departments, holidays, exports).
+- Every other active GreenRich role → **EMPLOYEE** for V3 attendance.
+
+**Important:** Attendance V3 uses this explicit role policy. The legacy role-matrix `own/team/all` settings are separate and do **not** override the V3 Office Admin/Employee access policy. The backend checks the active Auth user and database role for *every* request. Merely assigning a role name does not create a login.
+
+## One-time deployment (developer/administrator)
+
+**Protect production:** First back up the Supabase project and run these changes in a staging project. Verify the SQL tests and the V3 UI before switching live attendance.
+
+1. Use a linked Supabase CLI project. Existing GreenRich SQL was manually applied in the dashboard, so inspect `supabase migration list` and reconcile migration history before `supabase db push`; do **not** blindly repair or reset a production database.
+2. Apply these migrations **in this order**, once each:
+   - `supabase/migrations/20261029090000_attendance_v3.sql`
+   - `supabase/migrations/20261029090100_attendance_v3_ops.sql`
+   - `supabase/migrations/20261029090200_attendance_v3_assign.sql`
+3. Deploy the complete folder (not just index.ts) using:
+   ```bash
+   supabase login
+   supabase link --project-ref uawgwkplkvahhmhvroul
+   supabase db push
+   supabase functions deploy attendance-api
+   ```
+   Alternatively use a Supabase project **Dashboard → SQL Editor** to run the three migration files in order. This is a **one-time** installation, not per-employee SQL. Deploy the entire function folder using the CLI; the dashboard editor would require copying all imported files.
+4. Supabase normally supplies `SUPABASE_URL` and the service-role key or named secret keys to Edge Functions. Check that the private server environment contains the expected credentials. **Never** put a service-role/secret key into GitHub Pages, messages or committed frontend code.
+5. Keep **Verify JWT enabled** for user-facing `attendance-api`. The function additionally verifies the user JWT via Supabase Auth and checks that their profile is active. Requests must include a real Auth JWT as `Authorization: Bearer ...` and the public project key as `apikey`.
+6. Open `https://maheshgreenrich.github.io/GREENRICH-CRM/attendance-v3.html`. Sign in first at `secure.html`.
+7. For scheduled ABSENT records, enable Supabase Cron under **Integrations → Cron**; review/run `supabase/scheduling/attendance_absences.sql` after checking that the project's Cron scheduler uses UTC. It runs at **19:30 UTC = 01:00 IST** and marks the previously completed office day. Holidays, weekends, approved leave and employees not yet joined are excluded. Monitor Cron job history.
+
+### Office Admin user setup
+
+1. Sign in as the original `Admin` account.
+2. Create an employee Auth account and `gr_profiles` record, assigning role **Office Admin**. Create additional employee logins for other staff.
+3. On Attendance V3, Office Admin can view all employees, set departments/shifts, mark/correct/delete any date **with a mandatory reason**, bulk mark, review corrections and leave, manage holidays/shifts, and download monthly CSV, Excel (.xls XML Spreadsheet 2003) or PDF.
+4. Employees can check in and out exactly once per office day using **server time**, read only their history, request corrections for past dates, and submit/track leave.
+
+Employee accounts and role administration are managed through GreenRich ONE's existing Admin workflow; V3 does not provision Auth users. Its `Office Admin` role does not automatically gain the ability to create/disable other users or edit the role matrix.
+
+## API endpoints (base: `/functions/v1/attendance-api`)
+
+| Method | Route | Role |
+|---|---|---|
+| POST | `/attendance/check-in` | Employee |
+| POST | `/attendance/check-out` | Employee |
+| GET | `/attendance/me?from=&to=&page=&pageSize=` | Employee |
+| GET | `/attendance/me/summary?month=` | Employee |
+| POST | `/attendance/corrections` | Employee |
+| GET | `/attendance/corrections/me?page=` | Employee |
+| POST | `/leaves` | Employee |
+| GET | `/leaves/me?page=` | Employee |
+| GET | `/admin/staff` | Office Admin |
+| PUT | `/admin/staff/:id/assignment` | Office Admin |
+| GET | `/admin/attendance?userId=&department=&from=&to=&status=&page=&pageSize=` | Office Admin |
+| POST | `/admin/attendance` | Office Admin |
+| POST | `/admin/attendance/bulk` | Office Admin |
+| PUT | `/admin/attendance/:id` | Office Admin |
+| DELETE | `/admin/attendance/:id` | Office Admin |
+| GET | `/admin/corrections?status=&page=` | Office Admin |
+| PATCH | `/admin/corrections/:id/review` | Office Admin |
+| GET | `/admin/leaves?status=&page=` | Office Admin |
+| PATCH | `/admin/leaves/:id/review` | Office Admin |
+| GET | `/admin/reports/monthly?month=YYYY-MM&format=csv|xls|pdf` | Office Admin |
+| GET/POST | `/admin/holidays`, `/admin/shifts`, `/admin/departments` | Office Admin |
+| PUT/DELETE | `/admin/holidays/:id`, `/admin/shifts/:id`, `/admin/departments/:id` | Office Admin |
+
+JSON success shape: `{"data":...}`; errors: `{"error":{"message":"...","status":400}}`. Pagination: `page` starts at 1; `pageSize` 1–100; lists return `items,page,pageSize,total,pages`.
+
+### Examples
+
+```json
+POST /attendance/corrections
+{"date":"2026-10-28","requestedCheckIn":"2026-10-28T09:30:00+05:30","requestedCheckOut":"2026-10-28T18:00:00+05:30","reason":"Forgot to check out"}
+```
+
+```json
+POST /admin/attendance/bulk
+{"userIds":["UUID-1","UUID-2"],"date":"2026-10-28","status":"PRESENT","reason":"Manual back-office correction"}
+```
+
+Bulk marking is **atomic** (all employees or none), limited to 200 per operation. All Admin record writes are soft-deleted/audited with mandatory reasons. Direct database writes from the browser are not granted.
+
+## Business rules
+
+- Server time from PostgreSQL; no user-supplied dates allowed for clock-in/out.
+- One unique attendance record per user/date, with row locking during checkout; overnight shifts can check out the next day.
+- Late determined by shift start plus grace; half-day determined by completed hours.
+- Employee past-date changes require an approved correction, never direct edits.
+- Office Admin can mark, update or soft-delete with a reason and audit entries.
+- Cron absence job excludes holidays, weekends and approved leave, with idempotent retries.
+- Data is stored in `timestamptz` (UTC), displayed in IST.
+- Work department and shift assignment is audited.
+- RLS denies employee reads of other employees and denies **all direct authenticated writes** to V3 attendance tables.
+
+## Testing and release checklist
+
+The GitHub Actions workflow `Attendance V3 checks` runs `deno check`, API route tests and an isolated PostgreSQL integration suite. Additional manual checks required before production:
+
+- Employee A cannot access employee B's attendance, use admin endpoints or execute privileged RPCs directly.
+- Office Admin sees all employees and can mark, edit and soft-delete another employee's record.
+- Same employee cannot check in twice or check out before checking in.
+- Late/grace, half-day thresholds and overnight checkouts follow assigned shift.
+- Corrections/leave approvals update appropriate records and never approve twice.
+- Holidays/weekends/leave are excluded from daily absences.
+- Bulk actions commit atomically, repeated Cron runs do not duplicate records.
+- Exports contain the correct office-local dates; test CSV/Excel formula injection and PDF special characters.
+- Audit rows contain actor, action, reason and record changes.
+- Test desktop and mobile browsers.
+
+**Status:** Repository implementation only; do not call this deployed or production-verified until the migration, function, Cron, CI and manual security tests pass against your own Supabase project.
