@@ -32,4 +32,25 @@ const summary=report.slice(report.indexOf('export function buildMonthlySummaryEx
 for(const col of ['Employee Name','Present Days','Absent Days','Paid Leave','Unpaid Leave','Late Days','Permission Days'])assert.ok(summary.includes("'"+col+"'"));
 assert.doesNotMatch(summary,/\['Date','Employee','Status'/,'Summary should not have detailed log columns');
 assert.match(summary,/ss:Type="Number"/);
+
+/* Report grid and page order must be identical in embedded and standalone Attendance. */
+const inlineMarkupLiteral=client.match(/container\\.innerHTML=("(?:\\\\.|[^"\\\\])*");await init\\(\\)/)?.[1];
+assert.ok(inlineMarkupLiteral,'Embedded attendance template must be available for layout verification');
+const inlineMarkup=JSON.parse(inlineMarkupLiteral);
+const sectionOrder=[
+ 'Approval Inbox','Employee Attendance & Reports','Quick Employee Attendance',
+ 'Monthly Attendance Reports','Download Attendance Report','All Employees · Monthly Summary',
+ 'Mark / Correct Attendance','Attendance Corrections for Approval','Leave Requests for Approval'
+];
+for(const [label,html] of [['standalone',markup],['embedded',inlineMarkup]]){
+ let last=-1;
+ for(const title of sectionOrder){const position=html.indexOf(title);assert.ok(position>last,label+': unexpected section order at '+title);last=position}
+ assert.match(html,/class="av-grid av-report-download-grid"/,label+': download cards must sit in one row');
+ assert.match(html,/class="panel av-summary-download"/,label+': monthly summary must be a separate panel');
+ assert.match(html,/class="panel av-mark-panel"/,label+': preserve Mark/Correct Attendance after downloads');
+ assert.equal((html.match(/id="monthlyEmployeeList"/g)||[]).length,1,label+': employee list should exist once');
+}
+assert.match(css,/#tab-admin \.av-monthly-reports \.av-monthly-employee-list\{[\s\S]*?grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+assert.match(css,/#tab-admin \.av-report-download-grid\{[\s\S]*?grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+
 console.log('PASS monthly employee popup, month switching, 3 individual export formats, count-only summary Excel and protected API');

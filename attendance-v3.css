@@ -322,3 +322,66 @@
  #app header #grAttendanceSwitch{min-width:auto}
  #app header .profile{margin-left:auto !important}
 }
+
+/* Employee Attendance: requested full-width section order and compact report directory. */
+#tab-admin > .av-approvals-panel,
+#tab-admin > .av-monthly-reports,
+#tab-admin > .av-mark-panel{width:100%;max-width:none;min-width:0}
+#tab-admin .av-attendance-admin-actions{width:100%;margin-bottom:20px}
+#tab-admin .av-attendance-admin-actions > .av-bulk-panel{grid-column:1 / -1;min-width:0}
+#tab-admin .av-monthly-reports{margin-top:0}
+#tab-admin .av-monthly-reports .av-monthly-employee-list{
+ display:grid;
+ grid-template-columns:repeat(5,minmax(0,1fr));
+ gap:12px;
+ max-height:none;
+ overflow:visible;
+}
+#tab-admin .av-monthly-reports .av-report-employee{
+ display:grid;
+ grid-template-columns:32px minmax(0,1fr);
+ grid-template-rows:auto 1fr;
+ align-items:start;
+ column-gap:9px;
+ row-gap:6px;
+ padding:12px;
+ min-width:0;
+ min-height:102px;
+}
+#tab-admin .av-monthly-reports .av-report-employee-icon{width:32px;height:32px}
+#tab-admin .av-monthly-reports .av-report-employee-name{font-size:12.5px;line-height:1.35;align-self:center}
+#tab-admin .av-monthly-reports .av-report-employee-action{grid-column:1 / -1;white-space:normal;font-size:11px;line-height:1.4}
+#tab-admin .av-report-download-grid{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:18px;
+ width:100%;
+ align-items:stretch;
+ margin:0 0 20px;
+}
+#tab-admin .av-report-download-grid > .panel{
+ margin:0;
+ min-width:0;
+ height:100%;
+}
+#tab-admin .av-report-download-grid > .av-summary-download{
+ padding:20px;
+ border:1px solid #e1e8f5;
+}
+#tab-admin .av-report-download-grid .av-monthly-selector-row{align-items:end}
+#tab-admin .av-mark-panel{margin-top:0}
+@media(max-width:1400px){
+ #tab-admin .av-monthly-reports .av-monthly-employee-list{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:1100px){
+ #tab-admin .av-monthly-reports .av-monthly-employee-list{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+ #tab-admin .av-report-download-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:760px){
+ #tab-admin .av-monthly-reports .av-monthly-employee-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+ #tab-admin .av-monthly-reports .av-monthly-employee-list{grid-template-columns:minmax(0,1fr)}
+}

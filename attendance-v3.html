@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Attendance Management | GreenRich ONE</title>
-<link rel="stylesheet" href="greenrich-one.css"><link rel="stylesheet" href="attendance-v3.css">
+<link rel="stylesheet" href="greenrich-one.css"><link rel="stylesheet" href="attendance-v3.css?v=attendance-sections-20261029-1">
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script defer src="attendance-v3.js?v=2"></script></head>
 <body>
@@ -62,25 +62,23 @@
  <div id="adminChartSummary" class="cards av-summary-cards"></div><div id="adminChart" class="av-donut-view" aria-label="Attendance status round chart"></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (IST)</th><th>Out (IST)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
  <div class="av-grid av-attendance-admin-actions">
- <div class="panel"><h2>Mark / Correct Attendance</h2><form id="adminMark" class="av-form">
- <label>Employee<select name="userId" id="markEmployee" required></select></label><label>Date<input name="date" type="date" required></label>
- <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
- <label>Check-in (optional)<input name="checkIn" type="datetime-local"></label><label>Check-out (optional)<input name="checkOut" type="datetime-local"></label>
- <label>Note (optional)<textarea name="reason" rows="2" maxlength="1000"></textarea></label><button class="blue" type="submit">Save Attendance</button></form></div>
  <div class="panel av-bulk-panel"><h2>Quick Employee Attendance</h2><p>Select employees and mark their attendance individually or in bulk. Choose a date and a status; notes are optional.</p>
  <form class="av-form" id="bulkForm">
  <label>Date<input name="date" type="date" required></label>
  <label class="av-bulk-hidden">Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>HALF_DAY</option><option>WEEKEND</option><option>HOLIDAY</option><option>PAID_LEAVE</option></select></label>
  <label class="av-select-all"><input type="checkbox" id="selectAllEmployees"> Select All Employees <small id="selectedStaffCount">0 selected</small></label>
  <div class="av-bulklist av-bulk-table" id="bulkUsers"></div><label>Note (optional)<textarea name="reason" maxlength="1000"></textarea></label>
- <div class="av-actions"><button type="button" data-bulk-status="PRESENT" class="blue">✓ Mark Present</button><button type="button" data-bulk-status="ABSENT" class="secondary">Mark Absent</button><button type="button" data-bulk-status="HALF_DAY" class="secondary">Mark Half Day</button><button type="button" data-bulk-status="WEEKEND" class="secondary">Mark Weekend</button><button type="button" data-bulk-status="HOLIDAY" class="secondary">Mark Holiday</button><button type="button" data-bulk-status="PAID_LEAVE" class="secondary">Mark Paid Leave</button><button type="submit" class="av-hidden-submit" hidden>Save Selected</button></div></form></div></div>
- <div class="panel"><div class="row"><h2>Download Attendance Report</h2><input id="reportMonth" type="hidden"></div>
- <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
- <section class="panel av-monthly-reports" id="monthlyReportsSection">
+ <div class="av-actions"><button type="button" data-bulk-status="PRESENT" class="blue">✓ Mark Present</button><button type="button" data-bulk-status="ABSENT" class="secondary">Mark Absent</button><button type="button" data-bulk-status="HALF_DAY" class="secondary">Mark Half Day</button><button type="button" data-bulk-status="WEEKEND" class="secondary">Mark Weekend</button><button type="button" data-bulk-status="HOLIDAY" class="secondary">Mark Holiday</button><button type="button" data-bulk-status="PAID_LEAVE" class="secondary">Mark Paid Leave</button><button type="submit" class="av-hidden-submit" hidden>Save Selected</button></div></form></div>
+</div>
+<section class="panel av-monthly-reports" id="monthlyReportsSection">
  <div class="row"><div><h2>Monthly Attendance Reports</h2><p>Select an employee to open their monthly attendance calendar and download their report.</p></div></div>
  <h3 class="av-employee-list-title">Employee List</h3>
  <div id="monthlyEmployeeList" class="av-monthly-employee-list" aria-label="Employees for monthly attendance reports"></div>
- <div class="av-summary-download">
+</section>
+<div class="av-grid av-report-download-grid">
+ <div class="panel av-report-download-panel"><div class="row"><h2>Download Attendance Report</h2><input id="reportMonth" type="hidden"></div>
+ <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
+ <div class="panel av-summary-download">
   <h3>All Employees · Monthly Summary</h3>
   <p class="av-report-helper">Download one Excel sheet containing each employee's monthly Present, Absent, Leave, Late, Permission and other attendance counts. No daily log details.</p>
   <div class="av-monthly-selector-row">
@@ -89,7 +87,12 @@
   </div>
   <div id="allMonthlyReportInfo" class="av-report-info" aria-live="polite"></div>
  </div>
-</section>
+</div>
+<div class="panel av-mark-panel"><h2>Mark / Correct Attendance</h2><form id="adminMark" class="av-form">
+ <label>Employee<select name="userId" id="markEmployee" required></select></label><label>Date<input name="date" type="date" required></label>
+ <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
+ <label>Check-in (optional)<input name="checkIn" type="datetime-local"></label><label>Check-out (optional)<input name="checkOut" type="datetime-local"></label>
+ <label>Note (optional)<textarea name="reason" rows="2" maxlength="1000"></textarea></label><button class="blue" type="submit">Save Attendance</button></form></div>
 <div class="av-grid">
  <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
  <div class="panel"><h2>Leave Requests for Approval</h2><div id="adminLeaves"></div></div></div>
