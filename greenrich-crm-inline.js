@@ -70,6 +70,7 @@ window.GreenRichCRM={
   bind();navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
   return root;
  },
+ refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
  unmount:()=>{charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
 };
 })();
