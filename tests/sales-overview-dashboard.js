@@ -10,9 +10,9 @@ const dashboard=html.slice(html.indexOf('<section id="dashboard"'),html.indexOf(
 assert.ok(dashboard,'CRM dashboard template exists');
 for(const id of ['filter-company','filter-channel','filter-customer','filter-product','period','filter-from','filter-to','clear-filters'])
  assert.ok(dashboard.includes('id="'+id+'"'),'Missing filter '+id);
-for(const id of ['metrics','trend-chart','channel-chart','channel-breakdown','channel-progress','company-comparison','top-products','crm-overview'])
+for(const id of ['metrics','trend-chart','channel-chart','channel-breakdown','sales-insights','company-comparison','top-products','crm-overview'])
  assert.ok(dashboard.includes('id="'+id+'"'),'Missing visible dashboard section '+id);
-for(const id of ['dashboard-export-excel','dashboard-export-pdf','product-orders-dialog','product-orders-details'])
+for(const id of ['dashboard-export-excel','dashboard-export-pdf','product-orders-dialog','product-orders-details','channel-orders-dialog','channel-orders-details','close-channel-orders'])
  assert.ok(html.includes('id="'+id+'"'),'Missing dashboard action/dialog '+id);
 assert.ok(html.includes('greenrich-crm-inline.js?v=20261029-company-access-1'),'CRM cache version should refresh');
 assert.ok(crm.includes('const overviewSales=()=>scopedCompanyIds().flatMap'),'Comparison must respect per-user company access');
@@ -23,7 +23,12 @@ assert.ok(crm.includes("productKey(s)===product"),'Product filter should filter 
 assert.ok(crm.includes("channelForSale(s)===channel"),'Channel filter should filter rows');
 assert.ok(crm.includes('inPeriod(s)'),'Date period filter must remain');
 assert.ok(crm.includes('companyLabel(c.id)'),'Company totals should show company names');
-assert.ok(crm.includes('progressMarkup(channelPairs'),'Channel progress bars should be drawn');
+assert.ok(!dashboard.includes('id="channel-progress"'),'Remove duplicate Channel sales comparison panel');
+assert.ok(dashboard.includes('Average')===false,'Insights should be rendered from filtered sales, not static placeholder values');
+assert.ok(crm.includes('const channelQuantity=name=>rows.filter'),'Channel order quantities must be calculated from the filtered records');
+assert.ok(crm.includes('data-channel-drill'),'Channel sales legend must be clickable');
+assert.ok(crm.includes('showChannelOrders(channel.dataset.channelDrill)'),'Channel legend click must open drill-down');
+assert.ok(crm.includes('showChannelOrders(channelPairs[elements[0].index][0])'),'Doughnut segment click must open drill-down');
 assert.ok(crm.includes('progressMarkup(companyPairs'),'Company comparison should be drawn');
 assert.ok(crm.includes('channel-breakdown'),'Donut values must appear below chart');
 assert.ok(crm.includes('afterDatasetsDraw(chart)'),'Trend chart values should be drawn on canvas');
@@ -45,4 +50,20 @@ assert.ok(css.includes('#grCrmWorkspace .gr-progress-group'),'Progress charts sh
 const periods=['month','week','today','last30','all','custom'];
 for(const p of periods)assert.ok(dashboard.includes('value="'+p+'"'),'Existing date filter removed: '+p);
 for(const forbidden of ['attendance-v3.css','attendance-v3.js','greenrich-attendance-inline.js'])assert.ok(!crm.includes(forbidden),'CRM should not modify Attendance: '+forbidden);
+assert.ok(dashboard.includes('Sales insights'),'Helpful insights must replace duplicate channel progress panel');
+assert.ok(crm.includes("['Average order value'"),'Average order value insight missing');
+assert.ok(crm.includes("['Repeat customers'"),'Repeat-customer insight missing');
+assert.ok(crm.includes("['Pending orders'"),'Pending-order insight missing');
+assert.ok(crm.includes("['Highest sales day'"),'Best sales day missing');
+assert.ok(crm.includes('gr-product-revenue'),'Revenue column must be separately styled');
+assert.ok(crm.includes('class="gr-channel-qty"'),'Order quantity must be between name and revenue');
+assert.ok(crm.includes('channelOrderCount(name)'),'Channel order counts should use unique order IDs');
+assert.ok(crm.includes('const rows=filteredSales().filter(s=>channelForSale(s)===name)'),'Drilldown must use dashboard filters');
+for(const field of ['invoice_number','invoice_no','invoice_id','invoice_document_name','order_id','internal_order_id','tax_rate','tax_amount','shipping_charge','notes','person?.email','person?.mobile','person?.address1'])assert.ok(crm.includes(field),'Channel detail field missing: '+field);
+assert.ok(crm.includes('Not recorded'),'Missing invoice information must not be invented');
+assert.ok(crm.includes("dialog.showModal()"),'Channel drilldown must open dialog');
+assert.ok(css.includes('#grCrmWorkspace #top-products .gr-top-product > div:first-child > strong'),'Product title needs compact typography override');
+assert.ok(css.includes('#grCrmWorkspace #top-products .gr-top-product > strong.gr-product-revenue'),'Revenue must remain aligned and unwrapped');
+assert.ok(css.includes('#grCrmWorkspace .gr-channel-legend .gr-channel-row'),'Channel rows must be readable');
+assert.ok(css.includes('#grCrmWorkspace .gr-insight-grid'),'Sales insights must be responsive');
 console.log('PASS Sales Overview: company/customer/product/date/channel filters, visible charts, customer drill-down and visual exports');

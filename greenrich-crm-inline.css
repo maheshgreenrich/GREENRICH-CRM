@@ -388,3 +388,107 @@
 }
 
 #grCrmWorkspace #dashboard-export-actions[hidden]{display:none!important}
+
+/* GreenRich Sales overview: compact product text, aligned figures, interactive channel details. */
+#grCrmWorkspace #top-products{width:100%;min-width:0;margin-top:16px;overflow-x:auto}
+#grCrmWorkspace #top-products .gr-top-products-head,
+#grCrmWorkspace #top-products .gr-top-product{
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(112px,140px) minmax(112px,134px)!important;
+ align-items:center!important;column-gap:16px!important;min-width:0;
+}
+#grCrmWorkspace #top-products .gr-top-products-head{padding:8px 0 13px;line-height:1.4}
+#grCrmWorkspace #top-products .gr-top-products-head span:nth-child(2),
+#grCrmWorkspace #top-products .gr-top-products-head span:nth-child(3){text-align:right}
+#grCrmWorkspace #top-products .gr-top-product{padding:15px 0!important;min-height:0!important;line-height:1.35}
+#grCrmWorkspace #top-products .gr-top-product > div:first-child{min-width:0}
+#grCrmWorkspace #top-products .gr-top-product > div:first-child > strong{
+ display:block!important;font-family:Inter,system-ui,sans-serif!important;
+ font-size:13px!important;font-weight:650!important;line-height:1.45!important;
+ letter-spacing:0!important;color:#18366c!important;margin:0 0 4px!important;
+ text-transform:none!important;overflow-wrap:break-word
+}
+#grCrmWorkspace #top-products .gr-top-product > div:first-child > small{
+ display:block!important;font-size:11px!important;line-height:1.5!important;font-weight:400!important;
+ color:#7182a1!important;overflow-wrap:anywhere
+}
+#grCrmWorkspace #top-products .gr-top-product > strong.gr-product-revenue{
+ display:block!important;font-size:13px!important;font-weight:700!important;
+ line-height:1.5!important;letter-spacing:0!important;color:#153a81!important;
+ text-align:right!important;white-space:nowrap!important;margin:0!important;
+ font-variant-numeric:tabular-nums
+}
+#grCrmWorkspace #top-products .gr-product-bar-track{margin-top:10px!important}
+#grCrmWorkspace #top-products .gr-quantity-drill{
+ justify-self:end!important;max-width:100%;width:auto!important;min-width:0;
+ font-size:12px!important;line-height:1.3!important;font-weight:650!important;
+ padding:9px 12px!important;white-space:nowrap!important
+}
+#grCrmWorkspace .gr-channel-breakdown-header{display:grid;grid-template-columns:minmax(0,1fr) 100px minmax(105px,125px);gap:10px;
+ font-size:11px;font-weight:650;color:#8190a8;padding:8px 2px 0;margin-top:12px}
+#grCrmWorkspace .gr-channel-breakdown-header span:nth-child(n+2){text-align:right}
+#grCrmWorkspace .gr-channel-legend{margin-top:6px}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row{
+ display:grid!important;grid-template-columns:minmax(0,1fr) 100px minmax(105px,125px)!important;
+ gap:10px!important;align-items:center!important;
+ width:100%!important;padding:12px 2px!important;border:0!important;
+ border-top:1px solid #edf1f7!important;border-radius:0!important;
+ background:transparent!important;cursor:pointer;text-align:left!important;
+ font-size:12px!important;color:#304a76!important;line-height:1.4!important
+}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row:hover{background:#f6f9ff!important}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row:focus-visible{outline:2px solid #4774e4;outline-offset:2px}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-name{display:flex;min-width:0;align-items:center;gap:10px}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-name-text{min-width:0;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-qty{
+ display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+ color:#3f5b85;font-weight:600;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums
+}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-qty small{font-size:10px;line-height:1.3;color:#8493a9;font-weight:500}
+#grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-value{
+ margin:0!important;min-width:0!important;color:#1748ad!important;text-align:right!important;
+ white-space:nowrap!important;font-size:12px!important;font-weight:700!important;
+ line-height:1.4!important;letter-spacing:0!important;font-variant-numeric:tabular-nums
+}
+#grCrmWorkspace .gr-channel-hint{display:block;font-size:11px;color:#7889a5;margin-top:9px;line-height:1.5}
+#grCrmWorkspace .gr-donutbox canvas{cursor:pointer}
+#grCrmWorkspace .gr-insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+#grCrmWorkspace .gr-insight-item{padding:14px;border:1px solid #e3eafa;border-radius:12px;background:#f8faff;min-width:0}
+#grCrmWorkspace .gr-insight-item .gr-insight-title{display:block;font-size:11px;color:#637796;line-height:1.4;margin-bottom:7px}
+#grCrmWorkspace .gr-insight-item strong{display:block!important;font-size:16px!important;line-height:1.35!important;
+ color:#183d87!important;font-weight:700!important;overflow-wrap:anywhere;letter-spacing:0!important}
+#grCrmWorkspace .gr-insight-item small{display:block;font-size:11px;color:#7688a6;line-height:1.4;margin-top:4px}
+#grCrmWorkspace #channel-orders-dialog{width:min(1040px,calc(100vw - 30px))!important;max-width:1040px!important;padding:23px!important}
+#grCrmWorkspace #channel-orders-dialog h3{font-size:14px;line-height:1.35;margin:17px 0 8px;color:#243d67}
+#grCrmWorkspace .gr-channel-detail-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:12px 0 16px}
+#grCrmWorkspace .gr-channel-detail-summary > div{padding:12px;background:#f1f5ff;border:1px solid #e1e9fb;border-radius:10px;min-width:0}
+#grCrmWorkspace .gr-channel-detail-summary span{display:block;font-size:11px;color:#657998}
+#grCrmWorkspace .gr-channel-detail-summary strong{display:block;font-size:15px;color:#17459e;margin-top:4px;line-height:1.35;overflow-wrap:anywhere}
+#grCrmWorkspace #channel-orders-dialog .gr-channel-table-wrap{overflow:auto;max-height:46vh}
+#grCrmWorkspace #channel-orders-dialog table{width:100%;min-width:1250px}
+#grCrmWorkspace #channel-orders-dialog th,#grCrmWorkspace #channel-orders-dialog td{
+ font-size:11.5px!important;padding:10px!important;vertical-align:top!important;white-space:normal
+}
+#grCrmWorkspace #channel-orders-dialog td small{display:block;font-size:10.5px;line-height:1.5;color:#697c9e;margin-top:4px}
+#grCrmWorkspace #channel-orders-dialog .gr-channel-subtable{margin:0 0 10px;border:1px solid #e8edf8;border-radius:10px;overflow:hidden}
+#grCrmWorkspace #channel-orders-dialog .gr-channel-subrow{display:grid;grid-template-columns:minmax(0,1fr) 80px 125px;
+ gap:10px;padding:10px 12px;font-size:12px;border-bottom:1px solid #edf1f7;align-items:center}
+#grCrmWorkspace #channel-orders-dialog .gr-channel-subrow:last-child{border-bottom:0}
+#grCrmWorkspace #channel-orders-dialog .gr-channel-subrow strong{text-align:right;font-size:12px!important;color:#17459e}
+@media(max-width:800px){
+ #grCrmWorkspace #top-products .gr-top-products-head,#grCrmWorkspace #top-products .gr-top-product{
+  grid-template-columns:minmax(0,1fr) 105px 105px!important;gap:9px!important
+ }
+ #grCrmWorkspace .gr-channel-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+ #grCrmWorkspace #top-products .gr-top-products-head{display:none!important}
+ #grCrmWorkspace #top-products .gr-top-product{grid-template-columns:minmax(0,1fr) auto!important;row-gap:9px!important}
+ #grCrmWorkspace #top-products .gr-top-product > div:first-child{grid-column:1/-1}
+ #grCrmWorkspace #top-products .gr-top-product > strong.gr-product-revenue{text-align:left!important}
+ #grCrmWorkspace .gr-channel-breakdown-header{grid-template-columns:minmax(0,1fr) 68px 94px;gap:6px;font-size:10px}
+ #grCrmWorkspace .gr-channel-legend .gr-channel-row{grid-template-columns:minmax(0,1fr) 68px 94px!important;gap:6px!important}
+ #grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-value,
+ #grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-qty{font-size:11px!important}
+ #grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-name{gap:5px}
+ #grCrmWorkspace .gr-insight-grid{grid-template-columns:minmax(0,1fr)}
+}

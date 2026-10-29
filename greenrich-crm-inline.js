@@ -174,13 +174,35 @@ function renderDashboard(){
  ].map(x=>'<div class="metric"><span class="badge">'+x[2]+'</span><small>'+x[0]+'</small><strong>'+x[1]+'</strong><small>'+x[3]+'</small></div>').join('');
  charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
  const days=Object.keys(stats.byDate).sort(),channelPairs=sortedPairs(stats.channels),totalChannels=channelPairs.reduce((n,row)=>n+row[1],0);
- $('#channel-breakdown').innerHTML=channelPairs.length?channelPairs.map(([name,amount],index)=>'<div class="gr-visible-legend-row"><span class="gr-legend-swatch" style="background:'+palette[index%palette.length]+'"></span><span>'+esc(name)+' · '+(totalChannels?((amount/totalChannels)*100).toFixed(1):0)+'%</span><strong>'+fmt(amount)+'</strong></div>').join(''):'<p class="empty">No channels in this period</p>';
- $('#channel-progress').innerHTML=progressMarkup(channelPairs,Math.max(0,...channelPairs.map(x=>x[1])),'of largest channel');
+ const channelQuantity=name=>rows.filter(s=>channelForSale(s)===name).reduce((n,s)=>n+(Number(s.qty)||0),0);
+ const channelOrderCount=name=>new Set(rows.filter(s=>channelForSale(s)===name).map(s=>s.internal_order_id||companyForSale(s)+'|'+s.id)).size;
+ $('#channel-breakdown').innerHTML=channelPairs.length?channelPairs.map(([name,amount],index)=>
+  '<button type="button" class="gr-channel-row" data-channel-drill="'+esc(name)+'" aria-label="View '+esc(name)+' channel orders, products and customers">'+
+  '<span class="gr-channel-name"><span class="gr-legend-swatch" style="background:'+palette[index%palette.length]+'"></span><span class="gr-channel-name-text">'+esc(name)+' · '+(totalChannels?((amount/totalChannels)*100).toFixed(1):0)+'%</span></span>'+
+  '<span class="gr-channel-qty">'+num(channelQuantity(name))+' units <small>('+num(channelOrderCount(name))+' orders)</small></span>'+
+  '<strong class="gr-channel-value">'+fmt(amount)+'</strong></button>'
+ ).join(''):'<p class="empty">No channels in this period</p>';
+ const avgOrderValue=stats.orders?round(stats.total/stats.orders):0;
+ const buyerOrders=new Map();
+ rows.filter(s=>s.customer_id).forEach(s=>{
+  const orderId=s.internal_order_id||companyForSale(s)+'|'+s.id;
+  if(!buyerOrders.has(s.customer_id))buyerOrders.set(s.customer_id,new Set());
+  buyerOrders.get(s.customer_id).add(orderId);
+ });
+ const repeatBuyers=[...buyerOrders.values()].filter(orders=>orders.size>1).length;
+ const pendingOrders=new Set(rows.filter(s=>s.status==='Pending').map(s=>s.internal_order_id||companyForSale(s)+'|'+s.id)).size;
+ const peakDay=sortedPairs(stats.byDate)[0];
+ $('#sales-insights').innerHTML=[
+  ['Average order value',fmt(avgOrderValue),'Sales value ÷ number of orders'],
+  ['Repeat customers',num(repeatBuyers),'Customers with 2+ orders in this period'],
+  ['Pending orders',num(pendingOrders),'Orders currently awaiting completion'],
+  ['Highest sales day',peakDay?esc(peakDay[0]):'—',peakDay?fmt(peakDay[1])+' revenue':'No sales in selected period']
+ ].map(item=>'<div class="gr-insight-item"><span class="gr-insight-title">'+item[0]+'</span><strong>'+item[1]+'</strong><small>'+item[2]+'</small></div>').join('');
  const companyPairs=companyChoices.filter(c=>scopedCompanyIds().includes(c.id)).map(c=>[companyLabel(c.id),stats.companies[c.id]||0]);
  $('#company-comparison').innerHTML=progressMarkup(companyPairs,Math.max(0,...companyPairs.map(x=>x[1])),'of leading company');
  const top=stats.products.slice(0,8);
  $('#top-products').innerHTML=top.length?'<div class="gr-top-products-head"><span>Product</span><span>Revenue</span><span>Order quantity</span></div>'+
-  top.map(p=>'<div class="gr-top-product"><div><strong>'+esc(p.name)+'</strong><small>'+esc(companyLabel(p.companyId))+' · '+p.orders+' sale line(s)</small><div class="gr-product-bar-track"><div class="gr-product-bar" style="width:'+(stats.products[0].revenue?100*p.revenue/stats.products[0].revenue:0).toFixed(1)+'%"></div></div></div><strong>'+fmt(p.revenue)+'</strong><button type="button" class="gr-quantity-drill" data-product-drill="'+esc(p.key)+'" title="View customers and orders for '+esc(p.name)+'">'+num(p.qty)+' units ↗</button></div>').join(''):'<p class="empty">No products for the selected filters</p>';
+  top.map(p=>'<div class="gr-top-product"><div><strong>'+esc(p.name)+'</strong><small>'+esc(companyLabel(p.companyId))+' · '+p.orders+' sale line(s)</small><div class="gr-product-bar-track"><div class="gr-product-bar" style="width:'+(stats.products[0].revenue?100*p.revenue/stats.products[0].revenue:0).toFixed(1)+'%"></div></div></div><strong class="gr-product-revenue">'+fmt(p.revenue)+'</strong><button type="button" class="gr-quantity-drill" data-product-drill="'+esc(p.key)+'" title="View customers and orders for '+esc(p.name)+'">'+num(p.qty)+' units ↗</button></div>').join(''):'<p class="empty">No products for the selected filters</p>';
  const open=data.tasks.filter(t=>t.status!=='Done').length;
  $('#crm-overview').innerHTML='<div class="mini-row"><span>Shared customers</span><strong>'+num(data.customers.length)+'</strong></div>'+
   '<div class="mini-row"><span>Active leads in current company</span><strong>'+num(data.leads.filter(l=>!['Won','Lost'].includes(l.stage)).length)+'</strong></div>'+
@@ -202,7 +224,7 @@ function renderDashboard(){
   charts.push(new Chart($('#channel-chart'),{
    type:'doughnut',data:{labels:channelPairs.length?channelPairs.map(c=>c[0]):['No sales'],
     datasets:[{data:channelPairs.length?channelPairs.map(c=>c[1]):[1],backgroundColor:channelPairs.length?channelPairs.map((_,i)=>palette[i%palette.length]):['#e4eaf3'],borderWidth:0}]},
-   options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{enabled:true}}}
+   options:{responsive:true,maintainAspectRatio:false,cutout:'68%',onClick:(_event,elements)=>{if(elements.length&&channelPairs[elements[0].index])showChannelOrders(channelPairs[elements[0].index][0])},plugins:{legend:{display:false},tooltip:{enabled:true}}}
   }));
  }
  $('#trend-values').innerHTML=days.length?'<div class="gr-visible-legend-row"><span>First sale: '+esc(days[0])+' · Last sale: '+esc(days[days.length-1])+'</span><strong>'+fmt(total)+'</strong></div>':'<p class="empty">No sales to chart in this period</p>';
@@ -227,6 +249,53 @@ function showProductOrders(key){
  $('#product-orders-dialog').showModal();
 }
 
+
+
+function showChannelOrders(name){
+ const rows=filteredSales().filter(s=>channelForSale(s)===name).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+ if(!rows.length)return toast('No channel orders match the selected filters.');
+ const units=rows.reduce((n,s)=>n+(Number(s.qty)||0),0);
+ const revenue=rows.reduce((n,s)=>n+saleGross(s),0);
+ const orderKeys=new Set(rows.map(s=>s.internal_order_id||companyForSale(s)+'|'+s.id));
+ const customerKeys=new Set(rows.filter(s=>s.customer_id).map(s=>s.customer_id));
+ const products=new Map(),customers=new Map();
+ for(const s of rows){
+  const product=productKey(s),item=products.get(product)||{name:productForSale(s),company:companyLabel(companyForSale(s)),qty:0,revenue:0};
+  item.qty+=Number(s.qty)||0;item.revenue+=saleGross(s);products.set(product,item);
+  const key=s.customer_id||'unlinked:'+customerForSale(s);
+  const person=data.customers.find(c=>c.id===s.customer_id);
+  const customer=customers.get(key)||{name:customerForSale(s),phone:person?.mobile||'Not recorded',email:person?.email||'Not recorded',qty:0,revenue:0,orders:new Set()};
+  customer.qty+=Number(s.qty)||0;customer.revenue+=saleGross(s);
+  customer.orders.add(s.internal_order_id||companyForSale(s)+'|'+s.id);customers.set(key,customer);
+ }
+ const dialog=$('#channel-orders-dialog');
+ $('#channel-orders-title').textContent=name+' · Sales channel details';
+ $('#channel-orders-subtitle').textContent='Based on the current date, customer, product and company filters';
+ const summary=[['Sales revenue',fmt(revenue)],['Order quantity',num(units)+' units'],['Orders',num(orderKeys.size)],['Customers',num(customerKeys.size)]];
+ const productRows=[...products.values()].sort((a,b)=>b.revenue-a.revenue);
+ const customerRows=[...customers.values()].sort((a,b)=>b.revenue-a.revenue);
+ const asText=value=>value===undefined||value===null||String(value).trim()===''?'Not recorded':String(value);
+ // Invoice fields are not currently part of the Add Sale form. Only show real stored values.
+ const invoiceNumber=s=>asText(s.invoice_number||s.invoice_no||s.invoice_id);
+ const tableRows=rows.map(s=>{
+  const person=data.customers.find(c=>c.id===s.customer_id);
+  const address=[person?.address1,person?.address2,person?.city,person?.state,person?.pincode].filter(Boolean).join(', ');
+  return '<tr><td><strong>'+esc(asText(s.date))+'</strong><small>Internal: '+esc(asText(s.internal_order_id))+'</small><small>Platform: '+esc(asText(s.order_id))+'</small><small>Status: '+esc(asText(s.status))+'</small></td>'+
+   '<td><strong>'+esc(customerForSale(s))+'</strong><small>'+esc(asText(person?.mobile))+'</small><small>'+esc(asText(person?.mobile2))+' · '+esc(asText(person?.email))+'</small><small>'+esc(asText(address))+'</small></td>'+
+   '<td><strong>'+esc(productForSale(s))+'</strong><small>SKU: '+esc(asText(s.sku))+'</small><small>Company: '+esc(companyLabel(companyForSale(s)))+'</small><small>Quantity: '+num(s.qty)+' · Unit price: '+fmt(s.unit_price)+'</small></td>'+
+   '<td><strong>'+num(s.qty)+' units</strong><small>Taxable: '+fmt(s.taxable)+'</small><small>GST ('+esc(asText(s.tax_rate))+'%): '+fmt(s.tax_amount)+'</small><small>Shipping: '+fmt(s.shipping_charge||0)+'</small><small>Tax '+(s.inclusive?'inclusive':'exclusive')+'</small></td>'+
+   '<td><strong>'+fmt(saleGross(s))+'</strong><small>Invoice #: '+esc(invoiceNumber(s))+'</small><small>Invoice date: '+esc(asText(s.invoice_date))+'</small><small>Invoice status: '+esc(asText(s.invoice_status))+'</small><small>Invoice value: '+(s.invoice_total!=null&&s.invoice_total!==''?fmt(s.invoice_total):'Not recorded')+'</small><small>Invoice document: '+esc(asText(s.invoice_document_name||s.invoice_url?'Linked':'Not linked'))+'</small><small>Customer GSTIN: '+esc(asText(person?.gstin))+'</small><small>Notes: '+esc(asText(s.notes))+'</small></td></tr>';
+ }).join('');
+ const renderBreakdown=(items,type)=>items.length?'<div class="gr-channel-subtable">'+items.map(item=>'<div class="gr-channel-subrow"><span>'+esc(item.name)+(type==='product'?'<small> · '+esc(item.company)+'</small>':'<small> · '+esc(item.phone)+' · '+esc(item.email)+' · '+item.orders.size+' orders</small>')+'</span><span>'+num(item.qty)+' units</span><strong>'+fmt(item.revenue)+'</strong></div>').join('')+'</div>':'<p>No linked '+type+' records.</p>';
+ $('#channel-orders-details').innerHTML=
+  '<div class="gr-channel-detail-summary">'+summary.map(x=>'<div><span>'+x[0]+'</span><strong>'+x[1]+'</strong></div>').join('')+'</div>'+
+  '<h3>Products sold through '+esc(name)+'</h3>'+renderBreakdown(productRows,'product')+
+  '<h3>Customers who ordered</h3>'+renderBreakdown(customerRows,'customer')+
+  '<h3>All matching sales / order / invoice details</h3>'+
+  '<p class="gr-channel-hint">Invoice number and document details appear only when stored in the sale record. GreenRich ONE does not currently generate invoices in this screen.</p>'+
+  '<div class="gr-channel-table-wrap"><table><thead><tr><th>Order / Status</th><th>Customer / Contact / Address</th><th>Product / Company</th><th>Quantity / Tax / Shipping</th><th>Sale / Invoice / Notes</th></tr></thead><tbody>'+tableRows+'</tbody></table></div>';
+ dialog.showModal();
+}
 
 const reportFilename=()=>('greenrich-sales-overview-'+date());
 const safeExcel=v=>typeof v==='string'&&/^[\s]*[=+@-]/.test(v)?"'"+v:v;
@@ -596,9 +665,12 @@ function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>n
  $('#dashboard-export-excel').onclick=()=>runExport($('#dashboard-export-excel'),exportOverviewExcel);
  $('#dashboard-export-pdf').onclick=()=>runExport($('#dashboard-export-pdf'),exportOverviewPdf);
  $('#close-product-orders').onclick=()=>$('#product-orders-dialog').close();
+ $('#close-channel-orders').onclick=()=>$('#channel-orders-dialog').close();
  root.addEventListener('click',event=>{
   const button=event.target.closest('[data-product-drill]');
   if(button&&root.contains(button))showProductOrders(button.dataset.productDrill);
+  const channel=event.target.closest('[data-channel-drill]');
+  if(channel&&root.contains(channel))showChannelOrders(channel.dataset.channelDrill);
  });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');if(companyScope==='all')return toast('Select one company in the top selector before importing');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>{if(companyScope==='all')return toast('Select one company to back up its CRM records');download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))};$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');if(companyScope==='all')return toast('Select one company before restoring its backup');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
  mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false,companyIds=['grow-india'])=>{
