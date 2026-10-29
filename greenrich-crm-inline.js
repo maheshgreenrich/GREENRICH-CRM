@@ -13,7 +13,7 @@ const round=n=>Math.round((Number(n)||0)*100)/100;
 const initial=()=>({version:4,orderSequence:0,invoiceSequences:{},tags:[],products:[],channels:[{id:uid(),name:'Amazon',type:'Marketplace',active:true},{id:uid(),name:'Flipkart',type:'Marketplace',active:true},{id:uid(),name:'Website',type:'E-commerce',active:true}],customers:[],leads:[],tasks:[],sales:[]});
 let data;try{data=JSON.parse(localStorage.getItem(storageKey()))||initial();if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Invalid database')}catch{data=initial()}
 let page='dashboard',editId='',editing='',charts=[];
-const persist=()=>{try{localStorage.setItem(storageKey(),JSON.stringify(data));return true}catch{toast('Storage full or unavailable. Export a backup immediately.');return false}};
+const persist=()=>saveCompanyData(activeCompany,data);
 const toast=s=>{let n=$('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.remove('show'),4300)};
 const scopedCompanyIds=()=>companyScope==='all'?permittedCompanies:[companyScope];
 const scopeRows=k=>k==='customers'?data.customers:scopedCompanyIds().flatMap(companyId=>loadCompanyData(companyId)[k].map(row=>({...row,_companyId:companyId})));
@@ -29,7 +29,17 @@ const companyStorage=id=>id==='grow-india'?legacyKey:legacyKey+'::'+id;
 function ensureCRMData(store){if(!Array.isArray(store.tags))store.tags=[];if(!Number.isInteger(store.orderSequence)||store.orderSequence<0)store.orderSequence=0;if(!store.invoiceSequences||typeof store.invoiceSequences!=='object')store.invoiceSequences={};return store}
 function attachSharedCustomers(store){const shared=window.GreenRichSharedCustomers?.snapshot();if(shared){store.customers=shared.customers;store.tags=shared.tags}return ensureCRMData(store)}
 function loadCompanyData(id){if(id===activeCompany)return attachSharedCustomers(data);let parsed;try{parsed=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial()}catch{parsed=initial()}return attachSharedCustomers(parsed)}
-function saveCompanyData(id,copy){try{localStorage.setItem(companyStorage(id),JSON.stringify(copy));if(id===activeCompany)data=copy;return true}catch{toast('Unable to save browser records. Export a backup and check available storage.');return false}}
+function saveCompanyData(id,copy){
+ try{
+  const previous=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial();
+  if(!window.GreenRichCRMCloud)throw Error('Cloud synchronization service unavailable');
+  localStorage.setItem(companyStorage(id),JSON.stringify(copy));
+  if(id===activeCompany)data=copy;
+  void window.GreenRichCRMCloud.commit(id,previous,copy).catch(error=>
+   toast('CRM cloud save failed: '+error.message+'. Your data is still in this browser; do not clear its storage.'));
+  return true;
+ }catch(error){toast('Could not save CRM: '+error.message);return false}
+}
 const editorData=()=>loadCompanyData($('#f-company_id')?.value||activeCompany);
 const cleanPhone=v=>{const x=String(v||'').replace(/\D/g,'');return x.length>10?x.slice(-10):x};
 const consumesStock=s=>!['Cancelled','Returned'].includes(s.status);
@@ -719,7 +729,7 @@ function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>n
   if(button&&root.contains(button))showProductOrders(button.dataset.productDrill);
   const channel=event.target.closest('[data-channel-drill]');
   if(channel&&root.contains(channel))showChannelOrders(channel.dataset.channelDrill);
- });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');if(companyScope==='all')return toast('Select one company in the top selector before importing');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>{if(companyScope==='all')return toast('Select one company to back up its CRM records');download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))};$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');if(companyScope==='all')return toast('Select one company before restoring its backup');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
+ });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');if(companyScope==='all')return toast('Select one company in the top selector before importing');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>{if(companyScope==='all')return toast('Select one company to back up its CRM records');download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))};$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');if(companyScope==='all')return toast('Select one company before restoring its backup');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Restore this backup to shared CRM? It will apply to synced cloud records and can update or remove existing records.'))return;data=obj;persist();render();toast('Backup restoration queued for cloud sync')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
  mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false,companyIds=['grow-india'],issueAllowed=false,approveAllowed=false,dispatchAllowed=false)=>{
   permittedCompanies=[...new Set((Array.isArray(companyIds)?companyIds:[]).filter(id=>companyChoices.some(c=>c.id===id)))];
@@ -737,12 +747,24 @@ window.GreenRichCRM={
   root=document.createElement('div');root.id='grCrmWorkspace';
   root.append(document.getElementById('grCrmTemplate').content.cloneNode(true));
   container.append(root);
-  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Working view: '+activeCompanyName+' · Customers and tags are shared. Sales, stock, products, leads and follow-ups in the selected companies remain stored in this browser only, not synchronized across devices.';
+  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Connecting to shared GreenRich CRM data…';
   all('#navigation button[data-page]').forEach(button=>button.hidden=!allowedTabs.includes(button.dataset.page));
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Local CRM data needs restoration from a valid backup');
   await window.GreenRichSharedCustomers.ready({client,admin:isAdmin===true});
-   await window.GreenRichInvoices.load(client);
+  await window.GreenRichInvoices.load(client);
+  if(!window.GreenRichCRMCloud)throw Error('Shared CRM service not loaded. Refresh this page.');
+  const cloudState=await window.GreenRichCRMCloud.start({
+   client,companyIds:permittedCompanies,
+   onData:(companyId,store)=>{
+    if(companyId===activeCompany)data=attachSharedCustomers(store);
+    if(root?.isConnected)render();
+   },
+   onNotice:message=>toast(message)
+  });
+  if(notice)notice.textContent='Shared CRM active · '+activeCompanyName+
+   ' · Sales, orders, products, stock, leads and follow-ups are available to authorized employees on all devices.'+
+   (cloudState.migrated?' Imported '+cloudState.migrated+' existing browser records.':'');
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   attachSharedCustomers(data);
   $('#dashboard-export-actions').hidden=!allowDashboardExport;
@@ -764,6 +786,6 @@ window.GreenRichCRM={
   return root;
  },
  refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
- unmount:()=>{charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
+ unmount:()=>{window.GreenRichCRMCloud?.stop?.();charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
 };
 })();

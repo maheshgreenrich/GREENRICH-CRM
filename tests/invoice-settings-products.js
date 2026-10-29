@@ -19,7 +19,8 @@ assert.ok(inv.includes("keyFor=id=>id==='grow-india'?'greenrich-crm-v2':'greenri
 assert.ok(inv.includes("select.value"),'Changing company must update the form');
 assert.ok(inv.includes("client.from('gr_invoice_profiles').upsert"),'Seller fields must save to the shared database');
 assert.ok(inv.includes("values.gstin.slice(0,2)!==values.state_code"),'Seller state code must match GSTIN prefix');
-assert.ok(inv.includes('localStorage.setItem(keyFor(company),JSON.stringify(existing))'),'Product HSN values should save to the correct company browser storage');
+assert.ok(inv.includes('GreenRichCRMCloud.externalSave(company,before,existing,db)'),'Product HSN values must save to shared CRM cloud');
+assert.ok(inv.includes('localStorage.setItem(keyFor(company),JSON.stringify(existing))'),'Keep a browser recovery copy');
 assert.ok(inv.includes('invoice_status'), 'Issued invoices must not be touched');
 assert.ok(html.includes('greenrich-invoices.js?v=20261029-company-tax-2'));
 assert.ok(css.includes('.gr-tax-company-picker')&&css.includes('.gr-hsn-table'),'Settings needs responsive styling');

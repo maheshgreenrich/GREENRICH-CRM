@@ -56,6 +56,13 @@
  async function settings(host,{db,notify}){
   const tell=message=>notify?.(message);
   await load(db);
+  const selectable=window.GreenRichCompanies?.allowed?.()||companyIds;
+  if(window.GreenRichCRMCloud){
+   await window.GreenRichCRMCloud.start({
+    client:db,companyIds:selectable,
+    onData:null,onNotice:tell
+   });
+  }
   const currentChoice=window.GreenRichCompanies?.selected?.();
   host.innerHTML='<div class="panel gr-invoice-settings">'+
    '<div class="gr-tax-settings-head"><div><h2>Company Invoice &amp; Tax Details</h2><p>Enter the seller GST information for each company, then assign an HSN/SAC code to each product. These details will be used automatically in draft invoices.</p></div></div>'+
@@ -70,7 +77,7 @@
    '<div class="gr-hsn-actions"><button type="submit" class="blue" id="gr-hsn-save">Save Product HSN / SAC Codes</button><small id="gr-hsn-summary"></small></div></form>'+
    '</div>';
   const select=host.querySelector('#gr-invoice-company');
-  companyIds.forEach(id=>{const option=document.createElement('option');option.value=id;option.textContent=companyTitle(id);select.append(option)});
+  companyIds.filter(id=>selectable.includes(id)).forEach(id=>{const option=document.createElement('option');option.value=id;option.textContent=companyTitle(id);select.append(option)});
   if(companyIds.includes(currentChoice))select.value=currentChoice;
   const keyFor=id=>id==='grow-india'?'greenrich-crm-v2':'greenrich-crm-v2::enviro-solutions';
   const getProducts=id=>{
@@ -303,7 +310,7 @@
   const missingFields=missing(current);
   const banner=missingFields.length?'<div class="gr-invoice-warning">Before issuing, complete: '+e(missingFields.join(', '))+'.</div>':'<div class="gr-invoice-ready">Company and tax information is ready for review.</div>';
   dialog.innerHTML='<div class="gr-invoice-tools"><div><h2>Invoice · '+e(sale.invoice_number||'Draft')+'</h2><p>'+e(companyTitle(companyId))+' · '+e(status==='Issued'?'Issued':'Automatic draft, not issued')+'</p></div><div class="gr-invoice-tool-actions"><button class="btn soft" type="button" id="gr-invoice-close">Close</button><button class="btn soft" type="button" id="gr-invoice-pdf">↓ Download PDF</button><button class="btn primary" type="button" id="gr-invoice-issue" '+(status==='Issued'||missingFields.length||!canIssue?'disabled':'')+'>'+(status==='Issued'?'Already issued':'Issue Invoice')+'</button></div></div>'+banner+'<div class="gr-invoice-paper-scroll">'+renderDocument(current,status)+'</div>'+
-   '<p class="gr-invoice-note">Invoice numbers are currently generated from browser-local sales records. For statutory or multi-device issuance, reconcile invoice series with your accountant and move sales/invoice issuance to a shared database. This document does not generate a GST e-invoice IRN or e-way bill.</p>';
+   '<p class="gr-invoice-note">Sales records are shared in GreenRich cloud. Invoice numbering still needs a centrally allocated series before simultaneous statutory issuance from multiple devices. This document does not generate a GST e-invoice IRN or e-way bill.</p>';
   dialog.querySelector('#gr-invoice-close').onclick=()=>dialog.close();
   dialog.querySelector('#gr-invoice-pdf').onclick=async event=>{
    const button=event.currentTarget;button.disabled=true;

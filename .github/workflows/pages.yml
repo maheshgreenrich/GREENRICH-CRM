@@ -24,6 +24,9 @@ on:
       - 'tests/sales-dispatch-workflow.js'
       - 'supabase/migrations/20261029221000_dispatch_handoff_orders.sql'
       - 'greenrich-invoices.js'
+      - 'greenrich-crm-cloud.js'
+      - 'tests/shared-crm-realtime.js'
+      - 'supabase/migrations/20261029224000_crm_shared_records_realtime.sql'
       - 'greenrich-invoices.css'
       - 'tests/invoice-per-sale.js'
       - 'tests/invoice-settings-products.js'
@@ -97,6 +100,8 @@ jobs:
           node --check greenrich-sales-ops.js
           node tests/sales-dispatch-workflow.js
           node --check greenrich-invoices.js
+          node --check greenrich-crm-cloud.js
+          node tests/shared-crm-realtime.js
           node tests/invoice-per-sale.js
           node tests/invoice-settings-products.js
           node tests/one-page-crm-integration.js
