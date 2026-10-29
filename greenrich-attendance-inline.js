@@ -132,7 +132,9 @@ window.GreenRichAttendance=(function(){
   ]);
   const records=history.items||[],byDate=new Map(records.map(x=>[x.date,x]));
   const specialDays=new Map((holidayList.data||[]).map(x=>[x.date,x.name]));
-  const todayRecord=byDate.get(localDay());
+  const currentDate=localDay();
+  const todaysHistory=month===currentDate.slice(0,7)?null:await request('/attendance/me?'+params({from:currentDate,to:currentDate,page:1,pageSize:1}));
+  const todayRecord=byDate.get(currentDate)||todaysHistory?.items?.[0];
   const checkIn=todayRecord?.check_in,checkOut=todayRecord?.check_out;
   $('#checkInTime').textContent=checkIn?shortDate(checkIn):'Not marked';
   $('#checkOutTime').textContent=checkOut?shortDate(checkOut):'Not marked';
