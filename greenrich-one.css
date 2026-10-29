@@ -73,3 +73,42 @@ td{font-weight:400;color:#253752}
  #content{padding:14px}
 }
 @media(prefers-reduced-motion:reduce){button,.gr-switch-thumb,.gr-switch-track{transition:none!important}}
+
+
+/* Unified GreenRich corporate brand */
+aside .logo{
+ display:flex;
+ align-items:center;
+ gap:10px;
+ font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+ font-size:19px!important;
+ font-weight:600!important;
+ letter-spacing:-.045em;
+ white-space:nowrap;
+ padding:10px 11px!important;
+}
+.gr-brand-mark{
+ display:grid;place-items:center;flex-shrink:0;
+ width:32px;height:32px;
+ border:1px solid #5f91ea;border-radius:9px;
+ background:linear-gradient(140deg,#2768d3,#16417e);
+ color:#fff;font-size:19px;line-height:1;font-weight:700;
+ box-shadow:0 2px 7px #0b204333;
+}
+.gr-brand-name{font-weight:600;letter-spacing:-.04em;color:#f8fbff}
+.gr-brand-name em{font-style:normal;font-weight:500;letter-spacing:.025em;color:#b9d5ff;font-size:.8em}
+#app header>div>small{font-size:10px;font-weight:500;letter-spacing:.055em;color:#647ea2}
+.gr-settings-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.gr-settings-tabs button{width:auto!important;flex:0 0 auto;padding:9px 14px;font-size:12.5px}
+.gr-settings-tabs .gr-current-settings-tab{background:#2054bb;color:#fff;border-color:#2054bb}
+.gr-company-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.gr-company-card{display:grid;gap:15px;align-content:start;padding:19px;border:1px solid #dfe7f2;border-radius:13px;background:#fff}
+.gr-company-card-head{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.gr-company-card-head strong{font-size:14px;font-weight:600;color:#19324d}
+.gr-company-card label{font-weight:500;font-size:12px}
+.gr-company-actions{display:flex;flex-wrap:wrap;gap:8px}
+.gr-company-actions button{width:auto;max-width:100%;font-size:12px}
+#gr-company-settings-content .gr-crm-inner{min-width:0}
+#gr-company-settings-content #grCrmWorkspace nav.gr-crm-tabs{display:none!important}
+#gr-company-settings-content #grCrmWorkspace .gr-crm-data-notice{font-size:12px}
+@media(max-width:760px){.gr-company-cards{grid-template-columns:1fr}aside .logo{font-size:18px!important}}
