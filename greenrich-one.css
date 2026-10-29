@@ -5,3 +5,71 @@
 
 /* GreenRich ONE attendance chart and integrated ERP data */
 .gr-bars{display:grid;gap:12px;padding:12px 0}.gr-bar-line{display:grid;grid-template-columns:95px minmax(0,1fr) 95px;gap:12px;align-items:center;font-size:12px}.gr-bar-track{height:14px;background:#e9eff9;border-radius:20px;overflow:hidden}.gr-bar-fill{height:100%;border-radius:20px;background:#194bdf}.gr-c1{background:#e24b71}.gr-c2{background:#efae35}.gr-bar-line b{text-align:right}#demoNav{scrollbar-width:thin;scrollbar-color:#6076ac transparent}#demoContent iframe{height:calc(100vh - 160px)!important;min-height:650px!important}#demoContent .panel iframe{border:0}@media(max-width:760px){.gr-bar-line{grid-template-columns:72px minmax(0,1fr) 64px;gap:5px;font-size:10px}#demoContent iframe{min-height:620px!important}}
+
+
+/* GreenRich ONE professional dashboard typography and streamlined navigation */
+:root{
+ font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+ color:#202e42;--blue:#2155c5;--line:#e3e8f0;
+ font-synthesis:none;
+}
+body{background:#f5f7fa;font-size:14px;-webkit-font-smoothing:antialiased}
+h1,h2,h3{color:#152941;letter-spacing:-.025em;line-height:1.28;font-weight:600}
+h2{font-size:19px}h3{font-size:16px}
+p{font-size:13.5px;color:#68778b;line-height:1.55}
+label{font-weight:500;color:#63748b;letter-spacing:0}
+small{font-weight:400}
+button{transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
+.blue,.secondary{font-weight:600;font-size:13px}
+.blue{background:#2355c6}
+.secondary{background:#f5f7fc;border-color:#dce4f0;color:#2454a8}
+.blue:hover:not(:disabled){background:#1c47aa}
+.secondary:hover:not(:disabled){background:#eaf0fc}
+input,select,textarea{font-size:13px;outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{border-color:#6b94de;outline:2px solid #265db01e}
+aside{background:#102748;padding:22px 13px;box-shadow:3px 0 15px #182e4408}
+aside .logo{font-weight:600;font-size:21px;letter-spacing:-.04em;padding:9px 12px}
+aside>small{font-weight:500;letter-spacing:1px;font-size:10px;color:#a6bad7;padding:12px}
+#nav{gap:3px;padding-right:3px;scrollbar-width:thin}
+#nav button{display:flex;align-items:center;gap:12px;text-align:left;color:#bdccdf;border:0;background:transparent;font-size:13.5px;font-weight:500;line-height:1.3;letter-spacing:0;padding:11px 12px;border-radius:9px;min-height:42px}
+#nav button:hover{background:#213d61;color:#f5f8ff}
+#nav button.active,#nav button[aria-current="page"]{background:#234b83;color:white;font-weight:600}
+.gr-menu-icon{display:block;width:18px;height:18px;min-width:18px;color:#9eb8d8;stroke-width:1.8}
+#nav button.active .gr-menu-icon,#nav button:hover .gr-menu-icon{color:#e7f0ff}
+header{background:#fff;padding:16px 23px;gap:13px}
+header h1{font-size:21px;font-weight:600;letter-spacing:-.035em;color:#1a304a}
+header small{font-size:10px;font-weight:500;letter-spacing:.7px;color:#5579ba}
+.profile{gap:3px;min-width:0}
+.profile b{font-size:13.5px;font-weight:600;white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.profile small{font-size:11px;font-weight:450;letter-spacing:0;color:#77869b}
+#content{padding:22px}
+.panel,.card{border-radius:13px;box-shadow:0 2px 12px #20395708;border-color:#e4eaf3}
+.card strong{color:#224c9b;font-weight:600}
+th{font-weight:600;letter-spacing:.035em;color:#79879b}
+td{font-weight:400;color:#253752}
+.pill{font-weight:600}
+#attendanceQuick{display:flex;align-items:center;width:auto;min-width:0;flex-shrink:0}
+.gr-attendance-switch-wrap{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.gr-switch-label{font-size:11px;color:#6d7b8f;font-weight:500}
+#grAttendanceSwitch{display:inline-flex;align-items:center;gap:8px;border:1px solid #d7e1ee;background:#f5f8fc;color:#28507f;border-radius:999px;padding:5px 11px 5px 5px;font-weight:600;font-size:11px;white-space:nowrap;min-height:35px;min-width:108px}
+#grAttendanceSwitch .gr-switch-track{width:35px;height:20px;border-radius:50px;background:#b9c6d7;position:relative;flex-shrink:0;transition:background .15s}
+#grAttendanceSwitch .gr-switch-thumb{position:absolute;left:3px;top:3px;width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 1px 3px #0002;transition:transform .15s}
+#grAttendanceSwitch[data-state="in"]{background:#eaf7ef;border-color:#bde0c9;color:#147545}
+#grAttendanceSwitch[data-state="in"] .gr-switch-track{background:#26975e}
+#grAttendanceSwitch[data-state="in"] .gr-switch-thumb{transform:translateX(15px)}
+#grAttendanceSwitch[data-state="finished"]{background:#eff2f7;color:#728298}
+#grAttendanceSwitch[data-state="finished"] .gr-switch-track{background:#7d95b3}
+#grAttendanceSwitch[data-state="finished"] .gr-switch-thumb{transform:translateX(15px)}
+#grAttendanceSwitch[data-state="busy"]{opacity:.7}
+#grAttendanceSwitch:disabled{opacity:.72;cursor:default}
+#grAttendanceSwitch:focus-visible{outline:3px solid #6198ec;outline-offset:2px}
+#grClockInfo{font-size:10.5px;font-weight:450;color:#64758b;max-width:90px;white-space:normal;line-height:1.25}
+@media(max-width:1150px){.gr-switch-label{display:none}.gr-attendance-switch-wrap{gap:6px}}
+@media(max-width:760px){
+ header{padding:11px 14px}
+ #attendanceQuick{width:100%;display:flex!important;justify-content:flex-end}
+ .gr-attendance-switch-wrap{width:auto}
+ .profile b{max-width:190px}
+ #content{padding:14px}
+}
+@media(prefers-reduced-motion:reduce){button,.gr-switch-thumb,.gr-switch-track{transition:none!important}}
