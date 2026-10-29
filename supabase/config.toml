@@ -1,0 +1,6 @@
+# GreenRich ONE local Supabase CLI project configuration.
+# The actual hosted project ref is selected with: supabase link --project-ref ...
+project_id = "greenrich-one"
+
+[functions.attendance-api]
+verify_jwt = true
