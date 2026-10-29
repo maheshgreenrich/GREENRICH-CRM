@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>Create & Manage Roles | GreenRich ONE</title>
+ <link rel="stylesheet" href="greenrich-one.css">
+ <link rel="stylesheet" href="roles-manager.css">
+ <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+ <script defer src="roles-manager.js?v=roles-new-1"></script>
+</head>
+<body>
+ <div id="roleStatus" class="role-status" role="status">Checking your GreenRich Admin access...</div>
+ <div id="roleApp" class="app" hidden>
+  <aside>
+   <div class="logo">◆ <b>GreenRich ONE</b></div>
+   <small>ADMIN WORKSPACE</small>
+   <nav class="role-main-nav">
+    <a href="secure.html">▦ &nbsp; Dashboard</a>
+    <a href="secure.html#users">♙ &nbsp; Employee Users</a>
+    <a href="roles.html" class="active" aria-current="page">◈ &nbsp; Create & Manage Roles</a>
+   </nav>
+   <div class="bottom"><a href="secure.html">← Back to GreenRich ONE</a></div>
+  </aside>
+  <div class="main">
+   <header class="role-header">
+    <div><small>GREENRICH ONE · SUPABASE</small><h1>Create & Manage User Roles</h1></div>
+    <div class="profile"><b id="currentAdmin"></b><small>Administrator</small></div>
+   </header>
+   <main id="content" class="roles-content">
+    <div class="roles-intro">
+     <div><h2>Company Roles</h2><p>Create a role, assign its capabilities, and use it when you add an employee.</p></div>
+     <button class="blue" type="button" id="showCreate">+ Create New Role</button>
+    </div>
+    <section id="createSection" class="panel" hidden>
+     <div class="role-section-title"><h2>New Role</h2><button class="secondary" id="cancelCreate" type="button">Cancel</button></div>
+     <form id="createForm" class="role-create-form">
+      <label>Role name<input id="newRoleName" required minlength="2" maxlength="50" placeholder="Example: Supervisor, Store Manager"></label>
+      <label>Description (optional)<input id="newRoleDescription" maxlength="250" placeholder="What this team is responsible for"></label>
+      <button class="blue" type="submit" id="createButton">Create Role</button>
+     </form>
+     <p class="role-hint">New roles start with all permissions turned off. Enable access below after creating the role.</p>
+    </section>
+    <section class="panel">
+     <div class="role-section-title"><h2>Existing Roles</h2><span id="roleCount" class="role-pill"></span></div>
+     <div id="rolesList" class="role-list" aria-label="Existing roles"></div>
+    </section>
+    <section class="panel">
+     <div class="role-section-title">
+      <div><h2 id="selectedRoleTitle">Select a role</h2><p id="roleSubtext"></p></div>
+      <button id="deleteRoleButton" class="role-danger" type="button" hidden>Delete Role</button>
+     </div>
+     <div id="roleEditor" hidden>
+      <form id="editRoleForm" class="role-edit-form" hidden>
+       <label>Role name<input id="editRoleName" minlength="2" maxlength="50" required></label>
+       <label>Description<input id="editRoleDescription" maxlength="250"></label>
+       <button class="secondary" id="editRoleSave" type="submit">Save Role Details</button>
+      </form>
+      <div class="role-section-title"><h3>Capabilities & Data Access</h3><button id="savePermissions" class="blue" type="button">Save All Permissions</button></div>
+      <p class="role-hint">Tick Allow for each action, then select Own, Team or All for that action. Click Save All Permissions to store changes.</p>
+      <div id="saveState" aria-live="polite" class="role-save-state"></div>
+      <div class="tablewrap"><table class="role-matrix"><thead><tr><th>Module</th><th>View</th><th>Create</th><th>Edit</th><th>Delete</th><th>Approve</th><th>Export</th></tr></thead><tbody id="permissionRows"></tbody></table></div>
+     </div>
+    </section>
+    <p class="role-warning">Important: Saving a permission does not mean every ERP module enforces it yet. Attendance has partial database scope controls; modules not connected to Supabase still require server-side access rules. Admin access cannot be reduced here.</p>
+    <div id="feedback" class="role-feedback" role="alert" hidden></div>
+   </main>
+  </div>
+ </div>
+</body>
+</html>
