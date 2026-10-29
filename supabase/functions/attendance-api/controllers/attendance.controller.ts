@@ -53,11 +53,15 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  const method=req.method.toUpperCase(),pagination=page(q),ip=ipAddress(req);
  if(method==='POST'&&route==='/attendance/check-in')return response(await service.clock(db,actor,'in',ip),201);
  if(method==='POST'&&route==='/attendance/check-out')return response(await service.clock(db,actor,'out',ip));
- if(method==='GET'&&route==='/attendance/me')return response(await service.myHistory(db,actor,...Object.values(dateRange(q)) as [string,string],pagination));
+ if(method==='GET'&&route==='/attendance/me'){const range=dateRange(q);return response(await service.myHistory(db,actor,range.from,range.to,pagination))}
  if(method==='GET'&&route==='/attendance/me/summary')return response(await service.mySummary(db,actor,month(q.get('month')||new Date().toISOString().slice(0,7))));
  if(method==='POST'&&route==='/attendance/corrections'){
   const b=await bodyJSON(req);
-  return response(await service.correctionCreate(db,actor,{date:date(b.date),checkIn:dateTime(b.requestedCheckIn),checkOut:dateTime(b.requestedCheckOut),reason:reason(b.reason)}),201);
+  const requestedDate=date(b.date);
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const todayIST=parts.find(p=>p.type==='year')?.value+'-'+parts.find(p=>p.type==='month')?.value+'-'+parts.find(p=>p.type==='day')?.value;
+  if(requestedDate>=todayIST)fail('Corrections can only be requested for past dates');
+  return response(await service.correctionCreate(db,actor,{date:requestedDate,checkIn:dateTime(b.requestedCheckIn),checkOut:dateTime(b.requestedCheckOut),reason:reason(b.reason)}),201);
  }
  if(method==='GET'&&route==='/attendance/corrections/me')return response(await service.ownRequests(db,actor,'grm_corrections',pagination));
  if(method==='POST'&&route==='/leaves'){
