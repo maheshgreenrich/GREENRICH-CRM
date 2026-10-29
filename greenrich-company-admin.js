@@ -5,7 +5,7 @@
  let latest=[],currentUser='';
  const escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const selected=userId=>localStorage.getItem(KEY+(userId||currentUser))||'grow-india';
- const name=()=>latest.find(c=>c.id===selected())?.name||'GreenRich Grow India Pvt Ltd';
+ const name=userId=>latest.find(c=>c.id===selected(userId))?.name||(selected(userId)==='enviro-solutions'?'GreenRich Enviro Solutions Pvt Ltd':'GreenRich Grow India Pvt Ltd');
  async function mount(root,ctx){
   if(ctx.role!=='Admin')throw Error('Only the GreenRich Administrator can manage company settings');
   currentUser=ctx.user.id;
