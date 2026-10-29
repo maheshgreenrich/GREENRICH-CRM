@@ -8,6 +8,8 @@ on:
       - 'app.js'
       - 'greenrich-one.js'
       - 'greenrich-company-admin.js'
+      - 'greenrich-customer-tags.js'
+      - 'tests/sales-workflow-regression.js'
       - 'tests/two-companies-settings-and-typography.js'
       - 'greenrich-public-config.js'
       - 'tests/shared-login-regression.js'
@@ -65,6 +67,8 @@ jobs:
           test -s greenrich-one.css
           node --check greenrich-one.js
           node --check greenrich-company-admin.js
+          node --check greenrich-customer-tags.js
+          node tests/sales-workflow-regression.js
           node tests/two-companies-settings-and-typography.js
           test -s greenrich-public-config.js
           node --check greenrich-public-config.js

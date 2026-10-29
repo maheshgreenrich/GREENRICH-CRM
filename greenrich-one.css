@@ -121,3 +121,13 @@ aside .logo{
 #gr-company-admin .gr-settings-tabs button{font-family:inherit;font-size:12.5px;line-height:1.4}
 #gr-company-admin .gr-company-card strong{font-size:14px;line-height:1.4}
 @media(max-width:760px){#app aside .gr-brand-name{font-size:17px}#app header #activeCompanyLabel{font-size:10px}}
+
+/* Admin Settings: Customer Tags */
+#gr-company-settings-content .gr-tag-admin-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:13px 0 20px}
+#gr-company-settings-content .gr-tag-admin-toolbar label{display:grid;gap:6px;font-size:12px;color:#546884;min-width:230px}
+#gr-company-settings-content .gr-tag-admin-toolbar button{width:auto}
+#gr-company-settings-content .gr-tag-rows{display:grid;gap:10px}
+#gr-company-settings-content .gr-tag-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px;border:1px solid #dde5f1;border-radius:10px;background:#fff}
+#gr-company-settings-content .gr-tag-row strong{font-size:13px;color:#203c61}
+#gr-company-settings-content .gr-tag-row small{color:#69819d;margin-right:auto}
+#gr-company-settings-content .gr-tag-row button{width:auto!important;padding:8px 12px;font-size:12px}

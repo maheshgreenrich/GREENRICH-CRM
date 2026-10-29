@@ -293,3 +293,24 @@
 #grCrmWorkspace #sales-table td:nth-child(9) strong{white-space:nowrap;font-size:14px!important;font-variant-numeric:tabular-nums}
 #grCrmWorkspace .section-tools .btn,#grCrmWorkspace .report-grid .btn{width:auto;max-width:100%}
 @media(max-width:650px){#grCrmWorkspace .table-wrap table td{padding:10px 11px!important}#grCrmWorkspace .metric strong{font-size:19px!important}}
+
+/* Sales entry: company, customer search/new contact details, tags and stock preview */
+#grCrmWorkspace #editor{width:min(850px,calc(100vw - 28px));max-width:850px}
+#grCrmWorkspace .gr-customer-picker{grid-column:1/-1;min-width:0}
+#grCrmWorkspace .gr-field-title{display:block;font-weight:650;color:#354a6c;font-size:12px;margin:0 0 9px}
+#grCrmWorkspace .gr-customer-switch{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+#grCrmWorkspace .gr-customer-switch button{width:auto;border:1px solid #cfdaf1;background:#fff;color:#28518a;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:600}
+#grCrmWorkspace .gr-customer-switch button.active{background:#2054bb;color:white;border-color:#2054bb}
+#grCrmWorkspace .gr-customer-results{display:grid;gap:5px;max-height:185px;overflow:auto;margin:9px 0}
+#grCrmWorkspace .gr-customer-results button{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:space-between;padding:9px 12px;width:100%;text-align:left;background:#f7faff;border:1px solid #e1e8f6;border-radius:8px;color:#253b61;font-size:12px}
+#grCrmWorkspace #gr-customer-selected{font-size:12px;font-weight:650;color:#1f7850}
+#grCrmWorkspace .gr-new-customer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#grCrmWorkspace .gr-new-customer-grid .wide{grid-column:1/-1}
+#grCrmWorkspace .gr-tag-picks{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+#grCrmWorkspace .gr-tag-picks label{display:inline-flex;align-items:center;gap:7px;border:1px solid #d6e1f3;border-radius:20px;padding:7px 10px;font-size:12px;background:#f8faff}
+#grCrmWorkspace .gr-tag-picks input{width:15px;height:15px;min-width:15px;padding:0}
+#grCrmWorkspace .gr-customer-tag{display:inline-block;margin:2px;padding:3px 7px;background:#e9f1ff;color:#284a85;border-radius:7px;font-size:11px}
+#grCrmWorkspace .gr-stock-preview{grid-column:1/-1;padding:10px 13px;background:#eef7f2;color:#1e6b49;border-radius:9px;font-size:12px;font-weight:600}
+#grCrmWorkspace .gr-crm-help{font-size:12px;color:#6d7b92}
+#grCrmWorkspace #f-internal_order_id{background:#f0f4fc;color:#35527b}
+@media(max-width:650px){#grCrmWorkspace .gr-new-customer-grid{grid-template-columns:minmax(0,1fr)}}

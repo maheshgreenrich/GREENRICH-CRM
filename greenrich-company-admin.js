@@ -13,8 +13,8 @@
   if(response.error)throw Error('Unable to load company details: '+response.error.message);
   latest=response.data||[];
   if(!latest.some(c=>c.id===selected(ctx.user.id)&&c.active))localStorage.setItem(KEY+ctx.user.id,'grow-india');
-  let currentTab=['companies','users','roles','channels','reports'].includes(ctx.initialTab)?ctx.initialTab:'companies';
-  const tabDefinitions=[['companies','Company Profiles'],['users','User Management'],['roles','User Roles'],['channels','Sales Channels'],['reports','Import & Export']];
+  let currentTab=['companies','users','roles','tags','channels','reports'].includes(ctx.initialTab)?ctx.initialTab:'companies';
+  const tabDefinitions=[['companies','Company Profiles'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['channels','Sales Channels'],['reports','Import & Export']];
   root.innerHTML='<div id="gr-company-admin"><div class="panel"><h2>Settings</h2><p>Manage companies, employee accounts, user roles and administrator-only CRM tools.</p><div class="gr-settings-tabs">'+tabDefinitions.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div></div><div id="gr-company-settings-content"></div></div>';
   const host=root.querySelector('#gr-company-settings-content');
   const notice=message=>{ctx.notify(message)};
@@ -53,6 +53,11 @@
     catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
     return;
    }
+   if(tab==='tags'){
+    host.innerHTML='<div class="panel">Loading Customer Tags...</div>';
+    try{await ctx.openTags(host,selected(ctx.user.id))}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
+    return;
+   }
    if(!['channels','reports'].includes(tab))return;
    host.innerHTML='<div class="panel">Opening Admin tools...</div>';
    try{await ctx.openCRM(host,tab,true)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
@@ -60,5 +65,5 @@
   root.querySelectorAll('[data-settings-tab]').forEach(button=>button.onclick=()=>{void activate(button.dataset.settingsTab)});
   await activate(currentTab);
  }
- window.GreenRichCompanies={selected,name,mount};
+ window.GreenRichCompanies={selected,name,list:()=>latest.slice(),mount};
 })();
