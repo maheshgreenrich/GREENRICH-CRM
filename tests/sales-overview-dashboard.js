@@ -14,7 +14,7 @@ for(const id of ['metrics','trend-chart','channel-chart','channel-breakdown','sa
  assert.ok(dashboard.includes('id="'+id+'"'),'Missing visible dashboard section '+id);
 for(const id of ['dashboard-export-excel','dashboard-export-pdf','product-orders-dialog','product-orders-details','channel-orders-dialog','channel-orders-details','close-channel-orders'])
  assert.ok(html.includes('id="'+id+'"'),'Missing dashboard action/dialog '+id);
-assert.ok(html.includes('greenrich-crm-inline.js?v=20261029-channel-insights-1'),'CRM cache version should refresh');
+assert.ok(html.includes('greenrich-crm-inline.js?v=20261029-invoices-1'),'CRM cache version should refresh');
 assert.ok(crm.includes('const overviewSales=()=>scopedCompanyIds().flatMap'),'Comparison must respect per-user company access');
 assert.ok(crm.includes('loadCompanyData(companyId).sales'),'Never invent cross-company sales data');
 assert.ok(crm.includes("companyForSale(s)===company"),'Company filter should filter rows');
