@@ -12,6 +12,7 @@ on:
       - 'tests/attendance-product-regression.js'
       - 'tests/attendance-ui-refinement.js'
       - 'tests/attendance-correction-layout.js'
+      - 'tests/attendance-monthly-reports.js'
       - 'greenrich-one.css'
       - 'demo.html'
       - 'secure.html'
@@ -61,6 +62,7 @@ jobs:
           node tests/attendance-product-regression.js
           node tests/attendance-ui-refinement.js
           node tests/attendance-correction-layout.js
+          node tests/attendance-monthly-reports.js
           test -s secure.html
           test -s roles.html
           test -s roles-manager.js
