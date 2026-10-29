@@ -183,6 +183,7 @@ create or replace function public.grm_admin_attendance(
 returns public.grm_attendance language plpgsql security definer set search_path=''
 as $$
 declare rec public.grm_attendance; previous jsonb; changed public.grm_attendance;
+ shift_info public.grm_shifts; tz text; computed_status text:=p_status;
 begin
  if not exists(select 1 from public.gr_profiles p join public.gr_roles r on r.id=p.role_id
  where p.id=p_actor and p.active and r.name in ('Admin','Office Admin')) then
@@ -194,6 +195,26 @@ begin
   raise exception 'Invalid status';end if;
  if p_check_out is not null and (p_check_in is null or p_check_out<=p_check_in) then
   raise exception 'Check-out must be later than check-in';end if;
+ if not p_delete and p_check_in is not null and p_status in ('PRESENT','LATE','HALF_DAY') then
+   select office_timezone into tz from public.grm_settings where id=1;
+   tz:=coalesce(tz,'Asia/Kolkata');
+   if (p_check_in at time zone tz)::date<>p_day then
+     raise exception 'Check-in date must match office attendance date';
+   end if;
+   select shift.* into shift_info from public.gr_profiles employee
+     left join public.grm_shifts shift on shift.id=employee.shift_id where employee.id=p_user;
+   if shift_info.id is null then
+     select * into shift_info from public.grm_shifts where name='Standard Office';
+   end if;
+   if p_check_out is not null and
+       extract(epoch from(p_check_out-p_check_in))/3600 < shift_info.half_day_hours then
+      computed_status:='HALF_DAY';
+   elsif (p_check_in at time zone tz)::time>
+       (shift_info.start_time+make_interval(mins=>shift_info.grace_minutes))::time then
+      computed_status:='LATE';
+   else computed_status:='PRESENT';
+   end if;
+ end if;
  select * into rec from public.grm_attendance where user_id=p_user and date=p_day for update;
  previous:=case when rec.id is null then null else to_jsonb(rec) end;
  if p_delete then
@@ -202,7 +223,7 @@ begin
     where id=rec.id returning * into changed;
  else
   insert into public.grm_attendance(user_id,date,status,check_in,check_out,total_hours,source,marked_by,remarks)
-  values(p_user,p_day,p_status,p_check_in,p_check_out,
+  values(p_user,p_day,computed_status,p_check_in,p_check_out,
     case when p_check_in is not null and p_check_out is not null then round((extract(epoch from(p_check_out-p_check_in))/3600)::numeric,2) end,
     'ADMIN',p_actor,p_reason)
   on conflict(user_id,date) do update set
