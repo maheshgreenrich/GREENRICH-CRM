@@ -69,6 +69,10 @@ create table if not exists public.grm_leaves(
  created_at timestamptz not null default now(),
  constraint grm_leave_range check(to_date>=from_date)
 );
+create extension if not exists btree_gist;
+alter table public.grm_leaves add constraint grm_no_overlapping_approved_leaves
+ exclude using gist(user_id with =, daterange(from_date,to_date,'[]') with &&)
+ where (status='APPROVED');
 create index if not exists grm_leaves_user_range on public.grm_leaves(user_id,from_date,to_date);
 create index if not exists grm_leaves_pending on public.grm_leaves(status,created_at desc);
 create table if not exists public.grm_holidays(
