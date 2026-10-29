@@ -16,6 +16,9 @@ on:
       - 'attendance-control.html'
       - 'attendance-control.js'
       - 'attendance-control.css'
+      - 'attendance-v3.html'
+      - 'attendance-v3.js'
+      - 'attendance-v3.css'
       - 'phase1/office-admin-attendance.sql'
       - 'demo.js'
       - 'attendance-ui.js'
@@ -56,6 +59,10 @@ jobs:
           test -s attendance-control.js
           test -s attendance-control.css
           node --check attendance-control.js
+          test -s attendance-v3.html
+          test -s attendance-v3.js
+          test -s attendance-v3.css
+          node --check attendance-v3.js
           test -s demo.html
           node --check demo.js
           node --check attendance-ui.js
