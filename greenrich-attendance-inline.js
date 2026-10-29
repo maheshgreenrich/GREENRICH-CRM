@@ -8,7 +8,7 @@ window.GreenRichAttendance=(function(){
  const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
- let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6];
+ let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null;
  const manager=()=>actorRole==='Admin'||actorRole==='Office Admin';
  const notify=(message,error=false)=>{const e=$('#alert');e.hidden=false;e.textContent=message;e.classList.toggle('error',error);e.scrollIntoView({behavior:'smooth',block:'nearest'})};
  async function request(path,method='GET',body=null,download=false){
@@ -76,6 +76,19 @@ window.GreenRichAttendance=(function(){
     checkOut:iso(input(f,'checkOut')),reason:input(f,'reason')});
    f.dataset.recordId='';f.reset();notify('Attendance saved and audited.');await loadAdmin();
   })};
+  $('#bulkForm').elements.namedItem('date').value=today;
+  $('#bulkForm').elements.namedItem('reason').value='Daily employee attendance verified';
+  $('#adminMark').elements.namedItem('date').value=today;
+  $('#selectAllEmployees').onchange=e=>{$('#bulkUsers .av-employee-check').forEach(b=>b.checked=e.target.checked);updateSelected()};
+  $('[data-bulk-status]').forEach(b=>b.onclick=()=>{const form=$('#bulkForm');form.elements.namedItem('status').value=b.dataset.bulkStatus;form.requestSubmit()});
+  $('#bulkForm').elements.namedItem('date').onchange=()=>safe(drawDailyRoster);
+  $('[data-period]').forEach(b=>b.onclick=()=>{
+   const now=new Date(today+'T12:00:00+05:30'),fmt=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+   if(b.dataset.period==='day'){$('#adminFrom').value=today;$('#adminTo').value=today;}
+   else if(b.dataset.period==='week'){const monday=new Date(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));$('#adminFrom').value=fmt(monday);$('#adminTo').value=today;}
+   else{$('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;}
+   $('.av-period-tabs button').forEach(x=>x.classList.toggle('av-period-active',x===b));adminPage=1;safe(loadAdmin);
+  });
   $('#bulkForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget,ids=$$('#bulkUsers input:checked').map(el=>el.value);
    if(!ids.length)throw Error('Select at least one employee.');
@@ -107,7 +120,7 @@ window.GreenRichAttendance=(function(){
  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  try{await loadMine();if(manager())safe(loadPendingCount);}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
+  try{await loadMine();if(manager()){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
@@ -154,12 +167,61 @@ window.GreenRichAttendance=(function(){
  }
  async function loadStaff(){
   if(!manager())return;
-  [staff,departments]=await Promise.all([request('/admin/staff'),request('/admin/departments')]);
+  const [employees,depts]=await Promise.all([request('/admin/staff'),request('/admin/departments')]);
+  staff=employees||[];departments=depts||[];
   const users=staff.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.full_name)+'</option>').join('');
   $('#markEmployee').innerHTML=users;
+  const oldFilter=$('#filterEmployee').value,oldDepartment=$('#filterDepartment').value;
   $('#filterEmployee').innerHTML='<option value="">All Employees</option>'+users;
   $('#filterDepartment').innerHTML='<option value="">All Departments</option>'+departments.map(d=>'<option value="'+esc(d.id)+'">'+esc(d.name)+'</option>').join('');
-  $('#bulkUsers').innerHTML=staff.map(p=>'<label><input type="checkbox" value="'+esc(p.id)+'"> '+esc(p.full_name)+'</label>').join('');
+  $('#filterEmployee').value=oldFilter;$('#filterDepartment').value=oldDepartment;
+  $('#bulkUsers').innerHTML=staff.map(p=>'<div class="av-staff-row" data-staff="'+esc(p.id)+'"><label><input class="av-employee-check" type="checkbox" value="'+esc(p.id)+'"><span>'+esc(p.full_name)+'</span></label><small data-current="'+esc(p.id)+'">Not marked</small><div class="av-row-quick"><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="PRESENT">P</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="ABSENT">A</button><button type="button" data-quick-id="'+esc(p.id)+'" data-quick-status="HALF_DAY">½</button></div></div>').join('')||'<p>No active employee accounts found.</p>';
+  $$('#bulkUsers .av-employee-check').forEach(b=>b.onchange=updateSelected);
+  $$('#bulkUsers [data-quick-id]').forEach(b=>b.onclick=()=>safe(async()=>{
+   const form=$('#bulkForm'),date=input(form,'date'),reason=input(form,'reason')?.trim();
+   if(!date||!reason||reason.length<3)throw Error('Select date and enter a reason before marking.');
+   if(!confirm('Mark '+staff.find(p=>p.id===b.dataset.quickId)?.full_name+' as '+b.dataset.quickStatus+' on '+date+'?'))return;
+   b.disabled=true;try{await request('/admin/attendance','POST',{userId:b.dataset.quickId,date,status:b.dataset.quickStatus,reason});notify('Employee attendance saved and audited.');await loadAdmin();}finally{b.disabled=false}
+  }));
+  updateSelected();
+ }
+ function updateSelected(){
+  const checkboxes=$$('#bulkUsers .av-employee-check'),selected=checkboxes.filter(b=>b.checked);
+  $('#selectedStaffCount').textContent=selected.length+' / '+checkboxes.length+' selected';
+  $('#selectAllEmployees').checked=checkboxes.length>0&&selected.length===checkboxes.length;
+  $('#selectAllEmployees').indeterminate=selected.length>0&&selected.length<checkboxes.length;
+ }
+ async function loadPendingCount(){
+  if(!manager())return;
+  const [corr,leave]=await Promise.all([request('/admin/corrections?status=PENDING&pageSize=1'),request('/admin/leaves?status=PENDING&pageSize=1')]);
+  const total=(corr.total||0)+(leave.total||0);
+  $('#adminTab').textContent='Employee Attendance'+(total?' · '+total+' pending':'');
+  $('#pendingBadge').textContent=total?total+' approval requests pending':'No pending requests';
+ }
+ async function drawDailyRoster(){
+  const date=input($('#bulkForm'),'date');
+  const list=await request('/admin/attendance?'+params({from:date,to:date,page:1,pageSize:100}));
+  const map=new Map((list.items||[]).map(x=>[x.user_id,x]));
+  for(const el of $$('#bulkUsers [data-current]')){
+   const record=map.get(el.dataset.current);el.textContent=record?record.status.replace('_',' ')+(record.check_in?' · In '+shortDate(record.check_in):''):'Not marked';
+   const row=el.closest('.av-staff-row');
+   row?.querySelectorAll('[data-quick-status]').forEach(b=>b.classList.toggle('av-quick-active',record?.status===b.dataset.quickStatus));
+  }
+ }
+ async function drawAdminChart(){
+  const f=$('#adminFilters'),query={userId:input(f,'userId'),department:input(f,'department'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),pageSize:100},all=[];
+  let pages=1;
+  for(let index=1;index<=Math.min(pages,10);index++){
+   const part=await request('/admin/attendance?'+params({...query,page:index}));
+   all.push(...part.items);pages=part.pages||1;
+  }
+  const keys=['PRESENT','LATE','HALF_DAY','ABSENT','ON_LEAVE','HOLIDAY','WEEKEND'];
+  const colors={PRESENT:'present',LATE:'present',HALF_DAY:'half',ABSENT:'absent',ON_LEAVE:'leave',HOLIDAY:'holiday',WEEKEND:'weekend'};
+  const counts=Object.fromEntries(keys.map(k=>[k,all.filter(x=>x.status===k).length]));
+  $('#adminChartSummary').innerHTML=[['Employees',new Set(all.map(x=>x.user_id)).size],['Present',counts.PRESENT],['Absent',counts.ABSENT],['Half Day',counts.HALF_DAY],['Leave',counts.ON_LEAVE],['Records',all.length]].map(([n,v])=>'<div class="card"><small>'+esc(n)+'</small><strong>'+v+'</strong></div>').join('');
+  const max=Math.max(1,...Object.values(counts));
+  $('#adminChart').innerHTML='<div class="av-chart-title">Attendance overview · '+esc(input(f,'from'))+' to '+esc(input(f,'to'))+(pages>10?' · Showing first 1,000 rows':'')+'</div>'+
+    keys.map(k=>'<div class="av-chart-row"><span>'+esc(k.replace('_',' '))+'</span><div class="av-chart-track"><div class="av-chart-bar '+colors[k]+'" style="width:'+(counts[k]/max*100).toFixed(1)+'%"></div></div><strong>'+counts[k]+'</strong></div>').join('');
  }
  async function loadAdmin(){
   if(!manager())return;
