@@ -8,6 +8,7 @@ const controller=read('supabase/functions/attendance-api/controllers/attendance.
 const service=read('supabase/functions/attendance-api/services/attendance.service.ts');
 const report=read('supabase/functions/attendance-api/services/report.service.ts');
 new vm.Script(client);
+assert.ok(markup.indexOf('id="monthlyEmployeeList"')<markup.indexOf('id="downloadAllMonthlyExcel"'),'Employee list must appear before all-staff Excel download');
 for(const id of ['monthlyReportsSection','monthlyEmployeeList','monthlyEmployeeDialog','monthlyEmployeeMonth',
  'monthlyEmployeeCalendar','monthlyEmployeeCounts','monthlyEmployeeTimeSheet','downloadAllMonthlyExcel',
  'allMonthlyReportMonth','monthlyEmployeeClose']){
