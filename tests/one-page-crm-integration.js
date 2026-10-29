@@ -9,18 +9,20 @@ const fragment=html.match(/<template id="grCrmTemplate">([\s\S]*?)<\/template>/)
 assert.ok(fragment,'Single secure HTML must contain CRM DOM template');
 for(const module of ['dashboard','sales','customers','leads','tasks','products','channels','reports']){
  assert.match(fragment[1],new RegExp('<section id="'+module+'" class="page'));
- assert.match(fragment[1],new RegExp('data-page="'+module+'"'));
+ if(module!=='channels'&&module!=='reports')assert.match(fragment[1],new RegExp('data-page="'+module+'"'));
+ else assert.doesNotMatch(fragment[1],new RegExp('data-page="'+module+'"'),'Admin tools must not be in regular CRM tabs');
 }
 for(const id of ['editor-form','upload-sales','upload-backup','download-backup','restore-backup','trend-chart','channel-chart'])
  assert.ok(fragment[1].includes('id="'+id+'"'),'Missing legacy feature '+id);
 assert.match(html,/greenrich-crm-inline\.js/);
 assert.match(html,/greenrich-crm-inline\.css/);
-assert.match(shell,/GreenRichCRM\.mount\(container,view,allowed\)/);
+assert.match(shell,/GreenRichCRM\.mount\(container,view,allowed/);
 assert.match(shell,/const crmMap=/);
 assert.match(shell,/const canOpenPage=/);
 assert.match(crm,/root\.addEventListener\('click'/,'CRM actions must remain scoped');
 assert.match(crm,/const \$=s=>root\?\.querySelector/);
-assert.match(crm,/key='greenrich-crm-v2'/,'Existing browser data key must remain unchanged');
+assert.match(crm,/legacyKey='greenrich-crm-v2'/,'Existing Grow India browser data key must remain unchanged');
+assert.match(crm,/legacyKey\+'::'\+activeCompany/,'Other company must use isolated browser storage');
 assert.match(crm,/function importSales/);
 assert.match(crm,/function excelDownload/);
 assert.match(crm,/function doExport/);
