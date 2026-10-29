@@ -49,82 +49,73 @@ window.GreenRichAttendance=(function(){
   attendanceRights=(rights.data||[]).map(p=>p.action);
   if(p.data.shift_id){const assignedShift=await db.from('grm_shifts').select('working_days').eq('id',p.data.shift_id).maybeSingle();if(!assignedShift.error&&Array.isArray(assignedShift.data?.working_days))workingDays=assignedShift.data.working_days;}
   $('#todayLabel').textContent='Today · '+today;
-  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!canAdmin('edit');$('#launchPanel').hidden=actorRole!=='Admin';$('#adminMark').closest('.panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('.av-bulk-panel').hidden=!canAdmin('create')&&!canAdmin('edit');$$('[data-export]').forEach(b=>b.disabled=!canAdmin('export'));$('#launchDate').min=today;$('#launchDate').value=today;
+  $('#adminTab').hidden=!manager();
+  $('#adminMark').closest('.panel').hidden=!canAdmin('create')&&!canAdmin('edit');
+  $('.av-bulk-panel').hidden=!canAdmin('create')&&!canAdmin('edit');
+  $$('[data-export]').forEach(b=>b.disabled=!canAdmin('export'));
   $('#myMonth').value=today.slice(0,7);$('#reportMonth').value=today.slice(0,7);
   $('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;
   $('#correctionDate').max=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
-  
   $$('.av-tab').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
-  $('#checkIn').onclick=()=>safe(async()=>{await request('/attendance/check-in','POST',{});notify('Check-in saved using server time.');await loadMine()});
-  $('#checkOut').onclick=()=>safe(async()=>{await request('/attendance/check-out','POST',{});notify('Check-out saved using server time.');await loadMine()});
+  $('#checkIn').onclick=()=>safe(async()=>{await request('/attendance/check-in','POST',{});notify('Check-in recorded using server time');await loadMine()});
+  $('#checkOut').onclick=()=>safe(async()=>{await request('/attendance/check-out','POST',{});notify('Check-out recorded using server time');await loadMine()});
   $('#myMonth').onchange=()=>{myPage=1;safe(loadMine)};
   $('#myPrev').onclick=()=>{myPage=Math.max(1,myPage-1);safe(loadMine)};
   $('#myNext').onclick=()=>{myPage++;safe(loadMine)};
   $('#correctionForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget;
    await request('/attendance/corrections','POST',{date:input(f,'date'),requestedCheckIn:iso(input(f,'in')),requestedCheckOut:iso(input(f,'out')),reason:input(f,'reason')});
-   f.reset();notify('Attendance correction submitted for Office Admin review.');await loadRequests();
+   f.reset();notify('Correction submitted for approval');await loadRequests();
   })};
   $('#leaveForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget;await request('/leaves','POST',{type:input(f,'type'),fromDate:input(f,'from'),toDate:input(f,'to'),reason:input(f,'reason')});
-   f.reset();notify('Leave request submitted.');await loadRequests();
+   f.reset();notify('Leave request submitted');await loadRequests();
   })};
   $('#adminFilters').onsubmit=e=>{e.preventDefault();adminPage=1;safe(loadAdmin)};
   $('#adminPrev').onclick=()=>{adminPage=Math.max(1,adminPage-1);safe(loadAdmin)};
   $('#adminNext').onclick=()=>{adminPage++;safe(loadAdmin)};
   $('#adminMark').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget;
-   const editing=f.dataset.recordId;
-   await request(editing?'/admin/attendance/'+editing:'/admin/attendance',editing?'PUT':'POST',{
-    userId:input(f,'userId'),date:input(f,'date'),status:input(f,'status'),checkIn:iso(input(f,'checkIn')),
-    checkOut:iso(input(f,'checkOut')),reason:input(f,'reason')});
-   f.dataset.recordId='';f.reset();notify('Attendance saved and audited.');await loadAdmin();
+   await request('/admin/attendance','POST',{userId:input(f,'userId'),date:input(f,'date'),status:input(f,'status'),checkIn:iso(input(f,'checkIn')),checkOut:iso(input(f,'checkOut')),reason:input(f,'reason')});
+   notify('Attendance saved and audit recorded');f.elements.namedItem('reason').value='';await loadAdmin();
+  })};
+  const editDialog=$('#attendanceEditDialog'),editForm=$('#attendanceEditForm');
+  $('#attendanceEditClose').onclick=$('#attendanceEditCancel').onclick=()=>editDialog.close();
+  editForm.onsubmit=e=>{e.preventDefault();safe(async()=>{
+   const button=$('#attendanceEditSave');button.disabled=true;
+   try{
+    const f=e.currentTarget;
+    await request('/admin/attendance/'+input(f,'recordId'),'PUT',{status:input(f,'status'),checkIn:iso(input(f,'checkIn')),checkOut:iso(input(f,'checkOut')),reason:input(f,'reason')});
+    editDialog.close();notify('Attendance updated and recorded in the audit log');
+    await Promise.all([loadAdmin(),loadMine()]);
+   }finally{button.disabled=false}
   })};
   $('#bulkForm').elements.namedItem('date').value=today;
-  $('#bulkForm').elements.namedItem('reason').value='Daily employee attendance verified';
   $('#adminMark').elements.namedItem('date').value=today;
-  $('#selectAllEmployees').onchange=e=>{$$('#bulkUsers .av-employee-check').forEach(b=>b.checked=e.target.checked);updateSelected()};
+  $('#selectAllEmployees').onchange=e=>{$$('#bulkUsers .av-employee-check:not(:disabled)').forEach(b=>b.checked=e.target.checked);updateSelected()};
   $$('[data-bulk-status]').forEach(b=>b.onclick=()=>{const form=$('#bulkForm');form.elements.namedItem('status').value=b.dataset.bulkStatus;form.requestSubmit()});
   $('#bulkForm').elements.namedItem('date').onchange=()=>safe(drawDailyRoster);
   $$('[data-period]').forEach(b=>b.onclick=()=>{
    const now=new Date(today+'T12:00:00+05:30'),fmt=d=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);const f=t=>p.find(x=>x.type===t)?.value;return f('year')+'-'+f('month')+'-'+f('day')};
-   if(b.dataset.period==='day'){$('#adminFrom').value=today;$('#adminTo').value=today;}
-   else if(b.dataset.period==='week'){const monday=new Date(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));$('#adminFrom').value=fmt(monday);$('#adminTo').value=today;}
-   else{$('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;}
+   if(b.dataset.period==='day'){$('#adminFrom').value=today;$('#adminTo').value=today}
+   else if(b.dataset.period==='week'){const monday=new Date(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));$('#adminFrom').value=fmt(monday);$('#adminTo').value=today}
+   else{$('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today}
    $$('.av-period-tabs button').forEach(x=>x.classList.toggle('av-period-active',x===b));adminPage=1;safe(loadAdmin);
   });
   $('#bulkForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
-   const f=e.currentTarget,ids=$('#bulkUsers input.av-employee-check:not(:disabled):checked').map(el=>el.value);
-   if(!ids.length)throw Error('Select at least one employee.');
-   if(!confirm('Mark '+ids.length+' employee(s)?'))return;
+   const f=e.currentTarget,ids=$$('#bulkUsers input.av-employee-check:not(:disabled):checked').map(el=>el.value);
+   if(!ids.length)throw Error('Select at least one employee');
+   if(!confirm('Mark '+ids.length+' employees as '+input(f,'status')+'?'))return;
    const result=await request('/admin/attendance/bulk','POST',{userIds:ids,date:input(f,'date'),status:input(f,'status'),reason:input(f,'reason')});
-   notify('Updated '+result.updated+' employee attendance records.');await loadAdmin();
+   notify('Saved '+result.updated+' attendance records. Existing actual check-ins are protected.');await loadAdmin();
   })};
   $$('[data-export]').forEach(b=>b.onclick=()=>safe(async()=>{
    const ext=b.dataset.export,f=$('#adminFilters');
-   const filters={from:input(f,'from'),to:input(f,'to'),userId:input(f,'userId'),department:input(f,'department'),status:input(f,'status'),format:ext};
+   const filters={from:input(f,'from'),to:input(f,'to'),userId:input(f,'userId'),roleId:input(f,'roleId'),status:input(f,'status'),format:ext};
    const response=await request('/admin/reports/range?'+params(filters),'GET',null,true);
    const blob=await response.blob(),link=document.createElement('a'),url=URL.createObjectURL(blob);
    link.href=url;link.download='greenrich-attendance-'+filters.from+'-to-'+filters.to+'.'+ext;link.click();setTimeout(()=>URL.revokeObjectURL(url),500);
   }));
-  $('#launchForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
-  if(actorRole!=='Admin')throw Error('Built-in Admin permission required');
-  if(!confirm('Enable automatic ABSENT marking from the selected date?'))return;
-  const f=e.currentTarget;
-  const result=await request('/admin/settings/launch','POST',{startDate:input(f,'startDate'),reason:input(f,'reason')});
-  notify('Daily automatic absence marking will start from '+result.enabledFrom+'.');
-  await loadConfiguration();
- })};
- $('#disableLaunch').onclick=()=>safe(async()=>{
-  if(actorRole!=='Admin')throw Error('Built-in Admin permission required');
-  if(!confirm('Disable automatic ABSENT marking for all employees?'))return;
-  const reason=prompt('Reason for disabling automatic absent marking (required):');if(reason===null)return;
-  await request('/admin/settings/launch','POST',{startDate:null,reason});
-  notify('Automatic absence marking disabled.');await loadConfiguration();
- });
- $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
-  $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
-  $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
   try{await loadMine();if(manager()&&canAdmin('approve')){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
