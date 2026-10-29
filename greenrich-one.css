@@ -112,3 +112,12 @@ aside .logo{
 #gr-company-settings-content #grCrmWorkspace nav.gr-crm-tabs{display:none!important}
 #gr-company-settings-content #grCrmWorkspace .gr-crm-data-notice{font-size:12px}
 @media(max-width:760px){.gr-company-cards{grid-template-columns:1fr}aside .logo{font-size:18px!important}}
+
+/* Unified GreenRich ONE brand and professional typography. */
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+#app aside .gr-brand-name{font-family:inherit;font-size:18px;font-weight:650;letter-spacing:-.035em}
+#app aside .gr-brand-name em{font-size:.82em;font-weight:600;letter-spacing:.01em}
+#app header #activeCompanyLabel{font-size:11px;letter-spacing:.01em;text-transform:none;overflow-wrap:anywhere;color:#647b9a}
+#gr-company-admin .gr-settings-tabs button{font-family:inherit;font-size:12.5px;line-height:1.4}
+#gr-company-admin .gr-company-card strong{font-size:14px;line-height:1.4}
+@media(max-width:760px){#app aside .gr-brand-name{font-size:17px}#app header #activeCompanyLabel{font-size:10px}}

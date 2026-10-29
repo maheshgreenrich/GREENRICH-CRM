@@ -10,10 +10,10 @@ const crmAccess=()=>({
  leads:can('leads'),
  tasks:can('leads')||can('marketing'),
  products:can('stock'),
- channels:can('sales'),
- reports:can('reports')
+ channels:roleName()==='Admin',
+ reports:roleName()==='Admin'
 });
-const canOpenPage=m=>m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
+const canOpenPage=m=>['channels','reports'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
@@ -35,7 +35,7 @@ async function enter(){
   ]);
   if(profileResult.error||!profileResult.data?.active)throw Error('No active employee profile. Ask your Admin to set up your profile.');
   profile=profileResult.data;roles=roleRows;permissions=permissionRows;people=employeeRows;company=settingsRows[0]||null;
-  $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();
+  $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();const companyLabel=$('#activeCompanyLabel');if(companyLabel)companyLabel.textContent=window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd';
   document.title='GreenRich ONE · '+(company?.company_name||'CRM');
   if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
   show('app');navigation();
@@ -155,10 +155,11 @@ const loadCrmAssets=()=>{
  ]);
 };
 async function crmWorkspace(container,view,adminTools=false){
+ if(adminTools&&roleName()!=='Admin')throw Error('Only Admin can open company administration tools');
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
  const access=crmAccess(),allowed=adminTools?['channels','reports','dashboard']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
- window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd');
+ window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true);
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
@@ -174,8 +175,8 @@ async function employeeAction(data){
    try{const payload=await error.context.clone().json();details=payload?.error||payload?.message||details}catch(_){}
   }
   if(!details)details=error.message||'Unknown server error';
-  if(/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(details))details='The Supabase employee service is unreachable. Confirm function deployment and browser network access.';
-  if(/non-2xx status code/i.test(details))details='The server rejected this request'+(status?' (HTTP '+status+')':'')+'. Check Supabase Edge Functions > greenrich-admin-users > Logs.';
+  if(/Failed to send a request|Failed to fetch|FunctionsFetchError/i.test(details))details='The employee account service is unreachable. Confirm function deployment and browser network access.';
+  if(/non-2xx status code/i.test(details))details='The server rejected this request'+(status?' (HTTP '+status+')':'')+'. Check the employee account service logs.';
   throw Error(details);
  }
  if(result?.error)throw Error(result.error);
@@ -183,7 +184,7 @@ async function employeeAction(data){
 }
 async function users(c){
  if(roleName()!=='Admin')throw Error('Only Admin can manage users');
- c.innerHTML='<div class="panel"><div class="row"><h2>User Management</h2><div class="row"><a class="secondary" href="roles.html">Create & Manage Roles</a><button class="blue" type="button" id="newEmployeeButton">+ Create New User</button></div></div><div id="newEmployeePanel" hidden><h3>Create Employee</h3><span class="pill">Direct account creation</span><p>Enter username, login email and password. No invitation or email verification is required. Supabase requires a unique email for authentication.</p><form id="employeeForm" class="fields"><label>Username<input name="username" required minlength="3" placeholder="e.g. ezhil"></label><label>Email for Login<input name="email" type="email" required placeholder="employee@company.com"></label><label>Password<input name="password" type="password" minlength="10" required></label><label>Assign Role<select name="role">'+roles.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><div style="align-self:end"><button class="blue" type="submit">Create Employee</button></div></form></div><div class="notice">One-time setup: deploy the protected greenrich-admin-users Supabase Edge Function from this repository. The button will work only after that one-time deployment. <a href="https://github.com/maheshgreenrich/GREENRICH-CRM/blob/main/supabase/functions/greenrich-admin-users/index.ts" target="_blank" rel="noopener">Open deployment code</a>.</div></div><div class="panel"><div class="row"><h2>Manage Users</h2><span class="pill">'+people.length+' profiles</span></div><div class="tablewrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Admin Actions</th></tr></thead><tbody>'+people.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.username)+'</td><td>'+esc(p.email)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+esc(p.active?'Active':'Disabled')+'</td><td><button class="secondary" data-emp-edit="'+p.id+'">Edit / Role</button> <button class="secondary" data-emp-reset="'+p.id+'">Reset Password</button> <button class="secondary" data-emp-toggle="'+p.id+'">'+(p.active?'Deactivate':'Reactivate')+'</button></td></tr>').join('')+'</tbody></table></div></div>';
+ c.innerHTML='<div class="panel"><div class="row"><h2>User Management</h2><div class="row"><a class="secondary" href="roles.html">Create & Manage Roles</a><button class="blue" type="button" id="newEmployeeButton">+ Create New User</button></div></div><div id="newEmployeePanel" hidden><h3>Create Employee</h3><span class="pill">Direct account creation</span><p>Enter username, login email and password. No invitation or email verification is required. Every employee login must use a unique email.</p><form id="employeeForm" class="fields"><label>Username<input name="username" required minlength="3" placeholder="e.g. ezhil"></label><label>Email for Login<input name="email" type="email" required placeholder="employee@company.com"></label><label>Password<input name="password" type="password" minlength="10" required></label><label>Assign Role<select name="role">'+roles.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><div style="align-self:end"><button class="blue" type="submit">Create Employee</button></div></form></div><div class="notice">One-time setup: deploy the protected greenrich-admin-users employee service from this repository. The button will work only after that one-time deployment. <a href="https://github.com/maheshgreenrich/GREENRICH-CRM/blob/main/supabase/functions/greenrich-admin-users/index.ts" target="_blank" rel="noopener">Open deployment code</a>.</div></div><div class="panel"><div class="row"><h2>Manage Users</h2><span class="pill">'+people.length+' profiles</span></div><div class="tablewrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Admin Actions</th></tr></thead><tbody>'+people.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.username)+'</td><td>'+esc(p.email)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+esc(p.active?'Active':'Disabled')+'</td><td><button class="secondary" data-emp-edit="'+p.id+'">Edit / Role</button> <button class="secondary" data-emp-reset="'+p.id+'">Reset Password</button> <button class="secondary" data-emp-toggle="'+p.id+'">'+(p.active?'Deactivate':'Reactivate')+'</button></td></tr>').join('')+'</tbody></table></div></div>';
  $('#newEmployeeButton').onclick=()=>{const panel=$('#newEmployeePanel');panel.hidden=!panel.hidden;if(!panel.hidden)panel.querySelector('input').focus()};const refresh=async()=>{people=await query('gr_profiles');permissions=await query('gr_role_permissions');await users(c)};
  $('#employeeForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');const f=new FormData(form);button.disabled=true;try{const result=await employeeAction({action:'create',password:f.get('password'),name:f.get('username'),username:f.get('username'),email:f.get('email'),role:f.get('role')});toast(result.message||'Employee created');await refresh()}catch(e){toast(e.message)}finally{button.disabled=false}};
  c.querySelectorAll('[data-emp-edit]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empEdit);if(!p)return;const name=prompt('Employee name',p.full_name);if(name===null)return;const username=prompt('Username',p.username);if(username===null)return;const selected=prompt('Role: '+roles.map(x=>x.name).join(', '),roles.find(x=>x.id===p.role_id)?.name||'Sales');if(selected===null)return;const role=roles.find(r=>r.name.toLowerCase()===selected.trim().toLowerCase());if(!role)return toast('Role not found');try{const out=await employeeAction({action:'edit',userId:p.id,name,username,role:role.name});toast(out.message);await refresh()}catch(e){toast(e.message)}});
