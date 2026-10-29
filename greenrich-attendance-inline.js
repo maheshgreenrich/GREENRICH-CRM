@@ -244,7 +244,7 @@ window.GreenRichAttendance=(function(){
  async function loadAdmin(){
   if(!manager())return;
   if(!staff.length)await loadStaff();
-  const f=$('#adminFilters'),query=params({userId:input(f,'userId'),department:input(f,'department'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),page:adminPage,pageSize:20});
+  const f=$('#adminFilters'),query=params({userId:input(f,'userId'),roleId:input(f,'roleId'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),page:adminPage,pageSize:20});
   const result=await request('/admin/attendance?'+query);adminItems=result.items;
   $('#adminRows').innerHTML=adminItems.map(r=>tRow([
    esc(r.date),esc(r.gr_profiles?.full_name||staff.find(p=>p.id===r.user_id)?.full_name||r.user_id),
@@ -256,17 +256,19 @@ window.GreenRichAttendance=(function(){
   await Promise.all([drawAdminChart(),drawDailyRoster()]);
   $$('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
    const r=adminItems.find(x=>x.id===b.dataset.edit);if(!r)return;
-   const f=$('#adminMark');f.dataset.recordId=r.id;
-   f.elements.namedItem('userId').value=r.user_id;f.elements.namedItem('date').value=r.date;
+   const f=$('#attendanceEditForm');
+   f.elements.namedItem('recordId').value=r.id;
+   f.elements.namedItem('employee').value=staff.find(p=>p.id===r.user_id)?.full_name||r.user_id;
+   f.elements.namedItem('date').value=r.date;
    f.elements.namedItem('status').value=r.status;
    f.elements.namedItem('checkIn').value=officeLocal(r.check_in);
    f.elements.namedItem('checkOut').value=officeLocal(r.check_out);
-   notify('Record loaded. Enter a reason and save to correct the record.');f.scrollIntoView({block:'center',behavior:'smooth'});
+   f.elements.namedItem('reason').value='';
+   $('#attendanceEditDialog').showModal();
   });
   $$('#adminRows [data-delete]').forEach(b=>b.onclick=()=>safe(async()=>{
-   const reason=prompt('Reason for deleting this record (mandatory):');if(reason===null)return;
-   if(!confirm('Delete this attendance record?'))return;
-   await request('/admin/attendance/'+b.dataset.delete,'DELETE',{reason});
+   if(!confirm('Remove this attendance entry? The deletion is recorded in the audit log.'))return;
+   await request('/admin/attendance/'+b.dataset.delete,'DELETE',{reason:''});
    notify('Attendance soft-deleted with audit record.');await loadAdmin();
   }));
   const [corrections,leaves]=canAdmin('approve')?await Promise.all([request('/admin/corrections?'+params({status:'PENDING'})),request('/admin/leaves?'+params({status:'PENDING'}))]):[{items:[],total:0},{items:[],total:0}];
@@ -274,8 +276,8 @@ window.GreenRichAttendance=(function(){
   function approveRows(container,items,kind){
    $(container).innerHTML=table(items,r=>'<div class="av-entry"><strong>'+esc(staff.find(x=>x.id===r.user_id)?.full_name||r.user_id)+'</strong><b>'+esc(kind==='corrections'?r.date:r.from_date+' to '+r.to_date)+'</b><small>'+esc(r.reason)+'</small><div class="av-actions"><button class="secondary" data-review="'+esc(r.id)+'" data-decision="APPROVED">Approve</button><button class="secondary" data-review="'+esc(r.id)+'" data-decision="REJECTED">Reject</button></div></div>','No pending requests');
    $$(container+' [data-review]').forEach(b=>b.onclick=()=>safe(async()=>{
-    const note=prompt('Review note (mandatory):');if(note===null)return;
-    await request('/admin/'+kind+'/'+b.dataset.review+'/review','PATCH',{decision:b.dataset.decision,note});
+    if(!confirm(b.dataset.decision==='APPROVED'?'Approve this request?':'Reject this request?'))return;
+    await request('/admin/'+kind+'/'+b.dataset.review+'/review','PATCH',{decision:b.dataset.decision,note:''});
     notify('Request '+b.dataset.decision.toLowerCase()+'.');await loadAdmin();
    }));
   }
