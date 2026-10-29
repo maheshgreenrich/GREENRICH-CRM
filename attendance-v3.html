@@ -59,6 +59,17 @@
  <div class="panel"><h2>Leave Requests for Approval</h2><div id="adminLeaves"></div></div></div>
 </section>
 <section id="tab-config" class="av-section" hidden>
+ <div class="panel" id="launchPanel" hidden>
+  <h2>Automatic ABSENT Attendance</h2>
+  <p id="launchStatus">Automatic marking is currently disabled until the company launches Attendance V3.</p>
+  <form id="launchForm" class="av-filter">
+   <label>Start from this date<input name="startDate" type="date" id="launchDate" required></label>
+   <label>Reason<input name="reason" minlength="3" maxlength="250" required placeholder="Attendance V3 launch approval"></label>
+   <button class="blue" type="submit">Activate Daily Absence Marking</button>
+   <button class="secondary" id="disableLaunch" type="button">Disable Auto Marking</button>
+  </form>
+  <p>Only the main Admin can activate this feature. Employees are marked absent only after a completed working day, excluding holidays and approved leave.</p>
+ </div>
  <div class="av-grid"><div class="panel"><h2>Office Holidays</h2><form id="holidayForm" class="av-form">
  <input type="hidden" name="id"><label>Holiday Date<input name="date" type="date" required></label><label>Holiday Name<input name="name" required maxlength="120"></label>
  <label>Reason<input name="reason" required minlength="3"></label><button class="blue" type="submit">Save Holiday</button></form><div id="holidayRows"></div></div>
