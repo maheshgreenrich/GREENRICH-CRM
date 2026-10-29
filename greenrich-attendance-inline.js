@@ -49,7 +49,7 @@ window.GreenRichAttendance=(function(){
   attendanceRights=(rights.data||[]).map(p=>p.action);
   if(p.data.shift_id){const assignedShift=await db.from('grm_shifts').select('working_days').eq('id',p.data.shift_id).maybeSingle();if(!assignedShift.error&&Array.isArray(assignedShift.data?.working_days))workingDays=assignedShift.data.working_days;}
   $('#todayLabel').textContent='Today · '+today;
-  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!canAdmin('edit');$('#launchPanel').hidden=actorRole!=='Admin';$('#adminMark').closest('.panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('.av-bulk-panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('[data-export]').forEach(b=>b.disabled=!canAdmin('export'));$('#launchDate').min=today;$('#launchDate').value=today;
+  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!canAdmin('edit');$('#launchPanel').hidden=actorRole!=='Admin';$('#adminMark').closest('.panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('.av-bulk-panel').hidden=!canAdmin('create')&&!canAdmin('edit');$$('[data-export]').forEach(b=>b.disabled=!canAdmin('export'));$('#launchDate').min=today;$('#launchDate').value=today;
   $('#myMonth').value=today.slice(0,7);$('#reportMonth').value=today.slice(0,7);
   $('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;
   $('#correctionDate').max=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
@@ -83,15 +83,15 @@ window.GreenRichAttendance=(function(){
   $('#bulkForm').elements.namedItem('date').value=today;
   $('#bulkForm').elements.namedItem('reason').value='Daily employee attendance verified';
   $('#adminMark').elements.namedItem('date').value=today;
-  $('#selectAllEmployees').onchange=e=>{$('#bulkUsers .av-employee-check').forEach(b=>b.checked=e.target.checked);updateSelected()};
-  $('[data-bulk-status]').forEach(b=>b.onclick=()=>{const form=$('#bulkForm');form.elements.namedItem('status').value=b.dataset.bulkStatus;form.requestSubmit()});
+  $('#selectAllEmployees').onchange=e=>{$$('#bulkUsers .av-employee-check').forEach(b=>b.checked=e.target.checked);updateSelected()};
+  $$('[data-bulk-status]').forEach(b=>b.onclick=()=>{const form=$('#bulkForm');form.elements.namedItem('status').value=b.dataset.bulkStatus;form.requestSubmit()});
   $('#bulkForm').elements.namedItem('date').onchange=()=>safe(drawDailyRoster);
-  $('[data-period]').forEach(b=>b.onclick=()=>{
+  $$('[data-period]').forEach(b=>b.onclick=()=>{
    const now=new Date(today+'T12:00:00+05:30'),fmt=d=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);const f=t=>p.find(x=>x.type===t)?.value;return f('year')+'-'+f('month')+'-'+f('day')};
    if(b.dataset.period==='day'){$('#adminFrom').value=today;$('#adminTo').value=today;}
    else if(b.dataset.period==='week'){const monday=new Date(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));$('#adminFrom').value=fmt(monday);$('#adminTo').value=today;}
    else{$('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;}
-   $('.av-period-tabs button').forEach(x=>x.classList.toggle('av-period-active',x===b));adminPage=1;safe(loadAdmin);
+   $$('.av-period-tabs button').forEach(x=>x.classList.toggle('av-period-active',x===b));adminPage=1;safe(loadAdmin);
   });
   $('#bulkForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget,ids=$('#bulkUsers input.av-employee-check:not(:disabled):checked').map(el=>el.value);
@@ -272,7 +272,7 @@ window.GreenRichAttendance=(function(){
   $('#pendingBadge').textContent=pending?pending+' pending approval request'+(pending===1?'':'s'):'All requests reviewed';
   $('#adminTab').textContent='Employee Attendance'+(pending?' · '+pending+' pending':'');
   $('#approvalPreview').innerHTML=pending?'<div class="av-pending-links"><button type="button" class="secondary" data-go-approval="adminCorrections">'+corrections.total+' attendance corrections</button><button type="button" class="secondary" data-go-approval="adminLeaves">'+leaves.total+' leave requests</button></div>':'<p>There are no pending requests at the moment.</p>';
-  $('#approvalPreview [data-go-approval]').forEach(b=>b.onclick=()=>$('#'+b.dataset.goApproval).scrollIntoView({behavior:'smooth',block:'center'}));
+  $$('#approvalPreview [data-go-approval]').forEach(b=>b.onclick=()=>$('#'+b.dataset.goApproval).scrollIntoView({behavior:'smooth',block:'center'}));
  approveRows('#adminCorrections',corrections.items,'corrections');approveRows('#adminLeaves',leaves.items,'leaves');
  }
  async function loadConfiguration(){
