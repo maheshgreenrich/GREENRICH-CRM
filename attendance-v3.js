@@ -44,7 +44,7 @@
   if(role.error)throw Error(role.error.message);
   actorRole=role.data.name;actorName=p.data.full_name;
   $('#employeeName').textContent=actorName;$('#employeeRole').textContent=actorRole;$('#todayLabel').textContent='Today · '+today;
-  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!manager();$('#roleLink').hidden=actorRole!=='Admin';$('#userLink').hidden=actorRole!=='Admin';
+  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!manager();$('#launchPanel').hidden=actorRole!=='Admin';$('#launchDate').min=today;$('#launchDate').value=today;$('#roleLink').hidden=actorRole!=='Admin';$('#userLink').hidden=actorRole!=='Admin';
   $('#myMonth').value=today.slice(0,7);$('#reportMonth').value=today.slice(0,7);
   $('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;
   $('#correctionDate').max=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
@@ -88,7 +88,22 @@
    const blob=await response.blob(),link=document.createElement('a'),url=URL.createObjectURL(blob);
    link.href=url;link.download='greenrich-attendance-'+m+'.'+ext;link.click();setTimeout(()=>URL.revokeObjectURL(url),500);
   }));
-  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
+  $('#launchForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
+  if(actorRole!=='Admin')throw Error('Built-in Admin permission required');
+  if(!confirm('Enable automatic ABSENT marking from the selected date?'))return;
+  const f=e.currentTarget;
+  const result=await request('/admin/settings/launch','POST',{startDate:input(f,'startDate'),reason:input(f,'reason')});
+  notify('Daily automatic absence marking will start from '+result.enabledFrom+'.');
+  await loadConfiguration();
+ })};
+ $('#disableLaunch').onclick=()=>safe(async()=>{
+  if(actorRole!=='Admin')throw Error('Built-in Admin permission required');
+  if(!confirm('Disable automatic ABSENT marking for all employees?'))return;
+  const reason=prompt('Reason for disabling automatic absent marking (required):');if(reason===null)return;
+  await request('/admin/settings/launch','POST',{startDate:null,reason});
+  notify('Automatic absence marking disabled.');await loadConfiguration();
+ });
+ $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
   try{await loadMine()}catch(e){notify('Attendance V3 backend is not ready: '+e.message+'. Deploy the V3 SQL migrations and attendance-api Edge Function first.',true)}
@@ -159,6 +174,7 @@
  }
  async function loadConfiguration(){
   if(!manager())return;
+  if(actorRole==='Admin'){const setting=await request('/admin/settings/launch');$('#launchStatus').textContent=setting.enabled_from?'Automatic absence marking starts on '+setting.enabled_from+' (office timezone).':'Automatic absence marking is currently disabled.';}
   if(!staff.length)await loadStaff();
   [holidays,shifts,departments]=await Promise.all([request('/admin/holidays'),request('/admin/shifts'),request('/admin/departments')]);
   function render(kind,target,items,desc){
