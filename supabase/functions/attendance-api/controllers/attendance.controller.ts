@@ -17,9 +17,14 @@ const dateTime=(v:any,optional=true)=>{
  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(v)||!Number.isFinite(Date.parse(v)))fail('Timestamp must include timezone offset or Z');
  return new Date(v).toISOString();
 };
-const status=(v:any)=>{const values=['PRESENT','ABSENT','LATE','HALF_DAY','ON_LEAVE','HOLIDAY','WEEKEND'];if(!values.includes(v))fail('Invalid attendance status');return v as string};
+const status=(v:any)=>{const values=['PRESENT','ABSENT','LATE','HALF_DAY','ON_LEAVE','PAID_LEAVE','HOLIDAY','WEEKEND'];if(!values.includes(v))fail('Invalid attendance status');return v as string};
 const decision=(v:any)=>{if(!['APPROVED','REJECTED'].includes(v))fail('Decision must be APPROVED or REJECTED');return v as string};
 const reason=(v:any)=>{if(typeof v!=='string'||v.trim().length<3||v.trim().length>1000)fail('Reason is required (3–1000 characters)');return v.trim()};
+const optionalNote=(value:any)=>{
+ if(value===undefined||value===null||value==='')return '';
+ if(typeof value!=='string'||value.trim().length>1000)fail('Note must be 1000 characters or fewer');
+ return value.trim();
+};
 const page=(q:URLSearchParams)=>{
  const p=Number(q.get('page')||1),size=Number(q.get('pageSize')||20);
  if(!Number.isInteger(p)||p<1||p>100000||!Number.isInteger(size)||size<1||size>100)fail('Invalid pagination (page>=1, pageSize 1–100)');
@@ -61,14 +66,14 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
   const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
   const todayIST=parts.find(p=>p.type==='year')?.value+'-'+parts.find(p=>p.type==='month')?.value+'-'+parts.find(p=>p.type==='day')?.value;
   if(requestedDate>=todayIST)fail('Corrections can only be requested for past dates');
-  return response(await service.correctionCreate(db,actor,{date:requestedDate,checkIn:dateTime(b.requestedCheckIn),checkOut:dateTime(b.requestedCheckOut),reason:reason(b.reason)}),201);
+  return response(await service.correctionCreate(db,actor,{date:requestedDate,checkIn:dateTime(b.requestedCheckIn),checkOut:dateTime(b.requestedCheckOut),reason:optionalNote(b.reason)}),201);
  }
  if(method==='GET'&&route==='/attendance/corrections/me')return response(await service.ownRequests(db,actor,'grm_corrections',pagination));
  if(method==='POST'&&route==='/leaves'){
   const b=await bodyJSON(req),fromDate=date(b.fromDate),toDate=date(b.toDate);
   if(toDate<fromDate)fail('Leave end date cannot precede start date');
   if((Date.parse(toDate)-Date.parse(fromDate))/86400000>366)fail('Leave request exceeds 366 days');
-  return response(await service.leaveCreate(db,actor,{type:txt(b.type,'Leave type',40),fromDate,toDate,reason:reason(b.reason)}),201);
+  return response(await service.leaveCreate(db,actor,{type:txt(b.type,'Leave type',40),fromDate,toDate,reason:optionalNote(b.reason)}),201);
  }
  if(method==='GET'&&route==='/leaves/me')return response(await service.ownRequests(db,actor,'grm_leaves',pagination));
  if(method==='GET'&&route==='/admin/settings/launch')
@@ -76,52 +81,52 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  if(method==='POST'&&route==='/admin/settings/launch'){
   const b=await bodyJSON(req);
   return response({enabledFrom:await service.setLaunch(db,actor,
-     b.startDate===null?null:date(b.startDate),reason(b.reason))});
+     b.startDate===null?null:date(b.startDate),optionalNote(b.reason))});
  }
  if(method==='GET'&&route==='/admin/staff')return response(await service.directory(db,actor));
  const assignment=route.match(/^\/admin\/staff\/([a-f0-9-]{36})\/assignment$/i);
  if(method==='PUT'&&assignment){
   const b=await bodyJSON(req);
-  return response(await service.assignEmployee(db,actor,validUUID(assignment[1]),validUUID(b.departmentId,false),validUUID(b.shiftId,false),reason(b.reason),ip));
+  return response(await service.assignEmployee(db,actor,validUUID(assignment[1]),validUUID(b.departmentId,false),validUUID(b.shiftId,false),optionalNote(b.reason),ip));
  }
  if(method==='GET'&&route==='/admin/attendance'){
-  const range=dateRange(q),filters={...range,userId:qString(q,'userId'),department:qString(q,'department'),status:qString(q,'status')};
-  if(filters.userId)validUUID(filters.userId);if(filters.department)validUUID(filters.department);if(filters.status)status(filters.status);
+  const range=dateRange(q),filters={...range,userId:qString(q,'userId'),roleId:qString(q,'roleId'),status:qString(q,'status')};
+  if(filters.userId)validUUID(filters.userId);if(filters.roleId)validUUID(filters.roleId);if(filters.status)status(filters.status);
   return response(await service.attendanceSearch(db,actor,filters,pagination));
  }
  if(method==='POST'&&route==='/admin/attendance'){
   const b=await bodyJSON(req);
   return response(await service.manual(db,actor,{userId:validUUID(b.userId),date:date(b.date),status:status(b.status),
-    checkIn:dateTime(b.checkIn),checkOut:dateTime(b.checkOut),reason:reason(b.reason)},ip),201);
+    checkIn:dateTime(b.checkIn),checkOut:dateTime(b.checkOut),reason:optionalNote(b.reason)},ip),201);
  }
  if(method==='POST'&&route==='/admin/attendance/bulk'){
   const b=await bodyJSON(req);
   if(!Array.isArray(b.userIds))fail('userIds array required');
   return response({updated:await service.bulk(db,actor,{userIds:b.userIds.map((v:any)=>validUUID(v)),date:date(b.date),
-   status:status(b.status),reason:reason(b.reason)},ip)},201);
+   status:status(b.status),reason:optionalNote(b.reason)},ip)},201);
  }
  const record=route.match(/^\/admin\/attendance\/([a-f0-9-]{36})$/i);
  if(record&&(method==='PUT'||method==='DELETE')){
   const b=await bodyJSON(req);return response(await service.manualById(db,actor,validUUID(record[1]),{
-   status:method==='PUT'?status(b.status):undefined,checkIn:dateTime(b.checkIn),checkOut:dateTime(b.checkOut),reason:reason(b.reason)
+   status:method==='PUT'?status(b.status):undefined,checkIn:dateTime(b.checkIn),checkOut:dateTime(b.checkOut),reason:optionalNote(b.reason)
   },ip,method==='DELETE'));
  }
  if(method==='GET'&&route==='/admin/corrections')return response(await service.reviewList(db,actor,'grm_corrections',statusFilter(qString(q,'status')),pagination));
  const correction=route.match(/^\/admin\/corrections\/([a-f0-9-]{36})\/review$/i);
  if(method==='PATCH'&&correction){
-  const b=await bodyJSON(req);return response(await service.review(db,actor,'correction',validUUID(correction[1]),{decision:decision(b.decision),note:reason(b.note)},ip));
+  const b=await bodyJSON(req);return response(await service.review(db,actor,'correction',validUUID(correction[1]),{decision:decision(b.decision),note:optionalNote(b.note)},ip));
  }
  if(method==='GET'&&route==='/admin/leaves')return response(await service.reviewList(db,actor,'grm_leaves',statusFilter(qString(q,'status')),pagination));
  const leave=route.match(/^\/admin\/leaves\/([a-f0-9-]{36})\/review$/i);
  if(method==='PATCH'&&leave){
-  const b=await bodyJSON(req);return response(await service.review(db,actor,'leave',validUUID(leave[1]),{decision:decision(b.decision),note:reason(b.note)},ip));
+  const b=await bodyJSON(req);return response(await service.review(db,actor,'leave',validUUID(leave[1]),{decision:decision(b.decision),note:optionalNote(b.note)},ip));
  }
  if(method==='GET'&&route==='/admin/reports/range'){
   const range=dateRange(q),format=q.get('format')||'csv';
   if(!['csv','xls','pdf'].includes(format))fail('format must be csv, xls or pdf');
-  const userId=qString(q,'userId'),department=qString(q,'department'),requestedStatus=qString(q,'status');
-  if(userId)validUUID(userId);if(department)validUUID(department);if(requestedStatus)status(requestedStatus);
-  const rows=await service.reportRangeRows(db,actor,range.from,range.to,userId,department,requestedStatus);
+  const userId=qString(q,'userId'),roleId=qString(q,'roleId'),requestedStatus=qString(q,'status');
+  if(userId)validUUID(userId);if(roleId)validUUID(roleId);if(requestedStatus)status(requestedStatus);
+  const rows=await service.reportRangeRows(db,actor,range.from,range.to,userId,roleId,requestedStatus);
   return buildReport(range.from+'_'+range.to,format,rows);
  }
  if(method==='GET'&&route==='/admin/reports/monthly'){
