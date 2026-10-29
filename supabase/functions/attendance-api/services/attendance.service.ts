@@ -100,6 +100,16 @@ export async function configChange(db:Db,actor:Actor,entity:string,operation:str
  if(!body.reason||body.reason.trim().length<3)bad('Reason required');
  return invoke(db,'grm_admin_config',{p_actor:actor.id,p_entity:entity,p_operation:operation,p_id:id,p_data:body,p_reason:body.reason.trim(),p_ip:ip});
 }
+export async function launchStatus(db:Db,actor:Actor){
+ requireManager(actor);
+ const r=await db.from('grm_settings').select('enabled_from,office_timezone').eq('id',1).single();
+ assertDb(r);return r.data;
+}
+export async function setLaunch(db:Db,actor:Actor,startDate:string|null,reason:string){
+ if(actor.role!=='Admin')bad('Only the built-in Admin can activate automatic attendance',403);
+ if(reason.trim().length<3)bad('Activation reason required');
+ return invoke(db,'grm_set_launch',{p_actor:actor.id,p_start:startDate,p_reason:reason.trim()});
+}
 export async function assignEmployee(db:Db,actor:Actor,userId:string,departmentId:string|null,shiftId:string|null,reason:string,ip:string|null){
  requireManager(actor);
  if(!reason||reason.trim().length<3)bad('Reason required');
