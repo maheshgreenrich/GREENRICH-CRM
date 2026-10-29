@@ -34,7 +34,10 @@ Deno.serve(async request=>{
   if(p.error||!p.data?.active)return withCors(request,problem(403,'Employee account is inactive or missing'));
   const role=await db.from('gr_roles').select('name').eq('id',p.data.role_id).single();
   if(role.error||!role.data)return withCors(request,problem(403,'Employee role is unavailable'));
-  const actor={id:user.id,name:p.data.full_name,role:role.data.name};
+  const permissionResult=await db.from('gr_role_permissions').select('action,allowed,data_scope').eq('role_id',p.data.role_id).eq('module','attendance').eq('allowed',true).eq('data_scope','all');
+  if(permissionResult.error)return withCors(request,problem(500,'Could not verify attendance permissions'));
+  const actor={id:user.id,name:p.data.full_name,role:role.data.name,
+    attendanceRights:(permissionResult.data||[]).map(permission=>permission.action)};
   const result=await handle(request,db,actor);
   return withCors(request,result);
  }catch(e){
