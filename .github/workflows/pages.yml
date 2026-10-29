@@ -23,6 +23,7 @@ on:
       - 'greenrich-invoices.js'
       - 'greenrich-invoices.css'
       - 'tests/invoice-per-sale.js'
+      - 'tests/invoice-settings-products.js'
       - 'greenrich-crm-inline.css'
       - 'tests/one-page-crm-integration.js'
       - 'tests/one-page-crm-layout.js'
@@ -92,6 +93,7 @@ jobs:
           node --check greenrich-crm-inline.js
           node --check greenrich-invoices.js
           node tests/invoice-per-sale.js
+          node tests/invoice-settings-products.js
           node tests/one-page-crm-integration.js
           node tests/one-page-crm-layout.js
           test -s greenrich-attendance-inline.js

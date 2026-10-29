@@ -38,42 +38,148 @@
  }
  const currentProfile=id=>({...fallback,...(profiles[id]||{}),company_id:id});
  const companyTitle=id=>window.GreenRichCompanies?.list?.().find(c=>c.id===id)?.name||({'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'}[id])||id;
+ function applyProductCodes(store,values){
+  if(!store||!Array.isArray(store.products)||!Array.isArray(store.sales))throw Error('Invalid product and sales records.');
+  const changed=new Set();
+  for(const product of store.products){
+   if(!values.has(product.id))continue;
+   const value=blank(values.get(product.id));
+   if(value&&!/^([0-9]{4}|[0-9]{6}|[0-9]{8})$/.test(value))throw Error('HSN/SAC code must be 4, 6 or 8 digits.');
+   if(blank(product.hsn)!==value){product.hsn=value;changed.add(product.id)}
+  }
+  // Preserve legally issued invoice data; synchronize only unissued drafts.
+  for(const sale of store.sales){
+   if(changed.has(sale.product_id)&&sale.invoice_status!=='Issued')sale.hsn=values.get(sale.product_id);
+  }
+  return [...changed];
+ }
  async function settings(host,{db,notify}){
   const tell=message=>notify?.(message);
   await load(db);
-  host.innerHTML='<div class="panel gr-invoice-settings"><h2>Invoice Settings</h2><p>These seller details are shared for all employee logins. Add the correct company GST and bank details before issuing invoices. The Grow India details were copied from the supplied invoice example; please verify them. Enviro Solutions details need your confirmation.</p><label>Select company<select id="gr-invoice-company"></select></label><form id="gr-invoice-profile-form" class="gr-invoice-profile-form"></form></div>';
+  const currentChoice=window.GreenRichCompanies?.selected?.();
+  host.innerHTML='<div class="panel gr-invoice-settings">'+
+   '<div class="gr-tax-settings-head"><div><h2>Company Invoice &amp; Tax Details</h2><p>Enter the seller GST information for each company, then assign an HSN/SAC code to each product. These details will be used automatically in draft invoices.</p></div></div>'+
+   '<label class="gr-tax-company-picker"><span>Choose company to configure</span><select id="gr-invoice-company" aria-label="Company for invoice and tax configuration"></select></label>'+
+   '<div class="gr-tax-company-status" id="gr-tax-status" aria-live="polite"></div>'+
+   '<form id="gr-invoice-profile-form" class="gr-invoice-profile-form"></form>'+
+   '</div>'+
+   '<div class="panel gr-hsn-settings" id="gr-hsn-settings">'+
+   '<div class="gr-hsn-heading"><div><h2>Product HSN / SAC Codes</h2><p>Enter a separate HSN or SAC code for each product in the selected company. These codes are used for its draft invoices.</p></div><span class="gr-hsn-count" id="gr-hsn-count"></span></div>'+
+   '<p class="gr-hsn-browser-note">Product and sales records are still saved in this browser. HSN/SAC changes here apply to products and unissued drafts in this browser; issued invoices are not changed.</p>'+
+   '<form id="gr-hsn-form"><label class="gr-hsn-search-label">Search products<input id="gr-hsn-search" type="search" placeholder="Search product name or SKU"></label><div class="gr-hsn-table-wrap"><table class="gr-hsn-table"><thead><tr><th>Product</th><th>SKU</th><th>GST %</th><th>HSN / SAC code</th></tr></thead><tbody id="gr-hsn-list"></tbody></table></div>'+
+   '<div class="gr-hsn-actions"><button type="submit" class="blue" id="gr-hsn-save">Save Product HSN / SAC Codes</button><small id="gr-hsn-summary"></small></div></form>'+
+   '</div>';
   const select=host.querySelector('#gr-invoice-company');
-  companyIds.forEach(id=>{const o=document.createElement('option');o.value=id;o.textContent=companyTitle(id);select.append(o)});
-  const fields=[
-   ['legal_name','Legal company name','text'],['gstin','GSTIN','text'],['pan','PAN','text'],
-   ['address','Office address','textarea'],['city_state_pincode','City, State and PIN','text'],
-   ['state_name','State','text'],['state_code','GST state code','text'],['phone','Phone','tel'],['email','Email','email'],
-   ['bank_name','Bank name','text'],['bank_account','Bank account number','text'],['bank_ifsc','IFSC','text'],['bank_branch','Bank branch','text'],
-   ['default_freight_hsn','Freight / shipping SAC (optional)','text'],
-   ['default_declaration','Declaration','textarea'],['signatory','Signatory designation','text']
-  ];
-  const render=()=>{
-   const current=currentProfile(select.value),form=host.querySelector('#gr-invoice-profile-form');
-   form.innerHTML=fields.map(([id,label,type])=>'<label class="'+(type==='textarea'?'gr-invoice-wide':'')+'"><span>'+e(label)+'</span>'+(type==='textarea'?'<textarea name="'+id+'" rows="3">'+e(current[id])+'</textarea>':'<input name="'+id+'" type="'+type+'" value="'+e(current[id])+'">')+'</label>').join('')+
-    '<div class="gr-invoice-wide"><button class="blue" type="submit">Save Invoice Settings</button><p class="gr-invoice-settings-note">GSTIN, address, state and bank account details must match this company’s official records. Changes do not alter already-issued invoice snapshots.</p></div>';
+  companyIds.forEach(id=>{const option=document.createElement('option');option.value=id;option.textContent=companyTitle(id);select.append(option)});
+  if(companyIds.includes(currentChoice))select.value=currentChoice;
+  const keyFor=id=>id==='grow-india'?'greenrich-crm-v2':'greenrich-crm-v2::enviro-solutions';
+  const getProducts=id=>{
+   let store;
+   try{store=JSON.parse(localStorage.getItem(keyFor(id))||'null')}
+   catch{throw Error('Saved products cannot be read. Restore a valid CRM backup before editing HSN/SAC.')}
+   if(!store)store={products:[],sales:[]};
+   if(!Array.isArray(store.products)||!Array.isArray(store.sales))throw Error('Saved product data is invalid. Restore a valid CRM backup.');
+   return store;
   };
-  select.onchange=render;
-  host.querySelector('#gr-invoice-profile-form').onsubmit=async event=>{
-   event.preventDefault();const form=event.currentTarget,saveButton=form.querySelector('button[type="submit"]');saveButton.disabled=true;
-   const fields=Object.fromEntries(new FormData(form).entries());
-   for(const key of Object.keys(fields))fields[key]=blank(fields[key]);
-   if(fields.gstin&&!/^[0-9]{2}[A-Z0-9]{13}$/i.test(fields.gstin)){saveButton.disabled=false;return tell('Enter a valid 15-character GSTIN.');}
-   if(fields.state_code&&!/^\d{2}$/.test(fields.state_code)){saveButton.disabled=false;return tell('State code must have 2 digits.');}
-   if(fields.pan&&!/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(fields.pan)){saveButton.disabled=false;return tell('Enter a valid PAN.');}
+  const sellerFields=[
+   ['legal_name','Seller legal company name','text','Official registered company name'],
+   ['address','Seller registered address','textarea','Street, building and locality'],
+   ['city_state_pincode','City, state and PIN code','text','Example: Ayanambakkam, Chennai - 600095'],
+   ['gstin','Seller GSTIN','text','15-character GST registration number'],
+   ['state_name','Seller state','text','Example: Tamil Nadu'],
+   ['state_code','Seller GST state code','text','Two digits (Tamil Nadu: 33)']
+  ];
+  const optionalFields=[
+   ['pan','Company PAN','text'],['phone','Company phone','tel'],['email','Company email','email'],
+   ['bank_name','Bank name','text'],['bank_account','Bank account number','text'],
+   ['bank_ifsc','Bank IFSC','text'],['bank_branch','Bank branch','text'],
+   ['default_freight_hsn','Shipping / Freight SAC code','text'],
+   ['default_declaration','Invoice declaration','textarea'],['signatory','Signatory name or designation','text']
+  ];
+  const input=(row,value)=>{
+   const [id,label,type,hint]=row;
+   return '<label class="'+(type==='textarea'?'gr-invoice-wide':'')+'"><span>'+e(label)+
+    (hint?'<em class="gr-tax-required">Required for issuing</em>':'')+'</span>'+
+    (type==='textarea'?'<textarea name="'+id+'" rows="3" placeholder="'+e(hint||label)+'">'+e(value||'')+'</textarea>':
+     '<input name="'+id+'" type="'+type+'" value="'+e(value||'')+'" placeholder="'+e(hint||label)+'" '+(id==='gstin'?'maxlength="15" autocomplete="off"':id==='state_code'?'maxlength="2" inputmode="numeric"':'')+'>')+'</label>';
+  };
+  function renderSeller(){
+   const current=currentProfile(select.value),form=host.querySelector('#gr-invoice-profile-form');
+   const missingFields=sellerFields.map(row=>row[0]).filter(key=>!blank(current[key]));
+   const status=host.querySelector('#gr-tax-status');
+   status.textContent=missingFields.length?'Seller details pending: '+missingFields.length+' required field(s) missing for '+companyTitle(select.value):
+    'Seller details complete for '+companyTitle(select.value)+' · Verify official records before issuing invoices.';
+   status.classList.toggle('gr-tax-complete',!missingFields.length);
+   form.innerHTML='<h3 class="gr-invoice-wide gr-tax-section-title">1. Seller GST &amp; Address Details</h3>'+
+    '<p class="gr-invoice-wide gr-tax-help">Complete these for each company. Blank required details prevent issuing a final invoice, but you may save a partial profile.</p>'+
+    sellerFields.map(row=>input(row,current[row[0]])).join('')+
+    '<details class="gr-invoice-wide gr-tax-extra"><summary>Additional Invoice Details · Bank, PAN, Contact &amp; Declaration</summary><div class="gr-tax-extra-grid">'+optionalFields.map(row=>input(row,current[row[0]])).join('')+'</div></details>'+
+    '<div class="gr-invoice-wide gr-tax-save-row"><button class="blue" type="submit">Save Seller Details for '+e(companyTitle(select.value))+'</button><p class="gr-invoice-settings-note">Seller settings are shared for authorized employee logins. Already-issued invoice snapshots stay unchanged.</p></div>';
+  }
+  function renderHSN(){
+   const company=select.value,list=host.querySelector('#gr-hsn-list'),counter=host.querySelector('#gr-hsn-count');
+   let stored;
+   try{stored=getProducts(company)}
+   catch(error){list.innerHTML='<tr><td colspan="4">'+e(error.message)+'</td></tr>';counter.textContent='';host.querySelector('#gr-hsn-save').disabled=true;return}
+   const products=[...stored.products].sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+   counter.textContent=products.length+' products · '+products.filter(p=>blank(p.hsn)).length+' codes entered';
+   host.querySelector('#gr-hsn-save').disabled=!products.length;
+   list.innerHTML=products.length?products.map(p=>
+    '<tr data-hsn-product="'+e(p.id)+'"><td><strong>'+e(p.name||'Unnamed product')+'</strong></td>'+
+    '<td>'+e(p.sku||'—')+'</td><td>'+e(p.tax??'—')+'%</td>'+
+    '<td><input class="gr-hsn-input" data-product-id="'+e(p.id)+'" aria-label="HSN or SAC code for '+e(p.name)+'" value="'+e(p.hsn||'')+'" placeholder="4, 6 or 8 digits" inputmode="numeric" maxlength="8" pattern="([0-9]{4}|[0-9]{6}|[0-9]{8})"></td></tr>'
+   ).join(''):'<tr><td colspan="4" class="gr-hsn-empty">No products found for this company in this browser. Add products under Stock &amp; Products first, then return here to enter their HSN / SAC codes.</td></tr>';
+   host.querySelector('#gr-hsn-summary').textContent=products.length?'Empty codes will continue to block invoice issuance for their products.':'';
+   host.querySelector('#gr-hsn-search').value='';
+  }
+  select.onchange=()=>{renderSeller();renderHSN()};
+  host.querySelector('#gr-hsn-search').oninput=event=>{
+   const needle=event.target.value.trim().toLowerCase();
+   host.querySelectorAll('#gr-hsn-list tr[data-hsn-product]').forEach(row=>{
+    row.hidden=!row.textContent.toLowerCase().includes(needle);
+   });
+  };
+  host.querySelector('#gr-hsn-form').onsubmit=event=>{
+   event.preventDefault();const company=select.value,form=event.currentTarget;
+   const button=form.querySelector('button[type="submit"]');button.disabled=true;
    try{
-    const record={...fields,company_id:select.value,updated_at:new Date().toISOString()};
+    const existing=getProducts(company),inputs=[...form.querySelectorAll('[data-product-id]')];
+    const values=new Map();
+    for(const input of inputs){
+     const value=blank(input.value);
+     if(value&&!/^([0-9]{4}|[0-9]{6}|[0-9]{8})$/.test(value))throw Error('Use a 4-, 6- or 8-digit numeric HSN/SAC code for each product.');
+     values.set(input.dataset.productId,value);
+    }
+    const changed=applyProductCodes(existing,values);
+    if(changed.length){
+     localStorage.setItem(keyFor(company),JSON.stringify(existing));
+    }
+    tell(changed.length?'HSN/SAC saved for '+changed.length+' product(s) in '+companyTitle(company):'No HSN/SAC changes to save.');
+    renderHSN();
+   }catch(error){tell('Cannot save product HSN/SAC: '+error.message)}
+   finally{button.disabled=false}
+  };
+  host.querySelector('#gr-invoice-profile-form').onsubmit=async event=>{
+   event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]');button.disabled=true;
+   const values=Object.fromEntries(new FormData(form).entries());
+   for(const key of Object.keys(values))values[key]=blank(values[key]);
+   const fail=message=>{button.disabled=false;tell(message)};
+   if(values.gstin&&!/^[0-9]{2}[A-Z0-9]{13}$/i.test(values.gstin))return fail('GSTIN must contain 15 valid letters/numbers.');
+   if(values.state_code&&!/^\d{2}$/.test(values.state_code))return fail('GST state code must have 2 digits.');
+   if(values.gstin&&values.state_code&&values.gstin.slice(0,2)!==values.state_code)return fail('The GST state code must match the first two digits of this seller GSTIN.');
+   if(values.pan&&!/^[A-Z]{5}[0-9]{4}[A-Z]$/i.test(values.pan))return fail('Enter a valid company PAN.');
+   if(values.default_freight_hsn&&!/^([0-9]{4}|[0-9]{6}|[0-9]{8})$/.test(values.default_freight_hsn))return fail('Freight SAC must be 4, 6 or 8 numeric digits.');
+   try{
+    const record={...values,company_id:select.value,updated_at:new Date().toISOString()};
     const {data,error}=await client.from('gr_invoice_profiles').upsert(record,{onConflict:'company_id'}).select('*').single();
     if(error)throw Error(error.message);
-    profiles[select.value]=data;tell('Invoice settings saved for '+companyTitle(select.value));render();
-   }catch(error){tell('Cannot save invoice settings: '+error.message)}
-   finally{saveButton.disabled=false}
+    profiles[select.value]=data;
+    tell('Seller invoice details saved for '+companyTitle(select.value));
+    renderSeller();
+   }catch(error){tell('Unable to save seller details: '+error.message)}
+   finally{button.disabled=false}
   };
-  render();
+  renderSeller();renderHSN();
  }
  const valueBlock=(title,name,customer,address,code)=>'<section class="gr-invoice-party"><span class="gr-invoice-cell-label">'+e(title)+'</span><strong>'+e(name||'Not specified')+'</strong><div>'+e(address||'Address not recorded').replace(/\n/g,'<br>')+'</div>'+
   (customer?.mobile?'<div>Phone: '+e(customer.mobile)+'</div>':'')+(customer?.email?'<div>Email: '+e(customer.email)+'</div>':'')+
@@ -214,5 +320,5 @@
   };
   dialog.showModal();
  }
- window.GreenRichInvoices={load,currentProfile,settings,modelFor,missing,renderDocument,nextInvoiceId,words,open};
+ window.GreenRichInvoices={load,currentProfile,settings,applyProductCodes,modelFor,missing,renderDocument,nextInvoiceId,words,open};
 })();

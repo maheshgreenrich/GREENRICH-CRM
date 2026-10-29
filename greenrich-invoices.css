@@ -86,3 +86,114 @@
 #grCrmWorkspace .gr-invoice-extra-grid label{display:grid;gap:5px;font-size:11.5px;color:#516681}
 #grCrmWorkspace .gr-invoice-extra-grid input{max-width:100%;min-width:0}
 @media(max-width:600px){#grCrmWorkspace .gr-invoice-extra-grid{grid-template-columns:1fr}}
+
+/* Settings / Invoice Settings — independent seller configuration and per-company product HSN master. */
+#gr-company-settings-content .gr-tax-settings-head h2,
+#gr-company-settings-content .gr-hsn-heading h2{margin:0 0 7px;font-size:19px!important;font-weight:700!important;line-height:1.3!important;color:#163766}
+#gr-company-settings-content .gr-tax-settings-head p,
+#gr-company-settings-content .gr-hsn-heading p{font-size:12.5px!important;line-height:1.6;color:#667c9b;margin:0}
+#gr-company-settings-content .gr-invoice-settings .gr-tax-company-picker{
+ display:grid;gap:7px;max-width:530px;margin:20px 0 13px;
+ font-size:12px;color:#2b4b7b;font-weight:700
+}
+#gr-company-settings-content .gr-tax-company-picker select{
+ height:45px;max-width:none!important;width:100%;padding:10px 12px;
+ border:1px solid #bacfed;border-radius:10px;background:#f7faff;
+ font-size:13px;color:#193e79;font-weight:650
+}
+#gr-company-settings-content .gr-tax-company-status{
+ padding:11px 14px;border-radius:9px;border:1px solid #f4debd;
+ background:#fff9ec;color:#93621d;font-size:12px;line-height:1.5
+}
+#gr-company-settings-content .gr-tax-company-status.gr-tax-complete{
+ border-color:#c6e8d5;background:#f2fcf7;color:#286a49
+}
+#gr-company-settings-content .gr-invoice-profile-form{margin-top:18px}
+#gr-company-settings-content .gr-invoice-profile-form .gr-tax-section-title{
+ font-size:15px!important;line-height:1.3!important;font-weight:700!important;
+ color:#214479;margin:0
+}
+#gr-company-settings-content .gr-invoice-profile-form .gr-tax-help{
+ margin:-5px 0 4px;font-size:12px;line-height:1.5;color:#7183a0
+}
+#gr-company-settings-content .gr-invoice-profile-form label span{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+#gr-company-settings-content .gr-invoice-profile-form .gr-tax-required{
+ font-size:9.5px;font-weight:600;font-style:normal;letter-spacing:0;color:#8a6427;background:#fff6e7;
+ border-radius:4px;padding:3px 5px
+}
+#gr-company-settings-content .gr-invoice-profile-form input,
+#gr-company-settings-content .gr-invoice-profile-form textarea{
+ min-height:43px!important;box-sizing:border-box;font-size:12.5px!important;
+ line-height:1.5!important
+}
+#gr-company-settings-content .gr-invoice-profile-form textarea{min-height:80px!important}
+#gr-company-settings-content .gr-tax-extra{
+ padding:12px 15px;border:1px solid #dce7f6;background:#f7faff;
+ border-radius:10px;min-width:0
+}
+#gr-company-settings-content .gr-tax-extra summary{
+ font-size:12.5px;color:#2553a0;cursor:pointer;font-weight:700
+}
+#gr-company-settings-content .gr-tax-extra-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:14px
+}
+#gr-company-settings-content .gr-tax-extra-grid .gr-invoice-wide{grid-column:1/-1}
+#gr-company-settings-content .gr-tax-save-row{
+ display:flex;gap:12px;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;padding:13px 0 0;border-top:1px solid #e5ebf4
+}
+#gr-company-settings-content .gr-tax-save-row .blue{min-width:175px;width:auto!important}
+#gr-company-settings-content .gr-tax-save-row .gr-invoice-settings-note{
+ max-width:380px;margin:0
+}
+#gr-company-settings-content .gr-hsn-settings{margin-top:18px}
+#gr-company-settings-content .gr-hsn-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#gr-company-settings-content .gr-hsn-count{
+ display:inline-block;background:#eef4ff;border:1px solid #d9e7ff;border-radius:8px;
+ color:#2456a7;padding:7px 10px;font-size:11.5px;font-weight:650
+}
+#gr-company-settings-content .gr-hsn-browser-note{
+ border:1px solid #e5ebf5;background:#f8faff;border-radius:8px;
+ padding:10px 12px;font-size:11.5px;line-height:1.6;color:#667b9c;margin:16px 0
+}
+#gr-company-settings-content .gr-hsn-search-label{
+ display:grid;gap:7px;max-width:380px;font-size:12px;font-weight:650;color:#415777;
+ margin:0 0 16px
+}
+#gr-company-settings-content .gr-hsn-search-label input{
+ width:100%;max-width:none;min-height:42px;border:1px solid #d5e0ef;
+ border-radius:9px;padding:10px 12px;color:#284161;background:#fff
+}
+#gr-company-settings-content .gr-hsn-table-wrap{width:100%;overflow-x:auto;border:1px solid #e2eaf5;border-radius:10px}
+#gr-company-settings-content .gr-hsn-table{width:100%;border-collapse:collapse;min-width:520px;text-align:left}
+#gr-company-settings-content .gr-hsn-table thead{background:#f5f8fd}
+#gr-company-settings-content .gr-hsn-table th,
+#gr-company-settings-content .gr-hsn-table td{
+ padding:12px 14px;border-bottom:1px solid #edf1f7;font-size:12px!important;
+ line-height:1.4!important;vertical-align:middle;color:#415672
+}
+#gr-company-settings-content .gr-hsn-table th{font-size:11px!important;color:#788ca9;font-weight:700}
+#gr-company-settings-content .gr-hsn-table tbody tr:last-child td{border-bottom:0}
+#gr-company-settings-content .gr-hsn-table tbody tr[hidden]{display:none!important}
+#gr-company-settings-content .gr-hsn-table td:first-child{min-width:170px}
+#gr-company-settings-content .gr-hsn-table td:first-child strong{font-size:12px!important;color:#233d6a;line-height:1.45!important}
+#gr-company-settings-content .gr-hsn-table .gr-hsn-input{
+ width:100%;min-width:124px;max-width:180px;min-height:40px;
+ border:1px solid #cfdded;border-radius:8px;padding:8px 10px;
+ background:#fff;font-size:12px!important;font-weight:600;color:#1c457f;
+ font-variant-numeric:tabular-nums
+}
+#gr-company-settings-content .gr-hsn-table .gr-hsn-input:focus{
+ outline:2px solid #4b80ee;outline-offset:1px
+}
+#gr-company-settings-content .gr-hsn-empty{padding:25px 14px!important;color:#6e7e99!important;line-height:1.6!important}
+#gr-company-settings-content .gr-hsn-actions{
+ margin-top:15px;display:flex;justify-content:flex-start;flex-wrap:wrap;gap:12px;align-items:center
+}
+#gr-company-settings-content .gr-hsn-actions .blue{width:auto!important;min-width:170px}
+#gr-company-settings-content .gr-hsn-actions small{font-size:11px;line-height:1.5;color:#798ba5}
+@media(max-width:700px){
+ #gr-company-settings-content .gr-tax-extra-grid{grid-template-columns:1fr}
+ #gr-company-settings-content .gr-hsn-heading{flex-direction:column}
+ #gr-company-settings-content .gr-tax-save-row{align-items:flex-start;flex-direction:column}
+}

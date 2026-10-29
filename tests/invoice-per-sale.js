@@ -24,6 +24,10 @@ for(const anchor of ['invoice_number:old?.invoice_number||window.GreenRichInvoic
 assert.ok(crm.includes("if(old&&old.invoice_status==='Issued')"),'Issued sale edit must be blocked');
 assert.ok(crm.includes("if(k==='sales'&&item.invoice_status==='Issued')"),'Issued sale delete must be blocked');
 assert.ok(settings.includes("['invoices','Invoice Settings']"));
+assert.ok(invoiceJs.includes('Seller GST &amp; Address Details'),'Required seller fields should be prominent in Settings');
+assert.ok(invoiceJs.includes('Product HSN / SAC Codes'),'Products should have their own HSN editor');
+assert.ok(invoiceJs.includes("select.value"),'Company selector should filter seller and product details');
+assert.ok(invoiceJs.includes("gr_invoice_profiles"),'Seller data must be shared securely');
 assert.ok(app.includes('openInvoiceSettings:host=>window.GreenRichInvoices.settings'));
 assert.ok(html.includes('id="gr-invoice-dialog"')&&html.includes('greenrich-invoices.js')&&html.includes('greenrich-invoices.css'));
 assert.ok(css.includes('.gr-invoice-paper')&&css.includes('.gr-invoice-top')&&css.includes('.gr-invoice-tax'));
