@@ -112,3 +112,83 @@
 @media(max-width:950px){.av-staff-row{grid-template-columns:minmax(150px,1fr) minmax(120px,.6fr)}.av-row-quick{grid-column:1/-1;justify-content:flex-start}.av-round-report{gap:18px}}
 @media(max-width:760px){#attendanceQuick{display:flex!important}#app header{flex-wrap:wrap}#app header .profile{margin-left:auto}#attendanceQuick{width:100%;justify-content:flex-end}#grClockInfo{max-width:none}}
 @media(max-width:580px){.gr-header-clock button{padding:7px 9px;font-size:12px}.av-round-report{flex-direction:column}.av-staff-row{grid-template-columns:1fr}.av-row-quick{grid-column:auto}.av-donut{height:190px;width:190px;min-width:190px}}
+
+
+/* Full-width Quick Employee Attendance and correction approval date guidance */
+#tab-admin .av-attendance-admin-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:start;
+  width:100%;
+}
+#tab-admin .av-attendance-admin-actions > .av-bulk-panel{
+  grid-column:1 / -1;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+#tab-admin .av-bulk-panel #bulkForm,
+#tab-admin .av-bulk-panel #bulkUsers{
+  width:100%;
+  max-width:none;
+  min-width:0;
+}
+#tab-admin .av-bulk-panel #bulkUsers{
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+#tab-admin .av-bulk-panel .av-staff-row{
+  display:grid;
+  grid-template-columns:minmax(130px,1.1fr) minmax(108px,.7fr) minmax(0,2.9fr);
+  gap:14px;
+  align-items:center;
+  width:100%;
+  min-width:0;
+}
+#tab-admin .av-bulk-panel .av-row-quick{
+  min-width:0;
+  width:100%;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-start;
+  gap:7px;
+}
+#tab-admin .av-bulk-panel .av-row-quick .av-status-btn{
+  white-space:nowrap;
+  min-width:0;
+}
+.av-correction-dates{
+  display:grid;
+  gap:3px;
+  margin:6px 0;
+  color:#60718b;
+  font-size:12px;
+}
+.av-correction-date-alert{
+  background:#fff8e9;
+  border:1px solid #eed5a1;
+  border-radius:9px;
+  padding:10px;
+  margin:8px 0;
+  color:#795110;
+  font-size:12px;
+  line-height:1.45;
+}
+@media(max-width:1100px){
+ #tab-admin .av-bulk-panel .av-staff-row{
+  grid-template-columns:minmax(150px,1fr) minmax(90px,.55fr);
+ }
+ #tab-admin .av-bulk-panel .av-row-quick{
+  grid-column:1 / -1;
+ }
+}
+@media(max-width:750px){
+ #tab-admin .av-attendance-admin-actions{
+  grid-template-columns:minmax(0,1fr);
+ }
+ #tab-admin .av-bulk-panel .av-staff-row{
+  grid-template-columns:minmax(0,1fr);
+  gap:8px;
+ }
+ #tab-admin .av-bulk-panel .av-row-quick{grid-column:1}
+}
