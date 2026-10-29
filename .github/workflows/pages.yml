@@ -7,6 +7,7 @@ on:
       - 'styles.css'
       - 'app.js'
       - 'greenrich-one.js'
+      - 'greenrich-attendance-inline.js'
       - 'greenrich-one.css'
       - 'demo.html'
       - 'secure.html'
@@ -50,6 +51,8 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          test -s greenrich-attendance-inline.js
+          node --check greenrich-attendance-inline.js
           test -s secure.html
           test -s roles.html
           test -s roles-manager.js
