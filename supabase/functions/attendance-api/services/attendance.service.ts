@@ -20,18 +20,18 @@ export async function mySummary(db:Db,actor:Actor,month:string){
  for(const a of r.data||[]){
   if(a.status==='PRESENT')summary.present++;if(a.status==='LATE')summary.late++;
   if(a.status==='HALF_DAY')summary.half_day++;if(a.status==='ABSENT')summary.absent++;
-  if(a.status==='ON_LEAVE')summary.leave++;if(a.status==='HOLIDAY')summary.holiday++;
+  if(a.status==='ON_LEAVE'||a.status==='PAID_LEAVE')summary.leave++;if(a.status==='HOLIDAY')summary.holiday++;
   if(a.status==='WEEKEND')summary.weekend++;summary.hours+=Number(a.total_hours||0);
  }
  summary.hours=Math.round(summary.hours*100)/100;return summary;
 }
 export async function correctionCreate(db:Db,actor:Actor,body:any){
- if(!body.reason?.trim()||body.reason.trim().length<3)bad('Correction reason required');
+ 
  const existing=await db.from('grm_attendance').select('id').eq('user_id',actor.id).eq('date',body.date).is('deleted_at',null).maybeSingle();
  assertDb(existing);
  const result=await db.from('grm_corrections').insert({
   attendance_id:existing.data?.id||null,user_id:actor.id,date:body.date,
-  requested_check_in:body.checkIn||null,requested_check_out:body.checkOut||null,reason:body.reason.trim()
+  requested_check_in:body.checkIn||null,requested_check_out:body.checkOut||null,reason:String(body.reason||'').trim()
  }).select('*').single();assertDb(result);return result.data;
 }
 export async function leaveCreate(db:Db,actor:Actor,body:any){
@@ -43,8 +43,8 @@ export async function ownRequests(db:Db,actor:Actor,kind:'grm_corrections'|'grm_
 export async function attendanceSearch(db:Db,actor:Actor,filters:any,page:Page){
  requireAction(actor,'view');
  let ids:string[]|null=null;
- if(filters.department){
-  const r=await db.from('gr_profiles').select('id').eq('department_id',filters.department);assertDb(r);ids=(r.data||[]).map(x=>x.id);
+ if(filters.roleId){
+  const r=await db.from('gr_profiles').select('id').eq('role_id',filters.roleId);assertDb(r);ids=(r.data||[]).map(x=>x.id);
   if(!ids.length)return {items:[],page:page.page,pageSize:page.pageSize,total:0,pages:0};
  }
  let q=db.from('grm_attendance').select('*,gr_profiles!grm_attendance_user_id_fkey(full_name,department_id)',{count:'exact'}).is('deleted_at',null).order('date',{ascending:false}).order('user_id');
@@ -57,12 +57,12 @@ export async function attendanceSearch(db:Db,actor:Actor,filters:any,page:Page){
 }
 export async function manual(db:Db,actor:Actor,body:any,ip:string|null,deleted=false){
  requireAnyAction(actor,deleted?['delete']:['create','edit']);
- if(!body.reason||String(body.reason).trim().length<3)bad('Admin action reason required (at least 3 characters)');
+
  await active(db,body.userId);
  return invoke(db,'grm_admin_attendance',{
   p_actor:actor.id,p_user:body.userId,p_day:body.date,p_status:body.status||null,
   p_check_in:body.checkIn||null,p_check_out:body.checkOut||null,
-  p_reason:String(body.reason).trim(),p_delete:deleted,p_ip:ip
+  p_reason:String(body.reason||'').trim(),p_delete:deleted,p_ip:ip
  });
 }
 export async function manualById(db:Db,actor:Actor,id:string,body:any,ip:string|null,deleted=false){
@@ -76,8 +76,8 @@ export async function manualById(db:Db,actor:Actor,id:string,body:any,ip:string|
 export async function bulk(db:Db,actor:Actor,body:any,ip:string|null){
  requireAnyAction(actor,['create','edit']);
  if(!Array.isArray(body.userIds)||body.userIds.length<1||body.userIds.length>200)bad('Choose 1–200 employees');
- if(String(body.reason||'').trim().length<3)bad('Bulk marking reason required');
- return invoke(db,'grm_admin_bulk',{p_actor:actor.id,p_user_ids:body.userIds,p_day:body.date,p_status:body.status,p_reason:body.reason.trim(),p_ip:ip});
+
+ return invoke(db,'grm_admin_bulk',{p_actor:actor.id,p_user_ids:body.userIds,p_day:body.date,p_status:body.status,p_reason:String(body.reason||'').trim(),p_ip:ip});
 }
 export async function reviewList(db:Db,actor:Actor,kind:'grm_corrections'|'grm_leaves',status:string|undefined,page:Page){
  requireAction(actor,'approve');
@@ -88,9 +88,9 @@ export async function reviewList(db:Db,actor:Actor,kind:'grm_corrections'|'grm_l
 export async function review(db:Db,actor:Actor,kind:'correction'|'leave',id:string,body:any,ip:string|null){
  requireAction(actor,'approve');
  if(!['APPROVED','REJECTED'].includes(body.decision))bad('Decision must be APPROVED or REJECTED');
- if(!body.note||body.note.trim().length<3)bad('Review note required');
+
  return invoke(db,kind==='correction'?'grm_review_correction':'grm_review_leave',{
-  p_actor:actor.id,p_id:id,p_decision:body.decision,p_note:body.note.trim(),p_ip:ip
+  p_actor:actor.id,p_id:id,p_decision:body.decision,p_note:String(body.note||'').trim(),p_ip:ip
  });
 }
 export async function directory(db:Db,actor:Actor){requireAnyAction(actor,['view','create','edit','approve','export']);return staff(db)}
@@ -118,12 +118,12 @@ export async function assignEmployee(db:Db,actor:Actor,userId:string,departmentI
  if(!reason||reason.trim().length<3)bad('Reason required');
  return invoke(db,'grm_assign_employee',{p_actor:actor.id,p_target:userId,p_department:departmentId,p_shift:shiftId,p_reason:reason.trim(),p_ip:ip});
 }
-export async function reportRangeRows(db:Db,actor:Actor,from:string,to:string,userId?:string,department?:string,status?:string){
+export async function reportRangeRows(db:Db,actor:Actor,from:string,to:string,userId?:string,roleId?:string,status?:string){
  requireAction(actor,'export');
  if(from>to||Math.floor((Date.parse(to)-Date.parse(from))/86400000)>366)bad('Report date range must be between 1 and 367 days');
  let employees:string[]|null=null;
- if(department){
-  const d=await db.from('gr_profiles').select('id').eq('department_id',department);assertDb(d);
+ if(roleId){
+  const d=await db.from('gr_profiles').select('id').eq('role_id',roleId);assertDb(d);
   employees=(d.data||[]).map(p=>p.id);if(!employees.length)return [];
  }
  const rows:any[]=[];
