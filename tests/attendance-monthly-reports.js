@@ -34,7 +34,10 @@ assert.doesNotMatch(summary,/\['Date','Employee','Status'/,'Summary should not h
 assert.match(summary,/ss:Type="Number"/);
 
 /* Report grid and page order must be identical in embedded and standalone Attendance. */
-const inlineMarkupLiteral=client.match(/container\\.innerHTML=("(?:\\\\.|[^"\\\\])*");await init\\(\\)/)?.[1];
+const embeddedStart=client.indexOf('container.innerHTML=');
+const embeddedEnd=client.indexOf(';await init()',embeddedStart);
+assert.ok(embeddedStart>=0&&embeddedEnd>embeddedStart,'Embedded attendance template must be available for layout verification');
+const inlineMarkupLiteral=client.slice(embeddedStart+'container.innerHTML='.length,embeddedEnd);
 assert.ok(inlineMarkupLiteral,'Embedded attendance template must be available for layout verification');
 const inlineMarkup=JSON.parse(inlineMarkupLiteral);
 const sectionOrder=[
