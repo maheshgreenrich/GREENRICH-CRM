@@ -7,19 +7,7 @@ function nav(){$$('#demoNav button').forEach(b=>{b.classList.toggle('active',b.d
 function row(s){return '<div class="row">'+s+'</div>'}function card(label,n){return '<div class="card"><small>'+label+'</small><strong>'+n+'</strong></div>'}function badge(s){return '<span class="pill">'+safe(s)+'</span>'}
 const legacyPages={sales:'sales',customers:'customers',leads:'leads',tasks:'tasks',products:'products',channels:'channels',reports:'reports',salesDashboard:'dashboard'};
 function legacy(el,key){
-  el.innerHTML='<div class="notice">Sales & CRM data remains in this browser as before. The demo permission controls are not a security boundary; do not enter confidential customer data.</div><iframe id="salesWorkspace" title="GreenRich Sales and CRM" src="legacy.html?embedded=1" style="width:100%;height:calc(100vh - 220px);min-height:620px;border:1px solid #dde5f5;border-radius:14px;background:#fff"></iframe>';
-  const frame=$('#salesWorkspace');const moduleForIframe=({sales:'Sales',customers:'Customers',leads:'Leads',tasks:'Leads',products:'Products',channels:'Sales',reports:'Reports',salesDashboard:'Sales'})[key];
-  frame.onload=()=>{
-    try{
-      const doc=frame.contentDocument;
-      if(!doc)return;
-      const style=doc.createElement('style');
-      style.textContent='.sidebar{display:none!important}.app{display:block!important}main{width:100%!important;max-width:none!important}.topbar{position:relative!important}';
-      doc.head.appendChild(style);
-      const select=doc.querySelector('[data-page="'+legacyPages[key]+'"]');
-      if(select)select.click();if(!can(moduleForIframe,'Create')&&!can(moduleForIframe,'Edit')){doc.querySelectorAll('button').forEach(btn=>{if(/add|new|edit|delete|remove|import/i.test(btn.textContent||''))btn.disabled=true});}
-    }catch(err){console.warn('Embedded CRM view could not be adjusted',err)}
-  };
+  el.innerHTML='<div class="panel"><h2>Sales & CRM now lives in GreenRich ONE</h2><p>Sign in to the secure GreenRich ONE workspace and use Sales, Customers, Leads, Follow-ups, Products, Channels and Import / Export from the same page.</p><p>Existing browser-stored CRM records remain in this browser and can be backed up from the secure CRM workspace.</p><a class="blue" href="secure.html" style="display:inline-block;text-decoration:none">Open unified GreenRich ONE</a></div>';
 }
 
 const workKey='greenrich-erp-work-v1';
