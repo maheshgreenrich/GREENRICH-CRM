@@ -116,6 +116,14 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  if(method==='PATCH'&&leave){
   const b=await bodyJSON(req);return response(await service.review(db,actor,'leave',validUUID(leave[1]),{decision:decision(b.decision),note:reason(b.note)},ip));
  }
+ if(method==='GET'&&route==='/admin/reports/range'){
+  const range=dateRange(q),format=q.get('format')||'csv';
+  if(!['csv','xls','pdf'].includes(format))fail('format must be csv, xls or pdf');
+  const userId=qString(q,'userId'),department=qString(q,'department'),requestedStatus=qString(q,'status');
+  if(userId)validUUID(userId);if(department)validUUID(department);if(requestedStatus)status(requestedStatus);
+  const rows=await service.reportRangeRows(db,actor,range.from,range.to,userId,department,requestedStatus);
+  return buildReport(range.from+'_'+range.to,format,rows);
+ }
  if(method==='GET'&&route==='/admin/reports/monthly'){
   const m=month(q.get('month')||''),format=q.get('format')||'csv';
   if(!['csv','xls','pdf'].includes(format))fail('format must be csv, xls or pdf');
