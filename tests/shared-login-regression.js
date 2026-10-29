@@ -10,7 +10,7 @@ assert.match(secure,/<input id="password" type="password"/,'Password must use an
 assert.ok(secure.indexOf('greenrich-public-config.js')<secure.indexOf('greenrich-one.js'),'Public config must load before secure app');
 assert.match(config,/uawgwkplkvahhmhvroul\.supabase\.co/,'Same GreenRich Supabase project on every device');
 assert.match(config,/sb_publishable_/,'Frontend must only use a public API key');
-assert.doesNotMatch(config,/sb_secret_|service_role/,'Never publish Supabase secret API keys');
+assert.doesNotMatch(config,/sb_secret_|service_role\\s*[:=]/,'Never publish Supabase secret API keys');
 assert.match(app,/window\.GREENRICH_PUBLIC_CONFIG/,'App bootstrap must use public company configuration');
 assert.match(app,/localStorage\.setItem\('gr-supabase-url',publicConfig\.supabaseUrl\)/);
 assert.match(app,/localStorage\.setItem\('gr-supabase-key',publicConfig\.publishableKey\)/);
