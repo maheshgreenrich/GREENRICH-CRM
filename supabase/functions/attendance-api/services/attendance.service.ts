@@ -115,6 +115,27 @@ export async function assignEmployee(db:Db,actor:Actor,userId:string,departmentI
  if(!reason||reason.trim().length<3)bad('Reason required');
  return invoke(db,'grm_assign_employee',{p_actor:actor.id,p_target:userId,p_department:departmentId,p_shift:shiftId,p_reason:reason.trim(),p_ip:ip});
 }
+export async function reportRangeRows(db:Db,actor:Actor,from:string,to:string,userId?:string,department?:string,status?:string){
+ requireManager(actor);
+ if(from>to||Math.floor((Date.parse(to)-Date.parse(from))/86400000)>366)bad('Report date range must be between 1 and 367 days');
+ let employees:string[]|null=null;
+ if(department){
+  const d=await db.from('gr_profiles').select('id').eq('department_id',department);assertDb(d);
+  employees=(d.data||[]).map(p=>p.id);if(!employees.length)return [];
+ }
+ const rows:any[]=[];
+ for(let offset=0;offset<30000;offset+=1000){
+  let q=db.from('grm_attendance').select('date,user_id,status,check_in,check_out,total_hours,remarks,gr_profiles!grm_attendance_user_id_fkey(full_name)').is('deleted_at',null).gte('date',from).lte('date',to).order('date',{ascending:true}).range(offset,offset+999);
+  if(userId)q=q.eq('user_id',userId);
+  if(employees)q=q.in('user_id',employees);
+  if(status)q=q.eq('status',status);
+  const result=await q;assertDb(result);rows.push(...result.data||[]);
+  if((result.data||[]).length<1000)break;
+  if(offset+1000>=30000)bad('Report too large. Narrow reporting period.',413);
+ }
+ const officeTime=(utc:string|null)=>utc?new Date(utc).toLocaleString('en-GB',{timeZone:'Asia/Kolkata',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+ return rows.map(r=>[r.date,(r.gr_profiles as any)?.full_name||r.user_id,r.status,officeTime(r.check_in),officeTime(r.check_out),r.total_hours??'',r.remarks||'']);
+}
 export async function reportRows(db:Db,actor:Actor,month:string){
  requireManager(actor);const [from,after]=monthBounds(month),rows:any[]=[];
  for(let offset=0;offset<30000;offset+=1000){
