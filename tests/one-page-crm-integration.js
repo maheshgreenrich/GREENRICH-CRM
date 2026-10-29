@@ -34,5 +34,6 @@ assert.doesNotMatch(shell,/href="legacy\.html"|src="legacy\.html/);
 assert.doesNotMatch(demo,/legacy\.html/);
 assert.match(css,/#grCrmWorkspace/);
 assert.doesNotMatch(css,/(^|\n)\s*body\s*\{/);
-assert.match(html,/Local CRM records/,'Never mislabel browser-local data as synced');
+assert.match(html,/Shared customers/,'Customer master must be shared across employees');
+assert.match(html,/Sales, products and stock remain browser-local/,'Do not mislabel local sales and stock as synced');
 console.log('PASS: One HTML CRM, permission-aware module routing, local data compatibility, import/export, no legacy iframe');
