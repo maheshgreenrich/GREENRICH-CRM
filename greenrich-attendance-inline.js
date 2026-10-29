@@ -8,8 +8,9 @@ window.GreenRichAttendance=(function(){
  const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
- let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null;
- const manager=()=>actorRole==='Admin'||actorRole==='Office Admin';
+ let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null,attendanceRights=[];
+ const canAdmin=action=>actorRole==='Admin'||actorRole==='Office Admin'||attendanceRights.includes(action);
+ const manager=()=>canAdmin('view');
  const notify=(message,error=false)=>{const e=$('#alert');e.hidden=false;e.textContent=message;e.classList.toggle('error',error);e.scrollIntoView({behavior:'smooth',block:'nearest'})};
  async function request(path,method='GET',body=null,download=false){
   const session=(await db.auth.getSession()).data.session;
@@ -43,9 +44,12 @@ window.GreenRichAttendance=(function(){
   const role=await db.from('gr_roles').select('name').eq('id',p.data.role_id).single();
   if(role.error)throw Error(role.error.message);
   actorRole=role.data.name;actorName=p.data.full_name;ownId=user.id;
+  const rights=await db.from('gr_role_permissions').select('action,allowed,data_scope').eq('role_id',p.data.role_id).eq('module','attendance').eq('allowed',true).eq('data_scope','all');
+  if(rights.error)throw Error('Attendance permissions could not be loaded: '+rights.error.message);
+  attendanceRights=(rights.data||[]).map(p=>p.action);
   if(p.data.shift_id){const assignedShift=await db.from('grm_shifts').select('working_days').eq('id',p.data.shift_id).maybeSingle();if(!assignedShift.error&&Array.isArray(assignedShift.data?.working_days))workingDays=assignedShift.data.working_days;}
   $('#todayLabel').textContent='Today · '+today;
-  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!manager();$('#launchPanel').hidden=actorRole!=='Admin';$('#launchDate').min=today;$('#launchDate').value=today;
+  $('#adminTab').hidden=!manager();$('#manageTab').hidden=!canAdmin('edit');$('#launchPanel').hidden=actorRole!=='Admin';$('#adminMark').closest('.panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('.av-bulk-panel').hidden=!canAdmin('create')&&!canAdmin('edit');$('[data-export]').forEach(b=>b.disabled=!canAdmin('export'));$('#launchDate').min=today;$('#launchDate').value=today;
   $('#myMonth').value=today.slice(0,7);$('#reportMonth').value=today.slice(0,7);
   $('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;
   $('#correctionDate').max=new Date(new Date(today+'T00:00:00Z').getTime()-86400000).toISOString().slice(0,10);
@@ -121,7 +125,7 @@ window.GreenRichAttendance=(function(){
  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  try{await loadMine();if(manager()){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
+  try{await loadMine();if(manager()&&canAdmin('approve')){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
@@ -195,7 +199,7 @@ window.GreenRichAttendance=(function(){
   $('#selectAllEmployees').indeterminate=selected.length>0&&selected.length<checkboxes.length;
  }
  async function loadPendingCount(){
-  if(!manager())return;
+  if(!manager()||!canAdmin('approve'))return;
   const [corr,leave]=await Promise.all([request('/admin/corrections?status=PENDING&pageSize=1'),request('/admin/leaves?status=PENDING&pageSize=1')]);
   const total=(corr.total||0)+(leave.total||0);
   $('#adminTab').textContent='Employee Attendance'+(total?' · '+total+' pending':'');
@@ -234,7 +238,7 @@ window.GreenRichAttendance=(function(){
   $('#adminRows').innerHTML=adminItems.map(r=>tRow([
    esc(r.date),esc(r.gr_profiles?.full_name||staff.find(p=>p.id===r.user_id)?.full_name||r.user_id),
    esc(r.status),esc(shortDate(r.check_in)),esc(shortDate(r.check_out)),
-   '<button class="secondary" data-edit="'+esc(r.id)+'">Edit</button> <button class="secondary" data-delete="'+esc(r.id)+'">Delete</button>'
+   (canAdmin('edit')?'<button class="secondary" data-edit="'+esc(r.id)+'">Edit</button> ':'')+(canAdmin('delete')?'<button class="secondary" data-delete="'+esc(r.id)+'">Delete</button>':'—')
   ])).join('')||'<tr><td colspan="6">No records match these filters.</td></tr>';
   $('#adminPager').textContent='Page '+result.page+' of '+Math.max(1,result.pages)+' · '+result.total+' records';
   $('#adminPrev').disabled=adminPage<=1;$('#adminNext').disabled=adminPage>=result.pages;
@@ -254,7 +258,8 @@ window.GreenRichAttendance=(function(){
    await request('/admin/attendance/'+b.dataset.delete,'DELETE',{reason});
    notify('Attendance soft-deleted with audit record.');await loadAdmin();
   }));
-  const [corrections,leaves]=await Promise.all([request('/admin/corrections?'+params({status:'PENDING'})),request('/admin/leaves?'+params({status:'PENDING'}))]);
+  const [corrections,leaves]=canAdmin('approve')?await Promise.all([request('/admin/corrections?'+params({status:'PENDING'})),request('/admin/leaves?'+params({status:'PENDING'}))]):[{items:[],total:0},{items:[],total:0}];
+  $('.av-approvals-panel').hidden=!canAdmin('approve');$('#adminCorrections').closest('.panel').hidden=!canAdmin('approve');$('#adminLeaves').closest('.panel').hidden=!canAdmin('approve');
   function approveRows(container,items,kind){
    $(container).innerHTML=table(items,r=>'<div class="av-entry"><strong>'+esc(staff.find(x=>x.id===r.user_id)?.full_name||r.user_id)+'</strong><b>'+esc(kind==='corrections'?r.date:r.from_date+' to '+r.to_date)+'</b><small>'+esc(r.reason)+'</small><div class="av-actions"><button class="secondary" data-review="'+esc(r.id)+'" data-decision="APPROVED">Approve</button><button class="secondary" data-review="'+esc(r.id)+'" data-decision="REJECTED">Reject</button></div></div>','No pending requests');
    $$(container+' [data-review]').forEach(b=>b.onclick=()=>safe(async()=>{
