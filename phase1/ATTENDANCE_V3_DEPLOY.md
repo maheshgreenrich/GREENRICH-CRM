@@ -2,7 +2,7 @@
 
 ## Verified live deployment — 29 October 2026
 
-The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 5**, with JWT verification enabled.
+The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 6**, with JWT verification enabled.
 
 The scheduled job `greenrich-v3-daily-absence` is installed at **19:30 UTC / 01:00 IST**, but its required `grm_settings.enabled_from` launch date is **NULL** until the built-in Admin explicitly activates daily absences from the Attendance V3 → Holidays & Shifts screen. A test confirmed the guarded job inserts **0** rows while disabled. Do not change this guard without a rollout plan.
 
@@ -42,6 +42,19 @@ The V3 schema is **isolated** from the old `gr_attendance` and browser-local dem
 - **Approval notifications:** requests are visible in the authorised approvers' in-app approval inbox; the pending count refreshes while the Attendance module is open. External WhatsApp/email alerts are not configured.
 - **Automatic absences:** the scheduled job is installed but stays inactive until Admin sets the go-live date. Missing working-day records remain unmarked until processing is enabled.
 - **Test status:** source JavaScript, static DOM selectors and feature regressions checked; rollback-only SQL role grants and safe bulk checks passed. Real signed-in multi-browser acceptance and PDF/Excel output still require manual testing.
+
+### Attendance UI refinement — 29 October 2026
+
+- **One-page navigation:** `secure.html` remains the only main app. Check In and Check Out appear at the top-right, immediately after the signed-in username; the old header My Attendance shortcut is gone.
+- **Personal sections unchanged:** daily attendance times, monthly calendar, personal time sheet, correction and leave request sections remain available.
+- **Employee Attendance filter:** the second dropdown uses the existing `gr_roles` user-role assignment instead of a separately maintained department. Backend `roleId` filtering also applies to CSV, Excel and PDF exports.
+- **Edit attendance:** the record's Edit button opens a modal. Status is chosen from a dropdown, check-in and check-out use date-time picker controls, and saving refreshes the record list and chart immediately. While open, the Admin tab also refreshes approximately every 30 seconds.
+- **Round chart:** only attendance statuses with recorded nonzero counts appear, each with its assigned color.
+- **Quick roll-call:** each employee row has Present (green), Absent (red), Half Day (yellow), Weekend (dark gray), Holiday (blue), Paid Leave (pink) buttons. Bulk Select All is retained. Actual employee SELF check-ins remain protected from bulk overwrite.
+- **No Holidays & Shifts tab** in this Attendance interface. Existing shift configurations and automatic absence scheduler have not been deleted; the latter remains go-live guarded.
+- **Notes optional:** Admin create/edit/delete/bulk and review notes, plus employee leave and correction request notes, are optional. Admin audit logs still track who made each change, timestamp, operation, and old/new data. Built-in Admin launch-setting security still separately requires justification.
+- **Backend:** Supabase `attendance-api` Edge Function version **6** deployed with JWT verification and the migration `20261029130000_attendance_optional_notes_paid_leave.sql` applied. Optional-note and paid-leave behaviors were checked with rollback-only PostgreSQL tests; no test entries were retained.
+- **UI testing:** regression checks passed in source, but live GitHub Pages login and direct browser exercise remain unverified.
 
 ## One-time deployment (developer/administrator)
 
@@ -144,4 +157,4 @@ The GitHub Actions workflow `Attendance V3 checks` runs `deno check`, API route 
 - Audit rows contain actor, action, reason and record changes.
 - Test desktop and mobile browsers.
 
-**Status:** Database migrations, Edge API v5 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
+**Status:** Database migrations, Edge API v6 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
