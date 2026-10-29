@@ -10,6 +10,7 @@ on:
       - 'greenrich-crm-inline.js'
       - 'greenrich-crm-inline.css'
       - 'tests/one-page-crm-integration.js'
+      - 'tests/one-page-crm-layout.js'
       - 'greenrich-attendance-inline.js'
       - 'tests/attendance-inline-regression.js'
       - 'tests/attendance-product-regression.js'
@@ -63,6 +64,7 @@ jobs:
           test -s greenrich-crm-inline.css
           node --check greenrich-crm-inline.js
           node tests/one-page-crm-integration.js
+          node tests/one-page-crm-layout.js
           test -s greenrich-attendance-inline.js
           node --check greenrich-attendance-inline.js
           node tests/attendance-inline-regression.js
