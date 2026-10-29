@@ -1,7 +1,7 @@
 // Routes/controllers: request validation, pagination and REST endpoint mapping.
 import type {Db,Actor} from '../repositories/attendance.repository.ts';
 import * as service from '../services/attendance.service.ts';
-import {buildReport} from '../services/report.service.ts';
+import {buildReport,buildMonthlySummaryExcel} from '../services/report.service.ts';
 const fail=(m:string,status=400)=>{throw Object.assign(new Error(m),{status})};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const validUUID=(v:any,required=true)=>{if(!v&&!required)return null;if(typeof v!=='string'||!UUID.test(v))fail('Invalid UUID');return v as string};
@@ -17,7 +17,7 @@ const dateTime=(v:any,optional=true)=>{
  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(v)||!Number.isFinite(Date.parse(v)))fail('Timestamp must include timezone offset or Z');
  return new Date(v).toISOString();
 };
-const status=(v:any)=>{const values=['PRESENT','ABSENT','LATE','HALF_DAY','ON_LEAVE','PAID_LEAVE','HOLIDAY','WEEKEND'];if(!values.includes(v))fail('Invalid attendance status');return v as string};
+const status=(v:any)=>{const values=['PRESENT','ABSENT','LATE','HALF_DAY','ON_LEAVE','PAID_LEAVE','PERMISSION','HOLIDAY','WEEKEND'];if(!values.includes(v))fail('Invalid attendance status');return v as string};
 const decision=(v:any)=>{if(!['APPROVED','REJECTED'].includes(v))fail('Decision must be APPROVED or REJECTED');return v as string};
 const reason=(v:any)=>{if(typeof v!=='string'||v.trim().length<3||v.trim().length>1000)fail('Reason is required (3–1000 characters)');return v.trim()};
 const optionalNote=(value:any)=>{
@@ -120,6 +120,30 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  const leave=route.match(/^\/admin\/leaves\/([a-f0-9-]{36})\/review$/i);
  if(method==='PATCH'&&leave){
   const b=await bodyJSON(req);return response(await service.review(db,actor,'leave',validUUID(leave[1]),{decision:decision(b.decision),note:optionalNote(b.note)},ip));
+ }
+ if(method==='GET'&&route==='/admin/reports/employee'){
+  const m=month(q.get('month')||''),userId=validUUID(q.get('userId'));
+  return response(await service.monthlyEmployeeReport(db,actor,userId,m));
+ }
+ if(method==='GET'&&route==='/admin/reports/employee/download'){
+  service.requireAction(actor,'export');
+  const m=month(q.get('month')||''),userId=validUUID(q.get('userId'));
+  const format=q.get('format')||'csv';
+  if(!['csv','xls','pdf'].includes(format))fail('format must be csv, xls or pdf');
+  const lastDay=new Date(Date.UTC(Number(m.slice(0,4)),Number(m.slice(5,7)),0)).toISOString().slice(0,10);
+  const rows=await service.reportRangeRows(db,actor,m+'-01',lastDay,userId);
+  return buildReport(m+'-'+userId.slice(0,8),format,rows);
+ }
+ if(method==='GET'&&route==='/admin/reports/monthly-summary'){
+  const m=month(q.get('month')||'');
+  return response(await service.monthlyCompanySummary(db,actor,m));
+ }
+ if(method==='GET'&&route==='/admin/reports/monthly-summary/download'){
+  service.requireAction(actor,'export');
+  const m=month(q.get('month')||''),format=q.get('format')||'xls';
+  if(format!=='xls')fail('All-employee summary is Excel only');
+  const summary=await service.monthlyCompanySummary(db,actor,m);
+  return buildMonthlySummaryExcel(m,summary.employees);
  }
  if(method==='GET'&&route==='/admin/reports/range'){
   const range=dateRange(q),format=q.get('format')||'csv';
