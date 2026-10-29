@@ -11,14 +11,30 @@
 <nav class="av-nav"><a href="secure.html">▦ Dashboard</a><a class="active" href="attendance-v3.html">◈ Attendance</a><a href="roles.html" id="roleLink" hidden>♧ Manage Roles</a><a href="secure.html#users" id="userLink" hidden>♙ Employee Users</a></nav><div class="bottom"><a href="secure.html">← GreenRich ONE</a></div></aside>
 <div class="main"><header><div><small>GREENRICH ONE · SECURE ATTENDANCE</small><h1>Attendance Management</h1></div><div class="profile"><b id="employeeName"></b><small id="employeeRole"></small></div></header>
 <main id="v3Content">
-<div class="av-tabs"><button class="av-tab active" type="button" data-tab="mine">My Attendance</button><button class="av-tab" type="button" data-tab="requests">Leave & Corrections</button><button id="adminTab" class="av-tab" type="button" data-tab="admin" hidden>Office Admin</button><button id="manageTab" class="av-tab" type="button" data-tab="config" hidden>Holidays & Shifts</button></div>
+<div class="av-tabs"><button class="av-tab active" type="button" data-tab="mine">My Attendance</button><button id="adminTab" class="av-tab" type="button" data-tab="admin" hidden>Employee Attendance</button><button id="manageTab" class="av-tab" type="button" data-tab="config" hidden>Holidays & Shifts</button></div>
 <section id="tab-mine" class="av-section">
- <div class="panel"><div class="row"><div><h2>My Daily Attendance</h2><p>Check-in and check-out use server time in the company timezone.</p></div><span class="pill" id="todayLabel"></span></div>
- <div class="av-actions"><button type="button" class="blue" id="checkIn">Check In</button><button type="button" class="secondary" id="checkOut">Check Out</button><span id="clockStatus"></span></div></div>
- <div class="panel"><div class="row"><h2>Monthly Attendance</h2><label>Month<input id="myMonth" type="month"></label></div><div id="mySummary" class="cards"></div>
- <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (IST)</th><th>Check Out (IST)</th><th>Hours</th></tr></thead><tbody id="myRows"></tbody></table></div><div class="av-pager"><button id="myPrev" type="button">Previous</button><span id="myPager"></span><button id="myNext" type="button">Next</button></div></div>
-</section>
-<section id="tab-requests" class="av-section" hidden>
+ <div class="panel av-clock-panel">
+  <div class="row"><div><h2>My Daily Attendance</h2><p>Check-in மற்றும் Check-out நேரம் server-ல் பதிவு செய்யப்படும்.</p></div><span class="pill" id="todayLabel"></span></div>
+  <div class="av-clock-bar">
+   <button id="checkIn" type="button" class="blue av-clock-button"><span>↪ Check In</span></button>
+   <button id="checkOut" type="button" class="secondary av-clock-button"><span>↩ Check Out</span></button>
+   <div class="av-clock-metric"><small>CHECK IN</small><strong id="checkInTime">Not marked</strong></div>
+   <div class="av-clock-metric"><small>CHECK OUT</small><strong id="checkOutTime">Not marked</strong></div>
+  </div>
+  <p id="clockStatus" class="av-clock-note">Your attendance is saved securely using office server time.</p>
+ </div>
+ <div class="panel">
+  <div class="row"><div><h2>My Monthly Attendance Calendar</h2><p>Your attendance only • Present, Absent, Half Day, Leave, Holiday and Weekend</p></div><label>Month<input id="myMonth" type="month"></label></div>
+  <div id="mySummary" class="cards av-summary-cards"></div>
+  <div class="av-calendar-legend"><span><i class="av-dot present"></i> Present</span><span><i class="av-dot absent"></i> Absent</span><span><i class="av-dot half"></i> Half Day</span><span><i class="av-dot leave"></i> Leave</span><span><i class="av-dot holiday"></i> Holiday</span><span><i class="av-dot weekend"></i> Weekend</span></div>
+  <div id="myCalendar" class="av-calendar" aria-label="My monthly attendance calendar"></div>
+ </div>
+ <div class="panel">
+  <h2>My Check-in / Check-out Time Sheet</h2>
+  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (IST)</th><th>Check Out (IST)</th><th>Hours</th></tr></thead><tbody id="myRows"></tbody></table></div>
+  <div class="av-pager" hidden><button id="myPrev" type="button">Previous</button><span id="myPager"></span><button id="myNext" type="button">Next</button></div>
+ </div>
+ <div class="av-requests"><h2>Requests & Approvals</h2><p>Attendance correction or leave requests are sent to the authorised attendance approvers.</p>
 <div class="av-grid"><div class="panel"><h2>Request Attendance Correction</h2><p>For a previous date only. An Office Admin must approve.</p>
 <form id="correctionForm" class="av-form">
 <label>Date<input name="date" type="date" id="correctionDate" required></label>
@@ -32,14 +48,18 @@
 <button class="blue">Submit Leave Request</button></form></div></div>
 <div class="panel"><h2>My Correction Requests</h2><div id="myCorrections"></div></div>
 <div class="panel"><h2>My Leave Applications</h2><div id="myLeaves"></div></div>
+</div>
 </section>
 <section id="tab-admin" class="av-section" hidden>
- <div class="panel"><div class="row"><h2>Company Attendance</h2><span class="pill">Office Admin</span></div>
+ <div class="panel av-approvals-panel"><div class="row"><h2>Approval Inbox</h2><span class="pill" id="pendingBadge">Checking requests...</span></div><p>Employees' leave and attendance correction requests appear here for authorised approvers.</p><div id="approvalPreview"></div></div>
+ <div class="panel"><div class="row"><h2>Employee Attendance & Reports</h2><span class="pill">Admin / Office Admin</span></div>
+ <div class="av-period-tabs"><button type="button" class="secondary" data-period="day">Today</button><button type="button" class="secondary" data-period="week">This Week</button><button type="button" class="secondary" data-period="month">This Month</button></div>
  <form id="adminFilters" class="av-filter"><label>Employee<select name="userId" id="filterEmployee"><option value="">All Employees</option></select></label>
  <label>Department<select name="department" id="filterDepartment"><option value="">All Departments</option></select></label>
  <label>From<input name="from" id="adminFrom" type="date"></label><label>To<input name="to" id="adminTo" type="date"></label>
  <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
  <button class="blue">Apply Filters</button></form>
+ <div id="adminChartSummary" class="cards av-summary-cards"></div><div id="adminChart" class="av-chart" aria-label="Attendance status bar chart"></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (IST)</th><th>Out (IST)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
  <div class="av-grid">
  <div class="panel"><h2>Mark / Correct Attendance</h2><form id="adminMark" class="av-form">
@@ -47,13 +67,15 @@
  <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
  <label>Check-in (optional)<input name="checkIn" type="datetime-local"></label><label>Check-out (optional)<input name="checkOut" type="datetime-local"></label>
  <label>Reason (required)<textarea name="reason" required minlength="3" rows="2"></textarea></label><button class="blue" type="submit">Save Attendance</button></form></div>
- <div class="panel"><h2>Bulk Mark Attendance</h2><p>Select multiple employees. Maximum 200 per operation.</p><form class="av-form" id="bulkForm">
+ <div class="panel av-bulk-panel"><h2>Quick Employee Attendance</h2><p>Employee பெயர்களை select செய்து Present / Absent / Half Day ஒரே click-ல் mark செய்யலாம். Date மற்றும் Reason ஒருமுறை கொடுத்தால் போதும்.</p>
+ <form class="av-form" id="bulkForm">
  <label>Date<input name="date" type="date" required></label>
- <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>HOLIDAY</option></select></label>
- <div class="av-bulklist" id="bulkUsers"></div><label>Reason<textarea name="reason" required minlength="3"></textarea></label>
- <button class="blue" type="submit">Mark Selected Employees</button></form></div></div>
- <div class="panel"><div class="row"><h2>Monthly Report</h2><label>Month<input id="reportMonth" type="month"></label></div>
- <div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
+ <label class="av-bulk-hidden">Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>HALF_DAY</option></select></label>
+ <label class="av-select-all"><input type="checkbox" id="selectAllEmployees"> Select All Employees <small id="selectedStaffCount">0 selected</small></label>
+ <div class="av-bulklist av-bulk-table" id="bulkUsers"></div><label>Reason<textarea name="reason" required minlength="3"></textarea></label>
+ <div class="av-actions"><button type="button" data-bulk-status="PRESENT" class="blue">✓ Mark Present</button><button type="button" data-bulk-status="ABSENT" class="secondary">Mark Absent</button><button type="button" data-bulk-status="HALF_DAY" class="secondary">Mark Half Day</button><button type="submit" class="av-hidden-submit" hidden>Save Selected</button></div></form></div></div>
+ <div class="panel"><div class="row"><h2>Download Attendance Report</h2><label>Month<input id="reportMonth" type="month"></label></div>
+ <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
  <div class="av-grid">
  <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
  <div class="panel"><h2>Leave Requests for Approval</h2><div id="adminLeaves"></div></div></div>
