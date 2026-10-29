@@ -156,10 +156,11 @@ const loadCrmAssets=()=>{
 };
 async function crmWorkspace(container,view){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
- await loadCrmAssets();
  const access=crmAccess(),allowed=Object.entries(access).filter(([,v])=>v).map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
  window.GreenRichCRM.mount(container,view,allowed);
+ // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
+ void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
 function exportCSV(filename,cols,rows){let csv=[cols,...rows].map(r=>r.map(x=>{let v=String(x??'');if(/^[=+@\-\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}).join(',')).join('\r\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href)}
 async function employeeAction(data){
