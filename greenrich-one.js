@@ -317,6 +317,7 @@ async function settings(c){
   openUsers:host=>users(host),
   openRoles:host=>permissionPage(host),
    openTags:host=>window.GreenRichCustomerTags.mount(host,{db,notify:toast}),
+  openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
