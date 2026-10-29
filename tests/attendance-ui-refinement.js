@@ -1,0 +1,26 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
+const code=fs.readFileSync('greenrich-attendance-inline.js','utf8');
+const page=fs.readFileSync('attendance-v3.html','utf8');
+const secure=fs.readFileSync('secure.html','utf8');
+const main=fs.readFileSync('greenrich-one.js','utf8');
+new vm.Script(code);new vm.Script(main);
+assert.match(secure, /class="profile"[\s\S]*?id="attendanceQuick"/);
+assert.match(main,/grHeaderIn/);assert.match(main,/grHeaderOut/);
+assert.doesNotMatch(main,/attQuickOpen/);
+assert.match(page,/id="filterRole"/);assert.doesNotMatch(page,/id="filterDepartment"/);
+assert.match(code,/roleId:input\(f,'roleId'\)/);
+assert.match(page,/id="attendanceEditDialog"/);assert.match(code,/showModal\(\)/);
+assert.match(code,/conic-gradient/);assert.doesNotMatch(page,/id="adminChart"[^>]*bar chart/);
+assert.doesNotMatch(page,/id="tab-config"/);assert.doesNotMatch(page,/id="manageTab"/);
+for(const status of ['PRESENT','ABSENT','HALF_DAY','WEEKEND','HOLIDAY','PAID_LEAVE']){
+ assert.match(page,new RegExp('data-bulk-status="'+status+'"'));
+ assert.ok(code.includes("status:'"+status+"'"),'Missing quick-row '+status);
+}
+assert.match(code,/adminRefreshTimer=setInterval/);
+assert.doesNotMatch(page,/name="reason" required/);
+assert.match(page,/id="correctionForm"/);assert.match(page,/id="leaveForm"/);
+assert.match(page,/id="approvalPreview"/);assert.match(page,/id="myCalendar"/);
+const iterateSingle=[...code.matchAll(/(?<!\$)\$\([^)]*\)\.(?:forEach|map|filter|find|some|reduce)\s*\(/g)];
+assert.equal(iterateSingle.length,0,'Single element cannot be iterated');
+console.log('PASS: Header clock, role filter, modal, 6 colors, round chart, optional reasons and unchanged employee sections');
