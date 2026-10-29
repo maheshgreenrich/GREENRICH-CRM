@@ -100,6 +100,11 @@ export async function configChange(db:Db,actor:Actor,entity:string,operation:str
  if(!body.reason||body.reason.trim().length<3)bad('Reason required');
  return invoke(db,'grm_admin_config',{p_actor:actor.id,p_entity:entity,p_operation:operation,p_id:id,p_data:body,p_reason:body.reason.trim(),p_ip:ip});
 }
+export async function assignEmployee(db:Db,actor:Actor,userId:string,departmentId:string|null,shiftId:string|null,reason:string,ip:string|null){
+ requireManager(actor);
+ if(!reason||reason.trim().length<3)bad('Reason required');
+ return invoke(db,'grm_assign_employee',{p_actor:actor.id,p_target:userId,p_department:departmentId,p_shift:shiftId,p_reason:reason.trim(),p_ip:ip});
+}
 export async function reportRows(db:Db,actor:Actor,month:string){
  requireManager(actor);const [from,after]=monthBounds(month),rows:any[]=[];
  for(let offset=0;offset<30000;offset+=1000){
