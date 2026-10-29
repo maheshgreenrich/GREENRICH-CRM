@@ -57,7 +57,7 @@
  <form id="adminFilters" class="av-filter"><label>Employee<select name="userId" id="filterEmployee"><option value="">All Employees</option></select></label>
  <label>User Role<select name="roleId" id="filterRole"><option value="">All Roles</option></select></label>
  <label>From<input name="from" id="adminFrom" type="date"></label><label>To<input name="to" id="adminTo" type="date"></label>
- <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>PERMISSION</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
+ <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>PERMISSION</option><option>PERMISSION</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
  <button class="blue">Apply Filters</button></form>
  <div id="adminChartSummary" class="cards av-summary-cards"></div><div id="adminChart" class="av-donut-view" aria-label="Attendance status round chart"></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (IST)</th><th>Out (IST)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
@@ -95,7 +95,7 @@
  <div class="av-monthly-dialog-header"><div><h2 id="monthlyEmployeeHeading">Employee Monthly Attendance</h2><p id="monthlyEmployeeSubheading">Selected employee attendance report</p></div><button id="monthlyEmployeeClose" type="button" class="secondary" aria-label="Close employee monthly report">✕</button></div>
  <div class="av-monthly-selector-row"><label>Choose Month<input type="month" id="monthlyEmployeeMonth"></label></div>
  <div id="monthlyEmployeeCounts" class="av-monthly-counts" aria-live="polite"></div>
- <div class="av-calendar-legend"><span><i class="av-dot present"></i> Present</span><span><i class="av-dot absent"></i> Absent</span><span><i class="av-dot half"></i> Half Day</span><span><i class="av-dot leave"></i> Leave</span><span><i class="av-dot holiday"></i> Holiday</span><span><i class="av-dot weekend"></i> Weekend</span></div>
+ <div class="av-calendar-legend"><span><i class="av-dot present"></i> Present</span><span><i class="av-dot absent"></i> Absent</span><span><i class="av-dot half"></i> Half Day</span><span><i class="av-dot leave"></i> Leave</span><span><i class="av-dot holiday"></i> Holiday</span><span><i class="av-dot weekend"></i> Weekend</span><span><i class="av-dot permission"></i> Permission</span></div>
  <div id="monthlyEmployeeCalendar" class="av-calendar av-employee-report-calendar" aria-label="Selected employee monthly attendance calendar"></div>
  <h3>Monthly Check-in / Check-out Details</h3>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (IST)</th><th>Check Out (IST)</th><th>Hours</th></tr></thead><tbody id="monthlyEmployeeTimeSheet"></tbody></table></div>
