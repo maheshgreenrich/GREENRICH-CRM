@@ -113,5 +113,6 @@ export async function reportRows(db:Db,actor:Actor,month:string){
   if((r.data||[]).length<1000)break;
   if(offset+1000>=30000)bad('Report too large. Narrow reporting period.',413);
  }
- return rows.map(r=>[r.date,(r.gr_profiles as any)?.full_name||r.user_id,r.status,r.check_in||'',r.check_out||'',r.total_hours??'',r.remarks||'']);
+ const officeTime=(utc:string|null)=>utc?new Date(utc).toLocaleString('en-GB',{timeZone:'Asia/Kolkata',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+ return rows.map(r=>[r.date,(r.gr_profiles as any)?.full_name||r.user_id,r.status,officeTime(r.check_in),officeTime(r.check_out),r.total_hours??'',r.remarks||'']);
 }
