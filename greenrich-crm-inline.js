@@ -79,7 +79,7 @@ const specs={
  sales:[['date','Order date','date',true],['order_id','Platform order ID (optional)','text'],['internal_order_id','Internal Sales Order ID (automatic)','text',true],['company_id','Company','companies',true],['channel_id','Sales channel','channels',true],['customer_id','Existing customer','customers'],['product_id','Product','products',true],['qty','Quantity','number',true],['unit_price','Unit price (₹)','number',true],['tax_rate','Product GST / tax percentage (automatic)','number',true],['inclusive','Price includes tax?','select','',[['true','Yes, included'],['false','No, add tax']]],['shipping_charge','Shipping charge (optional)','number'],['status','Order status','select','',[['Completed','Completed'],['Pending','Pending'],['Cancelled','Cancelled'],['Returned','Returned']]],['notes','Notes','textarea']]
 };
 function field([id,label,type,required,options],value){
- const wrap=el('label',{class:type==='textarea'||type==='tags'?'wide':''}),title=el('span',{text:label});wrap.append(title);let input;
+ const wrap=el(type==='tags'?'div':'label',{class:type==='tags'?'wide gr-tag-field':type==='textarea'?'wide':''}),title=el('span',{text:label});wrap.append(title);let input;
  if(type==='tags'){wrap.insertAdjacentHTML('beforeend',tagChecks(data,id,Array.isArray(value)?value:[]));return wrap}
  if(type==='select'||['products','channels','customers','leads','companies'].includes(type)){
   input=el('select',{name:id,id:'f-'+id});
