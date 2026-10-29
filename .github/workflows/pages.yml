@@ -13,6 +13,7 @@ on:
       - 'tests/attendance-ui-refinement.js'
       - 'tests/attendance-correction-layout.js'
       - 'tests/attendance-monthly-reports.js'
+      - 'tests/dashboard-switch-performance.js'
       - 'greenrich-one.css'
       - 'demo.html'
       - 'secure.html'
@@ -63,6 +64,7 @@ jobs:
           node tests/attendance-ui-refinement.js
           node tests/attendance-correction-layout.js
           node tests/attendance-monthly-reports.js
+          node tests/dashboard-switch-performance.js
           test -s secure.html
           test -s roles.html
           test -s roles-manager.js
