@@ -13,9 +13,9 @@
   if(response.error)throw Error('Unable to load company details: '+response.error.message);
   latest=response.data||[];
   if(!latest.some(c=>c.id===selected(ctx.user.id)&&c.active))localStorage.setItem(KEY+ctx.user.id,'grow-india');
-  let currentTab='companies';
-  const tabDefinitions=[['companies','Company Profiles'],['channels','Sales Channels'],['reports','Import & Export'],['dashboard','Sales Reports']];
-  root.innerHTML='<div id="gr-company-admin"><div class="panel"><h2>Company & CRM Settings</h2><p>Manage the two GreenRich companies and administrator-only CRM tools from one place.</p><div class="gr-settings-tabs">'+tabDefinitions.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div></div><div id="gr-company-settings-content"></div></div>';
+  let currentTab=['companies','users','roles','channels','reports'].includes(ctx.initialTab)?ctx.initialTab:'companies';
+  const tabDefinitions=[['companies','Company Profiles'],['users','User Management'],['roles','User Roles'],['channels','Sales Channels'],['reports','Import & Export']];
+  root.innerHTML='<div id="gr-company-admin"><div class="panel"><h2>Settings</h2><p>Manage companies, employee accounts, user roles and administrator-only CRM tools.</p><div class="gr-settings-tabs">'+tabDefinitions.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div></div><div id="gr-company-settings-content"></div></div>';
   const host=root.querySelector('#gr-company-settings-content');
   const notice=message=>{ctx.notify(message)};
   async function showCompanyCards(){
@@ -47,7 +47,13 @@
    currentTab=tab;
    root.querySelectorAll('[data-settings-tab]').forEach(button=>button.classList.toggle('gr-current-settings-tab',button.dataset.settingsTab===tab));
    if(tab==='companies'){await showCompanyCards();return}
-   if(!['channels','reports','dashboard'].includes(tab))return;
+   if(tab==='users'||tab==='roles'){
+    host.innerHTML='<div class="panel">Loading administrator settings...</div>';
+    try{if(tab==='users')await ctx.openUsers(host);else await ctx.openRoles(host)}
+    catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
+    return;
+   }
+   if(!['channels','reports'].includes(tab))return;
    host.innerHTML='<div class="panel">Opening Admin tools...</div>';
    try{await ctx.openCRM(host,tab,true)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
   }
