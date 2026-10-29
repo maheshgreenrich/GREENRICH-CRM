@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attendance Control | GreenRich ONE</title>
+<link rel="stylesheet" href="greenrich-one.css">
+<link rel="stylesheet" href="attendance-control.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script defer src="attendance-control.js?v=office-1"></script></head>
+<body><div id="loading" class="auth"><div class="authcard"><h1>GreenRich ONE</h1><p id="status">Checking secure attendance permissions...</p><a href="secure.html">Return to secure login</a></div></div>
+<div id="workspace" class="app" hidden><aside><div class="logo">◆ <b>GreenRich ONE</b></div><small>COMPANY ATTENDANCE</small>
+<nav><a href="secure.html">Dashboard</a><a href="attendance-control.html" class="active">Attendance Control</a><a href="secure.html#users">Employee Users</a></nav>
+<div class="bottom"><a href="secure.html">← Back to GreenRich ONE</a></div></aside>
+<div class="main"><header><div><small>GREENRICH ONE · PERMISSION CONTROLLED</small><h1>Employee Attendance Control</h1></div><div class="profile"><b id="who"></b><small id="roleLabel"></small></div></header>
+<main id="content">
+<div class="panel"><div class="row"><h2>My Attendance</h2><span class="pill" id="myRole"></span></div><p id="myStatus"></p></div>
+<div class="panel"><div class="row"><h2>Mark / Correct Employee Attendance</h2><span class="pill" id="peopleCount"></span></div>
+<p>Only employees allowed by your Own / Team / All permissions are shown. An employee must already have a GreenRich account.</p>
+<form id="markForm" class="fields">
+<label>Employee<select id="employee" required></select></label>
+<label>Date<input id="day" type="date" required></label>
+<label>Attendance Status<select id="attendanceStatus"><option value="present">Present</option><option value="absent">Absent</option><option value="half_day">Half Day</option></select></label>
+<label>Remark (optional)<input id="remark" maxlength="250" placeholder="Reason or note"></label>
+<div><button class="blue" id="save" type="submit">Save Attendance</button></div>
+</form>
+<p id="scopeNotice"></p></div>
+<div class="panel"><div class="row"><h2>Employee Attendance Records</h2><div class="row"><label>Month<input id="month" type="month"></label><button class="secondary" id="export" type="button">Export CSV</button></div></div>
+<div class="cards" id="stats"></div>
+<div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody id="records"></tbody></table></div></div>
+<div id="notice" class="notice" role="status" hidden></div>
+</main></div></div></body></html>
