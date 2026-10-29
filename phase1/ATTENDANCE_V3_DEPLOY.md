@@ -2,7 +2,7 @@
 
 ## Verified live deployment — 29 October 2026
 
-The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 6**, with JWT verification enabled.
+The GreenRich production Supabase project `uawgwkplkvahhmhvroul` now has the V3 attendance schema and all backend migrations applied directly through the connected Supabase management interface. The `attendance-api` Edge Function is **ACTIVE, version 7**, with JWT verification enabled.
 
 The scheduled job `greenrich-v3-daily-absence` is installed at **19:30 UTC / 01:00 IST**, but its required `grm_settings.enabled_from` launch date is **NULL** until the built-in Admin explicitly activates daily absences from the Attendance V3 → Holidays & Shifts screen. A test confirmed the guarded job inserts **0** rows while disabled. Do not change this guard without a rollout plan.
 
@@ -55,6 +55,21 @@ The V3 schema is **isolated** from the old `gr_attendance` and browser-local dem
 - **Notes optional:** Admin create/edit/delete/bulk and review notes, plus employee leave and correction request notes, are optional. Admin audit logs still track who made each change, timestamp, operation, and old/new data. Built-in Admin launch-setting security still separately requires justification.
 - **Backend:** Supabase `attendance-api` Edge Function version **6** deployed with JWT verification and the migration `20261029130000_attendance_optional_notes_paid_leave.sql` applied. Optional-note and paid-leave behaviors were checked with rollback-only PostgreSQL tests; no test entries were retained.
 - **UI testing:** regression checks passed in source, but live GitHub Pages login and direct browser exercise remain unverified.
+
+### Per-employee monthly reports and company Excel counts
+
+Inside **GreenRich ONE → Attendance → Employee Attendance → Monthly Attendance Reports**:
+
+1. **Employee List:** click an active employee to open a popup. The month selector at the top changes that employee's calendar, recorded status counts and detailed check-in/out table. The bottom buttons download that employee's selected month's daily report as CSV, Excel (SpreadsheetML `.xls`) or PDF.
+2. **All Employees · Monthly Summary:** select a month below the employee list and download one Excel file. This contains **one row per active employee with monthly counts only**: Employee Name, Present Days, Absent Days, Half Days, Paid Leave, Unpaid Leave, Late Days, Permission Days, Holiday Days, Weekend Days. There are **no dates, check-in/out timestamps or daily attendance rows** in this company summary.
+3. `Present Days` includes `PRESENT` plus `LATE` days. `Late Days` is a subset and is **not** an extra attendance day. `Half Days` are counted separately; paid/unpaid leave are separate categories.
+4. Only **recorded** attendance statuses count in the downloadable totals. The calendar visually marks configured holidays and nonworking weekdays even if they have no attendance record; unmarked working days are **not assumed absent**. The automatic ABSENT job remains guarded by the Admin launch date.
+5. `PERMISSION` is now an explicit attendance status that an authorised Admin can set using Mark / Correct Attendance or the Edit popup. Its monthly count is tracked as `Permission Days`; historical records without this status are not reclassified.
+6. Report APIs require the attendance `view / All` permission for employee calendars and summary preview; downloads additionally require `export / All`. Regular employees cannot access other employees' monthly reports.
+
+Related REST endpoints: `GET /admin/reports/employee?userId=&month=`, `GET /admin/reports/employee/download?userId=&month=&format=csv|xls|pdf`, `GET /admin/reports/monthly-summary?month=`, and `GET /admin/reports/monthly-summary/download?month=&format=xls`.
+
+The production `attendance-api` Edge Function is **ACTIVE, version 7** with JWT verification enabled. The `PERMISSION` attendance status migration has been applied. Regression tests cover the monthly report UI, permissions, recorded status counts and count-only Excel output. A signed-in browser download test remains required before production sign-off.
 
 ## One-time deployment (developer/administrator)
 
@@ -157,4 +172,4 @@ The GitHub Actions workflow `Attendance V3 checks` runs `deno check`, API route 
 - Audit rows contain actor, action, reason and record changes.
 - Test desktop and mobile browsers.
 
-**Status:** Database migrations, Edge API v6 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
+**Status:** Database migrations, Edge API v7 and guarded Cron are deployed. End-to-end browser, export, and full role-security acceptance tests remain pending before production sign-off.
