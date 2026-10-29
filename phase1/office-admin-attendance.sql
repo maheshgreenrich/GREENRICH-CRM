@@ -40,10 +40,10 @@ as $$ select public.gr_attendance_action_allowed(p_target,'view') $$;
 
 -- Return ONLY minimal employee information to authorized attendance managers.
 create or replace function public.gr_attendance_people()
-returns table(id uuid,full_name text,role_id uuid,active boolean)
+returns table(id uuid,full_name text,role_id uuid,active boolean,manager_id uuid)
 language sql stable security definer set search_path = ''
 as $$
- select p.id,p.full_name,p.role_id,p.active
+ select p.id,p.full_name,p.role_id,p.active,p.manager_id
  from public.gr_profiles p
  where p.active and (
    public.gr_attendance_action_allowed(p.id,'view')
