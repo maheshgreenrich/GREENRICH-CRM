@@ -6,11 +6,11 @@ const cloud=fs.readFileSync('greenrich-crm-cloud.js','utf8'),crm=fs.readFileSync
 for(const [name,src] of [['cloud',cloud],['CRM',crm],['invoice',invoice]])new vm.Script(src,{filename:name});
 const ctx={window:{},Intl,Date,Number,Math,String,Object,Array,Error};
 vm.runInNewContext(cloud,ctx);
-const module=ctx.window.GreenRichCRMCloud;
-assert.ok(module);
+const cloudApi=ctx.window.GreenRichCRMCloud;
+assert.ok(cloudApi);
 const before={sales:[{id:'a',total:100},{id:'b',total:50}],products:[{id:'p1',stock:5}],channels:[],leads:[],tasks:[]};
 const after={sales:[{id:'a',total:130},{id:'c',total:200}],products:[{id:'p1',stock:5}],channels:[],leads:[],tasks:[]};
-const mutations=module.diff(before,after);
+const mutations=cloudApi.diff(before,after);
 assert.equal(mutations.length,3);
 assert.equal(mutations.find(x=>x.id==='a').type,'update');
 assert.equal(mutations.find(x=>x.id==='b').type,'delete');
