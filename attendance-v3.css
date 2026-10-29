@@ -4,3 +4,62 @@
 @media(max-width:1160px){.av-filter{grid-template-columns:repeat(3,minmax(140px,1fr))}.av-section .cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.av-grid{grid-template-columns:1fr}.av-filter{grid-template-columns:repeat(2,minmax(150px,1fr))}#v3Content{padding:14px}.av-section .cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:500px){.av-filter{grid-template-columns:1fr}.av-tabs{display:grid;grid-template-columns:repeat(2,1fr)}.av-actions{gap:7px}.av-bulklist{grid-template-columns:1fr}.av-pager{justify-content:center}}
+
+
+/* GreenRich ONE single-page attendance: employee-friendly clock and month calendar */
+.av-clock-panel{border-color:#cfdcf6;background:linear-gradient(120deg,#fff 60%,#f6f9ff)}
+.av-clock-bar{display:flex;flex-wrap:wrap;align-items:center;gap:13px;margin:18px 0}
+.av-clock-button{min-width:142px;padding:15px 21px;font-size:16px}
+.av-clock-button:disabled{opacity:.45;cursor:not-allowed}
+.av-clock-metric{display:grid;gap:5px;padding:9px 16px;border-left:1px solid #dee7f6;min-width:155px}
+.av-clock-metric small{color:#7786a1;font-weight:700;letter-spacing:.4px}
+.av-clock-metric strong{font-size:15px;color:#172d58}
+.av-clock-note{margin-top:13px;font-size:13px;color:#566d8d}
+.av-summary-cards{margin:16px 0;grid-template-columns:repeat(6,minmax(0,1fr))!important}
+.av-summary-cards .card{padding:13px;box-shadow:none;background:#f9fbff}
+.av-summary-cards .card strong{font-size:23px}
+.av-calendar-legend{display:flex;flex-wrap:wrap;gap:13px 20px;font-size:12px;margin:18px 0;color:#65738a}
+.av-calendar-legend span{display:flex;align-items:center;gap:7px}
+.av-dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+.av-dot.present,.av-calendar-day.present{background:#e6f7eb;color:#146d3b}
+.av-dot.absent,.av-calendar-day.absent{background:#ffe8e5;color:#9a3227}
+.av-dot.half,.av-calendar-day.half{background:#fff1d4;color:#936000}
+.av-dot.leave,.av-calendar-day.leave{background:#ebe6ff;color:#5d3cad}
+.av-dot.holiday,.av-calendar-day.holiday{background:#ffe4f0;color:#a82667}
+.av-dot.weekend,.av-calendar-day.weekend{background:#e5eaf1;color:#50637f}
+.av-calendar-day.unmarked{background:#f8faff;color:#7a889f}
+.av-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.av-calendar-weekday{text-align:center;padding:8px;color:#6c7c97;font-size:12px;font-weight:700}
+.av-calendar-day{display:grid;align-content:space-between;min-height:79px;border-radius:11px;border:1px solid #e4ebf5;padding:10px;gap:7px}
+.av-calendar-day strong{font-size:17px}
+.av-calendar-day small{font-size:10px;font-weight:650;text-transform:capitalize}
+.av-calendar-day.today{outline:2px solid #194bdf;outline-offset:1px}
+.av-calendar-empty{min-height:65px}
+.av-requests{margin-top:23px}
+.av-requests>.panel{margin-top:14px}
+.av-period-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px}
+.av-period-active{background:#194bdf!important;color:white!important}
+.av-chart{padding:15px;border:1px solid #e7edf8;border-radius:12px;margin:15px 0 25px}
+.av-chart-title{font-weight:700;font-size:13px;color:#526582;margin-bottom:12px}
+.av-chart-row{display:grid;grid-template-columns:95px minmax(0,1fr) 35px;gap:10px;align-items:center;margin:10px 0;font-size:12px;font-weight:600;color:#566888}
+.av-chart-track{height:14px;border-radius:15px;background:#eef2fa;overflow:hidden}
+.av-chart-bar{height:100%;border-radius:15px;background:#a6c1fb;min-width:1px}
+.av-chart-bar.present{background:#36a469}.av-chart-bar.absent{background:#dc6459}.av-chart-bar.half{background:#e7b046}.av-chart-bar.leave{background:#9279d5}.av-chart-bar.holiday{background:#cf80a6}.av-chart-bar.weekend{background:#8a9bb3}
+.av-approvals-panel{border-color:#d2ddf4}
+.av-pending-links{display:flex;gap:10px;flex-wrap:wrap}
+.av-bulk-panel .av-form{gap:13px}
+.av-bulk-hidden{display:none!important}
+.av-select-all{display:flex!important;align-items:center;gap:9px;background:#f1f5ff;border-radius:10px;padding:10px 12px}
+.av-select-all input,.av-staff-row input{width:18px;height:18px;min-width:18px;accent-color:#194bdf}
+.av-select-all small{margin-left:auto}
+.av-bulk-table{display:grid;grid-template-columns:1fr;max-height:410px;overflow:auto;padding:4px;border:1px solid #e2eaf8;border-radius:12px}
+.av-staff-row{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(115px,1fr) auto;gap:9px;align-items:center;padding:9px 7px;border-bottom:1px solid #ebeff7}
+.av-staff-row:last-child{border-bottom:0}
+.av-staff-row label{display:flex;gap:9px;align-items:center;color:#203354;font-size:13px}
+.av-staff-row small{font-size:11px;color:#60718b}
+.av-row-quick{display:flex;gap:4px}
+.av-row-quick button{border:1px solid #cad9ee;border-radius:7px;background:#f7faff;color:#2050b0;min-width:31px;padding:7px 6px;font-size:12px;font-weight:750}
+.av-row-quick button:hover,.av-row-quick button.av-quick-active{color:#fff;background:#194bdf}
+.av-hidden-submit{display:none!important}
+@media(max-width:950px){.av-summary-cards{grid-template-columns:repeat(3,minmax(0,1fr))!important}.av-clock-metric{min-width:135px}.av-staff-row{grid-template-columns:1fr auto}.av-staff-row small{grid-column:1/3}}
+@media(max-width:600px){.av-summary-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}.av-calendar{gap:4px}.av-calendar-day{min-height:57px;padding:5px}.av-calendar-day strong{font-size:13px}.av-calendar-day small{font-size:8px}.av-calendar-weekday{font-size:10px}.av-clock-bar{gap:8px}.av-clock-button{min-width:calc(50% - 4px);padding:12px}.av-clock-metric{min-width:calc(50% - 4px);padding:8px}.av-staff-row{grid-template-columns:1fr auto}.av-chart-row{grid-template-columns:76px minmax(0,1fr) 25px}}
