@@ -17,7 +17,18 @@ Deno.serve(async req=>{
   if(authError||!user)return response({error:'Session invalid'},401);
   const admin=createClient(url,secret,{auth:{autoRefreshToken:false,persistSession:false}});
   const {data:profile,error:pe}=await admin.from('gr_profiles').select('active,gr_roles(name)').eq('id',user.id).single();
-  if(pe||!profile?.active||profile?.gr_roles?.name!=='Admin')return response({error:'Admin permission required'},403);
+  if(pe||!profile?.active)return response({error:'Active employee profile required'},403);
+  const superAdmin=profile.gr_roles?.name==='Admin';
+  const {data:actor}=await admin.from('gr_profiles').select('role_id').eq('id',user.id).single();
+  const {data:actorRights}=await admin.from('gr_role_permissions').select('action,allowed,data_scope').eq('role_id',actor?.role_id||'00000000-0000-0000-0000-000000000000').eq('module','users');
+  const userScope=(action)=>superAdmin?'all':actorRights?.find(p=>p.action===action&&p.allowed)?.data_scope;
+  const allowedUser=(action,target)=>{const scope=userScope(action);return !!scope&&(scope==='all'||(scope==='team'&&target?.manager_id===user.id)||target?.id===user.id)};
+  const elevatedRole=async(roleId)=>{
+   const r=await admin.from('gr_roles').select('name').eq('id',roleId).single();
+   if(!r.data||['Admin','Director','Developer'].includes(r.data.name))return true;
+   const p=await admin.from('gr_role_permissions').select('module').eq('role_id',roleId).eq('allowed',true).in('module',['users','roles','settings']);
+   return !!p.error||!!p.data?.length;
+  };
   const body=await req.json(),action=body.action;
   if(action==='deleteRole'){
    const roleId=String(body.roleId||'');
