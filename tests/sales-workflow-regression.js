@@ -3,6 +3,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('nod
 const crm=fs.readFileSync('greenrich-crm-inline.js','utf8');
 const settings=fs.readFileSync('greenrich-company-admin.js','utf8');
 const tags=fs.readFileSync('greenrich-customer-tags.js','utf8');
+const shared=fs.readFileSync('greenrich-shared-customers.js','utf8');
 const html=fs.readFileSync('secure.html','utf8');
 const css=fs.readFileSync('greenrich-crm-inline.css','utf8');
 const app=fs.readFileSync('greenrich-one.js','utf8');
@@ -18,7 +19,7 @@ assert.ok(crm.includes('if(!saveCompanyData(targetId,copy))return'),'Save failur
 assert.ok(settings.includes("['tags','Customer Tags']"),'Customer Tags must be in Settings');
 assert.ok(settings.includes('ctx.openTags(host,selected(ctx.user.id))'));
 assert.ok(tags.includes('data-tag-edit')&&tags.includes('data-tag-delete'));
-assert.ok(tags.includes('db.customers.forEach'),'Deleting tags must remove customer tag assignments');
+assert.ok(shared.includes('customers.filter(c=>Array.isArray(c.tag_ids)&&c.tag_ids.includes(id))'),'Deleting shared tags must remove all customer assignments');
 assert.ok(html.includes('greenrich-customer-tags.js'));
 for(const header of ['Stock','Tags','Internal / Platform Order ID'])assert.ok(html.includes('>'+header+'</th>'));
 assert.ok(css.includes('gr-customer-picker'));
