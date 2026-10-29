@@ -146,8 +146,8 @@ window.GreenRichAttendance=(function(){
    const weekday=isoDay===0?7:isoDay;
    const actual=entry?.status;
    const status=actual||(specialDays.has(date)?'HOLIDAY':!workingDays.includes(weekday)?'WEEKEND':'UNMARKED');
-   const label=({PRESENT:'Present',LATE:'Late',HALF_DAY:'Half Day',ABSENT:'Absent',ON_LEAVE:'Leave',HOLIDAY:'Holiday',WEEKEND:'Weekend',UNMARKED:'—'})[status]||status;
-   const color=({PRESENT:'present',LATE:'present',HALF_DAY:'half',ABSENT:'absent',ON_LEAVE:'leave',HOLIDAY:'holiday',WEEKEND:'weekend',UNMARKED:'unmarked'})[status]||'unmarked';
+   const label=({PRESENT:'Present',LATE:'Late',HALF_DAY:'Half Day',ABSENT:'Absent',ON_LEAVE:'Leave',PAID_LEAVE:'Paid Leave',HOLIDAY:'Holiday',WEEKEND:'Weekend',UNMARKED:'—'})[status]||status;
+   const color=({PRESENT:'present',LATE:'present',HALF_DAY:'half',ABSENT:'absent',ON_LEAVE:'leave',PAID_LEAVE:'leave',HOLIDAY:'holiday',WEEKEND:'weekend',UNMARKED:'unmarked'})[status]||'unmarked';
    const title=specialDays.get(date)||label;
    cells.push('<div class="av-calendar-day '+color+(date===localDay()?' today':'')+'" title="'+esc(date+' — '+title)+'"><strong>'+day+'</strong><small>'+esc(label)+'</small></div>');
   }
