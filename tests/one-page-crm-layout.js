@@ -11,6 +11,8 @@ assert.match(crm,/#grCrmWorkspace nav#navigation\.gr-crm-tabs\s*\{[\s\S]*?displa
 assert.match(crm,/#grCrmWorkspace nav#navigation\.gr-crm-tabs\s*\{[\s\S]*?flex-wrap:wrap !important/);
 assert.match(crm,/#grCrmWorkspace nav#navigation\.gr-crm-tabs > button\[data-page\]\s*\{[\s\S]*?flex:0 0 auto !important/);
 assert.match(crm,/width:auto !important/);
+assert.match(html,/#grCrmWorkspace nav#navigation\.gr-crm-tabs\{/,'Core compact nav style must be in secure.html, not solely in an external stylesheet');
+assert.match(html,/#app \.main > header #attendanceQuick\{/,'Core switch-first header layout must ship in secure.html');
 const topHeader=html.match(/<header>([\s\S]*?)<\/header>/)?.[1]||'';
 assert.ok(topHeader.indexOf('id="attendanceQuick"')<topHeader.indexOf('class="profile"'),'Switch must be before profile');
 assert.match(attendance,/#app header #attendanceQuick\s*\{[\s\S]*?margin-left:auto !important/);
