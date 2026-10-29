@@ -43,3 +43,27 @@ export async function buildReport(month:string,format:string,rows:unknown[][]):P
   'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'
  }});
 }
+
+export function buildMonthlySummaryExcel(month:string,employees:Array<{name:string,counts:{
+ present:number;absent:number;halfDay:number;paidLeave:number;unpaidLeave:number;late:number;
+ permissions:number;holidays:number;weekends:number
+}}>){
+ const columns=['Employee Name','Present Days','Absent Days','Half Days','Paid Leave','Unpaid Leave','Late Days','Permission Days','Holiday Days','Weekend Days'];
+ // Excel 2003 XML (.xls) with numeric counts. No daily records are included.
+ const textCell=(v:string)=>'<Cell><Data ss:Type="String">'+xml(/^[=+@\\-]/.test(v)?"'"+v:v)+'</Data></Cell>';
+ const countCell=(v:number)=>'<Cell><Data ss:Type="Number">'+Math.max(0,Math.floor(Number(v)||0))+'</Data></Cell>';
+ const rows=employees.map(employee=>'<Row>'+textCell(employee.name)+
+  [employee.counts.present,employee.counts.absent,employee.counts.halfDay,
+   employee.counts.paidLeave,employee.counts.unpaidLeave,employee.counts.late,
+   employee.counts.permissions,employee.counts.holidays,employee.counts.weekends]
+   .map(countCell).join('')+'</Row>').join('');
+ const content='<?xml version="1.0" encoding="UTF-8"?>'+
+ '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'+
+ '<Worksheet ss:Name="Monthly Summary"><Table><Row>'+columns.map(textCell).join('')+'</Row>'+rows+
+ '</Table></Worksheet></Workbook>';
+ return new Response(content,{status:200,headers:{
+  'Content-Type':'application/vnd.ms-excel; charset=utf-8',
+  'Content-Disposition':'attachment; filename="greenrich-monthly-summary-'+month+'.xls"',
+  'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'
+ }});
+}
