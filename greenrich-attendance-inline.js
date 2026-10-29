@@ -106,7 +106,7 @@ window.GreenRichAttendance=(function(){
  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  try{await loadMine()}catch(e){notify('Attendance V3 backend is not ready: '+e.message+'. Deploy the V3 SQL migrations and attendance-api Edge Function first.',true)}
+  try{if(manager()){ $('.av-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab==='admin')); $('.av-section').forEach(section=>section.hidden=section.id!=='tab-admin'); await loadAdmin(); }else{ await loadMine(); }}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
