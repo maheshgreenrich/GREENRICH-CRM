@@ -159,6 +159,7 @@
  }
  async function loadConfiguration(){
   if(!manager())return;
+  if(!staff.length)await loadStaff();
   [holidays,shifts,departments]=await Promise.all([request('/admin/holidays'),request('/admin/shifts'),request('/admin/departments')]);
   function render(kind,target,items,desc){
    $(target).innerHTML=table(items,r=>'<div class="av-entry"><strong>'+esc(r.name)+'</strong><span>'+esc(desc(r))+'</span><div class="av-actions"><button class="secondary" data-change="'+esc(r.id)+'">Edit</button><button class="secondary" data-remove="'+esc(r.id)+'">Delete</button></div></div>','No records');
@@ -176,7 +177,19 @@
     await request('/admin/'+kind+'/'+b.dataset.remove,'DELETE',{reason});notify('Deleted and audited.');await loadConfiguration();
    }));
   }
-  render('holidays','#holidayRows',holidays,r=>r.date);
+  $('#assignmentRows').innerHTML=staff.map(p=>
+  '<tr><td>'+esc(p.full_name)+'</td><td><select data-dept="'+esc(p.id)+'"><option value="">Unassigned</option>'+
+  departments.map(d=>'<option value="'+esc(d.id)+'" '+(d.id===p.department_id?'selected':'')+'>'+esc(d.name)+'</option>').join('')+
+  '</select></td><td><select data-shift="'+esc(p.id)+'"><option value="">Standard Office</option>'+
+  shifts.map(shift=>'<option value="'+esc(shift.id)+'" '+(shift.id===p.shift_id?'selected':'')+'>'+esc(shift.name)+'</option>').join('')+
+  '</select></td><td><input data-reason="'+esc(p.id)+'" placeholder="Reason (required)" aria-label="Assignment reason for '+esc(p.full_name)+'"></td><td><button class="secondary" type="button" data-assign="'+esc(p.id)+'">Save</button></td></tr>'
+ ).join('');
+ $('#assignmentRows [data-assign]').forEach(b=>b.onclick=()=>safe(async()=>{
+  const id=b.dataset.assign,dept=$('[data-dept="'+id+'"]').value,shift=$('[data-shift="'+id+'"]').value,reason=$('[data-reason="'+id+'"]').value;
+  await request('/admin/staff/'+id+'/assignment','PUT',{departmentId:dept||null,shiftId:shift||null,reason});
+  notify('Employee department and shift updated.');staff=await request('/admin/staff');await loadConfiguration();
+ }));
+ render('holidays','#holidayRows',holidays,r=>r.date);
   render('shifts','#shiftRows',shifts,r=>r.start_time+' – '+r.end_time+' · Grace '+r.grace_minutes+' min');
   render('departments','#departmentRows',departments,r=>'Department');
  }
