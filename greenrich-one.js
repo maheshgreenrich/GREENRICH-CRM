@@ -5,11 +5,50 @@ const labels={dashboard:'Dashboard',attendance:'Attendance',users:'Users',roles:
 const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=x=>{let t=$('#toast');t.textContent=x;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)};const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
 const query=async(t)=>{let {data,error}=await db.from(t).select('*');if(error)throw Error(error.message);return data||[]};
 async function start(){const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');if(!url||!key){show('setup');return}if(!window.supabase){show('setup');toast('Authentication library unavailable');return}db=window.supabase.createClient(url,key);let {data}=await db.auth.getSession();if(data.session)await enter();else show('login')}
-async function enter(){const r=await db.auth.getUser();if(!r.data.user){show('login');return}user=r.data.user;try{roles=await query('gr_roles');const p=await db.from('gr_profiles').select('*').eq('id',user.id).single();if(p.error||!p.data?.active)throw Error('No active employee profile. Ask your Admin to set up your profile.');profile=p.data;permissions=await query('gr_role_permissions');people=await query('gr_profiles');company=(await query('gr_company_settings'))[0]||null;$('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();document.title='GreenRich ONE · '+(company?.company_name||'CRM');show('app');navigation();await attendanceQuick();await render()}catch(e){await db.auth.signOut();show('login');toast(e.message)}}
+async function enter(){
+ const auth=await db.auth.getUser();
+ if(!auth.data.user){show('login');return}
+ user=auth.data.user;
+ try{
+  // Independent authenticated reads run concurrently instead of five sequential requests.
+  const [roleRows,profileResult,permissionRows,employeeRows,settingsRows]=await Promise.all([
+   query('gr_roles'),
+   db.from('gr_profiles').select('*').eq('id',user.id).single(),
+   query('gr_role_permissions'),
+   query('gr_profiles'),
+   query('gr_company_settings')
+  ]);
+  if(profileResult.error||!profileResult.data?.active)throw Error('No active employee profile. Ask your Admin to set up your profile.');
+  profile=profileResult.data;roles=roleRows;permissions=permissionRows;people=employeeRows;company=settingsRows[0]||null;
+  $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();
+  document.title='GreenRich ONE · '+(company?.company_name||'CRM');
+  if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
+  show('app');navigation();
+  // Attendance status is useful but should never block dashboard navigation or first paint.
+  void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
+  await render();
+ }catch(e){await db.auth.signOut();show('login');toast(e.message)}
+}
+const menuIcons={
+ dashboard:'<rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/>',
+ attendance:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M8 16l2.2 2.2L16 13"/>',
+ users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+ roles:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+ leads:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 17a3 3 0 0 1 6 0M15 9h4M15 13h4"/>',
+ customers:'<path d="M3 21V5l9-3 9 3v16M3 9h18M8 21v-5h8v5"/>',
+ sales:'<path d="M3 7h18M6 3v4M18 3v4M5 11h14v10H5zM9 15h6"/>',
+ marketing:'<path d="m3 11 18-7-7 18-3-9-8-2Zm8 2 10-9"/>',
+ orders:'<path d="M4 7h16l-1 13H5L4 7ZM8 7a4 4 0 0 1 8 0"/>',
+ stock:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/>',
+ purchase:'<path d="M3 4h2l2.2 11h11l2.1-8H6M10 20h.01M18 20h.01"/>',
+ accounts:'<rect x="2" y="5" width="20" height="16" rx="2"/><path d="M2 10h20M16 15h3"/>',
+ settings:'<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .8 1.4-2 2-.9-.9a8 8 0 0 1-2.3 1l-.3 1.5h-3l-.3-1.5a8 8 0 0 1-2.3-1l-.9.9-2-2 .8-1.4a8 8 0 0 1-.4-2.5L5 12l1.6-.5a8 8 0 0 1 .4-2.5L6.2 7.6l2-2 .9.9a8 8 0 0 1 2.3-1l.3-1.5h3l.3 1.5a8 8 0 0 1 2.3 1l.9-.9 2 2-.8 1.4a8 8 0 0 1 .4 2.5L21 12l-1.6.5a8 8 0 0 1 0 2.5Z"/>',
+ reports:'<path d="M3 3v18h18M7 15l5-5 4 3 5-7"/>'
+};
 function navigation(){
- let visible=modules.filter(m=>can(m)||m==='attendance');
- $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" class="'+(page===m?'active':'')+'">'+({dashboard:'▦',attendance:'▣',users:'♙',roles:'◈',settings:'⚙',stock:'▤',purchase:'▣'}[m]||'◇')+' &nbsp; '+labels[m]+'</button>').join('');
- $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();render()});
+ const visible=modules.filter(m=>can(m)||m==='attendance');
+ $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
+ $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){$('#sidebar').classList.remove('open');return}page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();void render()});
 }
 async function attendanceQuick(){
  const area=$('#attendanceQuick');
