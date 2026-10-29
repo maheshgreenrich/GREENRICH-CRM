@@ -52,34 +52,48 @@ function navigation(){
 }
 async function attendanceQuick(){
  const area=$('#attendanceQuick');
- area.innerHTML='<div class="gr-header-clock" role="group" aria-label="Daily attendance"><button id="grHeaderIn" class="gr-clock-in" type="button">Check In</button><button id="grHeaderOut" class="gr-clock-out" type="button">Check Out</button><span id="grClockInfo" aria-live="polite">Checking...</span></div>';
- const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');
+ area.innerHTML='<div class="gr-attendance-switch-wrap"><span class="gr-switch-label">Attendance</span><button id="grAttendanceSwitch" type="button" role="switch" aria-checked="false" aria-label="Loading attendance" disabled><span class="gr-switch-track"><span class="gr-switch-thumb"></span></span><span id="grSwitchAction">Loading</span></button><small id="grClockInfo" aria-live="polite"></small></div>';
+ const button=$('#grAttendanceSwitch'),actionText=$('#grSwitchAction'),info=$('#grClockInfo');
+ const key=localStorage.getItem('gr-supabase-key'),url=localStorage.getItem('gr-supabase-url');
+ if(!key||!url){info.textContent='Not configured';return}
  const session=(await db.auth.getSession()).data.session;
- if(!session){$('#grClockInfo').textContent='Sign in required';return}
+ if(!session){info.textContent='Sign in required';return}
  const headers={Authorization:'Bearer '+session.access_token,apikey:key};
- const nowParts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date());
- const getPart=t=>nowParts.find(x=>x.type===t)?.value,day=getPart('year')+'-'+getPart('month')+'-'+getPart('day');
- const api=url.replace(/\/$/,'')+'/functions/v1/attendance-api';
+ const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date());
+ const part=t=>parts.find(p=>p.type===t)?.value,day=part('year')+'-'+part('month')+'-'+part('day');
+ const api=(url.endsWith('/')?url.slice(0,-1):url)+'/functions/v1/attendance-api';
  const send=async(path,method='GET')=>{
-  const response=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?'{}':undefined,cache:'no-store'});
-  const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(result?.error?.message||'Attendance request failed');
-  return result.data;
+  const r=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?'{}':undefined,cache:'no-store'});
+  const payload=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(payload?.error?.message||'Attendance service unavailable');
+  return payload.data;
  };
  try{
   const history=await send('/attendance/me?from='+day+'&to='+day+'&pageSize=1');
-  const record=history?.items?.[0];
-  const inButton=$('#grHeaderIn'),outButton=$('#grHeaderOut');
-  if(!inButton||!outButton)return;
-  inButton.disabled=!!record;outButton.disabled=!record?.check_in||!!record?.check_out;
-  $('#grClockInfo').textContent=record?.check_out?'Checked out':record?.check_in?'Checked in':record?'Already marked':'Not checked in';
-  const action=async(mode)=>{
-   inButton.disabled=true;outButton.disabled=true;
-   try{await send('/attendance/check-'+mode,'POST');toast(mode==='in'?'Check-in recorded':'Check-out recorded');await attendanceQuick();if(page==='attendance')await render();}
-   catch(e){toast(e.message);await attendanceQuick();}
+  if(!button.isConnected)return;
+  const record=history?.items?.[0],checkedIn=!!record?.check_in,checkedOut=!!record?.check_out;
+  const canCheckIn=!record,canCheckOut=checkedIn&&!checkedOut;
+  const state=checkedOut?'finished':canCheckOut?'in':record?'marked':'out';
+  button.dataset.state=state;button.setAttribute('aria-checked',String(canCheckOut||checkedOut));
+  button.setAttribute('aria-label',canCheckIn?'Check in for today':canCheckOut?'Check out for today':checkedOut?'Attendance completed for today':'Attendance already marked for today');
+  button.disabled=!canCheckIn&&!canCheckOut;
+  actionText.textContent=canCheckIn?'Check In':canCheckOut?'Check Out':checkedOut?'Completed':'Marked';
+  info.textContent=checkedOut?'Checked out':canCheckOut?'Checked in':record?'Recorded':'Not checked in';
+  button.onclick=async()=>{
+   if(button.disabled)return;
+   const mode=canCheckIn?'in':'out';
+   button.disabled=true;button.dataset.state='busy';actionText.textContent='Saving';
+   try{
+    await send('/attendance/check-'+mode,'POST');
+    toast(mode==='in'?'Check-in recorded':'Check-out recorded');
+    await attendanceQuick();
+    if(page==='attendance')window.GreenRichAttendance?.refreshOwn?.();
+   }catch(error){toast(error.message);await attendanceQuick()}
   };
-  inButton.onclick=()=>action('in');outButton.onclick=()=>action('out');
- }catch(e){const info=$('#grClockInfo');if(info)info.textContent='Clock unavailable';}
+ }catch(error){
+  if(!button.isConnected)return;
+  info.textContent='Unavailable';button.title=error.message;actionText.textContent='Offline';
+ }
 }
 let attendancePeople=[];
 function scopeAllows(module,action,id,staff=people){
