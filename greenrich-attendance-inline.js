@@ -106,7 +106,7 @@ window.GreenRichAttendance=(function(){
  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  try{if(manager()){ $('.av-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab==='admin')); $('.av-section').forEach(section=>section.hidden=section.id!=='tab-admin'); await loadAdmin(); }else{ await loadMine(); }}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
+  try{if(manager()){ $$('.av-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab==='admin')); $$('.av-section').forEach(section=>section.hidden=section.id!=='tab-admin'); await loadAdmin(); }else{ await loadMine(); }}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
@@ -200,7 +200,7 @@ window.GreenRichAttendance=(function(){
   shifts.map(shift=>'<option value="'+esc(shift.id)+'" '+(shift.id===p.shift_id?'selected':'')+'>'+esc(shift.name)+'</option>').join('')+
   '</select></td><td><input data-reason="'+esc(p.id)+'" placeholder="Reason (required)" aria-label="Assignment reason for '+esc(p.full_name)+'"></td><td><button class="secondary" type="button" data-assign="'+esc(p.id)+'">Save</button></td></tr>'
  ).join('');
- $('#assignmentRows [data-assign]').forEach(b=>b.onclick=()=>safe(async()=>{
+ $$('#assignmentRows [data-assign]').forEach(b=>b.onclick=()=>safe(async()=>{
   const id=b.dataset.assign,dept=$('[data-dept="'+id+'"]').value,shift=$('[data-shift="'+id+'"]').value,reason=$('[data-reason="'+id+'"]').value;
   await request('/admin/staff/'+id+'/assignment','PUT',{departmentId:dept||null,shiftId:shift||null,reason});
   notify('Employee department and shift updated.');staff=await request('/admin/staff');await loadConfiguration();
