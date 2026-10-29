@@ -31,6 +31,7 @@ Deno.serve(async req=>{
   };
   const body=await req.json(),action=body.action;
   if(action==='deleteRole'){
+   if(!superAdmin)return response({error:'Only the built-in Admin can delete roles'},403);
    const roleId=String(body.roleId||'');
    if(!/^[0-9a-f-]{36}$/i.test(roleId))return response({error:'Invalid role ID'},400);
    const roleResult=await admin.from('gr_roles').select('id,name').eq('id',roleId).maybeSingle();
@@ -46,16 +47,18 @@ Deno.serve(async req=>{
    return response({message:'Custom role deleted'});
   }
   if(action==='create'){
+   if(!superAdmin&&!['all','team'].includes(userScope('create')))return response({error:'Users > Create permission with Team or All scope is required'},403);
    const email=String(body.email||'').trim().toLowerCase(),username=String(body.username||'').trim(),name=String(body.name||'').trim(),role=String(body.role||''),password=String(body.password||'');
    if(!/^\S+@\S+\.\S+$/.test(email)||username.length<3||name.length<2||password.length<10)return response({error:'Enter valid name, username, email and a password of at least 10 characters'},400);
    const {data:roleRecord}=await admin.from('gr_roles').select('id').eq('name',role).maybeSingle();
    if(!roleRecord)return response({error:'Invalid role'},400);
+   if(!superAdmin&&await elevatedRole(roleRecord.id))return response({error:'This role requires built-in Admin approval'},403);
    const {data:exists}=await admin.from('gr_profiles').select('id').eq('username',username).maybeSingle();
    if(exists)return response({error:'Username already exists'},409);
    const created=await admin.auth.admin.createUser({email,password,email_confirm:true});
    if(created.error)return response({error:created.error.message},400);
    const id=created.data.user.id;
-   const inserted=await admin.from('gr_profiles').insert({id,username,full_name:name,email,role_id:roleRecord.id,active:true});
+   const inserted=await admin.from('gr_profiles').insert({id,username,full_name:name,email,role_id:roleRecord.id,active:true,manager_id:superAdmin?null:user.id});
    if(inserted.error){await admin.auth.admin.deleteUser(id);return response({error:'Employee profile could not be created: '+inserted.error.message},409);}
    await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'CREATE',new_value:{username,email,role}});
    return response({message:'Employee created. They can sign in using their email and password.'});
