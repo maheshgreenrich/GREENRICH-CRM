@@ -1,8 +1,8 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(location.hash==='#users'?'users':'dashboard'),company=null;
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','channels','orders','stock','purchase','accounts','settings','reports'];
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','stock','purchase','accounts','settings'];
 const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Company Settings',reports:'Reports'};
-const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',channels:'channels',marketing:'tasks',orders:'sales',stock:'products',reports:'reports'};
+const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',stock:'products'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
  sales:can('sales')||can('orders'),
