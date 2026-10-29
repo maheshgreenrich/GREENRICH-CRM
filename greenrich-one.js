@@ -8,7 +8,27 @@ async function start(){const url=localStorage.getItem('gr-supabase-url'),key=loc
 async function enter(){const r=await db.auth.getUser();if(!r.data.user){show('login');return}user=r.data.user;try{roles=await query('gr_roles');const p=await db.from('gr_profiles').select('*').eq('id',user.id).single();if(p.error||!p.data?.active)throw Error('No active employee profile. Ask your Admin to set up your profile.');profile=p.data;permissions=await query('gr_role_permissions');people=await query('gr_profiles');company=(await query('gr_company_settings'))[0]||null;$('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();document.title='GreenRich ONE · '+(company?.company_name||'CRM');show('app');navigation();await attendanceQuick();await render()}catch(e){await db.auth.signOut();show('login');toast(e.message)}}
 function navigation(){let visible=modules.filter(m=>can(m)||m==='attendance');$('#nav').innerHTML=visible.map(m=>'<button data-page="'+m+'" class="'+(page===m?'active':'')+'">'+({dashboard:'▦',attendance:'▣',users:'♙',roles:'◈',settings:'⚙',stock:'▤',purchase:'▣'}[m]||'◇')+' &nbsp; '+labels[m]+'</button>').join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(b.dataset.page==='roles'){location.href='roles.html';return}page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();render()})}
 async function attendanceQuick(){try{let res=await db.from('gr_attendance').select('status').eq('user_id',user.id).eq('attendance_date',today()).maybeSingle();const s=res.data?.status;$('#attendanceQuick').innerHTML='<div class="quick">Today: '+(s?'<b>'+s.replace('_',' ')+'</b>':['present','absent','half_day'].map(k=>'<button data-status="'+k+'">'+k.replace('_',' ')+'</button>').join(''))+'</div>';$('#attendanceQuick').querySelectorAll('button').forEach(b=>b.onclick=()=>mark(user.id,b.dataset.status,today()))}catch(e){toast(e.message)}}
-async function mark(id,status,date){if(!can('attendance','create'))return toast('Not authorized to mark attendance');try{const existing=await db.from('gr_attendance').select('id').eq('user_id',id).eq('attendance_date',date).maybeSingle();if(existing.error)throw Error(existing.error.message);if(existing.data&&roleName()!=='Admin')return toast('Attendance is already submitted; ask Admin to adjust');let result=existing.data?await db.from('gr_attendance').update({status,marked_at:new Date().toISOString(),marked_by:user.id}).eq('id',existing.data.id):await db.from('gr_attendance').insert({user_id:id,attendance_date:date,status,marked_by:user.id});if(result.error)throw Error(result.error.message);toast('Attendance recorded');await attendanceQuick();render()}catch(e){toast(e.message)}}
+let attendancePeople=[];
+function scopeAllows(module,action,id,staff=people){
+ if(!can(module,action))return false;
+ if(roleName()==='Admin')return true;
+ const p=permissions.find(x=>x.role_id===profile.role_id&&x.module===module&&x.action===action);
+ return !!p?.allowed&&(id===user.id||p.data_scope==='all'||(p.data_scope==='team'&&staff.some(x=>x.id===id&&x.manager_id===user.id)));
+}
+async function mark(id,status,date){
+ try{
+  const r=await db.rpc('gr_attendance_save',{p_user:id,p_date:date,p_status:status,p_remark:''});
+  if(r.error)throw Error(r.error.message);
+  toast('Attendance saved');await attendanceQuick();await render();
+ }catch(e){toast(e.message)}
+}
+async function removeAttendance(id,date){
+ if(!scopeAllows('attendance','delete',id,attendancePeople))return toast('Delete permission denied');
+ if(!confirm('Delete this attendance entry?'))return;
+ const r=await db.rpc('gr_attendance_remove',{p_user:id,p_date:date});
+ if(r.error)return toast(r.error.message);
+ toast('Attendance removed');await attendanceQuick();await render();
+}
 function card(t,v,sub=''){return '<div class="card"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(sub)+'</small></div>'}
 async function render(){if(!can(page)&&page!=='attendance'){page='dashboard';navigation()}$('#title').textContent=labels[page];let c=$('#content');c.innerHTML='<div class="panel">Loading...</div>';try{if(page==='dashboard')await dashboard(c);else if(page==='attendance')await attendance(c);else if(page==='users')await users(c);else if(page==='roles')await permissionPage(c);else if(page==='settings')await settings(c);else await placeholder(c)}catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
 async function dashboard(c){let a=await query('gr_attendance');let todays=a.filter(x=>x.attendance_date===today());let own=a.filter(x=>x.user_id===user.id);c.innerHTML='<div class="notice">Secure GreenRich ONE employee workspace. The previous Sales & CRM tracker is preserved separately; its local-browser records are not yet migrated to this database.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><a href="legacy.html" target="_blank">Open existing sales dashboard ↗</a></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()}}
