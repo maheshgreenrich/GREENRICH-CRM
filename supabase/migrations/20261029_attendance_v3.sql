@@ -55,6 +55,7 @@ create table if not exists public.grm_corrections(
  created_at timestamptz not null default now(),
  constraint grm_correction_hours check(requested_check_out is null or (requested_check_in is not null and requested_check_out>requested_check_in))
 );
+create unique index if not exists grm_one_pending_correction on public.grm_corrections(user_id,date) where status='PENDING';
 create index if not exists grm_corr_user_created on public.grm_corrections(user_id,created_at desc);
 create index if not exists grm_corr_status_created on public.grm_corrections(status,created_at desc);
 create table if not exists public.grm_leaves(
@@ -137,6 +138,9 @@ begin
  select s.* into shift_info from public.gr_profiles p left join public.grm_shifts s on s.id=p.shift_id where p.id=p_actor;
  if shift_info.id is null then select * into shift_info from public.grm_shifts where name='Standard Office';end if;
  if p_mode='in' then
+  if exists(select 1 from public.grm_attendance a where a.user_id=p_actor and a.source='SELF' and a.check_in is not null and a.check_out is null and a.deleted_at is null) then
+   raise exception 'Check out from the previous shift before checking in again';
+  end if;
   if exists(select 1 from public.grm_holidays where date=local_date) then raise exception 'Today is a holiday';end if;
   if not extract(isodow from local_date)::integer=any(shift_info.working_days) then raise exception 'Today is not a working day';end if;
   if exists(select 1 from public.grm_leaves where user_id=p_actor and status='APPROVED' and local_date between from_date and to_date) then
@@ -147,7 +151,11 @@ begin
   on conflict(user_id,date) do nothing returning * into rec;
   if rec.id is null then raise exception 'Already checked in or attendance recorded today';end if;
  elsif p_mode='out' then
-  select * into rec from public.grm_attendance where user_id=p_actor and date=local_date for update;
+  select * into rec from public.grm_attendance
+    where user_id=p_actor and date in (local_date,local_date-1)
+      and check_in is not null and check_out is null and deleted_at is null
+      and source='SELF' and at_time-check_in<interval '24 hours'
+    order by date desc limit 1 for update;
   if not found or rec.deleted_at is not null or rec.check_in is null or rec.source<>'SELF' then
     raise exception 'Check in first; cannot check out this entry';
   end if;
