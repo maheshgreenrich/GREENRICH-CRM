@@ -183,7 +183,7 @@ window.GreenRichAttendance=(function(){
    const blob=await response.blob(),link=document.createElement('a'),url=URL.createObjectURL(blob);
    link.href=url;link.download='greenrich-attendance-'+filters.from+'-to-'+filters.to+'.'+ext;link.click();setTimeout(()=>URL.revokeObjectURL(url),500);
   }));
-  try{await loadMine();if(manager()&&canAdmin('approve')){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
+  try{void safe(loadRequests);await loadMine();if(manager()&&canAdmin('approve')){safe(loadPendingCount);if(pendingRefreshTimer)clearInterval(pendingRefreshTimer);pendingRefreshTimer=setInterval(()=>{if(document.querySelector('#adminTab'))safe(loadPendingCount);else clearInterval(pendingRefreshTimer)},60000);}}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
@@ -223,7 +223,7 @@ window.GreenRichAttendance=(function(){
   $('#myCalendar').innerHTML=cells.join('');
   $('#myRows').innerHTML=records.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>tRow([esc(x.date),esc(x.status),esc(shortDate(x.check_in)),esc(shortDate(x.check_out)),esc(x.total_hours??'—')])).join('')||'<tr><td colspan="5">No attendance marked this month. Calendar still shows weekends and holidays.</td></tr>';
   $('#myPager').textContent='Showing '+records.length+' records for '+month;
-  await loadRequests();
+  // Personal leave/correction requests load independently; the calendar needn't wait for them.
  }
  async function loadRequests(){
   const [corrections,leaves]=await Promise.all([request('/attendance/corrections/me'),request('/leaves/me')]);
