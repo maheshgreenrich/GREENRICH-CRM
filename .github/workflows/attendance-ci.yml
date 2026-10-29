@@ -7,7 +7,7 @@ on:
       - 'attendance-v3.js'
       - 'attendance-v3.css'
       - 'supabase/functions/attendance-api/**'
-      - 'supabase/migrations/20261029_attendance_v3*.sql'
+      - 'supabase/migrations/20261029*_attendance_v3*.sql'
       - 'supabase/tests/**'
       - '.github/workflows/attendance-ci.yml'
   pull_request:
@@ -16,7 +16,7 @@ on:
       - 'attendance-v3.js'
       - 'attendance-v3.css'
       - 'supabase/functions/attendance-api/**'
-      - 'supabase/migrations/20261029_attendance_v3*.sql'
+      - 'supabase/migrations/20261029*_attendance_v3*.sql'
       - 'supabase/tests/**'
       - '.github/workflows/attendance-ci.yml'
 jobs:
@@ -55,7 +55,7 @@ jobs:
           set -e
           export PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGDATABASE=attendance_test
           psql -v ON_ERROR_STOP=1 -f supabase/tests/attendance_fixture.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_attendance_v3.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_attendance_v3_ops.sql
-          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_attendance_v3_assign.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029090000_attendance_v3.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029090100_attendance_v3_ops.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029090200_attendance_v3_assign.sql
           psql -v ON_ERROR_STOP=1 -f supabase/tests/attendance_integration.sql
