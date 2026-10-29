@@ -238,3 +238,6 @@
  .av-monthly-dialog-actions span{flex-basis:100%}
  .av-monthly-selector-row button{width:100%}
 }
+
+.av-summary-download{margin-top:24px;padding-top:20px;border-top:1px solid #e4eaf6}
+.av-summary-download h3{font-size:17px;margin:0 0 8px;color:#1a315a}
