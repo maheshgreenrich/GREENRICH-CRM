@@ -67,9 +67,29 @@ window.GreenRichAttendance=(function(){
   $('#myMonth').onchange=()=>{myPage=1;safe(loadMine)};
   $('#myPrev').onclick=()=>{myPage=Math.max(1,myPage-1);safe(loadMine)};
   $('#myNext').onclick=()=>{myPage++;safe(loadMine)};
-  $('#correctionForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
-   const f=e.currentTarget;
-   await request('/attendance/corrections','POST',{date:input(f,'date'),requestedCheckIn:iso(input(f,'in')),requestedCheckOut:iso(input(f,'out')),reason:input(f,'reason')});
+  const correctionForm=$('#correctionForm');
+  // Keep the correction request tied to its selected office date when the date is changed.
+  $('#correctionDate').onchange=()=>{
+   const selected=$('#correctionDate').value,checkIn=correctionForm.elements.namedItem('in'),checkOut=correctionForm.elements.namedItem('out');
+   if(!selected)return;
+   const oldInDate=checkIn.value?.slice(0,10);
+   if(checkIn.value)checkIn.value=selected+checkIn.value.slice(10);
+   if(checkOut.value){
+    const oldOutDate=checkOut.value.slice(0,10);
+    const overnight=oldInDate&&Math.round((Date.parse(oldOutDate+'T00:00:00Z')-Date.parse(oldInDate+'T00:00:00Z'))/86400000)===1;
+    const nextDay=new Date(Date.parse(selected+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+    checkOut.value=(overnight?nextDay:selected)+checkOut.value.slice(10);
+   }
+  };
+  correctionForm.onsubmit=e=>{e.preventDefault();safe(async()=>{
+   const f=e.currentTarget,selected=input(f,'date'),checkIn=input(f,'in'),checkOut=input(f,'out');
+   if(!checkIn||checkIn.slice(0,10)!==selected){
+    throw Error('Requested check-in must use the selected attendance date ('+selected+'). Please update the check-in date.');
+   }
+   if(checkOut&&Date.parse(checkOut)<Date.parse(checkIn)){
+    throw Error('Requested check-out must be after check-in.');
+   }
+   await request('/attendance/corrections','POST',{date:selected,requestedCheckIn:iso(checkIn),requestedCheckOut:iso(checkOut),reason:input(f,'reason')});
    f.reset();notify('Correction submitted for approval');await loadRequests();
   })};
   $('#leaveForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
@@ -279,11 +299,30 @@ window.GreenRichAttendance=(function(){
   const [corrections,leaves]=canAdmin('approve')?await Promise.all([request('/admin/corrections?'+params({status:'PENDING'})),request('/admin/leaves?'+params({status:'PENDING'}))]):[{items:[],total:0},{items:[],total:0}];
   $('.av-approvals-panel').hidden=!canAdmin('approve');$('#adminCorrections').closest('.panel').hidden=!canAdmin('approve');$('#adminLeaves').closest('.panel').hidden=!canAdmin('approve');
   function approveRows(container,items,kind){
-   $(container).innerHTML=table(items,r=>'<div class="av-entry"><strong>'+esc(staff.find(x=>x.id===r.user_id)?.full_name||r.user_id)+'</strong><b>'+esc(kind==='corrections'?r.date:r.from_date+' to '+r.to_date)+'</b><small>'+esc(r.reason)+'</small><div class="av-actions"><button class="secondary" data-review="'+esc(r.id)+'" data-decision="APPROVED">Approve</button><button class="secondary" data-review="'+esc(r.id)+'" data-decision="REJECTED">Reject</button></div></div>','No pending requests');
-   $$(container+' [data-review]').forEach(b=>b.onclick=()=>safe(async()=>{
-    if(!confirm(b.dataset.decision==='APPROVED'?'Approve this request?':'Reject this request?'))return;
-    await request('/admin/'+kind+'/'+b.dataset.review+'/review','PATCH',{decision:b.dataset.decision,note:''});
-    notify('Request '+b.dataset.decision.toLowerCase()+'.');await loadAdmin();
+   $(container).innerHTML=table(items,r=>{
+    const name=esc(staff.find(x=>x.id===r.user_id)?.full_name||r.user_id);
+    const isCorrection=kind==='corrections';
+    const requestedIn=isCorrection&&r.requested_check_in?officeLocal(r.requested_check_in):'';
+    const requestedOut=isCorrection&&r.requested_check_out?officeLocal(r.requested_check_out):'';
+    const mismatched=!!(requestedIn&&requestedIn.slice(0,10)!==r.date);
+    const details=isCorrection?'<div class="av-correction-dates"><span>Requested check-in: '+esc(requestedIn||'Not provided')+'</span><span>Requested check-out: '+esc(requestedOut||'Not provided')+'</span></div>':'';
+    const warning=mismatched?'<div class="av-correction-date-alert">The submitted times have a different date. On approval, the original times will be recorded under <b>'+esc(r.date)+'</b>, the selected attendance date. The original request is preserved in the audit log.</div>':'';
+    return '<div class="av-entry"><strong>'+name+'</strong><b>'+esc(isCorrection?r.date:r.from_date+' to '+r.to_date)+'</b><small>'+esc(r.reason)+'</small>'+details+warning+'<div class="av-actions"><button class="secondary" data-review="'+esc(r.id)+'" data-decision="APPROVED">Approve</button><button class="secondary" data-review="'+esc(r.id)+'" data-decision="REJECTED">Reject</button></div></div>';
+   },'No pending requests');
+   $$(container+' [data-review]').forEach(button=>button.onclick=()=>safe(async()=>{
+    const selected=items.find(item=>item.id===button.dataset.review);
+    const approving=button.dataset.decision==='APPROVED';
+    const inDate=kind==='corrections'&&selected?.requested_check_in?officeLocal(selected.requested_check_in).slice(0,10):null;
+    const mismatch=approving&&inDate&&inDate!==selected.date;
+    const message=mismatch
+     ?'The submitted check-in date is '+inDate+' but the selected attendance date is '+selected.date+'. Approving will use '+selected.date+' and preserve the entered clock times. Proceed?'
+     :approving?'Approve this request?':'Reject this request?';
+    if(!confirm(message))return;
+    button.disabled=true;
+    try{
+     await request('/admin/'+kind+'/'+button.dataset.review+'/review','PATCH',{decision:button.dataset.decision,note:''});
+     notify('Request '+button.dataset.decision.toLowerCase()+'.');await loadAdmin();
+    }finally{button.disabled=false}
    }));
   }
   const pending=(corrections.total||0)+(leaves.total||0);
