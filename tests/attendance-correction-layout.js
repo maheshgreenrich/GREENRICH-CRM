@@ -1,0 +1,18 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
+const js=fs.readFileSync('greenrich-attendance-inline.js','utf8');
+const html=fs.readFileSync('attendance-v3.html','utf8');
+const css=fs.readFileSync('attendance-v3.css','utf8');
+const migration=fs.readFileSync('supabase/migrations/20261029140000_attendance_correction_date_alignment.sql','utf8');
+new vm.Script(js,{filename:'greenrich-attendance-inline.js'});
+assert.match(html,/av-grid av-attendance-admin-actions/,'Admin attendance layout must have dedicated grid');
+assert.match(css,/#tab-admin \.av-attendance-admin-actions > \.av-bulk-panel\s*\{[\s\S]*?grid-column:1\s*\/\s*-1/,'Quick Attendance must span both columns');
+assert.match(css,/#tab-admin \.av-bulk-panel #bulkUsers\s*\{[\s\S]*?overflow-x:hidden/,'Roster should wrap instead of scrolling horizontally');
+assert.match(js,/const checkboxes=\$\$\('#bulkUsers \.av-employee-check:not\(:disabled\)'\)/,'Selection count must query all checkboxes');
+assert.match(js,/av-correction-date-alert/,'Admin must see a date mismatch warning');
+assert.match(js,/The submitted check-in date is /,'Approval confirmation must explain date alignment');
+assert.match(js,/Requested check-in must use the selected attendance date/,'New requests should validate the selected date');
+assert.match(migration,/normalized_in:=/,'Approval RPC should align original clock time with requested date');
+assert.match(migration,/normalised_from_other_date/,'Adjustment should be audited');
+assert.doesNotMatch(migration,/Check-in must fall on the requested office date/,'Legacy date mismatch must not reject approval');
+console.log('PASS: Full-width roster, Select All counter, date-safe correction approval and audit behavior');
