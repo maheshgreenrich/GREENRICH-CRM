@@ -16,7 +16,7 @@ assert.match(inline,/\/attendance\/check-out/);
 assert.match(inline,/\/admin\/attendance\/bulk/);
 assert.match(inline,/\/admin\/reports\/range/);
 assert.match(inline,/\/admin\/staff/);
-assert.match(inline,/data-bulk-status="HALF_DAY"/);
+assert.match(html,/data-bulk-status="HALF_DAY"/);
 assert.match(inline,/await loadMine\(\)/);
 assert.match(inline,/attendanceRights=/);
 assert.match(inline,/\.av-employee-check:not\(:disabled\):checked/);
