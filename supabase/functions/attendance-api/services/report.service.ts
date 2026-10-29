@@ -1,11 +1,12 @@
 // CSV, Excel 2003 XML (.xls), and paginated PDF report generators.
 const headings=['Date','Employee','Status','Check In (UTC)','Check Out (UTC)','Hours','Remarks'];
-const xml=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&quot;'}[c]!));
+const xmlChars:Record<string,string>={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'};
+const xml=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>xmlChars[c]||c);
 const safeCsv=(v:unknown)=>{
  let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;
  return '"'+s.replace(/"/g,'""')+'"';
 };
-const toText=(head:string,rows:unknown[][])=>[headings,...rows].map(r=>r.map(safeCsv).join(',')).join('\r\n');
+const toText=(rows:unknown[][])=>[headings,...rows].map(r=>r.map(safeCsv).join(',')).join('\r\n');
 const excel=(rows:unknown[][])=>{
  const all=[headings,...rows];
  return '<?xml version="1.0" encoding="UTF-8"?>'+
@@ -14,10 +15,11 @@ const excel=(rows:unknown[][])=>{
 };
 export async function buildReport(month:string,format:string,rows:unknown[][]):Promise<Response>{
  let bytes:Uint8Array|string;let media:string;let extension:string;
- if(format==='csv'){bytes='\ufeff'+toText(month,rows);media='text/csv; charset=utf-8';extension='csv'}
+ if(format==='csv'){bytes='\ufeff'+toText(rows);media='text/csv; charset=utf-8';extension='csv'}
  else if(format==='xls'){bytes=excel(rows);media='application/vnd.ms-excel; charset=utf-8';extension='xls'}
  else if(format==='pdf'){
   const {PDFDocument,StandardFonts,rgb}=await import('npm:pdf-lib@1.17.1');
+  if(rows.length>5000)throw Object.assign(new Error('PDF export limited to 5000 rows; use CSV or Excel'),{status:413});
   const pdf=await PDFDocument.create();const font=await pdf.embedFont(StandardFonts.Helvetica);
   const headers=['Date','Employee','Status','In UTC','Out UTC','Hours','Remarks'];
   const widths=[73,116,76,105,105,44,104],size=8;
