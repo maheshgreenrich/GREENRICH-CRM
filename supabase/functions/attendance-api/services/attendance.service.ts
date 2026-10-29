@@ -150,3 +150,76 @@ export async function reportRows(db:Db,actor:Actor,month:string){
  const officeTime=(utc:string|null)=>utc?new Date(utc).toLocaleString('en-GB',{timeZone:'Asia/Kolkata',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
  return rows.map(r=>[r.date,(r.gr_profiles as any)?.full_name||r.user_id,r.status,officeTime(r.check_in),officeTime(r.check_out),r.total_hours??'',r.remarks||'']);
 }
+
+// Admin monthly reporting. Counts reflect recorded attendance only; unmarked days are not assumed absent.
+// Present Days includes LATE records. Late Days is a subset, not an additional attendance day.
+const blankMonthlyCounts=()=>({present:0,absent:0,halfDay:0,paidLeave:0,unpaidLeave:0,late:0,permissions:0,holidays:0,weekends:0,recorded:0});
+function countMonthly(records:any[]){
+ const counts=blankMonthlyCounts();
+ for(const r of records){
+  counts.recorded++;
+  switch(r.status){
+   case 'PRESENT':counts.present++;break;
+   case 'LATE':counts.present++;counts.late++;break;
+   case 'ABSENT':counts.absent++;break;
+   case 'HALF_DAY':counts.halfDay++;break;
+   case 'PAID_LEAVE':counts.paidLeave++;break;
+   case 'ON_LEAVE':counts.unpaidLeave++;break;
+   case 'PERMISSION':counts.permissions++;break;
+   case 'HOLIDAY':counts.holidays++;break;
+   case 'WEEKEND':counts.weekends++;break;
+  }
+ }
+ return counts;
+}
+export async function monthlyEmployeeReport(db:Db,actor:Actor,userId:string,month:string){
+ requireAction(actor,'view');
+ const [from,after]=monthBounds(month);
+ const person=await db.from('gr_profiles').select('id,full_name,username,shift_id,joining_date,active').eq('id',userId).maybeSingle();
+ assertDb(person);if(!person.data||!person.data.active)bad('Active employee not found',404);
+ const [attendance,holidays]=await Promise.all([
+  db.from('grm_attendance').select('date,status,check_in,check_out,total_hours,source')
+   .eq('user_id',userId).is('deleted_at',null).gte('date',from).lt('date',after).order('date',{ascending:true}),
+  db.from('grm_holidays').select('date,name').gte('date',from).lt('date',after).order('date')
+ ]);
+ assertDb(attendance);assertDb(holidays);
+ let workingDays=[1,2,3,4,5,6];
+ if(person.data.shift_id){
+  const shift=await db.from('grm_shifts').select('working_days').eq('id',person.data.shift_id).maybeSingle();
+  assertDb(shift);
+  if(Array.isArray(shift.data?.working_days))workingDays=shift.data.working_days;
+ }
+ const records=attendance.data||[];
+ return {id:person.data.id,name:person.data.full_name,month,
+  joiningDate:person.data.joining_date,workingDays,holidays:holidays.data||[],
+  records,counts:countMonthly(records)};
+}
+export async function monthlyCompanySummary(db:Db,actor:Actor,month:string){
+ requireAction(actor,'view');
+ const [from,after]=monthBounds(month);
+ const profiles:any[]=[];
+ for(let offset=0;offset<5000;offset+=1000){
+  const r=await db.from('gr_profiles').select('id,full_name,username,joining_date')
+   .eq('active',true).order('full_name').range(offset,offset+999);assertDb(r);
+  profiles.push(...r.data||[]);
+  if((r.data||[]).length<1000)break;
+  if(offset+1000>=5000)bad('Too many employees for one report',413);
+ }
+ const ids=new Set(profiles.map(x=>x.id));
+ const all:any[]=[];
+ for(let offset=0;offset<50000;offset+=1000){
+  const r=await db.from('grm_attendance').select('user_id,status,date')
+   .is('deleted_at',null).gte('date',from).lt('date',after)
+   .order('date').order('user_id').range(offset,offset+999);
+  assertDb(r);all.push(...r.data||[]);
+  if((r.data||[]).length<1000)break;
+  if(offset+1000>=50000)bad('Monthly attendance exceeds report limit',413);
+ }
+ const grouped=new Map<string,any[]>();
+ for(const r of all)if(ids.has(r.user_id)){
+  const entries=grouped.get(r.user_id)||[];entries.push(r);grouped.set(r.user_id,entries);
+ }
+ return {month,totalEmployees:profiles.length,employees:profiles.map(person=>({
+  id:person.id,name:person.full_name,counts:countMonthly(grouped.get(person.id)||[])
+ }))};
+}
