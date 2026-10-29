@@ -71,6 +71,13 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
   return response(await service.leaveCreate(db,actor,{type:txt(b.type,'Leave type',40),fromDate,toDate,reason:reason(b.reason)}),201);
  }
  if(method==='GET'&&route==='/leaves/me')return response(await service.ownRequests(db,actor,'grm_leaves',pagination));
+ if(method==='GET'&&route==='/admin/settings/launch')
+  return response(await service.launchStatus(db,actor));
+ if(method==='POST'&&route==='/admin/settings/launch'){
+  const b=await bodyJSON(req);
+  return response({enabledFrom:await service.setLaunch(db,actor,
+     b.startDate===null?null:date(b.startDate),reason(b.reason))});
+ }
  if(method==='GET'&&route==='/admin/staff')return response(await service.directory(db,actor));
  const assignment=route.match(/^\/admin\/staff\/([a-f0-9-]{36})\/assignment$/i);
  if(method==='PUT'&&assignment){
