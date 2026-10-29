@@ -224,7 +224,7 @@ window.GreenRichAttendance=(function(){
   updateSelected();
  }
  function updateSelected(){
-  const checkboxes=$('#bulkUsers .av-employee-check:not(:disabled)'),selected=checkboxes.filter(b=>b.checked);
+  const checkboxes=$$('#bulkUsers .av-employee-check:not(:disabled)'),selected=checkboxes.filter(b=>b.checked);
   $('#selectedStaffCount').textContent=selected.length+' / '+checkboxes.length+' selected';
   $('#selectAllEmployees').checked=checkboxes.length>0&&selected.length===checkboxes.length;
   $('#selectAllEmployees').indeterminate=selected.length>0&&selected.length<checkboxes.length;
