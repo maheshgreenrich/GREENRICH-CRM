@@ -91,7 +91,7 @@
   $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  await loadMine();
+  try{await loadMine()}catch(e){notify('Attendance V3 backend is not ready: '+e.message+'. Deploy the V3 SQL migrations and attendance-api Edge Function first.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
