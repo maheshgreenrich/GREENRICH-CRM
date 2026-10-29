@@ -8,7 +8,7 @@ window.GreenRichAttendance=(function(){
  const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
- let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null,adminRefreshTimer=null,attendanceRights=[];
+ let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null,adminRefreshTimer=null,attendanceRights=[],selectedMonthlyEmployeeId=null,monthlyReportVersion=0;
  const canAdmin=action=>actorRole==='Admin'||actorRole==='Office Admin'||attendanceRights.includes(action);
  const manager=()=>canAdmin('view');
  const notify=(message,error=false)=>{const e=$('#alert');e.hidden=false;e.textContent=message;e.classList.toggle('error',error);e.scrollIntoView({behavior:'smooth',block:'nearest'})};
@@ -96,6 +96,31 @@ window.GreenRichAttendance=(function(){
    const f=e.currentTarget;await request('/leaves','POST',{type:input(f,'type'),fromDate:input(f,'from'),toDate:input(f,'to'),reason:input(f,'reason')});
    f.reset();notify('Leave request submitted');await loadRequests();
   })};
+  // Monthly attendance reports: an employee calendar popup and count-only Excel summary.
+  $('#allMonthlyReportMonth').value=today.slice(0,7);
+  $('#monthlyEmployeeMonth').value=today.slice(0,7);
+  $('#allMonthlyReportMonth').onchange=()=>safe(loadAllMonthlyReportInfo);
+  $('#downloadAllMonthlyExcel').disabled=!canAdmin('export');
+  $('#downloadAllMonthlyExcel').onclick=()=>safe(async()=>{
+    const month=$('#allMonthlyReportMonth').value,btn=$('#downloadAllMonthlyExcel');
+    if(!month)throw Error('Choose a month');
+    btn.disabled=true;
+    try{await downloadMonthlyReport('/admin/reports/monthly-summary/download?'+params({month,format:'xls'}),'greenrich-all-employees-'+month+'.xls')}
+    finally{btn.disabled=!canAdmin('export')}
+  });
+  $('#monthlyEmployeeClose').onclick=()=>$('#monthlyEmployeeDialog').close();
+  $('#monthlyEmployeeMonth').onchange=()=>safe(loadSelectedMonthlyEmployee);
+  $('[data-monthly-export]').forEach(button=>{
+   button.disabled=!canAdmin('export');
+   button.onclick=()=>safe(async()=>{
+    if(!selectedMonthlyEmployeeId)throw Error('Select an employee first');
+    const month=$('#monthlyEmployeeMonth').value,format=button.dataset.monthlyExport;
+    const filename='greenrich-'+(staff.find(p=>p.id===selectedMonthlyEmployeeId)?.full_name||'employee').replace(/[^a-z0-9_-]/gi,'-')+'-'+month+'.'+format;
+    button.disabled=true;
+    try{await downloadMonthlyReport('/admin/reports/employee/download?'+params({userId:selectedMonthlyEmployeeId,month,format}),filename)}
+    finally{button.disabled=!canAdmin('export')}
+   });
+  });
   $('#adminFilters').onsubmit=e=>{e.preventDefault();adminPage=1;safe(loadAdmin)};
   $('#adminPrev').onclick=()=>{adminPage=Math.max(1,adminPage-1);safe(loadAdmin)};
   $('#adminNext').onclick=()=>{adminPage++;safe(loadAdmin)};
@@ -266,9 +291,75 @@ window.GreenRichAttendance=(function(){
   const gradient=active.map(part=>{const beginning=offset;offset+=part.count/total*100;return part.color+' '+beginning.toFixed(3)+'% '+offset.toFixed(3)+'%'}).join(', ');
   $('#adminChart').innerHTML='<div class="av-round-report"><div class="av-donut" role="img" aria-label="Attendance breakdown: '+esc(active.map(x=>x.label+' '+x.count).join(', '))+'" style="background:conic-gradient('+gradient+')"><div class="av-donut-hole"><strong>'+total+'</strong><small>Total Records</small></div></div><div class="av-donut-legend">'+active.map(x=>'<div class="av-donut-legend-item"><span class="av-legend-name"><i style="background:'+x.color+'"></i>'+esc(x.label)+'</span><b>'+x.count+'</b></div>').join('')+'</div></div>'+(pages>10?'<small>Showing first 1,000 records. Download the report for the full date range.</small>':'');
  }
- async function loadAdmin(){
+ 
+ async function downloadMonthlyReport(path,filename){
+  const response=await request(path,'GET',null,true);
+  const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1200);
+ }
+ function renderMonthlyEmployeeList(){
+  const area=$('#monthlyEmployeeList');if(!area)return;
+  area.innerHTML=staff.map(person=>'<button class="av-report-employee" type="button" data-monthly-person="'+esc(person.id)+'"><span class="av-report-employee-icon" aria-hidden="true">👤</span><span class="av-report-employee-name">'+esc(person.full_name)+'</span><span class="av-report-employee-action">View Calendar & Report →</span></button>').join('')||'<p class="av-empty">No active employees found.</p>';
+  $('#monthlyEmployeeList [data-monthly-person]').forEach(button=>button.onclick=()=>safe(async()=>{
+   selectedMonthlyEmployeeId=button.dataset.monthlyPerson;
+   $('#monthlyEmployeeMonth').value=$('#allMonthlyReportMonth').value||today.slice(0,7);
+   const name=staff.find(person=>person.id===selectedMonthlyEmployeeId)?.full_name||'Employee';
+   $('#monthlyEmployeeHeading').textContent=name+' · Monthly Attendance';
+   $('#monthlyEmployeeSubheading').textContent='Loading attendance...';
+   $('#monthlyEmployeeDialog').showModal();
+   await loadSelectedMonthlyEmployee();
+  }));
+ }
+ async function loadAllMonthlyReportInfo(){
+  if(!manager())return;
+  const month=$('#allMonthlyReportMonth').value,display=$('#allMonthlyReportInfo');
+  if(!month)return;
+  display.textContent='Loading monthly summary...';
+  const result=await request('/admin/reports/monthly-summary?'+params({month}));
+  const counts={present:0,absent:0,paidLeave:0,unpaidLeave:0,late:0,permissions:0};
+  (result.employees||[]).forEach(p=>Object.keys(counts).forEach(k=>counts[k]+=Number(p.counts[k]||0)));
+  display.textContent=result.totalEmployees+' employees · '+counts.present+' present days · '+counts.absent+' absent days · '+(counts.paidLeave+counts.unpaidLeave)+' leave days · '+counts.late+' late days · '+counts.permissions+' permission days (recorded statuses only)';
+ }
+ async function loadSelectedMonthlyEmployee(){
+  if(!selectedMonthlyEmployeeId)return;
+  const version=++monthlyReportVersion;
+  const month=$('#monthlyEmployeeMonth').value;
+  const data=await request('/admin/reports/employee?'+params({userId:selectedMonthlyEmployeeId,month}));
+  if(version!==monthlyReportVersion||!$('#monthlyEmployeeDialog').open)return;
+  $('#monthlyEmployeeHeading').textContent=data.name+' · Monthly Attendance';
+  $('#monthlyEmployeeSubheading').textContent=month+' · Recorded attendance only; unmarked dates are not counted as absent.';
+  const c=data.counts||{};
+  const countLabels=[['Present',c.present],['Absent',c.absent],['Half Day',c.halfDay],['Paid Leave',c.paidLeave],['Unpaid Leave',c.unpaidLeave],['Late',c.late],['Permissions',c.permissions],['Holiday',c.holidays],['Weekend',c.weekends]];
+  $('#monthlyEmployeeCounts').innerHTML=countLabels.map(([label,count])=>'<div class="av-report-count"><small>'+esc(label)+'</small><strong>'+Number(count||0)+'</strong></div>').join('');
+  const records=data.records||[],byDate=new Map(records.map(r=>[r.date,r]));
+  const holidays=new Map((data.holidays||[]).map(h=>[h.date,h.name]));
+  const daysWorking=new Set(data.workingDays||[1,2,3,4,5,6]);
+  const year=Number(month.slice(0,4)),mo=Number(month.slice(5,7));
+  const days=new Date(Date.UTC(year,mo,0)).getUTCDate();
+  let cells=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="av-calendar-weekday">'+d+'</div>');
+  const offset=(new Date(Date.UTC(year,mo-1,1)).getUTCDay()+6)%7;
+  for(let i=0;i<offset;i++)cells.push('<div class="av-calendar-empty"></div>');
+  const labels={PRESENT:'Present',ABSENT:'Absent',LATE:'Late',HALF_DAY:'Half Day',ON_LEAVE:'Unpaid Leave',PAID_LEAVE:'Paid Leave',PERMISSION:'Permission',HOLIDAY:'Holiday',WEEKEND:'Weekend',UNMARKED:'—'};
+  const colors={PRESENT:'present',ABSENT:'absent',LATE:'present',HALF_DAY:'half',ON_LEAVE:'leave',PAID_LEAVE:'leave',PERMISSION:'permission',HOLIDAY:'holiday',WEEKEND:'weekend',UNMARKED:'unmarked'};
+  for(let n=1;n<=days;n++){
+   const date=month+'-'+String(n).padStart(2,'0'),record=byDate.get(date);
+   const dow=new Date(date+'T00:00:00Z').getUTCDay(),weekday=dow===0?7:dow;
+   const status=record?.status||(date<(data.joiningDate||'0000-01-01')?'UNMARKED':holidays.has(date)?'HOLIDAY':!daysWorking.has(weekday)?'WEEKEND':'UNMARKED');
+   cells.push('<div class="av-calendar-day '+(colors[status]||'unmarked')+'" title="'+esc(date+' — '+(holidays.get(date)||labels[status]||status))+'"><strong>'+n+'</strong><small>'+esc(labels[status]||status)+'</small></div>');
+  }
+  $('#monthlyEmployeeCalendar').innerHTML=cells.join('');
+  $('#monthlyEmployeeTimeSheet').innerHTML=records.map(r=>tRow([
+   esc(r.date),esc((labels[r.status]||r.status)),esc(shortDate(r.check_in)),
+   esc(shortDate(r.check_out)),esc(r.total_hours??'—')
+  ])).join('')||'<tr><td colspan="5">No recorded attendance for this month.</td></tr>';
+  $('#monthlyEmployeeDownloadNote').textContent='Download '+data.name+' · '+month;
+ }
+async function loadAdmin(){
   if(!manager())return;
   if(!staff.length)await loadStaff();
+  renderMonthlyEmployeeList();
+  if(!$('#allMonthlyReportInfo').dataset.month||$('#allMonthlyReportInfo').dataset.month!==$('#allMonthlyReportMonth').value){$('#allMonthlyReportInfo').dataset.month=$('#allMonthlyReportMonth').value;safe(loadAllMonthlyReportInfo)}
   const f=$('#adminFilters'),query=params({userId:input(f,'userId'),roleId:input(f,'roleId'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),page:adminPage,pageSize:20});
   const result=await request('/admin/attendance?'+query);adminItems=result.items;
   $('#adminRows').innerHTML=adminItems.map(r=>tRow([
