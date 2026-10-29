@@ -72,6 +72,11 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  }
  if(method==='GET'&&route==='/leaves/me')return response(await service.ownRequests(db,actor,'grm_leaves',pagination));
  if(method==='GET'&&route==='/admin/staff')return response(await service.directory(db,actor));
+ const assignment=route.match(/^\/admin\/staff\/([a-f0-9-]{36})\/assignment$/i);
+ if(method==='PUT'&&assignment){
+  const b=await bodyJSON(req);
+  return response(await service.assignEmployee(db,actor,validUUID(assignment[1]),validUUID(b.departmentId,false),validUUID(b.shiftId,false),reason(b.reason),ip));
+ }
  if(method==='GET'&&route==='/admin/attendance'){
   const range=dateRange(q),filters={...range,userId:qString(q,'userId'),department:qString(q,'department'),status:qString(q,'status')};
   if(filters.userId)validUUID(filters.userId);if(filters.department)validUUID(filters.department);if(filters.status)status(filters.status);
