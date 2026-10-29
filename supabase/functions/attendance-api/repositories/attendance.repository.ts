@@ -1,7 +1,7 @@
 // Attendance V3 repository: Supabase service-role operations. Never import in browser code.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 export type Db = SupabaseClient;
-export type Actor = { id:string;role:string;name:string };
+export type Actor = { id:string;role:string;name:string;attendanceRights:string[] };
 export type Page = {page:number;pageSize:number};
 export function assertDb(result:{data?:unknown,error?:{message:string},count?:number|null}){
  if(result.error)throw Object.assign(new Error(result.error.message),{status:400});
