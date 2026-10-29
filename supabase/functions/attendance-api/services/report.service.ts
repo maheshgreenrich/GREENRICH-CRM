@@ -1,5 +1,5 @@
 // CSV, Excel 2003 XML (.xls), and paginated PDF report generators.
-const headings=['Date','Employee','Status','Check In (UTC)','Check Out (UTC)','Hours','Remarks'];
+const headings=['Date','Employee','Status','Check In (IST)','Check Out (IST)','Hours','Remarks'];
 const xmlChars:Record<string,string>={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'};
 const xml=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>xmlChars[c]||c);
 const safeCsv=(v:unknown)=>{
@@ -21,7 +21,7 @@ export async function buildReport(month:string,format:string,rows:unknown[][]):P
   const {PDFDocument,StandardFonts,rgb}=await import('npm:pdf-lib@1.17.1');
   if(rows.length>5000)throw Object.assign(new Error('PDF export limited to 5000 rows; use CSV or Excel'),{status:413});
   const pdf=await PDFDocument.create();const font=await pdf.embedFont(StandardFonts.Helvetica);
-  const headers=['Date','Employee','Status','In UTC','Out UTC','Hours','Remarks'];
+  const headers=['Date','Employee','Status','In IST','Out IST','Hours','Remarks'];
   const widths=[73,116,76,105,105,44,104],size=8;
   const normalized=(v:unknown,max:number)=>String(v??'').replace(/[^\x20-\x7E\xA0-\xFF]/g,'?').slice(0,max);
   let page:any,cur=0;
