@@ -1,7 +1,22 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(location.hash==='#users'?'users':'dashboard'),company=null;
-const modules=['dashboard','attendance','users','roles','leads','customers','sales','marketing','orders','stock','purchase','accounts','settings','reports'];
-const labels={dashboard:'Dashboard',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Company Settings',reports:'Reports'};
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','channels','orders','stock','purchase','accounts','settings','reports'];
+const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Company Settings',reports:'Reports'};
+const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',channels:'channels',marketing:'tasks',orders:'sales',stock:'products',reports:'reports'};
+const crmAccess=()=>({
+ dashboard:can('sales')&&can('customers')&&can('leads'),
+ sales:can('sales')||can('orders'),
+ customers:can('customers'),
+ leads:can('leads'),
+ tasks:can('leads')||can('marketing'),
+ products:can('stock'),
+ channels:can('sales'),
+ reports:can('reports')
+});
+const canOpenPage=m=>m==='attendance'||can(m)||
+ (m==='crm'&&crmAccess().dashboard)||
+ (m==='tasks'&&crmAccess().tasks)||
+ (m==='channels'&&crmAccess().channels);
 const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=x=>{let t=$('#toast');t.textContent=x;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)};const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
 const query=async(t)=>{let {data,error}=await db.from(t).select('*');if(error)throw Error(error.message);return data||[]};
 async function start(){const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');if(!url||!key){show('setup');return}if(!window.supabase){show('setup');toast('Authentication library unavailable');return}db=window.supabase.createClient(url,key);let {data}=await db.auth.getSession();if(data.session)await enter();else show('login')}
@@ -46,7 +61,7 @@ const menuIcons={
  reports:'<path d="M3 3v18h18M7 15l5-5 4 3 5-7"/>'
 };
 function navigation(){
- const visible=modules.filter(m=>can(m)||m==='attendance');
+ const visible=modules.filter(canOpenPage);
  $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){$('#sidebar').classList.remove('open');return}page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();void render()});
 }
@@ -117,11 +132,31 @@ async function removeAttendance(id,date){
  toast('Attendance removed');await attendanceQuick();await render();
 }
 function card(t,v,sub=''){return '<div class="card"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(sub)+'</small></div>'}
-async function render(){if(!can(page)&&page!=='attendance'){page='dashboard';navigation()}$('#title').textContent=labels[page];let c=$('#content');c.innerHTML='<div class="panel">Loading...</div>';try{if(page==='dashboard')await dashboard(c);else if(page==='attendance')await attendance(c);else if(page==='users')await users(c);else if(page==='roles')await permissionPage(c);else if(page==='settings')await settings(c);else await placeholder(c)}catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
-async function dashboard(c){const [daily,ownTotal]=await Promise.all([db.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),db.from('gr_attendance').select('user_id',{count:'exact',head:true}).eq('user_id',user.id)]);if(daily.error||ownTotal.error)throw Error(daily.error?.message||ownTotal.error?.message);let todays=daily.data||[];let own={length:ownTotal.count||0};c.innerHTML='<div class="notice">Secure GreenRich ONE employee workspace. The previous Sales & CRM tracker is preserved separately; its local-browser records are not yet migrated to this database.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><a href="legacy.html" target="_blank">Open existing sales dashboard ↗</a></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()}}
+async function render(){if(!canOpenPage(page)){page='dashboard';navigation()}$('#title').textContent=labels[page];let c=$('#content');c.innerHTML='<div class="panel">Loading...</div>';try{if(page==='dashboard')await dashboard(c);else if(page==='attendance')await attendance(c);else if(page==='users')await users(c);else if(page==='roles')await permissionPage(c);else if(page==='settings')await settings(c);else if(crmMap[page])await crmWorkspace(c,crmMap[page]);else await placeholder(c)}catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
+async function dashboard(c){const [daily,ownTotal]=await Promise.all([db.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),db.from('gr_attendance').select('user_id',{count:'exact',head:true}).eq('user_id',user.id)]);if(daily.error||ownTotal.error)throw Error(daily.error?.message||ownTotal.error?.message);let todays=daily.data||[];let own={length:ownTotal.count||0};c.innerHTML='<div class="notice">Secure GreenRich ONE employee workspace. The previous Sales & CRM tracker is preserved separately; its local-browser records are not yet migrated to this database.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><button class="secondary" type="button" id="goCrm">Open Sales & CRM</button></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()};$('#goCrm').onclick=()=>{page='crm';navigation();render()};$('#goCrm').hidden=!canOpenPage('crm')}
 async function attendance(c){
  if(!window.GreenRichAttendance)throw Error('Attendance module script has not loaded. Refresh GreenRich ONE.');
  await window.GreenRichAttendance.mount(c);
+}
+let crmAssetsPromise=null;
+const loadCrmAssets=()=>{
+ if(crmAssetsPromise)return crmAssetsPromise;
+ const load=(url,test)=>test()?Promise.resolve():new Promise((resolve)=>{
+  const script=document.createElement('script');script.src=url;script.async=true;
+  script.onload=resolve;script.onerror=resolve;document.head.append(script);
+ });
+ // Load only when CRM opens, leaving login and attendance fast.
+ return crmAssetsPromise=Promise.all([
+  load('https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js',()=>!!window.Chart),
+  load('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX)
+ ]);
+};
+async function crmWorkspace(container,view){
+ if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
+ await loadCrmAssets();
+ const access=crmAccess(),allowed=Object.entries(access).filter(([,v])=>v).map(([key])=>key);
+ if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
+ window.GreenRichCRM.mount(container,view,allowed);
 }
 function exportCSV(filename,cols,rows){let csv=[cols,...rows].map(r=>r.map(x=>{let v=String(x??'');if(/^[=+@\-\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'}).join(',')).join('\r\n');let blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();URL.revokeObjectURL(a.href)}
 async function employeeAction(data){
@@ -195,7 +230,7 @@ async function permissionPage(c){
  select.onchange=draw;draw();
 }
 async function settings(c){if(!can('settings','view'))throw Error('Permission denied');c.innerHTML='<div class="panel"><h2>Company profile</h2><form id="companyForm" class="fields"><label>Company name<input id="companyName" required value="'+esc(company?.company_name||'GreenRich')+'"></label><label>Company logo URL<input type="url" id="logoUrl" value="'+esc(company?.logo_url||'')+'"></label><div style="align-self:end"><button class="blue">Save company settings</button></div></form><p>Use an image URL hosted on your own approved domain. Company logo uploads and document storage will need a configured secure Storage bucket.</p>'+(company?.logo_url?'<img alt="Company logo" style="max-height:90px;max-width:200px" src="'+esc(company.logo_url)+'">':'')+'</div>';$('#companyForm').onsubmit=async e=>{e.preventDefault();let values={company_name:$('#companyName').value,logo_url:$('#logoUrl').value||null,updated_at:new Date().toISOString()};let r=await db.from('gr_company_settings').update(values).eq('id',1);if(r.error)toast(r.error.message);else{company={...company,...values};toast('Company settings saved');render()}}}
-async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. The previous sales tracker is available separately; do not use the public browser-only tracker for confidential customer records.</div><a href="legacy.html" target="_blank">Open existing Sales & CRM interface ↗</a></div>'}
+async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. The previous sales tracker is available separately; do not use the public browser-only tracker for confidential customer records.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
 $('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='roles';navigation();render()}});
 $('#hamburger').onclick=()=>$('#sidebar').classList.toggle('open');start().catch(e=>{show('setup');toast(e.message)});
 })();
