@@ -87,7 +87,7 @@ window.GreenRichAttendance=(function(){
   $('[data-bulk-status]').forEach(b=>b.onclick=()=>{const form=$('#bulkForm');form.elements.namedItem('status').value=b.dataset.bulkStatus;form.requestSubmit()});
   $('#bulkForm').elements.namedItem('date').onchange=()=>safe(drawDailyRoster);
   $('[data-period]').forEach(b=>b.onclick=()=>{
-   const now=new Date(today+'T12:00:00+05:30'),fmt=d=>d.toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+   const now=new Date(today+'T12:00:00+05:30'),fmt=d=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);const f=t=>p.find(x=>x.type===t)?.value;return f('year')+'-'+f('month')+'-'+f('day')};
    if(b.dataset.period==='day'){$('#adminFrom').value=today;$('#adminTo').value=today;}
    else if(b.dataset.period==='week'){const monday=new Date(now);monday.setDate(monday.getDate()-((monday.getDay()+6)%7));$('#adminFrom').value=fmt(monday);$('#adminTo').value=today;}
    else{$('#adminFrom').value=today.slice(0,7)+'-01';$('#adminTo').value=today;}
@@ -212,7 +212,7 @@ window.GreenRichAttendance=(function(){
   for(const el of $$('#bulkUsers [data-current]')){
    const record=map.get(el.dataset.current);el.textContent=record?record.status.replace('_',' ')+(record.check_in?' · In '+shortDate(record.check_in):''):'Not marked';
    const row=el.closest('.av-staff-row');
-   row?.querySelectorAll('[data-quick-status]').forEach(b=>b.classList.toggle('av-quick-active',record?.status===b.dataset.quickStatus));
+   row?.querySelectorAll('[data-quick-status]').forEach(b=>{b.classList.toggle('av-quick-active',record?.status===b.dataset.quickStatus);b.disabled=!!record?.check_in&&record?.source==='SELF';b.title=b.disabled?'Employee has already checked in. Use Edit with a reason to correct this record.':'Quick attendance marking';});
   }
  }
  async function drawAdminChart(){
