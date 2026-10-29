@@ -8,7 +8,7 @@ window.GreenRichAttendance=(function(){
  const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
- let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null,attendanceRights=[];
+ let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6],pendingRefreshTimer=null,adminRefreshTimer=null,attendanceRights=[];
  const canAdmin=action=>actorRole==='Admin'||actorRole==='Office Admin'||attendanceRights.includes(action);
  const manager=()=>canAdmin('view');
  const notify=(message,error=false)=>{const e=$('#alert');e.hidden=false;e.textContent=message;e.classList.toggle('error',error);e.scrollIntoView({behavior:'smooth',block:'nearest'})};
@@ -28,8 +28,15 @@ window.GreenRichAttendance=(function(){
  function tab(which){
   $$('.av-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===which));
   $$('.av-section').forEach(s=>s.hidden=s.id!=='tab-'+which);
+  if(adminRefreshTimer){clearInterval(adminRefreshTimer);adminRefreshTimer=null}
   if(which==='mine')safe(loadMine);
-  if(which==='admin')safe(loadAdmin);
+  if(which==='admin'){
+   safe(loadAdmin);
+   adminRefreshTimer=setInterval(()=>{
+    if(!document.querySelector('#adminTab')){clearInterval(adminRefreshTimer);adminRefreshTimer=null;return}
+    if(!$('#tab-admin').hidden&&!$('#attendanceEditDialog').open)safe(loadAdmin);
+   },30000);
+  }
  }
  async function init(){
   const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');
