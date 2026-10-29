@@ -241,3 +241,25 @@
 
 .av-summary-download{margin-top:24px;padding-top:20px;border-top:1px solid #e4eaf6}
 .av-summary-download h3{font-size:17px;margin:0 0 8px;color:#1a315a}
+
+
+/* Lighter, consistent typography across Attendance and Admin panels */
+#v3Content,#v3Content button,#v3Content input,#v3Content select,#v3Content textarea,#v3Content label{
+ font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+#v3Content h2,#v3Content h3,.av-monthly-dialog h2,.av-edit-dialog h2{
+ font-weight:600;letter-spacing:-.025em;color:#20334d;
+}
+#v3Content h2{font-size:19px}
+#v3Content h3{font-size:16px}
+#v3Content p{font-size:13.5px;font-weight:400;line-height:1.58}
+#v3Content label,#v3Content button,.av-monthly-dialog button,.av-edit-dialog button{
+ font-weight:500;letter-spacing:0;
+}
+#v3Content .av-tab{font-weight:550;font-size:13px}
+#v3Content .panel,#v3Content .card{box-shadow:0 2px 12px #21395208}
+#v3Content th,#v3Content .av-calendar-weekday{font-weight:600}
+#v3Content td,#v3Content .av-staff-identity strong{font-weight:450}
+#v3Content .av-status-btn{font-weight:600}
+#v3Content .av-summary-cards strong,.av-monthly-dialog .av-report-count strong{font-weight:600}
+.av-monthly-dialog h2{font-size:20px}
