@@ -57,7 +57,7 @@
  <form id="adminFilters" class="av-filter"><label>Employee<select name="userId" id="filterEmployee"><option value="">All Employees</option></select></label>
  <label>User Role<select name="roleId" id="filterRole"><option value="">All Roles</option></select></label>
  <label>From<input name="from" id="adminFrom" type="date"></label><label>To<input name="to" id="adminTo" type="date"></label>
- <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
+ <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>PERMISSION</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
  <button class="blue">Apply Filters</button></form>
  <div id="adminChartSummary" class="cards av-summary-cards"></div><div id="adminChart" class="av-donut-view" aria-label="Attendance status round chart"></div>
  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (IST)</th><th>Out (IST)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
@@ -76,17 +76,38 @@
  <div class="av-actions"><button type="button" data-bulk-status="PRESENT" class="blue">✓ Mark Present</button><button type="button" data-bulk-status="ABSENT" class="secondary">Mark Absent</button><button type="button" data-bulk-status="HALF_DAY" class="secondary">Mark Half Day</button><button type="button" data-bulk-status="WEEKEND" class="secondary">Mark Weekend</button><button type="button" data-bulk-status="HOLIDAY" class="secondary">Mark Holiday</button><button type="button" data-bulk-status="PAID_LEAVE" class="secondary">Mark Paid Leave</button><button type="submit" class="av-hidden-submit" hidden>Save Selected</button></div></form></div></div>
  <div class="panel"><div class="row"><h2>Download Attendance Report</h2><input id="reportMonth" type="hidden"></div>
  <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
- <div class="av-grid">
+ <section class="panel av-monthly-reports" id="monthlyReportsSection">
+ <div class="row"><div><h2>Monthly Attendance Reports</h2><p>Select an employee to open their monthly attendance calendar and download their report.</p></div></div>
+ <div class="av-monthly-selector-row">
+  <label>Report Month<input id="allMonthlyReportMonth" type="month" aria-label="Month for all employees summary"></label>
+  <button id="downloadAllMonthlyExcel" type="button" class="blue"><span>Download All Employees Summary · Excel</span></button>
+ </div>
+ <p class="av-report-helper">The company Excel summary contains employee names and attendance counts only — no daily check-in/out log.</p>
+ <div id="allMonthlyReportInfo" class="av-report-info" aria-live="polite"></div>
+ <h3 class="av-employee-list-title">Employee List</h3>
+ <div id="monthlyEmployeeList" class="av-monthly-employee-list" aria-label="Employees for monthly attendance reports"></div>
+</section>
+<div class="av-grid">
  <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
  <div class="panel"><h2>Leave Requests for Approval</h2><div id="adminLeaves"></div></div></div>
 </section>
+<dialog id="monthlyEmployeeDialog" class="av-edit-dialog av-monthly-dialog" aria-labelledby="monthlyEmployeeHeading">
+ <div class="av-monthly-dialog-header"><div><h2 id="monthlyEmployeeHeading">Employee Monthly Attendance</h2><p id="monthlyEmployeeSubheading">Selected employee attendance report</p></div><button id="monthlyEmployeeClose" type="button" class="secondary" aria-label="Close employee monthly report">✕</button></div>
+ <div class="av-monthly-selector-row"><label>Choose Month<input type="month" id="monthlyEmployeeMonth"></label></div>
+ <div id="monthlyEmployeeCounts" class="av-monthly-counts" aria-live="polite"></div>
+ <div class="av-calendar-legend"><span><i class="av-dot present"></i> Present</span><span><i class="av-dot absent"></i> Absent</span><span><i class="av-dot half"></i> Half Day</span><span><i class="av-dot leave"></i> Leave</span><span><i class="av-dot holiday"></i> Holiday</span><span><i class="av-dot weekend"></i> Weekend</span></div>
+ <div id="monthlyEmployeeCalendar" class="av-calendar av-employee-report-calendar" aria-label="Selected employee monthly attendance calendar"></div>
+ <h3>Monthly Check-in / Check-out Details</h3>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (IST)</th><th>Check Out (IST)</th><th>Hours</th></tr></thead><tbody id="monthlyEmployeeTimeSheet"></tbody></table></div>
+ <div class="av-monthly-dialog-actions"><span id="monthlyEmployeeDownloadNote">Choose a download format for the selected month.</span><button type="button" class="secondary" data-monthly-export="csv">CSV</button><button type="button" class="secondary" data-monthly-export="xls">Excel</button><button type="button" class="blue" data-monthly-export="pdf">PDF</button></div>
+</dialog>
 <dialog id="attendanceEditDialog" class="av-edit-dialog" aria-labelledby="attendanceEditTitle">
  <form id="attendanceEditForm" class="av-form">
   <div class="av-modal-head"><h2 id="attendanceEditTitle">Edit Employee Attendance</h2><button type="button" id="attendanceEditClose" class="secondary">✕</button></div>
   <input type="hidden" name="recordId">
   <label>Employee<input name="employee" readonly></label>
   <label>Attendance Date<input name="date" type="date" readonly></label>
-  <label>Status<select name="status" required><option value="PRESENT">Present</option><option value="ABSENT">Absent</option><option value="LATE">Late</option><option value="HALF_DAY">Half Day</option><option value="WEEKEND">Weekend</option><option value="HOLIDAY">Holiday</option><option value="PAID_LEAVE">Paid Leave</option><option value="ON_LEAVE">On Leave (Unpaid)</option></select></label>
+  <label>Status<select name="status" required><option value="PRESENT">Present</option><option value="ABSENT">Absent</option><option value="LATE">Late</option><option value="HALF_DAY">Half Day</option><option value="WEEKEND">Weekend</option><option value="HOLIDAY">Holiday</option><option value="PAID_LEAVE">Paid Leave</option><option value="ON_LEAVE">On Leave (Unpaid)</option><option value="PERMISSION">Permission</option></select></label>
   <label>Check-in Date and Time<input name="checkIn" type="datetime-local"></label>
   <label>Check-out Date and Time<input name="checkOut" type="datetime-local"></label>
   <label>Note (optional)<textarea name="reason" rows="2" maxlength="1000"></textarea></label>
