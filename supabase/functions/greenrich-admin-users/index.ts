@@ -30,6 +30,13 @@ Deno.serve(async req=>{
    return !!p.error||!!p.data?.length;
   };
   const body=await req.json(),action=body.action;
+  const companyIds=(ids:unknown)=>{
+   if(!Array.isArray(ids)||ids.length<1||ids.length>2)return null;
+   const allowed=['grow-india','enviro-solutions'];
+   const items=ids.map(x=>String(x));
+   return items.every(x=>allowed.includes(x))&&new Set(items).size===items.length?items:null;
+  };
+  if(['create','edit','delete'].includes(action)&&!superAdmin)return response({error:'Only an Admin can manage employee accounts'},403);
   if(action==='deleteRole'){
    if(!superAdmin)return response({error:'Only the built-in Admin can delete roles'},403);
    const roleId=String(body.roleId||'');
@@ -53,14 +60,16 @@ Deno.serve(async req=>{
    const {data:roleRecord}=await admin.from('gr_roles').select('id').eq('name',role).maybeSingle();
    if(!roleRecord)return response({error:'Invalid role'},400);
    if(!superAdmin&&await elevatedRole(roleRecord.id))return response({error:'This role requires built-in Admin approval'},403);
+   const companies=companyIds(body.companyIds);
+   if(!companies)return response({error:'Select one or both companies for this employee'},400);
    const {data:exists}=await admin.from('gr_profiles').select('id').eq('username',username).maybeSingle();
    if(exists)return response({error:'Username already exists'},409);
    const created=await admin.auth.admin.createUser({email,password,email_confirm:true});
    if(created.error)return response({error:created.error.message},400);
    const id=created.data.user.id;
-   const inserted=await admin.from('gr_profiles').insert({id,username,full_name:name,email,role_id:roleRecord.id,active:true,manager_id:superAdmin?null:user.id});
+   const inserted=await admin.from('gr_profiles').insert({id,username,full_name:name,email,role_id:roleRecord.id,company_ids:companies,active:true,manager_id:superAdmin?null:user.id});
    if(inserted.error){await admin.auth.admin.deleteUser(id);return response({error:'Employee profile could not be created: '+inserted.error.message},409);}
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'CREATE',new_value:{username,email,role}});
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'CREATE',new_value:{username,email,role,company_ids:companies}});
    return response({message:'Employee created. They can sign in using their email and password.'});
   }
   const id=String(body.userId||'');
@@ -72,6 +81,7 @@ Deno.serve(async req=>{
    const fields={};if(body.name!==undefined){fields.full_name=String(body.name).trim();if(!fields.full_name)return response({error:'Name required'},400)}
    if(body.username!==undefined){fields.username=String(body.username).trim();if(fields.username.length<3)return response({error:'Username too short'},400)}
    if(body.role!==undefined){const rr=await admin.from('gr_roles').select('id').eq('name',String(body.role)).maybeSingle();if(!rr.data)return response({error:'Invalid role'},400);fields.role_id=rr.data.id}
+   if(body.companyIds!==undefined){const ids=companyIds(body.companyIds);if(!ids)return response({error:'Choose one or both companies'},400);fields.company_ids=ids}
    const updated=await admin.from('gr_profiles').update(fields).eq('id',id);if(updated.error)return response({error:updated.error.message},400);
    await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'UPDATE',new_value:fields});
    return response({message:'Employee updated'});
@@ -82,6 +92,26 @@ Deno.serve(async req=>{
    await admin.auth.admin.updateUserById(id,{ban_duration:active?'none':'876000h'});
    await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:active?'ENABLE':'DISABLE',new_value:{active}});
    return response({message:active?'Account enabled':'Account disabled'});
+  }
+  if(action==='delete'){
+   if(id===user.id)return response({error:'You cannot delete your own account'},403);
+   // Do not change or remove Attendance or audit records. Block deletion if linked history exists.
+   const refs=[
+    ['gr_attendance','user_id'],['gr_attendance','marked_by'],
+    ['grm_attendance','user_id'],['grm_attendance','marked_by'],
+    ['grm_corrections','user_id'],['grm_corrections','reviewed_by'],
+    ['grm_leaves','user_id'],['grm_leaves','reviewed_by'],
+    ['grm_audit_logs','actor_id'],['gr_profiles','manager_id']
+   ];
+   for(const [table,column] of refs){
+    const result=await admin.from(table).select(column,{count:'exact',head:true}).eq(column,id);
+    if(result.error)return response({error:'Unable to verify account history. Delete cancelled: '+result.error.message},409);
+    if(result.count)return response({error:'This employee has linked attendance, approval or staff history and cannot be permanently deleted. Use Deactivate to preserve records.'},409);
+   }
+   const deleted=await admin.auth.admin.deleteUser(id);
+   if(deleted.error)return response({error:'Account deletion failed: '+deleted.error.message},409);
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'DELETE',old_value:{username:target.username}});
+   return response({message:'Employee login and profile permanently deleted'});
   }
   if(action==='reset'){
    const {data:account,error:accountError}=await admin.auth.admin.getUserById(id);

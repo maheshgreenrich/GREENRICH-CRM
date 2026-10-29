@@ -2,7 +2,7 @@
 (()=>{
 let root=null,allowedTabs=[],adminMode=false,allowDashboardExport=false;
 const $=s=>root?.querySelector(s), all=s=>root?[...root.querySelectorAll(s)]:[], legacyKey='greenrich-crm-v2';
-let activeCompany='grow-india',activeCompanyName='GreenRich Grow India Pvt Ltd';
+let activeCompany='grow-india',activeCompanyName='GreenRich Grow India Pvt Ltd',companyScope='grow-india',permittedCompanies=['grow-india'];
 const storageKey=()=>activeCompany==='grow-india'?legacyKey:legacyKey+'::'+activeCompany;
 const uid=()=>crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const date=()=>{let d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -15,7 +15,10 @@ let data;try{data=JSON.parse(localStorage.getItem(storageKey()))||initial();if(!
 let page='dashboard',editId='',editing='',charts=[];
 const persist=()=>{try{localStorage.setItem(storageKey(),JSON.stringify(data));return true}catch{toast('Storage full or unavailable. Export a backup immediately.');return false}};
 const toast=s=>{let n=$('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.remove('show'),4300)};
-const find=(k,id)=>data[k].find(x=>x.id===id);
+const scopedCompanyIds=()=>companyScope==='all'?permittedCompanies:[companyScope];
+const scopeRows=k=>k==='customers'?data.customers:scopedCompanyIds().flatMap(companyId=>loadCompanyData(companyId)[k].map(row=>({...row,_companyId:companyId})));
+const ownerOf=(k,id)=>k==='customers'?activeCompany:(scopedCompanyIds().find(companyId=>loadCompanyData(companyId)[k].some(row=>row.id===id))||'');
+const find=(k,id)=>k==='customers'?data.customers.find(x=>x.id===id):scopeRows(k).find(x=>x.id===id);
 const nameOf=(k,id)=>find(k,id)?.name||find(k,id)?.title||'—';
 const safeN=n=>Number.isFinite(Number(n))?Number(n):0;
 const getCalc=(qty,price,tax,inclusive)=>{qty=safeN(qty);price=safeN(price);tax=safeN(tax);let gross=qty*price;let base=inclusive?gross/(1+tax/100):gross;let gst=inclusive?gross-base:base*tax/100;return {base:round(base),gst:round(gst),total:round(base+gst)}};
@@ -64,11 +67,11 @@ function channelFilters(){
  if(!selector)return;
  const selected=selector.value;
  selector.replaceChildren(el('option',{value:'all',text:'All channels'}));
- data.channels.forEach(c=>selector.append(el('option',{value:c.id,text:c.name})));
+ scopeRows('channels').forEach(c=>selector.append(el('option',{value:c.id,text:c.name+' · '+companyLabel(c._companyId)})));
  if([...selector.options].some(o=>o.value===selected))selector.value=selected;
 }
 const companyForSale=s=>s._companyId||s.company_id||activeCompany;
-const overviewSales=()=>companyChoices.flatMap(company=>loadCompanyData(company.id).sales.map(s=>({...s,_companyId:company.id})));
+const overviewSales=()=>scopedCompanyIds().flatMap(companyId=>loadCompanyData(companyId).sales.map(s=>({...s,_companyId:companyId})));
 const channelForSale=s=>s.channel_name||loadCompanyData(companyForSale(s)).channels.find(c=>c.id===s.channel_id)?.name||'Unknown channel';
 const productForSale=s=>s.product_name||loadCompanyData(companyForSale(s)).products.find(p=>p.id===s.product_id)?.name||'Unknown product';
 const customerForSale=s=>data.customers.find(c=>c.id===s.customer_id)?.name||s.customer_name||'Unknown customer';
@@ -88,10 +91,11 @@ function setOverviewOptions(id,items){
 }
 function overviewFilterOptions(){
  const company=$('#filter-company')?.value||'all';
- setOverviewOptions('#filter-company',{label:'Both companies',values:companyChoices.map(c=>({value:c.id,text:companyLabel(c.id)}))});
+ setOverviewOptions('#filter-company',{label:'Both companies',values:companyChoices.filter(c=>scopedCompanyIds().includes(c.id)).map(c=>({value:c.id,text:companyLabel(c.id)}))});
+ if(companyScope!=='all'){$('#filter-company').value=companyScope;$('#filter-company').disabled=true}else $('#filter-company').disabled=false;
  const customerList=[...data.customers].sort((a,b)=>a.name.localeCompare(b.name));
  setOverviewOptions('#filter-customer',{label:'All customers',values:customerList.map(c=>({value:c.id,text:c.name+(c.mobile?' · '+c.mobile:'')}))});
- const stores=companyChoices.filter(c=>company==='all'||company===c.id).map(c=>({id:c.id,store:loadCompanyData(c.id)}));
+ const stores=companyChoices.filter(c=>scopedCompanyIds().includes(c.id)&&(company==='all'||company===c.id)).map(c=>({id:c.id,store:loadCompanyData(c.id)}));
  const sales=stores.flatMap(c=>c.store.sales.map(s=>({...s,_companyId:c.id})));
  const channels=new Set(stores.flatMap(c=>c.store.channels.map(ch=>ch.name)).concat(sales.map(channelForSale)));
  setOverviewOptions('#filter-channel',{label:'All channels',values:[...channels].filter(Boolean).sort((a,b)=>a.localeCompare(b)).map(c=>({value:c,text:c}))});
@@ -133,7 +137,7 @@ function filteredSales(){
   &&(product==='all'||productKey(s)===product));
 }
 function overviewStats(rows){
- const channels={},companies=Object.fromEntries(companyChoices.map(c=>[c.id,0])),products=new Map(),byDate={};
+ const channels={},companies=Object.fromEntries(companyChoices.filter(c=>scopedCompanyIds().includes(c.id)).map(c=>[c.id,0])),products=new Map(),byDate={};
  let total=0,tax=0,qty=0;
  for(const sale of rows){
   const amount=saleGross(sale),count=Number(sale.qty)||0,name=channelForSale(sale),id=companyForSale(sale),key=productKey(sale);
@@ -172,7 +176,7 @@ function renderDashboard(){
  const days=Object.keys(stats.byDate).sort(),channelPairs=sortedPairs(stats.channels),totalChannels=channelPairs.reduce((n,row)=>n+row[1],0);
  $('#channel-breakdown').innerHTML=channelPairs.length?channelPairs.map(([name,amount],index)=>'<div class="gr-visible-legend-row"><span class="gr-legend-swatch" style="background:'+palette[index%palette.length]+'"></span><span>'+esc(name)+' · '+(totalChannels?((amount/totalChannels)*100).toFixed(1):0)+'%</span><strong>'+fmt(amount)+'</strong></div>').join(''):'<p class="empty">No channels in this period</p>';
  $('#channel-progress').innerHTML=progressMarkup(channelPairs,Math.max(0,...channelPairs.map(x=>x[1])),'of largest channel');
- const companyPairs=companyChoices.map(c=>[companyLabel(c.id),stats.companies[c.id]||0]);
+ const companyPairs=companyChoices.filter(c=>scopedCompanyIds().includes(c.id)).map(c=>[companyLabel(c.id),stats.companies[c.id]||0]);
  $('#company-comparison').innerHTML=progressMarkup(companyPairs,Math.max(0,...companyPairs.map(x=>x[1])),'of leading company');
  const top=stats.products.slice(0,8);
  $('#top-products').innerHTML=top.length?'<div class="gr-top-products-head"><span>Product</span><span>Revenue</span><span>Order quantity</span></div>'+
@@ -340,19 +344,32 @@ async function exportOverviewPdf(){
 
 const act=(k,id)=>`<button class="action-button" data-edit="${k}:${id}">Edit</button><button class="action-button delete" data-delete="${k}:${id}">Delete</button>`;
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
-function renderTables(){let q=$('#sales-search').value.toLowerCase(),ch=$('#sales-channel-filter').value;let sales=[...data.sales].filter(s=>(ch==='all'||s.channel_id===ch)&&[s.internal_order_id,s.order_id,productName(s),customerName(s),channelName(s)].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));$('#sales-count').textContent=sales.length+' sales · '+new Set(sales.map(x=>x.internal_order_id||x.id)).size+' internal orders';$('#sales-table').innerHTML=sales.map(s=>'<tr><td>'+esc(s.date)+'</td><td><strong>'+esc(s.internal_order_id||'Legacy')+'</strong><small>'+esc(s.order_id||'No platform ID')+'</small></td><td>'+esc(companyLabel(s.company_id||activeCompany))+'</td><td>'+esc(customerName(s))+'</td><td><strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small></td><td><span class="pill">'+esc(channelName(s))+'</span></td><td>'+esc(s.qty)+'</td><td>'+fmt(s.taxable)+'</td><td>'+fmt(s.tax_amount)+'</td><td>'+fmt(s.shipping_charge||0)+'</td><td><strong>'+fmt(s.total)+'</strong></td><td>'+act('sales',s.id)+'</td></tr>').join('')||empty(12);
-q=$('#customers-search').value.toLowerCase();$('#customers-table').innerHTML=data.customers.filter(c=>[c.name,c.mobile,c.mobile2,c.email,c.city,c.company].some(v=>String(v||'').toLowerCase().includes(q))).map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(c.gstin||'')+'</small></td><td>'+esc(c.mobile)+'<small>'+esc(c.mobile2||'')+' · '+esc(c.email)+'</small></td><td>'+esc(c.city)+'<small>'+esc(c.state)+'</small></td><td>'+esc(c.company)+'</td><td>'+esc(c.type)+'</td><td>'+(c.tag_ids||[]).map(id=>'<span class="gr-customer-tag">'+esc(data.tags.find(t=>t.id===id)?.name||'')+'</span>').join('')+'</td><td>'+new Set(data.sales.filter(s=>s.customer_id===c.id).map(s=>s.internal_order_id||s.id)).size+'</td><td>'+act('customers',c.id)+'</td></tr>').join('')||empty(8);
-q=$('#leads-search').value.toLowerCase();let stage=$('#lead-stage-filter').value;$('#leads-table').innerHTML=data.leads.filter(l=>(stage==='all'||l.stage===stage)&&[l.title,l.contact,l.notes,l.owner].some(v=>String(v||'').toLowerCase().includes(q))).map(l=>`<tr><td><strong>${esc(l.title)}</strong><small>${esc(l.contact)}</small></td><td>${esc(l.source)}</td><td><span class="pill ${l.stage==='Won'?'good':l.stage==='Lost'?'warn':''}">${esc(l.stage)}</span></td><td>${fmt(l.value)}</td><td>${esc(l.owner)}</td><td>${esc(l.followup||'—')}</td><td>${act('leads',l.id)}</td></tr>`).join('')||empty(7);
-q=$('#tasks-search').value.toLowerCase();let taskF=$('#task-filter').value;$('#tasks-table').innerHTML=data.tasks.filter(t=>(taskF==='all'||(taskF==='done')===(t.status==='Done'))&&[t.title,t.contact,t.owner].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>(a.due||'').localeCompare(b.due||'')).map(t=>`<tr><td>${esc(t.due)}</td><td><strong>${esc(t.title)}</strong><small>${esc(t.notes)}</small></td><td>${esc(t.contact)}</td><td>${esc(t.owner)}</td><td><span class="pill ${t.status==='Done'?'good':'warn'}">${esc(t.status)}</span></td><td>${act('tasks',t.id)}</td></tr>`).join('')||empty(6);
-q=$('#products-search').value.toLowerCase();$('#products-table').innerHTML=data.products.filter(p=>[p.name,p.sku,p.brand].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p.company_id||activeCompany))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(p.active?'good':'warn')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
-$('#channels-table').innerHTML=data.channels.map(c=>`<tr><td><strong>${esc(c.name)}</strong></td><td>${esc(c.type)}</td><td><span class="pill ${c.active?'good':'warn'}">${c.active?'Active':'Inactive'}</span></td><td>${data.sales.filter(s=>s.channel_id===c.id).length}</td><td>${act('channels',c.id)}</td></tr>`).join('')||empty(5)}
+
+function renderTables(){
+ const salesSearch=$('#sales-search').value.toLowerCase(),salesChannel=$('#sales-channel-filter').value;
+ const sales=scopeRows('sales').filter(s=>(salesChannel==='all'||s.channel_id===salesChannel)
+  &&[s.internal_order_id,s.order_id,productName(s),customerName(s),channelName(s),companyLabel(s._companyId)].some(v=>String(v||'').toLowerCase().includes(salesSearch)))
+  .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ $('#sales-count').textContent=sales.length+' sales · '+new Set(sales.map(x=>x.internal_order_id||x._companyId+'|'+x.id)).size+' internal orders';
+ $('#sales-table').innerHTML=sales.map(s=>'<tr><td>'+esc(s.date)+'</td><td><strong>'+esc(s.internal_order_id||'Legacy')+'</strong><small>'+esc(s.order_id||'No platform ID')+'</small></td><td>'+esc(companyLabel(s._companyId))+'</td><td>'+esc(customerName(s))+'</td><td><strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small></td><td><span class="pill">'+esc(channelName(s))+'</span></td><td>'+esc(s.qty)+'</td><td>'+fmt(s.taxable)+'</td><td>'+fmt(s.tax_amount)+'</td><td>'+fmt(s.shipping_charge||0)+'</td><td><strong>'+fmt(s.total)+'</strong></td><td>'+act('sales',s.id)+'</td></tr>').join('')||empty(12);
+ let q=$('#customers-search').value.toLowerCase();
+ $('#customers-table').innerHTML=data.customers.filter(c=>[c.name,c.mobile,c.mobile2,c.email,c.city,c.company].some(v=>String(v||'').toLowerCase().includes(q))).map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(c.gstin||'')+'</small></td><td>'+esc(c.mobile)+'<small>'+esc(c.mobile2||'')+' · '+esc(c.email)+'</small></td><td>'+esc(c.city)+'<small>'+esc(c.state)+'</small></td><td>'+esc(c.company)+'</td><td>'+esc(c.type)+'</td><td>'+(c.tag_ids||[]).map(id=>'<span class="gr-customer-tag">'+esc(data.tags.find(t=>t.id===id)?.name||'')+'</span>').join('')+'</td><td>'+new Set(scopeRows('sales').filter(s=>s.customer_id===c.id).map(s=>s.internal_order_id||s._companyId+'|'+s.id)).size+'</td><td>'+act('customers',c.id)+'</td></tr>').join('')||empty(8);
+ q=$('#leads-search').value.toLowerCase();
+ const stage=$('#lead-stage-filter').value;
+ $('#leads-table').innerHTML=scopeRows('leads').filter(l=>(stage==='all'||l.stage===stage)&&[l.title,l.contact,l.notes,l.owner,companyLabel(l._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(l=>'<tr><td><strong>'+esc(l.title)+'</strong><small>'+esc(l.contact)+' · '+esc(companyLabel(l._companyId))+'</small></td><td>'+esc(l.source)+'</td><td><span class="pill '+(l.stage==='Won'?'good':l.stage==='Lost'?'warn':'')+'">'+esc(l.stage)+'</span></td><td>'+fmt(l.value)+'</td><td>'+esc(l.owner)+'</td><td>'+esc(l.followup||'—')+'</td><td>'+act('leads',l.id)+'</td></tr>').join('')||empty(7);
+ q=$('#tasks-search').value.toLowerCase();const taskFilter=$('#task-filter').value;
+ $('#tasks-table').innerHTML=scopeRows('tasks').filter(t=>(taskFilter==='all'||(taskFilter==='done')===(t.status==='Done'))&&[t.title,t.contact,t.owner,companyLabel(t._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>(a.due||'').localeCompare(b.due||'')).map(t=>'<tr><td>'+esc(t.due)+'</td><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.notes)+'</small></td><td>'+esc(t.contact)+'<small>'+esc(companyLabel(t._companyId))+'</small></td><td>'+esc(t.owner)+'</td><td><span class="pill '+(t.status==='Done'?'good':'warn')+'">'+esc(t.status)+'</span></td><td>'+act('tasks',t.id)+'</td></tr>').join('')||empty(6);
+ q=$('#products-search').value.toLowerCase();
+ $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(p.active?'good':'warn')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
+ $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
+}
 function render(){channelFilters();if(page==='dashboard')renderDashboard();else renderTables()}
 const specs={
  products:[['company_id','Company','companies',true],['name','Product name','text',true],['sku','SKU / code','text',true],['brand','Brand','text'],['category','Category','text'],['price','Default unit price (₹)','number',true],['tax','Default GST / tax %','number',true],['stock','Current stock quantity','number',true],['inclusive','Price includes GST?','select','',[['true','Yes – inclusive'],['false','No – exclusive']]],['active','Status','select','',[['true','Active'],['false','Inactive']]],['description','Description / notes','textarea']],
- channels:[['name','Channel name','text',true],['type','Channel type','select','',[['Marketplace','Marketplace'],['E-commerce','E-commerce'],['Retail','Retail'],['Distributor','Distributor'],['Wholesale','Wholesale'],['Other','Other']]],['active','Status','select','',[['true','Active'],['false','Inactive']]]],
+ channels:[['company_id','Company','companies',true],['name','Channel name','text',true],['type','Channel type','select','',[['Marketplace','Marketplace'],['E-commerce','E-commerce'],['Retail','Retail'],['Distributor','Distributor'],['Wholesale','Wholesale'],['Other','Other']]],['active','Status','select','',[['true','Active'],['false','Inactive']]]],
  customers:[['name','Full name / customer name','text',true],['mobile','Primary mobile number','tel',true],['mobile2','Second mobile number (optional)','tel'],['email','Email address','email',true],['tag_ids','Customer tags','tags'],['company','Company name','text'],['type','Customer type','select','',[['Individual','Individual'],['Retailer','Retailer'],['Distributor','Distributor'],['Wholesale','Wholesale'],['Business','Business']]],['address1','Address line 1','textarea',true],['address2','Address line 2','text'],['city','City','text'],['state','State','text'],['pincode','PIN code','text'],['country','Country','text'],['gstin','GSTIN (optional)','text'],['source','Customer source','text'],['owner','Account owner','text'],['notes','Customer notes / history','textarea']],
- leads:[['title','Lead / enquiry title','text',true],['customer_id','Existing customer','customers'],['contact','Contact name / phone','text'],['source','Lead source','text'],['stage','Pipeline stage','select','',[['New','New'],['Contacted','Contacted'],['Qualified','Qualified'],['Quotation','Quotation'],['Won','Won'],['Lost','Lost']]],['value','Expected deal value (₹)','number'],['owner','Assigned to','text'],['followup','Next follow-up date','date'],['notes','Discussion notes','textarea']],
- tasks:[['title','Follow-up / task','text',true],['due','Due date','date',true],['customer_id','Linked customer','customers'],['lead_id','Linked lead','leads'],['contact','Other contact','text'],['owner','Assigned to','text'],['status','Status','select','',[['Open','Open'],['Done','Done']]],['notes','Notes','textarea']],
+ leads:[['company_id','Company','companies',true],['title','Lead / enquiry title','text',true],['customer_id','Existing customer','customers'],['contact','Contact name / phone','text'],['source','Lead source','text'],['stage','Pipeline stage','select','',[['New','New'],['Contacted','Contacted'],['Qualified','Qualified'],['Quotation','Quotation'],['Won','Won'],['Lost','Lost']]],['value','Expected deal value (₹)','number'],['owner','Assigned to','text'],['followup','Next follow-up date','date'],['notes','Discussion notes','textarea']],
+ tasks:[['company_id','Company','companies',true],['title','Follow-up / task','text',true],['due','Due date','date',true],['customer_id','Linked customer','customers'],['lead_id','Linked lead','leads'],['contact','Other contact','text'],['owner','Assigned to','text'],['status','Status','select','',[['Open','Open'],['Done','Done']]],['notes','Notes','textarea']],
  sales:[['date','Order date','date',true],['order_id','Platform order ID (optional)','text'],['internal_order_id','Internal Sales Order ID (automatic)','text',true],['company_id','Company','companies',true],['channel_id','Sales channel','channels',true],['customer_id','Existing customer','customers'],['product_id','Product','products',true],['qty','Quantity','number',true],['unit_price','Unit price (₹)','number',true],['tax_rate','Product GST / tax percentage (automatic)','number',true],['inclusive','Price includes tax?','select','',[['true','Yes, included'],['false','No, add tax']]],['shipping_charge','Shipping charge (optional)','number'],['status','Order status','select','',[['Completed','Completed'],['Pending','Pending'],['Cancelled','Cancelled'],['Returned','Returned']]],['notes','Notes','textarea']]
 };
 function field([id,label,type,required,options],value){
@@ -361,7 +378,7 @@ function field([id,label,type,required,options],value){
  if(type==='select'||['products','channels','customers','leads','companies'].includes(type)){
   input=el('select',{name:id,id:'f-'+id});
   if(type==='select'){(options||[]).forEach(([v,t])=>input.append(el('option',{value:v,text:t})))}
-  else if(type==='companies'){input.append(el('option',{value:'',text:'Select company'}));companyChoices.forEach(c=>input.append(el('option',{value:c.id,text:companyLabel(c.id)})))}
+  else if(type==='companies'){input.append(el('option',{value:'',text:'Select company'}));companyChoices.filter(c=>permittedCompanies.includes(c.id)).forEach(c=>input.append(el('option',{value:c.id,text:companyLabel(c.id)})))}
   else{input.append(el('option',{value:'',text:'Select '+(type==='customers'?'customer':type==='products'?'product':type==='channels'?'channel':'lead')}));data[type].filter(r=>r.active!==false||r.id===value).forEach(r=>input.append(el('option',{value:r.id,text:r.name||r.title})))}
  }else{
   input=el(type==='textarea'?'textarea':'input',{name:id,id:'f-'+id});
@@ -384,8 +401,8 @@ function openEditor(k,id=''){
  if(k==='channels'&&!adminMode)return toast('Only Admin can manage sales channels');
  editing=k;editId=id;const existing=id?find(k,id):null;
  $('#editor-title').textContent=(existing?'Edit ':'Add ')+({sales:'Sale',products:'Product',channels:'Channel',customers:'Customer',leads:'Lead',tasks:'Follow-up'}[k]);
- const defaults={date:date(),qty:1,stock:0,tax:0,price:0,inclusive:'true',active:'true',status:k==='tasks'?'Open':'Completed',stage:'New',type:k==='channels'?'Marketplace':'Individual',country:'India',company_id:activeCompany};
- $('#editor-fields').replaceChildren(...specs[k].map(s=>field(s,existing?.[s[0]]??defaults[s[0]])));
+ const defaults={date:date(),qty:1,stock:0,tax:0,price:0,inclusive:'true',active:'true',status:k==='tasks'?'Open':'Completed',stage:'New',type:k==='channels'?'Marketplace':'Individual',country:'India',company_id:companyScope==='all'?'':activeCompany};
+ $('#editor-fields').replaceChildren(...specs[k].map(s=>field(s,s[0]==='company_id'&&existing?(existing._companyId||existing.company_id||activeCompany):(existing?.[s[0]]??defaults[s[0]]))));
  $('#price-summary').hidden=k!=='sales';
  if(k==='sales'){
   const fields=$('#editor-fields');
@@ -438,7 +455,16 @@ function openEditor(k,id=''){
   $('#f-company_id').addEventListener('change',switchCompany);
   $('#f-product_id').addEventListener('change',autoProductPricing);
   ['qty','unit_price','shipping_charge'].forEach(x=>$('#f-'+x).addEventListener('input',pricePreview));
-  if(existing){if(!existing.internal_order_id)$('#f-internal_order_id').value=peekOrderId(editorData(),activeCompany);$('#f-customer_id').value=existing.customer_id||'';setCustomerMode('existing');$('#gr-customer-selected').textContent=existing.customer_name?'Selected: '+existing.customer_name:'';}
+  if(existing){
+   const selectedDb=editorData();
+   fillSelect($('#f-channel_id'),selectedDb.channels,'Select channel');
+   fillSelect($('#f-product_id'),selectedDb.products,'Select product');
+   fillSelect($('#f-customer_id'),selectedDb.customers,'Select customer');
+   $('#f-channel_id').value=existing.channel_id||'';
+   $('#f-product_id').value=existing.product_id||'';
+   if(!existing.internal_order_id)$('#f-internal_order_id').value=peekOrderId(selectedDb,$('#f-company_id').value||activeCompany);
+   $('#f-customer_id').value=existing.customer_id||'';
+   setCustomerMode('existing');$('#gr-customer-selected').textContent=existing.customer_name?'Selected: '+existing.customer_name:'';}
   else setCustomerMode(editorData().customers.length?'existing':'new');
   $('#f-tax_rate').readOnly=true;$('#f-inclusive').disabled=true;
   if(!existing)switchCompany();else{const p=editorData().products.find(x=>x.id===existing.product_id);$('#gr-stock-preview').textContent=p?'Available stock: '+Number(p.stock||0)+' units':'';pricePreview()}
@@ -450,9 +476,9 @@ async function saveEditor(event){
  event.preventDefault();
  const form=$('#editor-form'),inputs=new FormData(form),row={};
  inputs.forEach((value,key)=>{if(key!=='tag_ids')row[key]=String(value).trim()});
- const targetId=(editing==='sales'||editing==='products')?(row.company_id||activeCompany):activeCompany;
- if(!companyChoices.some(x=>x.id===targetId))return toast('Select a valid company');
- if(editId&&targetId!==activeCompany)return toast('To edit an existing record, choose its current company.');
+ const targetId=editing==='customers'?activeCompany:(row.company_id||(editId?ownerOf(editing,editId):companyScope==='all'?'':activeCompany));
+ if(!permittedCompanies.includes(targetId))return toast('Select a company you are assigned to');
+ if(editId&&editing!=='customers'&&targetId!==ownerOf(editing,editId))return toast('To edit an existing record, keep its current company.');
  const copy=JSON.parse(JSON.stringify(loadCompanyData(targetId)));ensureCRMData(copy);
  let old=editId?copy[editing].find(r=>r.id===editId):null;
  if(editId&&!old)return toast('Record could not be found in the selected company');
@@ -508,26 +534,27 @@ async function saveEditor(event){
 }
 async function removeRecord(k,id){
  const item=find(k,id);if(!item)return;
+ const owner=ownerOf(k,id);
  if(k==='customers'){
   if(!confirm('Delete this customer from both companies and all employee accounts?'))return;
   try{await window.GreenRichSharedCustomers.deleteCustomer(id);attachSharedCustomers(data);render();toast('Shared customer deleted')}
   catch(error){toast('Could not delete shared customer: '+error.message)}
   return;
  }
- if(k==='products'&&data.sales.some(s=>s.product_id===id))return toast('Product is used in sales. Mark it inactive instead.');
- if(k==='channels'&&data.sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
+ if(k==='products'&&loadCompanyData(owner).sales.some(s=>s.product_id===id))return toast('Product is used in sales. Mark it inactive instead.');
+ if(k==='channels'&&loadCompanyData(owner).sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
  if(!confirm('Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
- const copy=JSON.parse(JSON.stringify(data));
+ const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
  if(k==='sales'&&consumesStock(item)){const product=copy.products.find(p=>p.id===item.product_id);if(product&&Number.isInteger(Number(product.stock)))product.stock=Number(product.stock)+Number(item.qty||0)}
  copy[k]=copy[k].filter(r=>r.id!==id);
- if(saveCompanyData(activeCompany,copy)){render();toast('Record deleted')}
+ if(saveCompanyData(owner,copy)){render();toast('Record deleted')}
 }
 const exportSales=r=>({'Date':r.date,'Internal Order ID':r.internal_order_id||'Legacy','Order ID':r.order_id||'','Company':companyLabel(r.company_id||activeCompany),'Channel':channelName(r),'Customer':customerName(r),'Product':productName(r),'SKU':r.sku||'','Quantity':r.qty,'Unit Price':r.unit_price,'Tax %':r.tax_rate,'Tax Inclusive':r.inclusive?'Yes':'No','Taxable Amount':r.taxable,'Tax Amount':r.tax_amount,'Shipping':r.shipping_charge||0,'Total Amount':r.total,'Order Status':r.status,'Notes':r.notes||''});
 const csvSafe=x=>{let s=String(x??'');if(/^[\s]*[=+@\-]/.test(s)&&!/^-[\d.]+$/.test(s))s="'"+s;return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
 function download(name,blob){if(!adminMode)return toast('Only Admin can download backups');let u=URL.createObjectURL(blob),a=el('a',{href:u,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
 function excelDownload(name,rows,headers){if(!adminMode)return toast('Only Admin can export data');let safeRows=rows.map(row=>Object.fromEntries(headers.map(h=>[h,typeof row[h]==='string'&&/^[\s]*[=+@]/.test(row[h])?"'"+row[h]:row[h]??''])));if(window.XLSX){let ws=XLSX.utils.json_to_sheet(safeRows,{header:headers});ws['!cols']=headers.map(h=>({wch:Math.max(14,h.length+4)}));let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'GreenRich');XLSX.writeFile(wb,name+'.xlsx')}else{let csv=[headers,...rows.map(r=>headers.map(h=>r[h]??''))].map(r=>r.map(csvSafe).join(',')).join('\r\n');download(name+'.csv',new Blob(['\ufeff'+csv],{type:'text/csv'}));toast('Excel library unavailable — exported CSV instead')}}
 const salesHeaders=['Date','Internal Order ID','Order ID','Company','Channel','Customer','Product','SKU','Quantity','Unit Price','Tax %','Tax Inclusive','Taxable Amount','Tax Amount','Shipping','Total Amount','Order Status','Notes'];
-function doExport(k){if(!adminMode)return toast('Only Admin can export data');if(k==='sales')return excelDownload('greenrich-sales-'+date(),data.sales.map(exportSales),salesHeaders);let list=data[k],headers=Object.keys(list[0]||({products:{name:'',sku:'',brand:'',price:'',tax:'',inclusive:'',active:''},channels:{name:'',type:'',active:''},customers:{name:'',mobile:'',email:'',address1:'',city:'',state:''},leads:{title:'',stage:'',value:'',followup:''},tasks:{title:'',due:'',status:''}}[k]));headers=headers.filter(h=>h!=='id');excelDownload('greenrich-'+k+'-'+date(),list,headers)}
+function doExport(k){if(!adminMode)return toast('Only Admin can export data');if(k==='sales')return excelDownload('greenrich-sales-'+date(),scopeRows('sales').map(exportSales),salesHeaders);let list=scopeRows(k),headers=Object.keys(list[0]||({products:{name:'',sku:'',brand:'',price:'',tax:'',inclusive:'',active:''},channels:{name:'',type:'',active:''},customers:{name:'',mobile:'',email:'',address1:'',city:'',state:''},leads:{title:'',stage:'',value:'',followup:''},tasks:{title:'',due:'',status:''}}[k]));headers=headers.filter(h=>h!=='id');excelDownload('greenrich-'+k+'-'+date(),list,headers)}
 function parseCsv(txt){let lines=[],row=[],col='',quoted=false;for(let i=0;i<txt.length;i++){const c=txt[i];if(c==='"'){if(quoted&&txt[i+1]==='"'){col+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){row.push(col);col=''}else if((c==='\r'||c==='\n')&&!quoted){if(c==='\r'&&txt[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))lines.push(row);row=[];col=''}else col+=c}if(col||row.length){row.push(col);lines.push(row)}const headers=(lines.shift()||[]).map(h=>h.trim().replace(/^\ufeff/,''));return lines.map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]||''])))}
 async function importSales(file){
  if(!adminMode)return toast('Only Admin can import sales');
@@ -560,7 +587,7 @@ async function importSales(file){
  }catch(error){toast('Import error: '+error.message)}
  finally{$('#upload-sales').value=''}
 }
-function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update]');if(!b||!root.contains(b))return;if(b.dataset.stockUpdate){const current=data.products.find(p=>p.id===b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const copy=JSON.parse(JSON.stringify(data));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(activeCompany,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
+function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update]');if(!b||!root.contains(b))return;if(b.dataset.stockUpdate){const current=find('products',b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const owner=ownerOf('products',current.id),copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(owner,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
  ['filter-from','filter-to'].forEach(id=>$('#'+id).onchange=()=>{if($('#filter-from').value||$('#filter-to').value)$('#period').value='custom';renderDashboard()});
  $('#clear-filters').onclick=()=>{
   $('#period').value='month';['filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).value='all');
@@ -572,12 +599,16 @@ function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>n
  root.addEventListener('click',event=>{
   const button=event.target.closest('[data-product-drill]');
   if(button&&root.contains(button))showProductOrders(button.dataset.productDrill);
- });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
+ });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');if(companyScope==='all')return toast('Select one company in the top selector before importing');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>{if(companyScope==='all')return toast('Select one company to back up its CRM records');download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))};$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');if(companyScope==='all')return toast('Select one company before restoring its backup');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
- mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false)=>{
-  if(!/^[a-z0-9][a-z0-9_-]{2,48}$/.test(companyId))throw Error('Invalid company selection');
+ mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false,companyIds=['grow-india'])=>{
+  permittedCompanies=[...new Set((Array.isArray(companyIds)?companyIds:[]).filter(id=>companyChoices.some(c=>c.id===id)))];
+  if(!permittedCompanies.length)throw Error('No company access. Contact the Admin.');
+  if(companyId!=='all'&&!permittedCompanies.includes(companyId))throw Error('You are not assigned to the selected company.');
+  if(companyId==='all'&&permittedCompanies.length!==2)throw Error('Both Companies requires access to both companies.');
+  companyScope=companyId;const workingId=companyId==='all'?permittedCompanies[0]:companyId;
   if(!client||!window.GreenRichSharedCustomers)throw Error('Shared customer service is unavailable. Refresh the page.');
-  activeCompany=companyId;activeCompanyName=companyName;adminMode=adminTools===true;allowDashboardExport=exportAllowed===true||isAdmin===true;
+  activeCompany=workingId;activeCompanyName=companyName;adminMode=adminTools===true;allowDashboardExport=exportAllowed===true||isAdmin===true;
   if(!container||!document.getElementById('grCrmTemplate'))throw Error('CRM workspace template is missing');
   charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
   allowedTabs=(Array.isArray(allowed)?allowed:Object.keys(titles)).filter(x=>Object.hasOwn(titles,x)&&(adminMode||!['channels','reports'].includes(x)));
@@ -586,7 +617,7 @@ window.GreenRichCRM={
   root=document.createElement('div');root.id='grCrmWorkspace';
   root.append(document.getElementById('grCrmTemplate').content.cloneNode(true));
   container.append(root);
-  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Shared customers and tags · Available to all active employees across both GreenRich companies. Sales, products and stock for '+activeCompanyName+' still remain on this browser and are NOT synchronized across devices.';
+  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Working view: '+activeCompanyName+' · Customers and tags are shared. Sales, stock, products, leads and follow-ups in the selected companies remain stored in this browser only, not synchronized across devices.';
   all('#navigation button[data-page]').forEach(button=>button.hidden=!allowedTabs.includes(button.dataset.page));
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Local CRM data needs restoration from a valid backup');

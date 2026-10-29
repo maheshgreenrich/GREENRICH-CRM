@@ -13,6 +13,8 @@ on:
       - 'tests/shared-customers-and-tags.js'
       - 'tests/sales-workflow-regression.js'
       - 'tests/sales-overview-dashboard.js'
+      - 'tests/employee-company-access.js'
+      - 'supabase/functions/greenrich-admin-users/index.ts'
       - 'tests/two-companies-settings-and-typography.js'
       - 'greenrich-public-config.js'
       - 'tests/shared-login-regression.js'
@@ -75,6 +77,7 @@ jobs:
           node tests/shared-customers-and-tags.js
           node tests/sales-workflow-regression.js
           node tests/sales-overview-dashboard.js
+          node tests/employee-company-access.js
           node tests/two-companies-settings-and-typography.js
           test -s greenrich-public-config.js
           node --check greenrich-public-config.js

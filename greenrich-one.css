@@ -131,3 +131,27 @@ aside .logo{
 #gr-company-settings-content .gr-tag-row strong{font-size:13px;color:#203c61}
 #gr-company-settings-content .gr-tag-row small{color:#69819d;margin-right:auto}
 #gr-company-settings-content .gr-tag-row button{width:auto!important;padding:8px 12px;font-size:12px}
+
+/* Company access: compact top-of-page switch, never tied to Attendance. */
+#app .main>header .gr-header-company-picker{display:flex;flex-direction:column;gap:4px;min-width:min(300px,38vw);max-width:340px;margin:0;color:#5f7190}
+#app .main>header .gr-header-company-picker span{font-size:9px;line-height:1.1;font-weight:700;letter-spacing:.08em;color:#6681a5}
+#app .main>header #headerCompanySelect{width:100%;max-width:340px;min-width:0;border:1px solid #d3e1f5;border-radius:9px;background:#f6f9ff;color:#184a91;font-weight:650;font-size:12.5px;padding:7px 28px 7px 11px;cursor:pointer;white-space:normal}
+#app .main>header #headerCompanySelect:focus{outline:2px solid #285de0;outline-offset:2px}
+#app .main>header #headerCompanySelect:disabled{opacity:.85;cursor:default}
+#gr-company-settings-content .gr-user-company-create{grid-column:1/-1;display:grid;gap:8px;min-width:0;padding:12px;background:#f6f9ff;border:1px solid #dbe5f4;border-radius:10px}
+#gr-company-settings-content .gr-user-company-create strong{font-size:12px;color:#23416f}
+#gr-company-settings-content .gr-user-company-field{display:flex;flex-wrap:wrap;gap:8px 15px;align-items:center}
+#gr-company-settings-content .gr-user-company-field label{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:#344d6d;font-weight:600;white-space:normal;max-width:220px}
+#gr-company-settings-content .gr-user-company-field input[type=checkbox]{width:16px!important;height:16px!important;flex:0 0 16px;margin:0}
+#gr-company-settings-content .gr-save-companies{width:auto!important;max-width:100%;margin-top:7px;font-size:11px;white-space:nowrap}
+#gr-company-settings-content .gr-user-actions{min-width:180px;white-space:normal}
+#gr-company-settings-content .gr-user-actions button{width:auto!important;min-width:0;max-width:100%;padding:7px 10px;margin:3px 4px 3px 0;font-size:11px}
+#gr-company-settings-content .gr-delete-user{background:#fff0f1!important;color:#ad1934!important;border:1px solid #f0c4cb!important;border-radius:8px}
+@media(max-width:770px){
+ #app .main>header .gr-header-company-picker{min-width:145px;max-width:225px}
+ #app .main>header #headerCompanySelect{font-size:11px;padding:7px}
+}
+@media(max-width:480px){
+ #app .main>header .gr-header-company-picker{min-width:128px;max-width:175px}
+ #app .main>header #headerCompanySelect{font-size:10.5px}
+}

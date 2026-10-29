@@ -16,7 +16,7 @@ assert.doesNotMatch(app,/const modules=\[[^\]]*'reports'/);
 assert.match(settings,/GreenRich Grow India Pvt Ltd/);
 assert.match(settings,/GreenRich Enviro Solutions Pvt Ltd/);
 assert.match(settings,/gr_companies/);
-assert.match(settings,/\.update\(\{name:companyName/);
+assert.match(settings,/\.update\(\{name:newName/);
 assert.match(settings,/data-settings-tab/);
 assert.match(settings,/Work With This Company/);
 assert.match(app,/settings:'Settings'/,'Sidebar must say Settings');

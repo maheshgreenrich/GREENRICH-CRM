@@ -37,7 +37,8 @@ async function enter(){
   ]);
   if(profileResult.error||!profileResult.data?.active)throw Error('No active employee profile. Ask your Admin to set up your profile.');
   profile=profileResult.data;roles=roleRows;permissions=permissionRows;people=employeeRows;company=settingsRows[0]||null;
-  $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();const companyLabel=$('#activeCompanyLabel');if(companyLabel)companyLabel.textContent=window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd';
+  await window.GreenRichCompanies.configure({userId:user.id,companyIds:profile.company_ids,db});
+  $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();configureCompanySelector();
   document.title='GreenRich ONE · '+(company?.company_name||'CRM');
   if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
   show('app');navigation();
@@ -65,6 +66,25 @@ const menuIcons={
  settings:'<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .8 1.4-2 2-.9-.9a8 8 0 0 1-2.3 1l-.3 1.5h-3l-.3-1.5a8 8 0 0 1-2.3-1l-.9.9-2-2 .8-1.4a8 8 0 0 1-.4-2.5L5 12l1.6-.5a8 8 0 0 1 .4-2.5L6.2 7.6l2-2 .9.9a8 8 0 0 1 2.3-1l.3-1.5h3l.3 1.5a8 8 0 0 1 2.3 1l.9-.9 2 2-.8 1.4a8 8 0 0 1 .4 2.5L21 12l-1.6.5a8 8 0 0 1 0 2.5Z"/>',
  reports:'<path d="M3 3v18h18M7 15l5-5 4 3 5-7"/>'
 };
+function configureCompanySelector(){
+ const select=$('#headerCompanySelect'),manager=window.GreenRichCompanies;if(!select||!manager)return;
+ const valid=manager.allowed(),selected=manager.selected(user?.id);
+ select.replaceChildren();
+ manager.list().filter(c=>valid.includes(c.id)).forEach(c=>{const option=document.createElement('option');option.value=c.id;option.textContent=c.name;select.append(option)});
+ if(valid.length===2){const option=document.createElement('option');option.value='all';option.textContent='Both Companies';select.append(option)}
+ select.value=selected;
+ const label=$('#activeCompanyLabel');if(label)label.textContent=manager.name(user?.id);
+ select.disabled=valid.length<=1;
+ select.onchange=()=>{
+  try{
+   manager.choose(select.value,user.id);
+   if(label)label.textContent=manager.name(user.id);
+   document.title='GreenRich ONE · '+manager.name(user.id);
+   if(crmMap[page])void render();
+   // Attendance is a completed module: changing company never re-renders it.
+  }catch(error){toast(error.message);select.value=manager.selected(user.id)}
+ };
+}
 function navigation(){
  const visible=modules.filter(canOpenPage);
  $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
@@ -161,7 +181,7 @@ async function crmWorkspace(container,view,adminTools=false){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
  const access=crmAccess(),allowed=adminTools?['channels','reports']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
- await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'));
+ await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed());
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
@@ -186,13 +206,64 @@ async function employeeAction(data){
 }
 async function users(c){
  if(roleName()!=='Admin')throw Error('Only Admin can manage users');
- c.innerHTML='<div class="panel"><div class="row"><h2>User Management</h2><div class="row"><button class="secondary" type="button" id="openRoleSettings">Manage User Roles</button><button class="blue" type="button" id="newEmployeeButton">+ Create New User</button></div></div><div id="newEmployeePanel" hidden><h3>Create Employee</h3><span class="pill">Direct account creation</span><p>Enter username, login email and password. No invitation or email verification is required. Every employee login must use a unique email.</p><form id="employeeForm" class="fields"><label>Username<input name="username" required minlength="3" placeholder="e.g. ezhil"></label><label>Email for Login<input name="email" type="email" required placeholder="employee@company.com"></label><label>Password<input name="password" type="password" minlength="10" required></label><label>Assign Role<select name="role">'+roles.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><div style="align-self:end"><button class="blue" type="submit">Create Employee</button></div></form></div><div class="notice">One-time setup: deploy the protected greenrich-admin-users employee service from this repository. The button will work only after that one-time deployment. <a href="https://github.com/maheshgreenrich/GREENRICH-CRM/blob/main/supabase/functions/greenrich-admin-users/index.ts" target="_blank" rel="noopener">Open deployment code</a>.</div></div><div class="panel"><div class="row"><h2>Manage Users</h2><span class="pill">'+people.length+' profiles</span></div><div class="tablewrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Admin Actions</th></tr></thead><tbody>'+people.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.username)+'</td><td>'+esc(p.email)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+esc(p.active?'Active':'Disabled')+'</td><td><button class="secondary" data-emp-edit="'+p.id+'">Edit / Role</button> <button class="secondary" data-emp-reset="'+p.id+'">Reset Password</button> <button class="secondary" data-emp-toggle="'+p.id+'">'+(p.active?'Deactivate':'Reactivate')+'</button></td></tr>').join('')+'</tbody></table></div></div>';
- const openRoleSettings=c.querySelector('#openRoleSettings');if(openRoleSettings)openRoleSettings.onclick=()=>c.closest('#gr-company-admin')?.querySelector('[data-settings-tab="roles"]')?.click();
- $('#newEmployeeButton').onclick=()=>{const panel=$('#newEmployeePanel');panel.hidden=!panel.hidden;if(!panel.hidden)panel.querySelector('input').focus()};const refresh=async()=>{people=await query('gr_profiles');permissions=await query('gr_role_permissions');await users(c)};
- $('#employeeForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector('button');const f=new FormData(form);button.disabled=true;try{const result=await employeeAction({action:'create',password:f.get('password'),name:f.get('username'),username:f.get('username'),email:f.get('email'),role:f.get('role')});toast(result.message||'Employee created');await refresh()}catch(e){toast(e.message)}finally{button.disabled=false}};
- c.querySelectorAll('[data-emp-edit]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empEdit);if(!p)return;const name=prompt('Employee name',p.full_name);if(name===null)return;const username=prompt('Username',p.username);if(username===null)return;const selected=prompt('Role: '+roles.map(x=>x.name).join(', '),roles.find(x=>x.id===p.role_id)?.name||'Sales');if(selected===null)return;const role=roles.find(r=>r.name.toLowerCase()===selected.trim().toLowerCase());if(!role)return toast('Role not found');try{const out=await employeeAction({action:'edit',userId:p.id,name,username,role:role.name});toast(out.message);await refresh()}catch(e){toast(e.message)}});
- c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;if(!confirm('Send a password reset email to '+p.email+'?'))return;try{const out=await employeeAction({action:'reset',userId:p.id});toast(out.message)}catch(e){toast(e.message)}});
- c.querySelectorAll('[data-emp-toggle]').forEach(button=>button.onclick=async()=>{const p=people.find(x=>x.id===button.dataset.empToggle);if(!p)return;const action=p.active?'disable':'enable';if(!confirm((p.active?'Deactivate':'Reactivate')+' '+p.username+'?'))return;try{const out=await employeeAction({action,userId:p.id});toast(out.message);await refresh()}catch(e){toast(e.message)}});
+ const companies=window.GreenRichCompanies.list(),active=companies.filter(c=>c.active!==false);
+ const fields=(ids,name)=>'<div class="gr-user-company-field" role="group" aria-label="Employee company access">'+active.map(company=>'<label><input type="checkbox" name="'+esc(name)+'" value="'+esc(company.id)+'" '+(ids.includes(company.id)?'checked':'')+'><span>'+esc(company.name)+'</span></label>').join('')+'</div>';
+ c.innerHTML='<div class="panel"><div class="row"><h2>User Management</h2><div class="row"><button class="secondary" type="button" id="openRoleSettings">Manage User Roles</button><button class="blue" type="button" id="newEmployeeButton">+ Create New User</button></div></div>'+
+  '<div id="newEmployeePanel" hidden><h3>Create Employee</h3><p>Choose each employee\'s company access separately from their role.</p><form id="employeeForm" class="fields"><label>Username<input name="username" required minlength="3" placeholder="Employee username"></label><label>Email for Login<input name="email" type="email" required></label><label>Password<input name="password" type="password" minlength="10" required></label><label>Assign Role<select name="role">'+roles.map(r=>'<option>'+esc(r.name)+'</option>').join('')+'</select></label><div class="gr-user-company-create"><strong>Company Access (required)</strong>'+fields(active.map(c=>c.id),'companyIds')+'</div><div style="align-self:end"><button class="blue" type="submit">Create Employee</button></div></form></div>'+
+  '<p class="notice">Company assignments are set for each employee, independently of their user role. Users assigned to both companies can switch between either company or Both Companies. Customers remain a shared master.</p></div>'+
+  '<div class="panel"><div class="row"><h2>Manage Users</h2><span class="pill">'+people.length+' profiles</span></div><div class="tablewrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Company Access</th><th>Status</th><th>Admin Actions</th></tr></thead><tbody>'+
+  people.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.username)+'</td><td>'+esc(p.email)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+fields(Array.isArray(p.company_ids)?p.company_ids:active.map(c=>c.id),'companyAccess')+
+  '<button class="secondary gr-save-companies" type="button" data-emp-companies="'+esc(p.id)+'" '+(p.id===user.id?'disabled title="Your own assignment cannot be changed"':'')+'>Save Access</button></td><td>'+esc(p.active?'Active':'Disabled')+'</td>'+
+  '<td class="gr-user-actions"><button class="secondary" data-emp-edit="'+esc(p.id)+'">Edit / Role</button><button class="secondary" data-emp-reset="'+esc(p.id)+'">Reset Password</button><button class="secondary" data-emp-toggle="'+esc(p.id)+'" '+(p.id===user.id?'disabled':'')+'>'+(p.active?'Deactivate':'Reactivate')+'</button><button class="gr-delete-user" data-emp-delete="'+esc(p.id)+'" '+(p.id===user.id?'disabled title="You cannot delete your own account"':'')+'>Delete User</button></td></tr>').join('')+
+  '</tbody></table></div></div>';
+ const roleButton=c.querySelector('#openRoleSettings');if(roleButton)roleButton.onclick=()=>c.closest('#gr-company-admin')?.querySelector('[data-settings-tab="roles"]')?.click();
+ const refresh=async()=>{people=await query('gr_profiles');permissions=await query('gr_role_permissions');await users(c)};
+ const panel=c.querySelector('#newEmployeePanel');c.querySelector('#newEmployeeButton').onclick=()=>{panel.hidden=!panel.hidden;if(!panel.hidden)panel.querySelector('input').focus()};
+ c.querySelector('#employeeForm').onsubmit=async event=>{
+  event.preventDefault();const form=event.currentTarget,f=new FormData(form),companyIds=f.getAll('companyIds'),button=form.querySelector('button[type="submit"]');
+  if(!companyIds.length)return toast('Select at least one company for the employee');
+  button.disabled=true;
+  try{const result=await employeeAction({action:'create',password:f.get('password'),name:f.get('username'),username:f.get('username'),email:f.get('email'),role:f.get('role'),companyIds});toast(result.message||'Employee created');await refresh()}
+  catch(error){toast(error.message)}finally{button.disabled=false}
+ };
+ c.querySelectorAll('[data-emp-companies]').forEach(button=>button.onclick=async()=>{
+  const p=people.find(x=>x.id===button.dataset.empCompanies);if(!p||p.id===user.id)return;
+  const row=button.closest('tr'),companyIds=[...row.querySelectorAll('input[name="companyAccess"]:checked')].map(x=>x.value);
+  if(!companyIds.length)return toast('Select at least one company');
+  if(!confirm('Update company access for '+p.full_name+'?'))return;
+  button.disabled=true;
+  try{const out=await employeeAction({action:'edit',userId:p.id,companyIds});toast(out.message||'Company access updated');await refresh()}
+  catch(e){toast('Unable to change company access: '+e.message)}finally{button.disabled=false}
+ });
+ c.querySelectorAll('[data-emp-edit]').forEach(button=>button.onclick=async()=>{
+  const p=people.find(x=>x.id===button.dataset.empEdit);if(!p)return;
+  const name=prompt('Employee name',p.full_name);if(name===null)return;
+  const username=prompt('Username',p.username);if(username===null)return;
+  const selected=prompt('Role: '+roles.map(x=>x.name).join(', '),roles.find(x=>x.id===p.role_id)?.name||'Sales');if(selected===null)return;
+  const role=roles.find(r=>r.name.toLowerCase()===selected.trim().toLowerCase());if(!role)return toast('Role not found');
+  try{const out=await employeeAction({action:'edit',userId:p.id,name,username,role:role.name});toast(out.message||'User updated');await refresh()}
+  catch(e){toast(e.message)}
+ });
+ c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{
+  const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;
+  if(!confirm('Send a password reset email to '+p.email+'?'))return;
+  try{const out=await employeeAction({action:'reset',userId:p.id});toast(out.message)}catch(e){toast(e.message)}
+ });
+ c.querySelectorAll('[data-emp-toggle]').forEach(button=>button.onclick=async()=>{
+  const p=people.find(x=>x.id===button.dataset.empToggle);if(!p||p.id===user.id)return;
+  const action=p.active?'disable':'enable';
+  if(!confirm((p.active?'Deactivate':'Reactivate')+' '+p.username+'?'))return;
+  try{const out=await employeeAction({action,userId:p.id});toast(out.message);await refresh()}catch(e){toast(e.message)}
+ });
+ c.querySelectorAll('[data-emp-delete]').forEach(button=>button.onclick=async()=>{
+  const p=people.find(x=>x.id===button.dataset.empDelete);if(!p||p.id===user.id)return;
+  const answer=prompt('Permanently delete '+p.full_name+'? This is irreversible. Employee records with attendance or audit history are protected. Type the exact username to confirm:',p.username);
+  if(answer!==p.username)return toast('Deletion cancelled: username confirmation did not match');
+  if(!confirm('Final confirmation: permanently delete '+p.username+'?'))return;
+  button.disabled=true;
+  try{const out=await employeeAction({action:'delete',userId:p.id});toast(out.message||'Employee deleted');await refresh()}
+  catch(e){toast('Delete blocked: '+e.message)}finally{button.disabled=false}
+ });
 }
 async function permissionPage(c){
  if(roleName()!=='Admin')throw Error('Admin only');
@@ -249,7 +320,7 @@ async function settings(c){
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
-   const label=$('#activeCompanyLabel');if(label)label.textContent=name;
+   configureCompanySelector();
   }
  });
 }
