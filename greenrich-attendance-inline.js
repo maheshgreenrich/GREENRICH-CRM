@@ -8,7 +8,7 @@ window.GreenRichAttendance=(function(){
  const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
- let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1;
+ let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1,ownId='',workingDays=[1,2,3,4,5,6];
  const manager=()=>actorRole==='Admin'||actorRole==='Office Admin';
  const notify=(message,error=false)=>{const e=$('#alert');e.hidden=false;e.textContent=message;e.classList.toggle('error',error);e.scrollIntoView({behavior:'smooth',block:'nearest'})};
  async function request(path,method='GET',body=null,download=false){
@@ -38,11 +38,12 @@ window.GreenRichAttendance=(function(){
   db=window.supabase.createClient(url,key);apiKey=key;apiRoot=url.replace(/\/$/,'')+'/functions/v1/attendance-api';
   const user=(await db.auth.getUser()).data.user;
   if(!user)throw Error('Sign in using the secure GreenRich ONE login.');
-  const p=await db.from('gr_profiles').select('full_name,active,role_id').eq('id',user.id).single();
+  const p=await db.from('gr_profiles').select('full_name,active,role_id,shift_id').eq('id',user.id).single();
   if(p.error||!p.data?.active)throw Error('Employee account is not active.');
   const role=await db.from('gr_roles').select('name').eq('id',p.data.role_id).single();
   if(role.error)throw Error(role.error.message);
-  actorRole=role.data.name;actorName=p.data.full_name;
+  actorRole=role.data.name;actorName=p.data.full_name;ownId=user.id;
+  if(p.data.shift_id){const assignedShift=await db.from('grm_shifts').select('working_days').eq('id',p.data.shift_id).maybeSingle();if(!assignedShift.error&&Array.isArray(assignedShift.data?.working_days))workingDays=assignedShift.data.working_days;}
   $('#todayLabel').textContent='Today · '+today;
   $('#adminTab').hidden=!manager();$('#manageTab').hidden=!manager();$('#launchPanel').hidden=actorRole!=='Admin';$('#launchDate').min=today;$('#launchDate').value=today;
   $('#myMonth').value=today.slice(0,7);$('#reportMonth').value=today.slice(0,7);
@@ -106,19 +107,45 @@ window.GreenRichAttendance=(function(){
  $('#holidayForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('holidays',e.currentTarget))};
   $('#shiftForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('shifts',e.currentTarget))};
   $('#departmentForm').onsubmit=e=>{e.preventDefault();safe(()=>saveConfig('departments',e.currentTarget))};
-  try{if(manager()){ $$('.av-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab==='admin')); $$('.av-section').forEach(section=>section.hidden=section.id!=='tab-admin'); await loadAdmin(); }else{ await loadMine(); }}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
+  try{await loadMine();if(manager())safe(loadPendingCount);}catch(e){notify('Attendance could not load: '+e.message+'. Check your login and Attendance API access.',true)}
  }
  async function loadMine(){
   const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
-  const [items,summary]=await Promise.all([
-   request('/attendance/me?'+params({from,to,page:myPage,pageSize:20})),
-   request('/attendance/me/summary?'+params({month}))
+  const [history,summary,holidayList]=await Promise.all([
+   request('/attendance/me?'+params({from,to,page:1,pageSize:100})),
+   request('/attendance/me/summary?'+params({month})),
+   db.from('grm_holidays').select('date,name').gte('date',from).lte('date',to)
   ]);
-  $('#mySummary').innerHTML=[['Present',summary.present],['Late',summary.late],['Half Day',summary.half_day],['Absent',summary.absent],['Total Hours',summary.hours]].map(([t,n])=>'<div class="card"><small>'+esc(t)+'</small><strong>'+esc(n)+'</strong></div>').join('');
-  $('#myRows').innerHTML=items.items.map(r=>tRow([esc(r.date),esc(r.status),esc(shortDate(r.check_in)),esc(shortDate(r.check_out)),esc(r.total_hours??'—')])).join('')||'<tr><td colspan="5">No attendance records this month.</td></tr>';
-  $('#myPager').textContent='Page '+items.page+' of '+Math.max(1,items.pages)+' · '+items.total+' records';
-  $('#myPrev').disabled=myPage<=1;$('#myNext').disabled=myPage>=items.pages;
-  $('#clockStatus').textContent='Your records are stored securely in Supabase.';
+  const records=history.items||[],byDate=new Map(records.map(x=>[x.date,x]));
+  const specialDays=new Map((holidayList.data||[]).map(x=>[x.date,x.name]));
+  const todayRecord=byDate.get(localDay());
+  const checkIn=todayRecord?.check_in,checkOut=todayRecord?.check_out;
+  $('#checkInTime').textContent=checkIn?shortDate(checkIn):'Not marked';
+  $('#checkOutTime').textContent=checkOut?shortDate(checkOut):'Not marked';
+  $('#checkIn').disabled=!!todayRecord;
+  $('#checkOut').disabled=!checkIn||!!checkOut;
+  $('#clockStatus').textContent=checkOut?'Completed for today · '+Number(todayRecord.total_hours||0).toFixed(2)+' hours':checkIn?'Checked in. Remember to check out before leaving.':todayRecord?'Attendance already recorded for today.':'You have not checked in today.';
+  const totals=[['Present',summary.present],['Late',summary.late],['Half Day',summary.half_day],['Absent',summary.absent],['Leave',summary.leave],['Hours',summary.hours]];
+  $('#mySummary').innerHTML=totals.map(([name,count])=>'<div class="card"><small>'+esc(name)+'</small><strong>'+esc(count||0)+'</strong></div>').join('');
+  const year=Number(month.slice(0,4)),mo=Number(month.slice(5,7)),days=new Date(Date.UTC(year,mo,0)).getUTCDate();
+  let cells=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>'<div class="av-calendar-weekday">'+d+'</div>');
+  const firstWeekday=(new Date(Date.UTC(year,mo-1,1)).getUTCDay()+6)%7;
+  for(let i=0;i<firstWeekday;i++)cells.push('<div class="av-calendar-empty" aria-hidden="true"></div>');
+  for(let day=1;day<=days;day++){
+   const date=month+'-'+String(day).padStart(2,'0'),entry=byDate.get(date);
+   const isoDay=new Date(date+'T00:00:00Z').getUTCDay();
+   const weekday=isoDay===0?7:isoDay;
+   const actual=entry?.status;
+   const status=actual||(specialDays.has(date)?'HOLIDAY':!workingDays.includes(weekday)?'WEEKEND':'UNMARKED');
+   const label=({PRESENT:'Present',LATE:'Late',HALF_DAY:'Half Day',ABSENT:'Absent',ON_LEAVE:'Leave',HOLIDAY:'Holiday',WEEKEND:'Weekend',UNMARKED:'—'})[status]||status;
+   const color=({PRESENT:'present',LATE:'present',HALF_DAY:'half',ABSENT:'absent',ON_LEAVE:'leave',HOLIDAY:'holiday',WEEKEND:'weekend',UNMARKED:'unmarked'})[status]||'unmarked';
+   const title=specialDays.get(date)||label;
+   cells.push('<div class="av-calendar-day '+color+(date===localDay()?' today':'')+'" title="'+esc(date+' — '+title)+'"><strong>'+day+'</strong><small>'+esc(label)+'</small></div>');
+  }
+  $('#myCalendar').innerHTML=cells.join('');
+  $('#myRows').innerHTML=records.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(x=>tRow([esc(x.date),esc(x.status),esc(shortDate(x.check_in)),esc(shortDate(x.check_out)),esc(x.total_hours??'—')])).join('')||'<tr><td colspan="5">No attendance marked this month. Calendar still shows weekends and holidays.</td></tr>';
+  $('#myPager').textContent='Showing '+records.length+' records for '+month;
+  await loadRequests();
  }
  async function loadRequests(){
   const [corrections,leaves]=await Promise.all([request('/attendance/corrections/me'),request('/leaves/me')]);
