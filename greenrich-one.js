@@ -13,7 +13,7 @@ const crmAccess=()=>({
  channels:can('sales'),
  reports:can('reports')
 });
-const canOpenPage=m=>m==='attendance'||can(m)||
+const canOpenPage=m=>m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
