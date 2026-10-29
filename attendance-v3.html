@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attendance Management | GreenRich ONE</title>
+<link rel="stylesheet" href="greenrich-one.css"><link rel="stylesheet" href="attendance-v3.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script defer src="attendance-v3.js?v=1"></script></head>
+<body>
+<div id="authNotice" class="auth"><div class="authcard"><h2>GreenRich ONE Attendance</h2><p id="authStatus">Checking secure login…</p><a href="secure.html">Open secure employee login</a></div></div>
+<div id="attendanceApp" class="app" hidden>
+<aside><div class="logo">◆ <b>GreenRich ONE</b></div><small>ATTENDANCE V3</small>
+<nav class="av-nav"><a href="secure.html">▦ Dashboard</a><a class="active" href="attendance-v3.html">◈ Attendance</a><a href="roles.html" id="roleLink" hidden>♧ Manage Roles</a><a href="secure.html#users" id="userLink" hidden>♙ Employee Users</a></nav><div class="bottom"><a href="secure.html">← GreenRich ONE</a></div></aside>
+<div class="main"><header><div><small>GREENRICH ONE · SECURE ATTENDANCE</small><h1>Attendance Management</h1></div><div class="profile"><b id="employeeName"></b><small id="employeeRole"></small></div></header>
+<main id="v3Content">
+<div class="av-tabs"><button class="av-tab active" type="button" data-tab="mine">My Attendance</button><button class="av-tab" type="button" data-tab="requests">Leave & Corrections</button><button id="adminTab" class="av-tab" type="button" data-tab="admin" hidden>Office Admin</button><button id="manageTab" class="av-tab" type="button" data-tab="config" hidden>Holidays & Shifts</button></div>
+<section id="tab-mine" class="av-section">
+ <div class="panel"><div class="row"><div><h2>My Daily Attendance</h2><p>Check-in and check-out use server time in the company timezone.</p></div><span class="pill" id="todayLabel"></span></div>
+ <div class="av-actions"><button type="button" class="blue" id="checkIn">Check In</button><button type="button" class="secondary" id="checkOut">Check Out</button><span id="clockStatus"></span></div></div>
+ <div class="panel"><div class="row"><h2>Monthly Attendance</h2><label>Month<input id="myMonth" type="month"></label></div><div id="mySummary" class="cards"></div>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Status</th><th>Check In (UTC)</th><th>Check Out (UTC)</th><th>Hours</th></tr></thead><tbody id="myRows"></tbody></table></div><div class="av-pager"><button id="myPrev" type="button">Previous</button><span id="myPager"></span><button id="myNext" type="button">Next</button></div></div>
+</section>
+<section id="tab-requests" class="av-section" hidden>
+<div class="av-grid"><div class="panel"><h2>Request Attendance Correction</h2><p>For a previous date only. An Office Admin must approve.</p>
+<form id="correctionForm" class="av-form">
+<label>Date<input name="date" type="date" id="correctionDate" required></label>
+<label>Requested Check-in (local office time)<input name="in" type="datetime-local" required></label>
+<label>Requested Check-out (local office time)<input name="out" type="datetime-local"></label>
+<label>Reason<textarea name="reason" required minlength="3" maxlength="1000" rows="3"></textarea></label><button class="blue" type="submit">Submit Correction</button></form></div>
+<div class="panel"><h2>Apply for Leave</h2><form id="leaveForm" class="av-form">
+<label>Leave Type<select name="type"><option>Casual Leave</option><option>Sick Leave</option><option>Earned Leave</option><option>Unpaid Leave</option></select></label>
+<label>From<input name="from" type="date" required></label><label>To<input name="to" type="date" required></label>
+<label>Reason<textarea name="reason" rows="3" minlength="3" maxlength="1000" required></textarea></label>
+<button class="blue">Submit Leave Request</button></form></div></div>
+<div class="panel"><h2>My Correction Requests</h2><div id="myCorrections"></div></div>
+<div class="panel"><h2>My Leave Applications</h2><div id="myLeaves"></div></div>
+</section>
+<section id="tab-admin" class="av-section" hidden>
+ <div class="panel"><div class="row"><h2>Company Attendance</h2><span class="pill">Office Admin</span></div>
+ <form id="adminFilters" class="av-filter"><label>Employee<select name="userId" id="filterEmployee"><option value="">All Employees</option></select></label>
+ <label>Department<select name="department" id="filterDepartment"><option value="">All Departments</option></select></label>
+ <label>From<input name="from" id="adminFrom" type="date"></label><label>To<input name="to" id="adminTo" type="date"></label>
+ <label>Status<select name="status"><option value="">All Statuses</option><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
+ <button class="blue">Apply Filters</button></form>
+ <div class="tablewrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Status</th><th>In (UTC)</th><th>Out (UTC)</th><th>Actions</th></tr></thead><tbody id="adminRows"></tbody></table></div><div class="av-pager"><button id="adminPrev">Previous</button><span id="adminPager"></span><button id="adminNext">Next</button></div></div>
+ <div class="av-grid">
+ <div class="panel"><h2>Mark / Correct Attendance</h2><form id="adminMark" class="av-form">
+ <label>Employee<select name="userId" id="markEmployee" required></select></label><label>Date<input name="date" type="date" required></label>
+ <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>LATE</option><option>HALF_DAY</option><option>ON_LEAVE</option><option>HOLIDAY</option><option>WEEKEND</option></select></label>
+ <label>Check-in (optional)<input name="checkIn" type="datetime-local"></label><label>Check-out (optional)<input name="checkOut" type="datetime-local"></label>
+ <label>Reason (required)<textarea name="reason" required minlength="3" rows="2"></textarea></label><button class="blue" type="submit">Save Attendance</button></form></div>
+ <div class="panel"><h2>Bulk Mark Attendance</h2><p>Select multiple employees. Maximum 200 per operation.</p><form class="av-form" id="bulkForm">
+ <label>Date<input name="date" type="date" required></label>
+ <label>Status<select name="status"><option>PRESENT</option><option>ABSENT</option><option>HOLIDAY</option></select></label>
+ <div class="av-bulklist" id="bulkUsers"></div><label>Reason<textarea name="reason" required minlength="3"></textarea></label>
+ <button class="blue" type="submit">Mark Selected Employees</button></form></div></div>
+ <div class="panel"><div class="row"><h2>Monthly Report</h2><label>Month<input id="reportMonth" type="month"></label></div>
+ <div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
+ <div class="av-grid">
+ <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
+ <div class="panel"><h2>Leave Requests for Approval</h2><div id="adminLeaves"></div></div></div>
+</section>
+<section id="tab-config" class="av-section" hidden>
+ <div class="av-grid"><div class="panel"><h2>Office Holidays</h2><form id="holidayForm" class="av-form">
+ <input type="hidden" name="id"><label>Holiday Date<input name="date" type="date" required></label><label>Holiday Name<input name="name" required maxlength="120"></label>
+ <label>Reason<input name="reason" required minlength="3"></label><button class="blue" type="submit">Save Holiday</button></form><div id="holidayRows"></div></div>
+ <div class="panel"><h2>Office Working Shifts</h2><form id="shiftForm" class="av-form">
+ <input type="hidden" name="id"><label>Shift Name<input name="name" required maxlength="120"></label>
+ <label>Start Time<input name="startTime" type="time" required></label><label>End Time<input name="endTime" type="time" required></label>
+ <label>Grace Minutes<input name="graceMinutes" type="number" min="0" max="240" value="10" required></label>
+ <label>Half-day Hours<input name="halfDayHours" type="number" min="0.5" max="24" step="0.5" value="4" required></label>
+ <label>Working Days (1=Mon … 7=Sun)<input name="workingDays" placeholder="1,2,3,4,5,6" value="1,2,3,4,5,6" required></label>
+ <label>Reason<input name="reason" required minlength="3"></label><button class="blue" type="submit">Save Shift</button></form>
+ <div id="shiftRows"></div></div></div>
+ <div class="panel"><h2>Departments</h2><form class="av-filter" id="departmentForm"><label>Name<input name="name" required></label><label>Reason<input name="reason" minlength="3" required></label><button class="blue">Add Department</button></form><div id="departmentRows"></div></div>
+</section>
+<div id="alert" class="av-alert" role="alert" hidden></div>
+</main></div></div></body></html>
