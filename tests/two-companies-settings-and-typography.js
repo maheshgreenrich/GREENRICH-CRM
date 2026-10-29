@@ -25,13 +25,13 @@ assert.match(css,/table td strong/);
 assert.match(css,/font-size:14px !important/);
 assert.match(base,/\.gr-brand-name/);
 
-const crmTemplate=shell.match(/<template id="grCrmTemplate">([\\s\\S]*?)<\\/template>/)?.[1]||'';
+const crmTemplate=shell.split('<template id="grCrmTemplate">')[1]?.split('</template>')[0]||'';
 for(const section of ['sales','customers','leads','tasks','products']){
- const markup=crmTemplate.match(new RegExp('<section id="'+section+'" class="page"[\\\\s\\\\S]*?<\\\\/section>'))?.[0]||'';
+ const markup=crmTemplate.split('<section id="'+section+'" class="page"')[1]?.split('</section>')[0]||'';
  assert.ok(markup,'Missing CRM section '+section);
  assert.doesNotMatch(markup,/data-export=|id="export-sales"/,'Exports must be located in Admin Settings');
 }
-assert.match(app,/if\\(adminTools&&roleName\\(\\)!=='Admin'\\)/);
-assert.match(crm,/adminMode=adminTools===true/);
-assert.match(css,/#grCrmWorkspace #sales-table td:nth-child\\(9\\) strong/);
-console.log('PASS: two-company Admin management, protected navigation, Sales tools moved, local record separation and compact brand typography');
+assert.ok(app.includes("if(adminTools&&roleName()!=='Admin')"),'Admin route must verify role');
+assert.ok(crm.includes('adminMode=adminTools===true'),'Admin state must guard import/export');
+assert.ok(css.includes('#grCrmWorkspace #sales-table td:nth-child(9) strong'),'Sales amounts need compact typography');
+console.log('PASS: two-company Admin management, protected navigation, Admin data controls and compact typography');
