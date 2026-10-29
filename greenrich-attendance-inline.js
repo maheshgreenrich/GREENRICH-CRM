@@ -222,19 +222,24 @@ window.GreenRichAttendance=(function(){
   }
  }
  async function drawAdminChart(){
-  const f=$('#adminFilters'),query={userId:input(f,'userId'),department:input(f,'department'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),pageSize:100},all=[];
+  const f=$('#adminFilters'),query={userId:input(f,'userId'),roleId:input(f,'roleId'),from:input(f,'from'),to:input(f,'to'),status:input(f,'status'),pageSize:100},all=[];
   let pages=1;
   for(let index=1;index<=Math.min(pages,10);index++){
    const part=await request('/admin/attendance?'+params({...query,page:index}));
    all.push(...part.items);pages=part.pages||1;
   }
-  const keys=['PRESENT','LATE','HALF_DAY','ABSENT','ON_LEAVE','HOLIDAY','WEEKEND'];
-  const colors={PRESENT:'present',LATE:'present',HALF_DAY:'half',ABSENT:'absent',ON_LEAVE:'leave',HOLIDAY:'holiday',WEEKEND:'weekend'};
-  const counts=Object.fromEntries(keys.map(k=>[k,all.filter(x=>x.status===k).length]));
-  $('#adminChartSummary').innerHTML=[['Employees',new Set(all.map(x=>x.user_id)).size],['Present',counts.PRESENT],['Absent',counts.ABSENT],['Half Day',counts.HALF_DAY],['Leave',counts.ON_LEAVE],['Records',all.length]].map(([n,v])=>'<div class="card"><small>'+esc(n)+'</small><strong>'+v+'</strong></div>').join('');
-  const max=Math.max(1,...Object.values(counts));
-  $('#adminChart').innerHTML='<div class="av-chart-title">Attendance overview · '+esc(input(f,'from'))+' to '+esc(input(f,'to'))+(pages>10?' · Showing first 1,000 rows':'')+'</div>'+
-    keys.map(k=>'<div class="av-chart-row"><span>'+esc(k.replace('_',' '))+'</span><div class="av-chart-track"><div class="av-chart-bar '+colors[k]+'" style="width:'+(counts[k]/max*100).toFixed(1)+'%"></div></div><strong>'+counts[k]+'</strong></div>').join('');
+  const categories=[
+   ['PRESENT','Present','#319f66'],['LATE','Late','#6cba80'],['HALF_DAY','Half Day','#e2ae3d'],
+   ['ABSENT','Absent','#dd615b'],['ON_LEAVE','On Leave','#9875c8'],['PAID_LEAVE','Paid Leave','#e88bac'],
+   ['HOLIDAY','Holiday','#3676d9'],['WEEKEND','Weekend','#535963']
+  ];
+  const active=categories.map(([key,label,color])=>({key,label,color,count:all.filter(r=>r.status===key).length})).filter(v=>v.count>0);
+  const total=active.reduce((n,r)=>n+r.count,0);
+  $('#adminChartSummary').innerHTML=[['Employees',new Set(all.map(x=>x.user_id)).size],['Attendance Records',all.length]].map(([name,count])=>'<div class="card"><small>'+esc(name)+'</small><strong>'+count+'</strong></div>').join('');
+  if(!total){$('#adminChart').innerHTML='<p class="av-empty">No attendance records for the selected dates and filters.</p>';return}
+  let offset=0;
+  const gradient=active.map(part=>{const beginning=offset;offset+=part.count/total*100;return part.color+' '+beginning.toFixed(3)+'% '+offset.toFixed(3)+'%'}).join(', ');
+  $('#adminChart').innerHTML='<div class="av-round-report"><div class="av-donut" role="img" aria-label="Attendance breakdown: '+esc(active.map(x=>x.label+' '+x.count).join(', '))+'" style="background:conic-gradient('+gradient+')"><div class="av-donut-hole"><strong>'+total+'</strong><small>Total Records</small></div></div><div class="av-donut-legend">'+active.map(x=>'<div class="av-donut-legend-item"><span class="av-legend-name"><i style="background:'+x.color+'"></i>'+esc(x.label)+'</span><b>'+x.count+'</b></div>').join('')+'</div></div>'+(pages>10?'<small>Showing first 1,000 records. Download the report for the full date range.</small>':'');
  }
  async function loadAdmin(){
   if(!manager())return;
