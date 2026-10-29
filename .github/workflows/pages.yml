@@ -7,6 +7,9 @@ on:
       - 'styles.css'
       - 'app.js'
       - 'greenrich-one.js'
+      - 'greenrich-crm-inline.js'
+      - 'greenrich-crm-inline.css'
+      - 'tests/one-page-crm-integration.js'
       - 'greenrich-attendance-inline.js'
       - 'tests/attendance-inline-regression.js'
       - 'tests/attendance-product-regression.js'
@@ -29,7 +32,6 @@ on:
       - 'phase1/office-admin-attendance.sql'
       - 'demo.js'
       - 'attendance-ui.js'
-      - 'legacy.html'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
@@ -57,6 +59,10 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          test -s greenrich-crm-inline.js
+          test -s greenrich-crm-inline.css
+          node --check greenrich-crm-inline.js
+          node tests/one-page-crm-integration.js
           test -s greenrich-attendance-inline.js
           node --check greenrich-attendance-inline.js
           node tests/attendance-inline-regression.js
