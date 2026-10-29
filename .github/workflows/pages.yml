@@ -9,6 +9,8 @@ on:
       - 'greenrich-one.js'
       - 'greenrich-company-admin.js'
       - 'greenrich-customer-tags.js'
+      - 'greenrich-shared-customers.js'
+      - 'tests/shared-customers-and-tags.js'
       - 'tests/sales-workflow-regression.js'
       - 'tests/two-companies-settings-and-typography.js'
       - 'greenrich-public-config.js'
@@ -68,6 +70,8 @@ jobs:
           node --check greenrich-one.js
           node --check greenrich-company-admin.js
           node --check greenrich-customer-tags.js
+          node --check greenrich-shared-customers.js
+          node tests/shared-customers-and-tags.js
           node tests/sales-workflow-regression.js
           node tests/two-companies-settings-and-typography.js
           test -s greenrich-public-config.js

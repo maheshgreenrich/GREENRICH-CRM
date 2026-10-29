@@ -24,7 +24,8 @@ const companyChoices=[{id:'grow-india',name:'GreenRich Grow India Pvt Ltd'},{id:
 const companyLabel=id=>window.GreenRichCompanies?.list?.().find(c=>c.id===id)?.name||companyChoices.find(c=>c.id===id)?.name||'Unknown company';
 const companyStorage=id=>id==='grow-india'?legacyKey:legacyKey+'::'+id;
 function ensureCRMData(store){if(!Array.isArray(store.tags))store.tags=[];if(!Number.isInteger(store.orderSequence)||store.orderSequence<0)store.orderSequence=0;return store}
-function loadCompanyData(id){if(id===activeCompany)return ensureCRMData(data);let parsed;try{parsed=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial()}catch{parsed=initial()}return ensureCRMData(parsed)}
+function attachSharedCustomers(store){const shared=window.GreenRichSharedCustomers?.snapshot();if(shared){store.customers=shared.customers;store.tags=shared.tags}return ensureCRMData(store)}
+function loadCompanyData(id){if(id===activeCompany)return attachSharedCustomers(data);let parsed;try{parsed=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial()}catch{parsed=initial()}return attachSharedCustomers(parsed)}
 function saveCompanyData(id,copy){try{localStorage.setItem(companyStorage(id),JSON.stringify(copy));if(id===activeCompany)data=copy;return true}catch{toast('Unable to save browser records. Export a backup and check available storage.');return false}}
 const editorData=()=>loadCompanyData($('#f-company_id')?.value||activeCompany);
 const cleanPhone=v=>{const x=String(v||'').replace(/\D/g,'');return x.length>10?x.slice(-10):x};
@@ -169,7 +170,7 @@ function openEditor(k,id=''){
  if(k==='customers'){$('#f-company_id')?.remove();} // Customer records belong to the currently active company.
  $('#editor').showModal();
 }
-function saveEditor(event){
+async function saveEditor(event){
  event.preventDefault();
  const form=$('#editor-form'),inputs=new FormData(form),row={};
  inputs.forEach((value,key)=>{if(key!=='tag_ids')row[key]=String(value).trim()});
@@ -187,22 +188,20 @@ function saveEditor(event){
   if(!Number.isInteger(row.qty)||row.qty<1||!Number.isFinite(row.unit_price)||row.unit_price<0||!Number.isFinite(row.shipping_charge)||row.shipping_charge<0)return toast('Quantity, unit price and shipping amount must be valid');
   if(row.order_id&&copy.sales.some(s=>s.id!==editId&&s.order_id&&s.order_id.toLowerCase()===row.order_id.toLowerCase()&&s.channel_id===row.channel_id&&s.product_id===row.product_id))return toast('This platform order, product and channel are already recorded');
   const mode=form.dataset.customerMode||'existing';
-  if(mode==='new'){
-   const fresh={name:row.new_name||'',email:row.new_email||'',mobile:row.new_mobile||'',mobile2:row.new_mobile2||'',address1:row.new_address1||'',tag_ids:inputs.getAll('new_tag_ids'),company:companyLabel(targetId),type:'Individual',country:'India'};
-   const problem=validateCustomer(copy,fresh,'');
-   if(problem)return toast(problem);
-   fresh.id=uid();copy.customers.push(fresh);
-   row.customer_id=fresh.id;
-  }else{
-   const existing=copy.customers.find(c=>c.id===row.customer_id);
-   if(!existing)return toast('Find and select an existing customer, or choose New Customer');
-  }
-  const customer=copy.customers.find(c=>c.id===row.customer_id);
+  const fresh=mode==='new'?{name:row.new_name||'',email:row.new_email||'',mobile:row.new_mobile||'',mobile2:row.new_mobile2||'',address1:row.new_address1||'',tag_ids:inputs.getAll('new_tag_ids'),company:companyLabel(targetId),type:'Individual',country:'India'}:null;
+  if(fresh){const problem=validateCustomer(copy,fresh,'');if(problem)return toast(problem)}
+  else if(!copy.customers.some(c=>c.id===row.customer_id))return toast('Find and select an existing customer, or choose New Customer');
   if(old&&consumesStock(old)){const previous=copy.products.find(p=>p.id===old.product_id);if(previous)previous.stock=Number(previous.stock||0)+Number(old.qty||0)}
   if(!Number.isInteger(Number(product.stock))||Number(product.stock)<row.qty)return toast('Insufficient stock for '+product.name+'. Available: '+(Number(product.stock)||0)+', requested: '+row.qty+'. Update product stock first.');
   const calc=getCalc(row.qty,row.unit_price,row.tax_rate,row.inclusive);
   const status=row.status||old?.status||'Completed';
   if(!['Completed','Pending','Cancelled','Returned'].includes(status))return toast('Select a valid order status');
+  if(fresh){
+   try{const created=await window.GreenRichSharedCustomers.saveCustomer(fresh);row.customer_id=created.id;copy.customers.push(created)}
+   catch(error){return toast('Unable to create shared customer: '+error.message)}
+  }
+  const customer=copy.customers.find(c=>c.id===row.customer_id);
+  if(!customer)return toast('Shared customer not found. Refresh and try again.');
   Object.assign(row,{id:editId||uid(),internal_order_id:old?.internal_order_id||nextOrderId(copy,targetId),company_id:targetId,taxable:calc.base,tax_amount:calc.gst,total:round(calc.total+row.shipping_charge),product_name:product.name,sku:product.sku,channel_name:channel.name,customer_name:customer.name,status});
   ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_tag_ids'].forEach(k=>delete row[k]);
   if(consumesStock(row))product.stock-=row.qty;
@@ -217,6 +216,12 @@ function saveEditor(event){
  }else if(editing==='customers'){
   row.tag_ids=inputs.getAll('tag_ids');
   const issue=validateCustomer(copy,row,editId);if(issue)return toast(issue);
+  try{
+   await window.GreenRichSharedCustomers.saveCustomer({...row,...(editId?{id:editId}:{})});
+   attachSharedCustomers(data);$('#editor').close();render();
+   toast(editId?'Shared customer updated':'Customer saved for all GreenRich employees');
+  }catch(error){toast('Unable to save shared customer: '+error.message)}
+  return;
  }else if(editing==='leads')row.value=Number(row.value)||0;
  if(editing!=='sales')row.id=editId||uid();
  if(old)Object.assign(old,row);else copy[editing].push(row);
@@ -225,8 +230,14 @@ function saveEditor(event){
  if(editing==='sales'&&targetId===activeCompany&&allowedTabs.includes('sales'))navigate('sales');
  toast((editing==='sales'?'Sales order '+row.internal_order_id+' saved. Stock updated.':'Saved successfully')+(targetId!==activeCompany?' Switch to '+companyLabel(targetId)+' to view it.':''));
 }
-function removeRecord(k,id){
+async function removeRecord(k,id){
  const item=find(k,id);if(!item)return;
+ if(k==='customers'){
+  if(!confirm('Delete this customer from both companies and all employee accounts?'))return;
+  try{await window.GreenRichSharedCustomers.deleteCustomer(id);attachSharedCustomers(data);render();toast('Shared customer deleted')}
+  catch(error){toast('Could not delete shared customer: '+error.message)}
+  return;
+ }
  if(k==='products'&&data.sales.some(s=>s.product_id===id))return toast('Product is used in sales. Mark it inactive instead.');
  if(k==='channels'&&data.sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
  if(!confirm('Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
@@ -275,8 +286,9 @@ async function importSales(file){
 }
 function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>openEditor(titles[page][3]);$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update]');if(!b||!root.contains(b))return;if(b.dataset.stockUpdate){const current=data.products.find(p=>p.id===b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const copy=JSON.parse(JSON.stringify(data));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(activeCompany,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','leads-search','tasks-search','products-search'].forEach(id=>$('#'+id).oninput=renderTables);['sales-channel-filter','lead-stage-filter','task-filter'].forEach(id=>$('#'+id).onchange=renderTables);['period','filter-channel','filter-from','filter-to'].forEach(id=>$('#'+id).onchange=renderDashboard);$('#clear-filters').onclick=()=>{$('#period').value='month';$('#filter-channel').value='all';$('#filter-from').value='';$('#filter-to').value='';renderDashboard()};$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Replace ALL current browser data with this backup?'))return;data=obj;persist();render();toast('Backup restored')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
- mount:(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false)=>{
+ mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false)=>{
   if(!/^[a-z0-9][a-z0-9_-]{2,48}$/.test(companyId))throw Error('Invalid company selection');
+  if(!client||!window.GreenRichSharedCustomers)throw Error('Shared customer service is unavailable. Refresh the page.');
   activeCompany=companyId;activeCompanyName=companyName;adminMode=adminTools===true;
   if(!container||!document.getElementById('grCrmTemplate'))throw Error('CRM workspace template is missing');
   charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
@@ -286,10 +298,13 @@ window.GreenRichCRM={
   root=document.createElement('div');root.id='grCrmWorkspace';
   root.append(document.getElementById('grCrmTemplate').content.cloneNode(true));
   container.append(root);
-  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Local CRM records · '+activeCompanyName+' — These records are stored in this browser only, not synced across devices. Each company has separate local CRM records. Export a backup before clearing browser data.';
+  const notice=$('.gr-crm-data-notice');if(notice)notice.textContent='Shared customers and tags · Available to all active employees across both GreenRich companies. Sales, products and stock for '+activeCompanyName+' still remain on this browser and are NOT synchronized across devices.';
   all('#navigation button[data-page]').forEach(button=>button.hidden=!allowedTabs.includes(button.dataset.page));
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Local CRM data needs restoration from a valid backup');
+  await window.GreenRichSharedCustomers.ready({client,admin:isAdmin===true});
+  data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
+  attachSharedCustomers(data);
   $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
   bind();navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
   return root;

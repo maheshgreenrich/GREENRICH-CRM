@@ -7,7 +7,7 @@ const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
  sales:can('sales')||can('orders'),
- customers:can('customers'),
+ customers:true,
  leads:can('leads'),
  tasks:can('leads')||can('marketing'),
  products:can('stock'),
@@ -16,6 +16,7 @@ const crmAccess=()=>({
 });
 const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
  (m==='crm'&&crmAccess().dashboard)||
+ (m==='customers'&&crmAccess().customers)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
 const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=x=>{let t=$('#toast');t.textContent=x;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)};const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
@@ -137,7 +138,7 @@ async function removeAttendance(id,date){
 }
 function card(t,v,sub=''){return '<div class="card"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(sub)+'</small></div>'}
 async function render(){if(!canOpenPage(page)){page='dashboard';navigation()}$('#title').textContent=labels[page];let c=$('#content');c.innerHTML='<div class="panel">Loading...</div>';try{if(page==='dashboard')await dashboard(c);else if(page==='attendance')await attendance(c);else if(page==='settings')await settings(c);else if(crmMap[page])await crmWorkspace(c,crmMap[page]);else await placeholder(c)}catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
-async function dashboard(c){const [daily,ownTotal]=await Promise.all([db.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),db.from('gr_attendance').select('user_id',{count:'exact',head:true}).eq('user_id',user.id)]);if(daily.error||ownTotal.error)throw Error(daily.error?.message||ownTotal.error?.message);let todays=daily.data||[];let own={length:ownTotal.count||0};c.innerHTML='<div class="notice">GreenRich ONE combines employee management, attendance and Sales & CRM in this workspace. Sales and customer data currently stays in this browser and is not yet synced across devices.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><button class="secondary" type="button" id="goCrm">Open Sales & CRM</button></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()};$('#goCrm').onclick=()=>{page='crm';navigation();render()};$('#goCrm').hidden=!canOpenPage('crm')}
+async function dashboard(c){const [daily,ownTotal]=await Promise.all([db.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),db.from('gr_attendance').select('user_id',{count:'exact',head:true}).eq('user_id',user.id)]);if(daily.error||ownTotal.error)throw Error(daily.error?.message||ownTotal.error?.message);let todays=daily.data||[];let own={length:ownTotal.count||0};c.innerHTML='<div class="notice">GreenRich ONE combines employee management, attendance and Sales & CRM in this workspace. Customer records and tags are shared across both companies and all employee logins. Sales, products and stock still remain in this browser and are not synced across devices.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><button class="secondary" type="button" id="goCrm">Open Sales & CRM</button></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()};$('#goCrm').onclick=()=>{page='crm';navigation();render()};$('#goCrm').hidden=!canOpenPage('crm')}
 async function attendance(c){
  if(!window.GreenRichAttendance)throw Error('Attendance module script has not loaded. Refresh GreenRich ONE.');
  await window.GreenRichAttendance.mount(c);
@@ -160,7 +161,7 @@ async function crmWorkspace(container,view,adminTools=false){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
  const access=crmAccess(),allowed=adminTools?['channels','reports']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
- window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true);
+ await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin');
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
@@ -244,7 +245,7 @@ async function settings(c){
   db,user,role:roleName(),notify:toast,initialTab,
   openUsers:host=>users(host),
   openRoles:host=>permissionPage(host),
-   openTags:(host,companyId)=>window.GreenRichCustomerTags.mount(host,{companyId,notify:toast}),
+   openTags:host=>window.GreenRichCustomerTags.mount(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
