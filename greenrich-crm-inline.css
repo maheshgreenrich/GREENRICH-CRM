@@ -246,3 +246,40 @@
   font-size:12px;
  }
 }
+
+
+/* Professional CRM table typography: values are data, not headings */
+#grCrmWorkspace table td,
+#grCrmWorkspace .table-card td,
+#grCrmWorkspace .table-wrap td{
+ font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+ font-size:13px !important;
+ line-height:1.5;
+ font-weight:400 !important;
+ color:#33445c;
+ padding-top:13px;
+ padding-bottom:13px;
+ vertical-align:middle;
+}
+#grCrmWorkspace table td strong,
+#grCrmWorkspace .table-card td strong,
+#grCrmWorkspace .table-wrap td strong{
+ display:inline !important;
+ font-size:14px !important;
+ font-weight:600 !important;
+ line-height:1.4 !important;
+ letter-spacing:0 !important;
+ color:#213550 !important;
+ white-space:normal;
+}
+#grCrmWorkspace table td small{display:block;font-size:11px;font-weight:400;color:#7a899b;margin-top:2px}
+#grCrmWorkspace table th{font-size:10.5px!important;font-weight:600!important;letter-spacing:.07em}
+#grCrmWorkspace .metric strong{font-size:22px!important;font-weight:600!important}
+#grCrmWorkspace .mini-row strong{font-size:13px!important;font-weight:600!important}
+#grCrmWorkspace .table-wrap{overflow-x:auto}
+#grCrmWorkspace .table-wrap table{min-width:900px}
+#grCrmWorkspace .gr-crm-header h2{font-size:19px!important;font-weight:600!important}
+#grCrmWorkspace .gr-crm-inner h3{font-weight:600!important}
+#grCrmWorkspace .gr-crm-header #primary-action{font-size:12px;font-weight:600}
+#gr-company-settings-tools #grCrmWorkspace nav.gr-crm-tabs{display:none!important}
+#gr-company-settings-tools #grCrmWorkspace .gr-crm-header{margin-top:0}
