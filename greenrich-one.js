@@ -233,7 +233,18 @@ async function permissionPage(c){
  };
  select.onchange=draw;draw();
 }
-async function settings(c){if(!can('settings','view'))throw Error('Permission denied');c.innerHTML='<div class="panel"><h2>Company profile</h2><form id="companyForm" class="fields"><label>Company name<input id="companyName" required value="'+esc(company?.company_name||'GreenRich')+'"></label><label>Company logo URL<input type="url" id="logoUrl" value="'+esc(company?.logo_url||'')+'"></label><div style="align-self:end"><button class="blue">Save company settings</button></div></form><p>Use an image URL hosted on your own approved domain. Company logo uploads and document storage will need a configured secure Storage bucket.</p>'+(company?.logo_url?'<img alt="Company logo" style="max-height:90px;max-width:200px" src="'+esc(company.logo_url)+'">':'')+'</div>';$('#companyForm').onsubmit=async e=>{e.preventDefault();let values={company_name:$('#companyName').value,logo_url:$('#logoUrl').value||null,updated_at:new Date().toISOString()};let r=await db.from('gr_company_settings').update(values).eq('id',1);if(r.error)toast(r.error.message);else{company={...company,...values};toast('Company settings saved');render()}}}
+async function settings(c){
+ if(roleName()!=='Admin')throw Error('Administrator access only');
+ if(!window.GreenRichCompanies?.mount)throw Error('Company Settings module is not loaded. Reload the page.');
+ await window.GreenRichCompanies.mount(c,{
+  db,user,role:roleName(),notify:toast,
+  openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
+  onCompanyChange:(id,name)=>{
+   document.title='GreenRich ONE · '+name;
+   const label=$('#activeCompanyLabel');if(label)label.textContent=name;
+  }
+ });
+}
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. Sales & CRM features are available in this same workspace. Browser-local records are not shared across devices.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
 $('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='roles';navigation();render()}});
 $('#hamburger').onclick=()=>$('#sidebar').classList.toggle('open');start().catch(e=>{show('setup');toast(e.message)});
