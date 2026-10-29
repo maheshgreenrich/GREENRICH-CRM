@@ -74,7 +74,7 @@
  <label class="av-select-all"><input type="checkbox" id="selectAllEmployees"> Select All Employees <small id="selectedStaffCount">0 selected</small></label>
  <div class="av-bulklist av-bulk-table" id="bulkUsers"></div><label>Reason<textarea name="reason" required minlength="3"></textarea></label>
  <div class="av-actions"><button type="button" data-bulk-status="PRESENT" class="blue">✓ Mark Present</button><button type="button" data-bulk-status="ABSENT" class="secondary">Mark Absent</button><button type="button" data-bulk-status="HALF_DAY" class="secondary">Mark Half Day</button><button type="submit" class="av-hidden-submit" hidden>Save Selected</button></div></form></div></div>
- <div class="panel"><div class="row"><h2>Download Attendance Report</h2><label>Month<input id="reportMonth" type="month"></label></div>
+ <div class="panel"><div class="row"><h2>Download Attendance Report</h2><input id="reportMonth" type="hidden"></div>
  <p>Report uses the selected employee, date range and status filters above (day / week / month).</p><div class="av-actions"><button type="button" data-export="csv" class="secondary">Export CSV</button><button type="button" data-export="xls" class="secondary">Export Excel</button><button type="button" data-export="pdf" class="secondary">Export PDF</button></div></div>
  <div class="av-grid">
  <div class="panel"><h2>Attendance Corrections for Approval</h2><div id="adminCorrections"></div></div>
