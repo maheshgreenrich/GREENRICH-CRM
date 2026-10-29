@@ -154,11 +154,11 @@ const loadCrmAssets=()=>{
   load('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX)
  ]);
 };
-async function crmWorkspace(container,view){
+async function crmWorkspace(container,view,adminTools=false){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
- const access=crmAccess(),allowed=Object.entries(access).filter(([,v])=>v).map(([key])=>key);
+ const access=crmAccess(),allowed=adminTools?['channels','reports','dashboard']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
- window.GreenRichCRM.mount(container,view,allowed);
+ window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name()||'GreenRich Grow India Pvt Ltd');
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
