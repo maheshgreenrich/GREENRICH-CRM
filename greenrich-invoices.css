@@ -1,0 +1,88 @@
+/* Invoice template inspired by the user-supplied one-page Sales_1770.pdf.
+   Print/PDF-ready independent invoice sheet, not the CRM/Attendance layout. */
+#grCrmWorkspace .gr-sales-invoice-action{font-size:11.5px!important;border-radius:8px!important;padding:8px 10px!important;margin:4px 2px!important;color:#174bb0!important;background:#eaf1ff!important;white-space:nowrap}
+#grCrmWorkspace .gr-invoice-dialog{width:min(1080px,calc(100vw - 24px))!important;max-width:1080px!important;max-height:95vh!important;overflow:auto!important;background:#f4f6f9!important;padding:0!important}
+#grCrmWorkspace .gr-invoice-tools{position:sticky;top:0;z-index:4;background:#fff;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid #dce3ee}
+#grCrmWorkspace .gr-invoice-tools h2{font-size:18px!important;color:#163968;margin:0 0 3px!important}
+#grCrmWorkspace .gr-invoice-tools p{font-size:12px;color:#7384a0;margin:0}
+#grCrmWorkspace .gr-invoice-tool-actions{display:flex;flex-wrap:wrap;gap:8px}
+#grCrmWorkspace .gr-invoice-tool-actions .btn{font-size:12px!important;padding:9px 12px!important}
+#grCrmWorkspace .gr-invoice-warning,#grCrmWorkspace .gr-invoice-ready{font-size:12px;line-height:1.55;padding:11px 18px;background:#fff7e8;color:#8b550d;border-bottom:1px solid #f1dfb6}
+#grCrmWorkspace .gr-invoice-ready{background:#effaf3;color:#24784b;border-color:#d6eddb}
+#grCrmWorkspace .gr-invoice-note{padding:4px 18px 16px;font-size:11px;line-height:1.5;color:#6f7e98}
+#grCrmWorkspace .gr-invoice-paper-scroll{padding:16px;overflow:auto}
+#grCrmWorkspace .gr-invoice-paper{box-sizing:border-box;width:794px;min-height:1123px;max-width:100%;background:#fff;color:#111!important;margin:0 auto;padding:26px 25px 19px;font-family:Arial,Helvetica,sans-serif!important;font-size:11px;line-height:1.4;box-shadow:0 2px 14px #172a4a24}
+#grCrmWorkspace .gr-invoice-paper *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif!important}
+#grCrmWorkspace .gr-invoice-heading{position:relative;text-align:center;font-size:15px;font-weight:700;height:23px;line-height:22px;color:#111}
+#grCrmWorkspace .gr-invoice-draft{position:absolute;right:0;top:0;font-size:10px;letter-spacing:.04em;color:#a04343}
+#grCrmWorkspace .gr-invoice-top{display:grid;grid-template-columns:1fr 1fr;border:1px solid #171717;min-height:325px}
+#grCrmWorkspace .gr-invoice-left{display:grid;grid-template-rows:auto 1fr 1fr;border-right:1px solid #111}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-party{padding:7px 9px;border-bottom:1px solid #111;min-width:0;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-party:last-child{border-bottom:0}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-party strong{display:block;font-size:12px;line-height:1.4}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-party div{line-height:1.35}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-cell-label{display:block;font-size:10px;color:#333;margin:0 0 3px}
+#grCrmWorkspace .gr-invoice-ref-grid{display:grid;grid-template-columns:1fr 1fr}
+#grCrmWorkspace .gr-invoice-ref{border-bottom:1px solid #333;min-height:37px;padding:4px 7px;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-invoice-ref:nth-child(odd){border-right:1px solid #333}
+#grCrmWorkspace .gr-invoice-ref span{display:block;font-size:10px;color:#333}
+#grCrmWorkspace .gr-invoice-ref strong{display:block;font-size:11px;color:#111;font-weight:650}
+#grCrmWorkspace .gr-invoice-terms{padding:8px 7px}
+#grCrmWorkspace .gr-invoice-terms strong{display:block;font-size:10.5px}
+#grCrmWorkspace .gr-invoice-terms p{margin:4px 0 0;font-size:10.5px;color:#111}
+#grCrmWorkspace .gr-invoice-paper table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:0!important;font-size:10.5px;text-align:left}
+#grCrmWorkspace .gr-invoice-paper th,#grCrmWorkspace .gr-invoice-paper td{border:1px solid #222;color:#111!important;background:#fff!important;padding:5px 4px!important;text-transform:none!important;letter-spacing:0!important;font-size:10.5px!important;white-space:normal!important;line-height:1.35;vertical-align:top;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-invoice-paper .right{text-align:right}
+#grCrmWorkspace .gr-invoice-lines{margin-top:-1px;min-height:300px}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(1){width:5%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(2){width:30%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(3){width:13%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(4){width:12%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(5){width:12%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(6){width:7%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(7){width:9%}
+#grCrmWorkspace .gr-invoice-lines th:nth-child(8){width:12%}
+#grCrmWorkspace .gr-invoice-lines tbody tr:not(.gr-invoice-total){height:38px}
+#grCrmWorkspace .gr-invoice-paper .gr-invoice-total td{font-weight:700!important;background:#fdfdfd!important}
+#grCrmWorkspace .gr-invoice-words{padding:7px 8px;border:1px solid #222;border-top:0;font-size:10px}
+#grCrmWorkspace .gr-invoice-words span{display:block;font-size:10px}
+#grCrmWorkspace .gr-invoice-words strong{font-size:11px}
+#grCrmWorkspace .gr-invoice-tax{margin-top:-1px}
+#grCrmWorkspace .gr-invoice-tax th:nth-child(1){width:36%}
+#grCrmWorkspace .gr-invoice-tax th:nth-child(2){width:24%}
+#grCrmWorkspace .gr-invoice-tax th:nth-child(3){width:16%}
+#grCrmWorkspace .gr-invoice-tax th:nth-child(4){width:24%}
+#grCrmWorkspace .gr-invoice-tax-words{padding:7px 8px;margin:0;border:1px solid #222;border-top:0;font-size:11px}
+#grCrmWorkspace .gr-invoice-footer{display:grid;grid-template-columns:1.6fr 1fr;border:1px solid #222;border-top:0;min-height:140px}
+#grCrmWorkspace .gr-invoice-footer > div:first-child{padding:9px 10px}
+#grCrmWorkspace .gr-invoice-footer strong{font-size:10.5px}
+#grCrmWorkspace .gr-invoice-footer p{font-size:10.5px;margin:2px 0 8px;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-invoice-sign{align-self:end;min-height:98px;display:flex;flex-direction:column;justify-content:space-between;padding:8px 10px!important;border-left:1px solid #222;border-top:1px solid #222}
+#grCrmWorkspace .gr-invoice-sign strong{font-size:10px}
+#grCrmWorkspace .gr-invoice-sign span{font-size:10px;text-align:right}
+#grCrmWorkspace .gr-invoice-computer{text-align:center;margin:10px 0 0;color:#333;font-size:10px}
+#gr-company-settings-content .gr-invoice-settings>label{display:grid;gap:6px;max-width:430px;font-size:12px;color:#334f79;margin:12px 0}
+#gr-company-settings-content .gr-invoice-settings>label select{width:100%;padding:10px;border:1px solid #d8e3f5;border-radius:8px}
+#gr-company-settings-content .gr-invoice-profile-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:17px}
+#gr-company-settings-content .gr-invoice-profile-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#415575;font-weight:600}
+#gr-company-settings-content .gr-invoice-profile-form input,#gr-company-settings-content .gr-invoice-profile-form textarea{width:100%;max-width:none;border:1px solid #d4dfec;border-radius:9px;padding:10px;font-size:12px;background:#fff;color:#243b61}
+#gr-company-settings-content .gr-invoice-profile-form .gr-invoice-wide{grid-column:1/-1}
+#gr-company-settings-content .gr-invoice-profile-form button{width:auto!important}
+#gr-company-settings-content .gr-invoice-settings-note{font-size:11px;color:#6b7d9c;margin:10px 0}
+@media(max-width:850px){
+ #grCrmWorkspace .gr-invoice-paper-scroll{padding:10px}
+ #grCrmWorkspace .gr-invoice-paper{max-width:none}
+ #gr-company-settings-content .gr-invoice-profile-form{grid-template-columns:minmax(0,1fr)}
+}
+@media print{
+ @page{size:A4 portrait;margin:6mm}
+ body *{visibility:hidden!important}
+ #gr-invoice-paper,#gr-invoice-paper *{visibility:visible!important}
+ #gr-invoice-paper{position:absolute!important;top:0!important;left:0!important;box-shadow:none!important;width:198mm!important;min-height:0!important;padding:0!important;margin:0!important}
+}
+#grCrmWorkspace .gr-invoice-extra-fields{grid-column:1/-1;padding:10px 13px;background:#f7faff;border:1px solid #dce6f7;border-radius:10px}
+#grCrmWorkspace .gr-invoice-extra-fields summary{font-size:12px;font-weight:650;color:#264a84;cursor:pointer;padding:7px 0}
+#grCrmWorkspace .gr-invoice-extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:13px 0 3px}
+#grCrmWorkspace .gr-invoice-extra-grid label{display:grid;gap:5px;font-size:11.5px;color:#516681}
+#grCrmWorkspace .gr-invoice-extra-grid input{max-width:100%;min-width:0}
+@media(max-width:600px){#grCrmWorkspace .gr-invoice-extra-grid{grid-template-columns:1fr}}
