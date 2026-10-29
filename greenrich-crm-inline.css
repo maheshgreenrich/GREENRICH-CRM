@@ -492,3 +492,118 @@
  #grCrmWorkspace .gr-channel-legend .gr-channel-row .gr-channel-name{gap:5px}
  #grCrmWorkspace .gr-insight-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Sales Orders and Dispatch workspace — scoped entirely under GreenRich CRM. */
+#grCrmWorkspace .gr-order-filters{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;
+ align-items:end;margin:18px 0 17px;padding:16px 18px;background:#fff;
+ border:1px solid #dfe7f3;border-radius:15px;box-shadow:0 2px 9px #17365b08
+}
+#grCrmWorkspace .gr-order-filters label{display:grid;gap:6px;min-width:0;color:#536d93;font-weight:650;font-size:11px}
+#grCrmWorkspace .gr-order-filters input,#grCrmWorkspace .gr-order-filters select{
+ height:43px;min-width:0;width:100%;max-width:none;box-sizing:border-box;
+ background:#fff;border:1px solid #d7e2f2;border-radius:9px;padding:8px 11px;
+ color:#1b3e73;font-size:12px;font-weight:550
+}
+#grCrmWorkspace .gr-order-filters .gr-order-search{grid-column:span 2}
+#grCrmWorkspace .gr-order-filter-reset{display:flex;align-items:end}
+#grCrmWorkspace .gr-order-filter-reset .btn{height:43px;min-width:84px}
+#grCrmWorkspace .gr-order-status-metrics,
+#grCrmWorkspace .gr-dispatch-metrics{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0 20px
+}
+#grCrmWorkspace .gr-order-stat{display:flex;flex-direction:column;gap:7px;min-width:0;background:#fff;
+ border:1px solid #e0e8f4;border-radius:13px;padding:14px 16px;box-shadow:0 2px 8px #17365b06}
+#grCrmWorkspace .gr-order-stat span{font-size:11px;color:#647c9b;line-height:1.4;font-weight:550}
+#grCrmWorkspace .gr-order-stat strong{font-size:21px!important;line-height:1.25!important;color:#173e8a!important;
+ font-weight:750!important;letter-spacing:-.02em;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#grCrmWorkspace .gr-order-stat small{font-size:10.5px;color:#798ba6;line-height:1.4}
+#grCrmWorkspace .gr-orders-table-head{display:flex;align-items:center;justify-content:space-between;gap:14px;
+ flex-wrap:wrap;margin:16px 0 10px}
+#grCrmWorkspace .gr-orders-table-head h3,
+#grCrmWorkspace .gr-dispatch-heading h3{font-size:17px!important;color:#1b3f77;margin:0 0 5px!important}
+#grCrmWorkspace .gr-orders-table-head p,
+#grCrmWorkspace .gr-dispatch-heading p{font-size:11.5px!important;line-height:1.5;color:#6f81a2;margin:0}
+#grCrmWorkspace .gr-order-column-tools{display:flex;flex-wrap:wrap;gap:8px}
+#grCrmWorkspace .gr-order-column-tools .btn{font-size:11.5px!important;padding:9px 12px!important;width:auto}
+#grCrmWorkspace .gr-order-columns-panel{padding:15px;background:#fff;border:1px solid #dce6f4;
+ border-radius:12px;margin:10px 0 15px}
+#grCrmWorkspace .gr-order-columns-panel[hidden]{display:none!important}
+#grCrmWorkspace .gr-order-columns-panel>strong{font-size:13px;color:#183d76}
+#grCrmWorkspace .gr-order-columns-panel>p{font-size:11.5px;color:#7789a4;margin:6px 0 13px}
+#grCrmWorkspace #orders-columns-choices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:13px}
+#grCrmWorkspace #orders-columns-choices label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:550;color:#385373}
+#grCrmWorkspace #orders-columns-choices input[type=checkbox]{width:15px!important;height:15px!important;margin:0!important;flex:none}
+#grCrmWorkspace .gr-orders-card{padding:0!important;overflow:hidden}
+#grCrmWorkspace .gr-orders-scroll{max-width:100%;overflow-x:auto!important;scroll-behavior:smooth}
+#grCrmWorkspace .gr-orders-table{width:100%;min-width:max-content;border-collapse:collapse}
+#grCrmWorkspace .gr-orders-table thead th{font-size:10.5px!important;line-height:1.4!important;white-space:nowrap!important;
+ padding:14px 12px!important;letter-spacing:.03em!important;color:#6e84a6!important}
+#grCrmWorkspace .gr-orders-table tbody td{font-size:12px!important;padding:13px 12px!important;line-height:1.5!important;
+ white-space:normal;vertical-align:middle!important;min-width:76px;max-width:230px}
+#grCrmWorkspace .gr-orders-table tbody td strong{font-size:12px!important;line-height:1.4!important;color:#173a71}
+#grCrmWorkspace .gr-orders-table tbody td small{display:block;font-size:10.5px;line-height:1.5;color:#7d8eaa}
+#grCrmWorkspace .gr-orders-table td[data-order-cell="actions"]{min-width:240px;max-width:420px}
+#grCrmWorkspace .gr-orders-table td[data-order-cell="customer"]{min-width:125px;max-width:210px}
+#grCrmWorkspace .gr-orders-table td[data-order-cell="company"]{min-width:190px}
+#grCrmWorkspace .gr-order-customer{display:block;max-width:100%;border:0!important;border-bottom:1px dashed #3772d5!important;
+ padding:0!important;background:transparent!important;color:#1f54b9!important;
+ font-size:12px!important;text-align:left;cursor:pointer;font-weight:650!important}
+#grCrmWorkspace .gr-order-customer:hover{color:#12387f!important}
+#grCrmWorkspace .gr-order-actions{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+#grCrmWorkspace .gr-order-actions button{font-size:10.5px!important;padding:7px 10px!important;margin:0!important;white-space:nowrap}
+#grCrmWorkspace .gr-order-approve{background:#1659bf!important;color:#fff!important;border:1px solid #1659bf!important;
+ border-radius:8px;cursor:pointer;font-weight:700}
+#grCrmWorkspace .gr-order-approve:disabled{opacity:.55;cursor:not-allowed}
+#grCrmWorkspace .gr-order-approved{font-size:10.5px;color:#25694c;font-weight:650;white-space:nowrap}
+#grCrmWorkspace .gr-order-muted{font-size:10.5px;color:#75869f}
+#grCrmWorkspace .gr-order-approval-tag{display:inline-block;white-space:nowrap;font-weight:650;
+ font-size:10.5px;padding:5px 9px;border-radius:20px;background:#fff3e5;color:#966022}
+#grCrmWorkspace .gr-order-approval-tag[data-state="Approved"],
+#grCrmWorkspace .gr-order-approval-tag[data-state="Packed"]{background:#e9f1ff;color:#3153a3}
+#grCrmWorkspace .gr-order-approval-tag[data-state="Shipped"]{background:#e9f8f4;color:#23725e}
+#grCrmWorkspace .gr-order-approval-tag[data-state="Delivered"]{background:#e5f6e9;color:#28764a}
+#grCrmWorkspace .gr-orders-footer{padding:10px 14px;border-top:1px solid #e7edf6;
+ display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#grCrmWorkspace .gr-orders-footer>div:last-child{display:flex;gap:6px}
+#grCrmWorkspace .gr-orders-footer .btn{padding:7px 10px;font-size:11px}
+#grCrmWorkspace .gr-dispatch-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:10px 0 17px}
+#grCrmWorkspace .gr-dispatch-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
+ padding:15px;background:#fff;border:1px solid #e0e8f4;border-radius:12px}
+#grCrmWorkspace .gr-dispatch-filters label{display:grid;gap:7px;font-size:11px;color:#607a9b;font-weight:650}
+#grCrmWorkspace .gr-dispatch-filters input,#grCrmWorkspace .gr-dispatch-filters select{height:43px;width:100%;max-width:none;min-width:0;border:1px solid #d7e2f2;border-radius:9px;padding:9px;color:#29487a}
+#grCrmWorkspace .gr-ops-dialog{width:min(860px,calc(100vw - 26px))!important;max-width:860px!important;
+ max-height:90vh!important;overflow:auto!important;padding:23px!important;border-radius:15px!important}
+#grCrmWorkspace .gr-ops-dialog .gr-ops-dialog-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#grCrmWorkspace .gr-ops-dialog h2{font-size:19px!important;color:#214272}
+#grCrmWorkspace .gr-ops-dialog h3{font-size:14px!important;margin:17px 0 8px;color:#224379}
+#grCrmWorkspace .gr-ops-dialog .gr-customer-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#grCrmWorkspace .gr-customer-profile-grid>div{border:1px solid #e0e8f4;background:#f7faff;padding:12px;border-radius:10px;min-width:0}
+#grCrmWorkspace .gr-customer-profile-grid span{display:block;color:#7187a5;font-size:11px}
+#grCrmWorkspace .gr-customer-profile-grid strong{display:block;font-size:12px!important;color:#204579;overflow-wrap:anywhere;margin-top:3px}
+#grCrmWorkspace .gr-profile-timeline{display:grid;gap:8px;max-height:260px;overflow:auto}
+#grCrmWorkspace .gr-profile-timeline>div{display:grid;gap:5px;padding:11px;border:1px solid #e7ecf4;border-radius:9px}
+#grCrmWorkspace .gr-profile-timeline strong{font-size:12px!important;color:#1e477f}
+#grCrmWorkspace .gr-profile-timeline span,#grCrmWorkspace .gr-profile-timeline small{font-size:11.5px;color:#5c718d}
+#grCrmWorkspace .gr-profile-timeline a{font-size:11.5px;color:#2058c0}
+#grCrmWorkspace .gr-ops-disclaimer{border:1px solid #dbe6f4;background:#f4f8fe;padding:10px;border-radius:9px;font-size:11.5px;color:#617697;line-height:1.55}
+#grCrmWorkspace .gr-dispatch-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:15px}
+#grCrmWorkspace .gr-dispatch-form label{display:grid;gap:7px;color:#496483;font-size:11.5px;font-weight:650}
+#grCrmWorkspace .gr-dispatch-form input,#grCrmWorkspace .gr-dispatch-form select,#grCrmWorkspace .gr-dispatch-form textarea{width:100%;max-width:none;min-width:0;box-sizing:border-box;padding:10px;border:1px solid #d7e2f2;border-radius:8px;font-size:12px}
+#grCrmWorkspace .gr-dispatch-form .wide{grid-column:1/-1}
+#grCrmWorkspace .gr-dispatch-form #gr-dispatch-editor-info{grid-column:1/-1;border-bottom:1px solid #e2e9f4;padding:5px 0;font-size:11.5px;color:#526a8b}
+#grCrmWorkspace .gr-dispatch-form>button{grid-column:1/-1;max-width:240px}
+@media(max-width:1100px){
+ #grCrmWorkspace .gr-order-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #grCrmWorkspace .gr-order-status-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #grCrmWorkspace #orders-columns-choices{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:680px){
+ #grCrmWorkspace .gr-order-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #grCrmWorkspace .gr-order-filters .gr-order-search{grid-column:1/-1}
+ #grCrmWorkspace .gr-order-status-metrics,#grCrmWorkspace .gr-dispatch-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #grCrmWorkspace #orders-columns-choices{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #grCrmWorkspace .gr-dispatch-filters{grid-template-columns:1fr}
+ #grCrmWorkspace .gr-dispatch-form{grid-template-columns:1fr}
+ #grCrmWorkspace .gr-dispatch-form .wide,#grCrmWorkspace .gr-dispatch-form>button,#grCrmWorkspace .gr-dispatch-form #gr-dispatch-editor-info{grid-column:1}
+}

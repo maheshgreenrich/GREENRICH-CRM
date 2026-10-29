@@ -1,9 +1,9 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','stock','purchase','accounts','settings'];
-const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
-const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',stock:'products'};
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','dispatch','stock','purchase','accounts','settings'];
+const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
+const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
  sales:can('sales')||can('orders'),
@@ -11,12 +11,14 @@ const crmAccess=()=>({
  leads:can('leads'),
  tasks:can('leads')||can('marketing'),
  products:can('stock'),
+ dispatch:can('dispatch')||can('orders')||can('stock'),
  channels:roleName()==='Admin',
  reports:roleName()==='Admin'
 });
 const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='customers'&&crmAccess().customers)||
+ (m==='dispatch'&&crmAccess().dispatch)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
 const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=x=>{let t=$('#toast');t.textContent=x;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)};const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
@@ -181,7 +183,7 @@ async function crmWorkspace(container,view,adminTools=false){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
  const access=crmAccess(),allowed=adminTools?['channels','reports']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
- await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'));
+ await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'),roleName()==='Admin'||can('sales','approve')||can('orders','approve'),roleName()==='Admin'||can('dispatch','edit')||can('stock','edit')||can('orders','edit'));
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
