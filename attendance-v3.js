@@ -5,6 +5,7 @@
  const localDay=()=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const get=t=>p.find(x=>x.type===t).value;return get('year')+'-'+get('month')+'-'+get('day')};
  const iso=value=>value?new Date(value.length===16?value+':00+05:30':value).toISOString():null;
  const shortDate=s=>s?new Date(s).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',hour12:true}):'—';
+ const officeLocal=s=>{if(!s)return '';const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(s));const v=t=>p.find(x=>x.type===t).value;return v('year')+'-'+v('month')+'-'+v('day')+'T'+v('hour')+':'+v('minute')};
  const input=(form,name)=>form.elements.namedItem(name).value;
  const today=localDay();
  let db,apiRoot,apiKey,actorRole='',actorName='',staff=[],departments=[],shifts=[],holidays=[],adminItems=[],myPage=1,adminPage=1;
@@ -68,10 +69,11 @@
   $('#adminNext').onclick=()=>{adminPage++;safe(loadAdmin)};
   $('#adminMark').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget;
-   await request('/admin/attendance','POST',{
+   const editing=f.dataset.recordId;
+   await request(editing?'/admin/attendance/'+editing:'/admin/attendance',editing?'PUT':'POST',{
     userId:input(f,'userId'),date:input(f,'date'),status:input(f,'status'),checkIn:iso(input(f,'checkIn')),
     checkOut:iso(input(f,'checkOut')),reason:input(f,'reason')});
-   notify('Attendance saved and audited.');await loadAdmin();
+   f.dataset.recordId='';f.reset();notify('Attendance saved and audited.');await loadAdmin();
   })};
   $('#bulkForm').onsubmit=e=>{e.preventDefault();safe(async()=>{
    const f=e.currentTarget,ids=$$('#bulkUsers input:checked').map(el=>el.value);
@@ -92,7 +94,7 @@
   await loadMine();
  }
  async function loadMine(){
-  const month=$('#myMonth').value,from=month+'-01',to=month+'-31';
+  const month=$('#myMonth').value,from=month+'-01',to=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10);
   const [items,summary]=await Promise.all([
    request('/attendance/me?'+params({from,to,page:myPage,pageSize:20})),
    request('/attendance/me/summary?'+params({month}))
@@ -134,6 +136,8 @@
    const f=$('#adminMark');f.dataset.recordId=r.id;
    f.elements.namedItem('userId').value=r.user_id;f.elements.namedItem('date').value=r.date;
    f.elements.namedItem('status').value=r.status;
+   f.elements.namedItem('checkIn').value=officeLocal(r.check_in);
+   f.elements.namedItem('checkOut').value=officeLocal(r.check_out);
    notify('Record loaded. Enter a reason and save to correct the record.');f.scrollIntoView({block:'center',behavior:'smooth'});
   });
   $$('#adminRows [data-delete]').forEach(b=>b.onclick=()=>safe(async()=>{
