@@ -309,10 +309,10 @@
  async function sharePdf(paper,filename){
   const pdf=await buildPdf(paper);
   const title=filename.replace(/[^\w.-]/g,'_')+'.pdf';
-  const file=new File([pdf.output('blob')],title,{type:'application/pdf'});
-  if(typeof navigator!=='undefined'&&navigator.share&&navigator.canShare?.({files:[file]})){
+  const file=typeof File!=='undefined'?new File([pdf.output('blob')],title,{type:'application/pdf'}):null;
+  if(file&&typeof navigator!=='undefined'&&navigator.share&&navigator.canShare?.({files:[file]})){
    try{await navigator.share({files:[file],title:'GreenRich invoice '+filename,text:'GreenRich invoice PDF. Please verify the customer before sending.'});return 'shared'}
-   catch(error){if(error?.name==='AbortError')return 'cancelled';throw error}
+   catch(error){if(error?.name==='AbortError')return 'cancelled';if(error?.name!=='NotAllowedError')throw error}
   }
   pdf.save(title);
   return 'downloaded';

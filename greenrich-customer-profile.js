@@ -156,7 +156,7 @@
      '<section class="gr360-panel"><div class="gr360-panel-heading"><div><span class="gr360-kicker">QUOTATIONS</span><h3>Quotation & enquiry history</h3><p>Recorded quotation-stage enquiries, not fictional documents</p></div></div>'+quotationList(model)+'</section>'+
      '<section class="gr360-panel"><div class="gr360-panel-heading"><div><span class="gr360-kicker">ACTIVITY</span><h3>Follow-ups & actions</h3><p>Open and completed customer follow-up tasks</p></div></div>'+followupList(model)+'</section>'+
     '</div>'+
-    '<div class="gr360-disclaimer">WhatsApp and email actions open your own messaging app with a prepared message. PDF files cannot be automatically attached to a WhatsApp link or email link: open the invoice, download its PDF, then attach it in your messaging app. Only actual GreenRich records appear above.</div>'+
+    '<div class="gr360-disclaimer">WhatsApp and email actions open your own messaging app with a prepared message. WhatsApp and email text links do not attach PDFs. Open an invoice and select Share PDF to use the mobile share menu (including WhatsApp/email where supported). Otherwise download the PDF and attach it manually. Only actual GreenRich records appear above.</div>'+
    '</div>';
   function shareText(kind,record){
    const top='Hello '+name+',\n';
