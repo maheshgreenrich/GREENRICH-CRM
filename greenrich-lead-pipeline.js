@@ -30,7 +30,14 @@
  .gl-card-line{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin:7px 0}
  .gl-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
  .gl-card button{border:1px solid #d9e3f1;background:white;color:#265193}
- .gl-card button:focus-visible,.gl-row button:focus-visible{outline:3px solid #87aefa}
+ .gl-card .gl-name-link{border:0!important;padding:0!important;background:transparent!important;text-align:left;font-weight:700;font-size:14px!important;color:#17365e!important;cursor:pointer}
+ .gl-card .gl-card-actions a{font-size:12px;border:1px solid #d9e3f1;padding:8px 10px;text-decoration:none;color:#265193;border-radius:7px;background:#fff}
+ .gl-multi{position:relative;min-width:137px;align-self:flex-end;font-size:12px}
+ .gl-multi summary{height:36px;padding:8px 10px;background:#fff;border:1px solid #d3e0ef;border-radius:8px;cursor:pointer;list-style:none}
+ .gl-multi summary:after{content:' ▾';float:right}.gl-multi-options{position:absolute;z-index:20;top:37px;left:0;width:max(190px,100%);max-height:220px;overflow:auto;background:white;border:1px solid #c7d9eb;border-radius:9px;box-shadow:0 9px 25px #142f5030;padding:9px}
+ .gl-multi-options label{display:flex;flex-direction:row;align-items:center;gap:8px;padding:5px 2px}
+ .gl-multi-options input{width:15px;height:15px;min-width:15px}
+  .gl-card button:focus-visible,.gl-row button:focus-visible{outline:3px solid #87aefa}
  .gl-note{padding:13px;border-radius:10px;background:#fff7e8;border:1px solid #efd9a6;color:#805b18;font-size:13px}
  .gl-dialog{border:1px solid #cfdbed;border-radius:14px;box-shadow:0 15px 60px #15355935;padding:23px;max-width:min(590px,94vw);max-height:90vh;overflow:auto}
  .gl-dialog::backdrop{background:#112f5280}.gl-dialog h3{margin:0 0 10px;font-size:19px}
@@ -48,17 +55,33 @@
  }
  async function query(ctx){
   const cs=ctx.companyIds;
-  const [leads,staff,orders,customers,products]=await Promise.all([
+  const [leads,staff,orders,customers,products,sources,tags]=await Promise.all([
    allRows(ctx.db,'gr_lead_pipeline','*',q=>q.in('company_id',cs)),
    Promise.all(cs.map(async co=>{const {data,error}=await ctx.db.rpc('gr_pipeline_staff',{p_company:co});if(error)throw error;return (data||[]).map(p=>({...p,company_id:co}))})),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','sales').limit(1000),
    ctx.db.from('gr_crm_customers').select('id,name,mobile').order('name').limit(1000),
-   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000)
+   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000),
+   ctx.db.from('gr_crm_sources').select('id,name,active').eq('active',true).order('name'),
+   ctx.db.from('gr_crm_tags').select('id,name').order('name')
   ]);
-  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;
-  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];
+  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;if(sources.error)throw sources.error;if(tags.error)throw tags.error;
+  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];ctx.approvedSources=sources.data||[];ctx.approvedTags=tags.data||[];
   ctx.canViewTeam=ctx.staff.some(p=>p.id!==ctx.userId&&p.manager_id===ctx.userId)||ctx.admin||ctx.scope==='all'||ctx.scope==='team';
  }
+ const normalizedSource=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'');
+ const matchesApproved=(s,approved)=>normalizedSource(s)===normalizedSource(approved);
+ const choiceMulti=(key,items,selected,label)=>'<details class="gl-multi"><summary>'+escape(label)+
+   (selected?.length?' ('+selected.length+')':'')+'</summary><div class="gl-multi-options">'+
+   (items.length?items.map(([value,caption])=>'<label><input type="checkbox" data-gl-multi="'+escape(key)+'" value="'+escape(value)+'" '+
+     (selected?.includes(value)?'checked':'')+'>'+escape(caption)+'</label>').join(''):'<small>No approved choices</small>')+
+   '</div></details>';
+ const leadLink=(l,caption)=>'<button type="button" class="gl-name-link" data-gl-action="profile" data-id="'+escape(l.lead_id)+
+   '" data-company="'+escape(l.company_id)+'">'+escape(caption||l.contact||l.title)+'</button>';
+ const contactButtons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
+  return (digits.length>=10?'<a title="Call" href="tel:'+escape(m)+'">☎ Call</a>':'')+
+   (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<a title="Email" href="mailto:'+escape(l.email)+'">✉ Email</a>':'')+
+   (digits.length>=10&&digits.length<=15?'<a title="WhatsApp" rel="noopener noreferrer" target="_blank" href="https://wa.me/'+digits+'">WhatsApp</a>':'');
+ };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
  const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Unassigned':'Employee');
  const labelProduct=(ctx,lead)=>ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name||lead.product_id||'—';
@@ -69,26 +92,27 @@
   return (f.company==='all'||l.company_id===f.company)&&
    (f.person==='all'||l.assigned_to===f.person)&&
    (fromTime===null||timestamp>=fromTime)&&(toTime===null||timestamp<=toTime)&&
-   (!f.product||l.product_id===f.product)&&
-   (!f.source||l.source===f.source)&&(!f.tag||l.tag_ids?.includes(f.tag))&&
+   (!f.product?.length||f.product.includes(l.product_id))&&
+   (!f.source?.length||f.source.some(label=>matchesApproved(l.source,label)))&&
+   (!f.tag?.length||f.tag.some(id=>l.tag_ids?.includes(id)))&&
    (!f.search||[l.title,l.contact,l.mobile,l.email,l.source,name(ctx,l.assigned_to)].join(' ').toLowerCase().includes(f.search.toLowerCase()));
  });
  const choices=(array,current)=>array.map(([v,t])=>'<option value="'+escape(v)+'" '+(v===current?'selected':'')+'>'+escape(t)+'</option>').join('');
  const button=(label,action,attrs='')=>'<button type="button" data-gl-action="'+escape(action)+'" '+attrs+'>'+escape(label)+'</button>';
  function buildFilters(ctx){
-  const f=ctx.filters,persons=[...new Map(ctx.staff.map(p=>[p.id,p])).values()],owners=ctx.canViewTeam?persons:[];
-  const products=[...new Map(ctx.products.map(p=>[p.record_id,p])).values()].filter(p=>ctx.leads.some(l=>l.product_id===p.record_id));
-  const sources=[...new Set(ctx.leads.map(l=>l.source).filter(Boolean))].sort();
-  const tags=[...new Set(ctx.leads.flatMap(l=>l.tag_ids||[]))].sort();
+  const f=ctx.filters,people=[...new Map(ctx.staff.map(p=>[p.id,p])).values()];
+  const currentCompany=f.company;
+  const products=ctx.products.filter(p=>(currentCompany==='all'||p.company_id===currentCompany)&&p.payload?.active!==false);
+  const uniqueProducts=[...new Map(products.map(p=>[p.record_id,p])).values()];
   return '<div class="gl-row" aria-label="Lead filters">'+
    '<label>From date & time<input type="datetime-local" data-gl-filter="from" value="'+escape(f.from)+'"></label>'+
    '<label>To date & time<input type="datetime-local" data-gl-filter="to" value="'+escape(f.to)+'"></label>'+
    '<label>Company<select data-gl-filter="company">'+choices([['all','All assigned companies'],...ctx.companyIds.map(id=>[id,companyText(ctx,id)])],f.company)+'</select></label>'+
-   '<label>Product<select data-gl-filter="product">'+choices([['','All products'],...products.map(p=>[p.record_id,p.payload?.name||p.record_id])],f.product)+'</select></label>'+
-   '<label>Source<select data-gl-filter="source">'+choices([['','All sources'],...sources.map(s=>[s,s])],f.source)+'</select></label>'+
-   '<label>Tags<select data-gl-filter="tag">'+choices([['','All tags'],...tags.map(t=>[t,t])],f.tag)+'</select></label>'+
-   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All visible salespeople'],...owners.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
-   '<label>Search<input data-gl-filter="search" placeholder="Name, phone, email…" value="'+escape(f.search)+'"></label>'+
+   choiceMulti('product',uniqueProducts.map(p=>[p.record_id,p.payload?.name||p.record_id]),f.product,'All products')+
+   choiceMulti('source',ctx.approvedSources.map(x=>[x.name,x.name]),f.source,'Approved sources')+
+   choiceMulti('tag',ctx.approvedTags.map(x=>[x.id,x.name]),f.tag,'Approved tags')+
+   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
+   '<label>Search<input data-gl-filter="search" placeholder="Name, mobile, email…" value="'+escape(f.search)+'"></label>'+
    '</div>';
  }
  const showMessage=(ctx,e)=>notify(ctx,e?.message||String(e));
@@ -287,7 +311,7 @@
   root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
-  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},
+  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
@@ -302,7 +326,7 @@
  async function mountShared(ctx){
   const key=ctx.userId+'|'+ctx.companyIds.join(',');
   if(cache.has(key))return cache.get(key);
-  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
+  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
   await query(state);cache.set(key,state);return state;
  }
  async function renderCustomerTimeline(root,db,customerId,companies,staffName){
