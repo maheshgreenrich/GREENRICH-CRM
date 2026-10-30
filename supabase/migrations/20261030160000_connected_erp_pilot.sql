@@ -339,3 +339,12 @@ insert into public.gr_pilot_orders(company_id,product_id,customer_name,qty)
 select p.company_id,p.id,'[TEST] Sample Customer (no real commitment)',1 from fresh p
 where not exists(select 1 from public.gr_pilot_orders o where o.product_id=p.id)
 on conflict do nothing;
+
+-- Supabase Postgres Changes: publish only the small pilot order table to enable cross-device refresh.
+do $block$
+begin
+ if exists(select 1 from pg_publication where pubname='supabase_realtime')
+ and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='gr_pilot_orders') then
+  alter publication supabase_realtime add table public.gr_pilot_orders;
+ end if;
+end $block$;
