@@ -8,8 +8,8 @@ const sheets=read('greenrich-sheet-manager.js');
 const html=read('secure.html');
 const sql=read('supabase/migrations/20261030223000_sales_queue_followup_ux.sql');
 for(const code of [pipeline,contacts,profile,sheets])new vm.Script(code);
-for(const path of ['greenrich-lead-pipeline','greenrich-contacts','greenrich-lead-profile','greenrich-sheet-manager'])
- assert.ok(html.includes(path+'.js?v=20261030-salesux-3'),'script not updated: '+path);
+for(const path of ['greenrich-lead-pipeline','greenrich-lead-profile'])assert.ok(html.includes(path+'.js?v=20261030-modernbi-1'));
+for(const path of ['greenrich-contacts','greenrich-sheet-manager'])assert.ok(html.includes(path+'.js?v=20261030-salesux-3'));
 assert.ok(contacts.includes('data-contact-lead-profile')&&contacts.includes("openLeadProfile(btn.dataset.contactCompany"));
 assert.ok(contacts.includes('host:page,onClose:back')&&profile.includes("data-full>Full page view"));
 assert.ok(profile.includes('gr_pipeline_source_answers'),'Must not rely on Admin-only import audit');
