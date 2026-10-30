@@ -232,7 +232,7 @@
    if(!window.GreenRichSheetManager){notify(ctx,'Lead integrations module failed to load. Refresh GreenRich ONE.');return}
    void window.GreenRichSheetManager.open(ctx).catch(e=>notify(ctx,e.message));return;
   }
-  if(action==='profile'||action==='quick'){if(!l)return;await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id});return;}
+  if(action==='profile'||action==='quick'){if(!l)return;await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,quick:action==='quick'});return;}
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
    if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
