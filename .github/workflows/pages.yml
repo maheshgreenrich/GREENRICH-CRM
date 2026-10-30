@@ -32,6 +32,8 @@ on:
       - 'greenrich-public-config.js'
       - 'tests/shared-login-regression.js'
       - 'greenrich-crm-inline.js'
+      - 'greenrich-lead-pipeline.js'
+      - 'tests/lead-pipeline-page.js'
       - 'greenrich-contacts.js'
       - 'greenrich-contacts.css'
       - 'greenrich-sources.js'
@@ -129,6 +131,9 @@ jobs:
           test -s greenrich-crm-inline.js
           test -s greenrich-crm-inline.css
           node --check greenrich-crm-inline.js
+          test -s greenrich-lead-pipeline.js
+          node --check greenrich-lead-pipeline.js
+          node tests/lead-pipeline-page.js
           node --check greenrich-contacts.js
           node --check greenrich-sources.js
           node tests/unified-contacts-management.js
