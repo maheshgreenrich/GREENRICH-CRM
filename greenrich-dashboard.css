@@ -1,0 +1,59 @@
+/* GreenRich ONE executive dashboard — actual data and user-scoped visibility */
+.gr-exec{--gr-exec-blue:#2457c8;min-width:0;width:100%;display:grid;gap:18px}
+.gr-exec-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:4px 0}
+.gr-exec-heading>div>span{display:block;color:#6481aa;font-size:10px;letter-spacing:.12em;font-weight:800}
+.gr-exec-heading h2{font-size:23px!important;line-height:1.25!important;color:#173a72!important;font-weight:750!important;margin:5px 0!important;letter-spacing:-.03em}
+.gr-exec-heading p{font-size:12px!important;color:#7286a3!important;margin:4px 0}
+.gr-exec-heading>small{font-size:11px;color:#49658e;background:#ebf3ff;border-radius:9px;padding:8px 11px}
+.gr-exec-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;background:#fff;border:1px solid #e0e8f4;border-radius:16px;padding:18px 19px;box-shadow:0 3px 15px #123a6c08}
+.gr-exec-filters label{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:650;color:#5b7296;min-width:0}
+.gr-exec-filters input,.gr-exec-filters select{width:100%;min-width:0!important;max-width:none!important;height:43px!important;box-sizing:border-box;border:1px solid #d7e3f3;border-radius:10px;background:#f9fbff;padding:9px 12px;font-size:12px!important;font-weight:650;color:#244879}
+.gr-exec-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.gr-exec-actions button{font-size:11.5px!important;font-weight:650;padding:10px 13px!important;min-height:42px;border-radius:9px;border:1px solid #dce6f6;background:#eaf1fe;color:#2255b5;cursor:pointer}
+.gr-exec-actions button:last-child{background:#2457c8;color:#fff;border-color:#2457c8}
+.gr-exec-loading{padding:15px;border:1px solid #dbe8f7;background:#f0f6ff;border-radius:11px;font-size:12px;color:#47678f}
+.gr-exec-loading[hidden]{display:none!important}
+.gr-exec-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.gr-exec-card{min-width:0;background:#fff;border:1px solid #dfe8f5;border-radius:16px;padding:20px;box-shadow:0 4px 22px #102e6010;display:flex;flex-direction:column;gap:17px}
+.gr-exec-card-head{display:flex;justify-content:space-between;gap:14px}
+.gr-exec-card-head small{display:block;text-transform:uppercase;letter-spacing:.11em;font-weight:800;font-size:9px;color:#567ebc;margin-bottom:6px}
+.gr-exec-card-head h2{font-size:17px!important;line-height:1.3!important;color:#173a6e!important;margin:0!important;font-weight:750!important;letter-spacing:-.018em}
+.gr-exec-card-head p{font-size:11.5px!important;line-height:1.5!important;color:#778ca9!important;margin:5px 0 0}
+.gr-exec-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.gr-exec-stats>div{padding:12px 13px;background:#f7faff;border:1px solid #e5ecfa;border-radius:10px;min-width:0}
+.gr-exec-stats small{display:block;color:#7186a4;font-size:10.5px;font-weight:600}
+.gr-exec-stats strong{display:block;color:#19448f;font-size:20px!important;line-height:1.3!important;font-weight:750!important;margin-top:5px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.gr-exec-bars{display:grid;gap:13px}
+.gr-exec-bar{min-width:0}
+.gr-exec-bar>div{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.gr-exec-bar span{color:#405c80;font-size:11.5px;line-height:1.45;overflow-wrap:anywhere}
+.gr-exec-bar b{color:#1950ad;font-weight:750;font-size:11.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.gr-exec-bar section{height:10px;background:#e9f0fa;border-radius:99px;overflow:hidden}
+.gr-exec-bar section i{height:100%;display:block;border-radius:99px;background:linear-gradient(90deg,#608efa,#2054c9);min-width:2px}
+.gr-exec-ring-wrap{display:flex;align-items:center;justify-content:space-evenly;gap:18px;flex-wrap:wrap}
+.gr-exec-ring{width:165px;height:165px;flex:0 0 165px;border-radius:50%;display:grid;place-items:center}
+.gr-exec-ring>div{width:105px;height:105px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-radius:50%;box-shadow:0 0 0 1px #ffffffc0}
+.gr-exec-ring b{font-size:23px;font-weight:800;color:#1d4183}
+.gr-exec-ring small{font-size:11px;color:#7389a7}
+.gr-exec-ring-legend{flex:1;min-width:140px;display:grid;gap:11px}
+.gr-exec-ring-legend>div{display:flex;align-items:center;gap:10px;justify-content:space-between;font-size:11.5px;color:#567094}
+.gr-exec-ring-legend>div span{display:flex;align-items:center;gap:7px}
+.gr-exec-ring-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;flex:0 0 9px}
+.gr-exec-ring-legend strong{color:#2550a6;font-size:12px;font-weight:750}
+.gr-exec-empty{display:grid;place-items:center;padding:25px 12px;min-height:90px;text-align:center;color:#8b9db6;font-size:12px;background:#f9fbff;border-radius:9px;border:1px dashed #e1e8f3}
+.gr-exec-foot{font-size:10.5px!important;line-height:1.6!important;color:#7a8fac!important;margin:0}
+.gr-exec-admin{display:grid;gap:16px;background:#fff;border:1px solid #dfe8f5;border-radius:14px;padding:22px}
+.gr-exec-admin h2{font-size:19px!important;color:#1e427d!important;margin:0}
+.gr-exec-admin>p{font-size:12px!important;line-height:1.55;color:#6d829f;margin:0}
+.gr-exec-admin>label{display:grid;gap:7px;font-size:12px;font-weight:650;color:#38577e;max-width:500px}
+.gr-exec-admin select{width:100%;height:43px;border:1px solid #d8e3f4;border-radius:10px;padding:10px;font-size:12px;background:#fff;color:#204575}
+#gr-exec-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#gr-exec-choices label{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:9px;background:#f7faff;border:1px solid #e4ecfa;font-size:12px;font-weight:650;color:#32547f}
+#gr-exec-choices input{width:16px!important;height:16px!important;flex:0 0 16px}
+.gr-exec-admin-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.gr-exec-admin-actions button{width:auto!important;min-height:39px!important;border:1px solid #d6e2f5;border-radius:9px;padding:9px 12px;font-size:12px;font-weight:650;background:#eef3fb;color:#224c9b;cursor:pointer}
+.gr-exec-admin-actions .blue{background:#2458c8!important;color:#fff!important}
+#gr-exec-message{font-size:11.5px;color:#5b789b}
+@media(max-width:1080px){.gr-exec-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:850px){.gr-exec-grid{grid-template-columns:1fr}.gr-exec-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.gr-exec-filters{padding:14px;gap:10px}.gr-exec-card{padding:15px}.gr-exec-ring{height:140px;width:140px;flex-basis:140px}.gr-exec-ring>div{width:88px;height:88px}#gr-exec-choices{grid-template-columns:1fr}.gr-exec-stats strong{font-size:16px!important}}

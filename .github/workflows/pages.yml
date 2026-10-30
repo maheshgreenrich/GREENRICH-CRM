@@ -20,6 +20,12 @@ on:
       - 'greenrich-public-config.js'
       - 'tests/shared-login-regression.js'
       - 'greenrich-crm-inline.js'
+      - 'greenrich-dashboard.js'
+      - 'greenrich-dashboard.css'
+      - 'greenrich-actions.js'
+      - 'greenrich-actions.css'
+      - 'tests/executive-dashboard-and-dispatch.js'
+      - 'supabase/migrations/20261030090000_dashboard_and_pending_dispatch.sql'
       - 'greenrich-customer-profile.js'
       - 'greenrich-customer-profile.css'
       - 'tests/customer-360-profile.js'
@@ -100,6 +106,9 @@ jobs:
           test -s greenrich-crm-inline.js
           test -s greenrich-crm-inline.css
           node --check greenrich-crm-inline.js
+          node --check greenrich-dashboard.js
+          node --check greenrich-actions.js
+          node tests/executive-dashboard-and-dispatch.js
           node --check greenrich-customer-profile.js
           node tests/customer-360-profile.js
           node --check greenrich-sales-ops.js

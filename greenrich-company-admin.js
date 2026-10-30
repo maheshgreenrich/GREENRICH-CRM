@@ -31,8 +31,8 @@
   if(ctx.role!=='Admin')throw Error('Only Admin may manage company settings');
   currentUser=ctx.user.id;
   if(!latest.length)await configure({userId:ctx.user.id,companyIds:access,db:ctx.db});
-  let currentTab=['companies','users','roles','tags','invoices','channels','reports'].includes(ctx.initialTab)?ctx.initialTab:'companies';
-  const tabs=[['companies','Company Profiles'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['invoices','Invoice Settings'],['channels','Sales Channels'],['reports','Import & Export']];
+  let currentTab=['companies','users','roles','tags','invoices','channels','reports','dashboard'].includes(ctx.initialTab)?ctx.initialTab:'companies';
+  const tabs=[['companies','Company Profiles'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['invoices','Invoice Settings'],['dashboard','Dashboard Access'],['channels','Sales Channels'],['reports','Import & Export']];
   root.innerHTML='<div id="gr-company-admin"><div class="panel"><h2>Settings</h2><p>Manage the two companies, employee-specific company access, customer tags, roles and Admin tools.</p><div class="gr-settings-tabs">'+tabs.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div></div><div id="gr-company-settings-content"></div></div>';
   const host=root.querySelector('#gr-company-settings-content'),notice=ctx.notify;
   async function showCompanyCards(){
@@ -57,7 +57,8 @@
    if(tab==='companies')return showCompanyCards();
    if(tab==='users'||tab==='roles'){host.innerHTML='<div class="panel">Loading administrator settings...</div>';try{if(tab==='users')await ctx.openUsers(host);else await ctx.openRoles(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(tab==='tags'){host.innerHTML='<div class="panel">Loading Customer Tags...</div>';try{await ctx.openTags(host,selected(ctx.user.id))}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
-   if(tab==='invoices'){host.innerHTML='<div class="panel">Loading invoice settings...</div>';try{await ctx.openInvoiceSettings(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
+   if(tab==='dashboard'){host.innerHTML='<div class="panel">Loading dashboard access...</div>';try{await ctx.openDashboardAccess(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
+    if(tab==='invoices'){host.innerHTML='<div class="panel">Loading invoice settings...</div>';try{await ctx.openInvoiceSettings(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(!['channels','reports'].includes(tab))return;
    host.innerHTML='<div class="panel">Opening Admin tools...</div>';try{await ctx.openCRM(host,tab,true)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
   }

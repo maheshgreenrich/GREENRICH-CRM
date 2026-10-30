@@ -159,13 +159,31 @@ async function removeAttendance(id,date){
  toast('Attendance removed');await attendanceQuick();await render();
 }
 function card(t,v,sub=''){return '<div class="card"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(sub)+'</small></div>'}
-async function render(){if(!canOpenPage(page)){page='dashboard';navigation()}$('#title').textContent=labels[page];let c=$('#content');c.innerHTML='<div class="panel">Loading...</div>';try{if(page==='dashboard')await dashboard(c);else if(page==='attendance')await attendance(c);else if(page==='settings')await settings(c);else if(crmMap[page])await crmWorkspace(c,crmMap[page]);else await placeholder(c)}catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}}
-async function dashboard(c){const [daily,ownTotal]=await Promise.all([db.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),db.from('gr_attendance').select('user_id',{count:'exact',head:true}).eq('user_id',user.id)]);if(daily.error||ownTotal.error)throw Error(daily.error?.message||ownTotal.error?.message);let todays=daily.data||[];let own={length:ownTotal.count||0};c.innerHTML='<div class="notice">GreenRich ONE combines employee management, attendance and Sales & CRM in this workspace. Customer records and tags are shared across both companies and all employee logins. Sales, orders, products, inventory and follow-ups use the shared GreenRich cloud with real-time updates for employees who have company access.</div><div class="cards">'+card('Active employees',people.filter(p=>p.active).length)+card('Present today',todays.filter(x=>x.status==='present').length)+card('Half day today',todays.filter(x=>x.status==='half_day').length)+card('Your attendance records',own.length)+'</div><div class="panel"><h2>Department workspace</h2><p>Signed in as '+esc(profile.full_name)+' · '+esc(roleName())+'</p><div class="row"><button class="blue" id="goAttendance">View attendance</button><button class="secondary" type="button" id="goCrm">Open Sales & CRM</button></div></div>';$('#goAttendance').onclick=()=>{page='attendance';navigation();render()};$('#goCrm').onclick=()=>{page='crm';navigation();render()};$('#goCrm').hidden=!canOpenPage('crm')}
+async function render(){
+ if(!canOpenPage(page)){page='dashboard';navigation()}
+ $('#title').textContent=labels[page];const c=$('#content');
+ if(crmMap[page]&&crmCache&&crmCache.company===window.GreenRichCompanies?.selected(user?.id)){
+  c.replaceChildren(crmCache.host);window.GreenRichCRM.switchPage(crmMap[page]);return;
+ }
+ c.replaceChildren();
+ try{
+  if(page==='dashboard')await dashboard(c);
+  else if(page==='attendance')await attendance(c);
+  else if(page==='settings'){crmCache=null;await settings(c)}
+  else if(crmMap[page])await crmWorkspace(c,crmMap[page]);
+  else await placeholder(c)
+ }catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
+}
+async function dashboard(c){
+ if(!window.GreenRichExecutiveDashboard)throw Error('Dashboard not loaded. Refresh GreenRich ONE.');
+ await window.GreenRichExecutiveDashboard.mount(c,{db,userId:user.id,
+ companyIds:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),notify:toast});
+}
 async function attendance(c){
  if(!window.GreenRichAttendance)throw Error('Attendance module script has not loaded. Refresh GreenRich ONE.');
  await window.GreenRichAttendance.mount(c);
 }
-let crmAssetsPromise=null;
+let crmCache=null,crmAssetsPromise=null;
 const loadCrmAssets=()=>{
  if(crmAssetsPromise)return crmAssetsPromise;
  const load=(url,test)=>test()?Promise.resolve():new Promise((resolve)=>{
@@ -183,6 +201,11 @@ async function crmWorkspace(container,view,adminTools=false){
  if(!window.GreenRichCRM)throw Error('Sales & CRM module has not loaded. Refresh the page.');
  const access=crmAccess(),allowed=adminTools?['channels','reports']:Object.entries(access).filter(([key,v])=>v&&key!=='channels'&&key!=='reports').map(([key])=>key);
  if(!allowed.includes(view))throw Error('You do not have permission to open this CRM section');
+ if(!adminTools){
+  const host=document.createElement('div');
+  crmCache={host,company:window.GreenRichCompanies?.selected(user?.id)||'grow-india'};
+  container.append(host);container=host;
+ }
  await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'),roleName()==='Admin'||can('sales','approve')||can('orders','approve'),roleName()==='Admin'||can('dispatch','edit')||can('stock','edit')||can('orders','edit'));
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
@@ -321,6 +344,7 @@ async function settings(c){
    openTags:host=>window.GreenRichCustomerTags.mount(host,{db,notify:toast}),
   openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
+   openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
    configureCompanySelector();

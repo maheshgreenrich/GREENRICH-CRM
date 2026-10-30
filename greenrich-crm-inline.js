@@ -421,7 +421,8 @@ async function exportOverviewPdf(){
  toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
 }
 
-const act=(k,id)=>`<button class="action-button" data-edit="${k}:${id}">Edit</button><button class="action-button delete" data-delete="${k}:${id}">Delete</button>`;
+const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button><button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>';
+ const act=(k,id)=>window.GreenRichActionMenu.wrap(actButtons(k,id));
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
 
@@ -792,6 +793,24 @@ window.GreenRichCRM={
   all('#navigation button[data-page]').forEach(button=>button.hidden=!allowedTabs.includes(button.dataset.page));
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Local CRM data needs restoration from a valid backup');
+  $('#dashboard-export-actions').hidden=!allowDashboardExport;
+  $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
+  bind();
+  if(!window.GreenRichSalesOps||!window.GreenRichActionMenu)throw Error('CRM actions module missing. Refresh GreenRich ONE.');
+  const operationsReady=window.GreenRichSalesOps.mount(root,{client,companies:scopedCompanyIds(),approve:approveAllowed===true||isAdmin===true,dispatch:dispatchAllowed===true||isAdmin===true,source:{
+   getSales:()=>scopeRows('sales'),getCustomers:()=>data.customers,getTags:()=>data.tags,
+   getLeads:()=>scopeRows('leads'),showCustomerProfile:(customerId,saleId)=>openCustomerProfile(customerId,saleId),productName,channelName,companyLabel,
+   invoiceAction,actions:act,rawActions:actButtons,toast,
+   saveApproved:(companyId,saleId,record)=>{
+    const copy=JSON.parse(JSON.stringify(loadCompanyData(companyId))),row=copy.sales.find(s=>s.id===saleId);
+    if(!row)return false;
+    row.approval_status='Approved';row.approved_at=record.approved_at;row.dispatch_id=record.id;
+    return saveCompanyData(companyId,copy);
+   }
+  }});
+  currentCustomerId='';currentSourceSaleId='';
+  // First paint the requested CRM page, then load shared records in the background.
+  navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
   await window.GreenRichSharedCustomers.ready({client,admin:isAdmin===true});
   await window.GreenRichInvoices.load(client);
   if(!window.GreenRichCRMCloud)throw Error('Shared CRM service not loaded. Refresh this page.');
@@ -808,25 +827,11 @@ window.GreenRichCRM={
    (cloudState.migrated?' Imported '+cloudState.migrated+' existing browser records.':'');
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   attachSharedCustomers(data);
-  $('#dashboard-export-actions').hidden=!allowDashboardExport;
-  $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
-  bind();
-  if(!window.GreenRichSalesOps)throw Error('Sales and Dispatch module not loaded. Refresh GreenRich ONE.');
-  await window.GreenRichSalesOps.mount(root,{client,companies:scopedCompanyIds(),approve:approveAllowed===true||isAdmin===true,dispatch:dispatchAllowed===true||isAdmin===true,source:{
-   getSales:()=>scopeRows('sales'),getCustomers:()=>data.customers,getTags:()=>data.tags,
-   getLeads:()=>scopeRows('leads'),showCustomerProfile:(customerId,saleId)=>openCustomerProfile(customerId,saleId),productName,channelName,companyLabel,
-   invoiceAction,actions:act,toast,
-   saveApproved:(companyId,saleId,record)=>{
-    const copy=JSON.parse(JSON.stringify(loadCompanyData(companyId))),row=copy.sales.find(s=>s.id===saleId);
-    if(!row)return false;
-    row.approval_status='Approved';row.approved_at=record.approved_at;row.dispatch_id=record.id;
-    return saveCompanyData(companyId,copy);
-   }
-  }});
-  currentCustomerId='';currentSourceSaleId='';
-  navigate(allowedTabs.includes(view)?view:allowedTabs[0]);
+  await operationsReady;
+  if(root?.isConnected)render();
   return root;
  },
+ switchPage:view=>{if(allowedTabs.includes(view))navigate(view)},
  openCustomerProfile:(id,saleId='')=>openCustomerProfile(id,saleId),
  refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
  unmount:()=>{window.GreenRichCRMCloud?.stop?.();charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}

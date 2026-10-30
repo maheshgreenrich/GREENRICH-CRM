@@ -28,7 +28,7 @@
  const companyName=s=>adapter.companyLabel(s._companyId);
  const orderKey=s=>(s._companyId||s.company_id)+'|'+s.id;
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
- const approvalStatus=s=>dispatchFor(s)?.status||s.approval_status||'Pending verification';
+ const approvalStatus=s=>dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
  const filterPeriod=(period,from,to,day)=>{
   if(period==='all')return true;
   if(period==='custom')return (!from||day>=from)&&(!to||day<=to);
@@ -130,7 +130,7 @@
      '<button class="gr-order-approve" type="button" data-approve-order="'+esc(s.id)+'" data-approve-company="'+esc(s._companyId)+'">Approve</button>':
      (cloud?'<span class="gr-order-approved">✓ Sent to dispatch</span>':
       (blocked?'<span class="gr-order-muted">Not approvable</span>':'<span class="gr-order-muted">'+esc(status)+'</span>'));
-    return '<div class="gr-order-actions">'+approve+adapter.actions('sales',s.id)+adapter.invoiceAction(s)+'</div>';
+    return '<div class="gr-order-actions">'+window.GreenRichActionMenu.wrap(approve+adapter.rawActions('sales',s.id)+adapter.invoiceAction(s))+'</div>';
    }
    default:return '—';
   }
@@ -159,7 +159,7 @@
   const list=dispatchRows.filter(r=>allowed.includes(r.company_id)&&(status==='all'||r.status===status)&&(company==='all'||r.company_id===company)&&
    (!term||[r.order_id,r.platform_order_id,r.company_id,r.customer_name,r.customer_mobile,r.customer_email,r.product_name,r.sku,r.courier_name,r.tracking_number,r.invoice_number].some(x=>String(x??'').toLowerCase().includes(term))));
   const count=k=>list.filter(r=>r.status===k).length;
-  q('#dispatch-metrics').innerHTML=[['Approved',count('Approved')],['Packed',count('Packed')],['Shipped',count('Shipped')],['Delivered',count('Delivered')]].map(([label,value])=>'<div class="gr-order-stat"><span>'+label+'</span><strong>'+num(value)+'</strong></div>').join('');
+  q('#dispatch-metrics').innerHTML=[['Pending',count('Pending')+count('Approved')],['Packed',count('Packed')],['Shipped',count('Shipped')],['Delivered',count('Delivered')]].map(([label,value])=>'<div class="gr-order-stat"><span>'+label+'</span><strong>'+num(value)+'</strong></div>').join('');
   q('#dispatch-table').innerHTML=list.length?list.map(r=>'<tr>'+
    '<td><strong>'+esc(r.order_id)+'</strong><small>'+esc(r.order_date)+'</small></td>'+
    '<td>'+esc(adapter.companyLabel(r.company_id))+'</td>'+
@@ -168,9 +168,9 @@
    '<td>'+esc(new Date(r.approved_at).toLocaleDateString('en-IN'))+'</td>'+
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
-   '<td><div class="gr-order-actions"><button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
-   (canDispatch?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')+
-   '</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No approved orders match these filters.</td></tr>';
+   '<td><div class="gr-order-actions">'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
+   (canDispatch?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')
+   )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
  function showCustomer(id,sourceSaleId){
@@ -235,7 +235,7 @@
   q('#gr-dispatch-editor-info').innerHTML='<p><strong>'+esc(order.customer_name||'Customer')+'</strong> · '+esc(order.product_name)+' · '+num(order.quantity)+' units</p><p>'+esc(adapter.companyLabel(order.company_id))+' · '+money(order.order_total)+' · '+esc(order.shipping_address||'Shipping address not recorded')+'</p>'+
    '<p>Approved: '+esc(new Date(order.approved_at).toLocaleString('en-IN'))+'</p>';
   for(const field of ['status','courier_name','tracking_number','tracking_url','dispatch_note']){
-   const element=q('#gr-dispatch-editor-form').elements.namedItem(field);if(element)element.value=order[field]|| (field==='status'?'Approved':'');
+   const element=q('#gr-dispatch-editor-form').elements.namedItem(field);if(element)element.value=order[field]|| (field==='status'?'Pending':'');
    if(element)element.disabled=readonly;
   }
   q('#gr-dispatch-editor-form').querySelector('button[type="submit"]').hidden=readonly;
@@ -247,8 +247,8 @@
   if(!current)return actionMessage('Dispatch row missing');
   const form=event.currentTarget,values=Object.fromEntries(new FormData(form).entries());
   for(const key of Object.keys(values))values[key]=text(values[key]);
-  if(!['Approved','Packed','Shipped','Delivered'].includes(values.status))return actionMessage('Invalid stage');
-  const sequence=['Approved','Packed','Shipped','Delivered'];
+  if(!['Pending','Packed','Shipped','Delivered'].includes(values.status))return actionMessage('Invalid stage');
+  const sequence=['Pending','Packed','Shipped','Delivered'];
   if(sequence.indexOf(values.status)<sequence.indexOf(current.status))return actionMessage('Cannot move a dispatched order backward');
   if(values.status==='Delivered'&&!['Shipped','Delivered'].includes(current.status))return actionMessage('Mark the order Shipped before Delivered');
   if(['Shipped','Delivered'].includes(values.status)&&(!values.courier_name||!values.tracking_number))return actionMessage('Courier name and tracking number are required to ship');

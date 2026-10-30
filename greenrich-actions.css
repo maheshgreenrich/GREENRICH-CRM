@@ -1,0 +1,18 @@
+.gr-more-cell{display:inline-flex;align-items:center;justify-content:center;min-width:36px}
+.gr-more-source[hidden]{display:none!important}
+.gr-more-trigger{display:grid!important;place-items:center!important;width:35px!important;height:35px!important;
+ margin:0!important;padding:0!important;line-height:1!important;font-size:23px!important;
+ font-weight:700!important;color:#365783!important;background:#f3f7ff!important;border:1px solid #dce6f5!important;
+ border-radius:9px!important;cursor:pointer!important}
+.gr-more-trigger:hover,.gr-more-trigger[aria-expanded="true"]{background:#e5efff!important;color:#174fba!important}
+.gr-more-popover{position:fixed;z-index:100000;width:198px;max-height:70vh;overflow:auto;
+ display:flex;flex-direction:column;padding:5px;border:1px solid #d7e2f2;border-radius:12px;
+ background:#fff;box-shadow:0 14px 38px #102c5840}
+.gr-more-popover .gr-more-option{display:block!important;width:100%!important;height:auto!important;
+ border:0!important;border-radius:7px!important;background:#fff!important;color:#294875!important;
+ font-size:12px!important;line-height:1.35!important;font-weight:600!important;text-align:left!important;
+ padding:11px 12px!important;cursor:pointer!important}
+.gr-more-popover .gr-more-option:hover,.gr-more-popover .gr-more-option:focus-visible{background:#edf3ff!important}
+.gr-more-popover .gr-more-option.danger{color:#b34b57!important}
+.gr-more-popover .gr-more-option:disabled{opacity:.4;cursor:not-allowed}
+#grCrmWorkspace td[data-order-cell="actions"]{min-width:60px!important;max-width:120px!important}
