@@ -5,7 +5,7 @@ const html=fs.readFileSync('secure.html','utf8'),
  ui=fs.readFileSync('greenrich-erp-pilot.js','utf8'),
  sql=fs.readFileSync('supabase/migrations/20261030160000_connected_erp_pilot.sql','utf8');
 new vm.Script(ops);new vm.Script(ui);
-assert.ok(html.includes('greenrich-erp-pilot.js?v=20261030-erp-pilot-1'),'Pilot script must load');
+assert.ok(html.includes('greenrich-erp-pilot.js?v=20261030-erp-pilot-2'),'Pilot script must load');
 assert.ok(html.indexOf('greenrich-erp-pilot.js?v=')<html.indexOf('greenrich-operations.js?v='),'Load before Operations shell');
 assert.ok(ops.includes("['pilot','Connected Order-to-Stock · Pilot','stock']"),'ERP pilot inside existing Operations sidebar');
 assert.ok(ops.includes('GreenRichPilot.mount('));
