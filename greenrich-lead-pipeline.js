@@ -99,7 +99,7 @@
   const stat=[['Visible leads',rows.length],['Quotation follow-ups',quoted.length],['Won sales orders',wins.filter(l=>l.won_order_id).length],['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
   root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
     (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
-    button('Won sales history','history')+button('Meta Leads Sync','metasync')+'</div></div>'+
+    button('Won sales history','history')+button('Sheet Integrations / Duplicates','metasync')+'</div></div>'+
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
@@ -167,8 +167,8 @@
  async function act(ctx,b){
   const action=b.dataset.glAction,l=getLead(ctx,b.dataset.id,b.dataset.company);
   if(action==='metasync'){
-   if(!window.GreenRichMetaSync){notify(ctx,'Meta connection module failed to load. Refresh GreenRich ONE.');return}
-   void window.GreenRichMetaSync.open(ctx).catch(e=>notify(ctx,e.message));return;
+   if(!window.GreenRichSheetManager){notify(ctx,'Lead integrations module failed to load. Refresh GreenRich ONE.');return}
+   void window.GreenRichSheetManager.open(ctx).catch(e=>notify(ctx,e.message));return;
   }
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
