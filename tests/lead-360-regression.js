@@ -13,7 +13,7 @@ assert.ok(html.indexOf('greenrich-lead-profile.js?v=')<html.indexOf('greenrich-c
 assert.ok(contacts.includes('data-contact-lead-profile'));
 assert.ok(contacts.includes('window.GreenRichLeadProfile.open'));
 assert.ok(leads.includes('leadLink(l,l.contact||l.title)'));
-assert.ok(leads.includes("button('Quick view','quick'"));
+assert.ok(leads.includes("ico('quick','Quick view'"));
 assert.ok(leads.includes("window.GreenRichLeadProfile.open"));
 assert.ok(leads.includes("contactIcons(l)"));
 assert.ok(profile.includes('gr_lead_stage_history')&&profile.includes('gr_pipeline_source_answers'));
