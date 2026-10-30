@@ -305,6 +305,23 @@ begin
  where company_id=x.company_id and kind='leads' and record_id=x.lead_id;
 end $$;
 
+
+-- Report source-specific Google permission errors without exposing integration secrets.
+create or replace function public.gr_sheet_sync_report_error(p_token text,p_connection uuid,p_error text)
+returns void language plpgsql security definer set search_path=''
+as $
+declare v_admin uuid;
+begin
+ v_admin:=public.gr_sheet_token_admin(p_token);
+ update public.gr_sheet_connections c set last_error=left(coalesce(p_error,'Unknown sync error'),400),
+   last_sync_at=now(),updated_at=now()
+ where c.id=p_connection and c.created_by=v_admin and c.enabled
+ and exists(select 1 from public.gr_profiles p where p.id=v_admin and c.company_id=any(p.company_ids));
+ if not found then raise exception 'Source not authorized';end if;
+end $;
+revoke all on function public.gr_sheet_sync_report_error(text,uuid,text) from public,anon,authenticated;
+grant execute on function public.gr_sheet_sync_report_error(text,uuid,text) to anon,authenticated;
+
 -- Existing configured Meta spreadsheet appears automatically as first connection
 -- (no backfill: old importer may already have imported row 4).
 insert into public.gr_sheet_connections(company_id,sheet_id,tab_name,source_name,brand,
