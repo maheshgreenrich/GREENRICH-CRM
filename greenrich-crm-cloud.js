@@ -45,7 +45,14 @@
    const store=local(id);
    if(localStorage.getItem(importedKey(id))==='yes'||!store)continue; // Newly opened browser: never seed arbitrary empty local channels.
    if(!ensureArray(store))throw Error('Local CRM backup for '+id+' is invalid. Export it before migration.');
-   for(const kind of KINDS)legacy.push(...toRows(id,kind,store[kind]));
+   // Legacy leads lack verified employee IDs. Preserve them for assigned import in
+   // the pipeline instead of silently uploading unassigned records or overwriting them.
+   if(store.leads.length){
+    const backupKey='greenrich-crm-pipeline-legacy-backup:'+id;
+    if(!localStorage.getItem(backupKey))localStorage.setItem(backupKey,JSON.stringify(store.leads));
+    notify('Saved '+store.leads.length+' legacy leads from '+id+' for assignment in Leads & CRM → Assign saved leads.');
+   }
+   for(const kind of KINDS.filter(k=>k!=='leads'))legacy.push(...toRows(id,kind,store[kind]));
   }
   if(!legacy.length)return 0;
   // INSERT ... ON CONFLICT DO NOTHING; pre-existing cloud records always win.
