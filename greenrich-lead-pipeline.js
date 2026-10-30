@@ -37,6 +37,9 @@
  .gl-multi summary:after{content:' ▾';float:right}.gl-multi-options{position:absolute;z-index:20;top:37px;left:0;width:max(190px,100%);max-height:220px;overflow:auto;background:white;border:1px solid #c7d9eb;border-radius:9px;box-shadow:0 9px 25px #142f5030;padding:9px}
  .gl-multi-options label{display:flex;flex-direction:row;align-items:center;gap:8px;padding:5px 2px}
  .gl-multi-options input{width:15px;height:15px;min-width:15px}
+ .gl-first-interests fieldset{border:1px solid #dbe5f1;border-radius:8px;margin:9px 0;padding:11px;max-height:180px;overflow:auto}
+ .gl-first-interests fieldset label{display:inline-flex;margin:4px 10px 4px 0;flex-direction:row;align-items:center;gap:6px}
+ .gl-first-interests input{width:16px!important;height:16px!important}
   .gl-card button:focus-visible,.gl-row button:focus-visible{outline:3px solid #87aefa}
  .gl-note{padding:13px;border-radius:10px;background:#fff7e8;border:1px solid #efd9a6;color:#805b18;font-size:13px}
  .gl-dialog{border:1px solid #cfdbed;border-radius:14px;box-shadow:0 15px 60px #15355935;padding:23px;max-width:min(590px,94vw);max-height:90vh;overflow:auto}
@@ -181,22 +184,46 @@
  const noteFld=()=>'<label>Conversation details / reason (required)<textarea name="note" maxlength="4000" required placeholder="What was discussed? What is the next action?"></textarea></label>';
  const getLead=(ctx,id,company)=>ctx.leads.find(l=>l.lead_id===id&&l.company_id===company);
  function move(ctx,l,to){
-  const next=to||stages[stages.indexOf(l.stage)+1]||'Contacted';
+  const allowed=l.stage==='New'?['Contacted','Qualified','Quotation','Lost']:
+   l.stage==='Contacted'?['Qualified','Lost']:
+   l.stage==='Qualified'?['Quotation','Lost']:
+   l.stage==='Quotation'?['Won','Lost']:
+   l.stage==='Lost'?['Contacted']:[];
+  if(!allowed.length){notify(ctx,'Won is complete. Reopening requires an authorized correction.');return}
+  const next=allowed.includes(to)?to:allowed[0];
   const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id);
-  const orderSelect='<label>Linked Sales Order (required to mark Won)<select name="order"><option value="">Select existing sales order</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
-  const body='<p class="gl-caption">'+escape(l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
-   selectFld('Move to stage','stage',stages.filter(s=>s!==l.stage).map(s=>[s,s]))+noteFld()+
-   fld('Next follow-up date','due','date','',true)+orderSelect+
-   '<p class="gl-note">For Won: create a Sales Order for the linked customer first, then select it here.</p>';
+  const orderSelect='<label>Linked Sales Order (required for Won)<select name="order"><option value="">Select existing sales order</option>'+
+    orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
+  const firstMove=l.stage==='New';
+  const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
+  const formChoices=firstMove?'<div class="gl-first-interests"><h4>Product & Tags — first stage update only</h4>'+
+   '<p class="gl-caption">Choose one or more approved products and tags when first contacting or qualifying this enquiry.</p>'+
+   '<fieldset><legend>Interested products</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
+     (p.record_id===l.product_id?'checked':'')+'>'+escape(p.payload?.name||p.record_id)+'</label>').join('')+'</fieldset>'+
+   '<fieldset><legend>Tags approved in Settings</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
+     ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
+  const body='<p class="gl-caption">'+escape(l.title)+' · Current: '+escape(l.stage)+'</p>'+
+   selectFld('Move to stage','stage',allowed.map(s=>[s,s]))+formChoices+noteFld()+
+   fld('Next follow-up date','due','date','',false)+orderSelect+
+   '<p class="gl-note">'+(l.stage==='New'?'First movement may be Contacted, Qualified, Quotation or Lost. Later forward movements follow the pipeline order.':
+   'Allowed next stages are listed above. For Won, link a customer and create their Sales Order first.')+'</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
-   const stage=fd.get('stage');if(!stage)throw Error('Select a stage');
-   if(stage==='Won'&&!l.customer_id)throw Error('This lead must be linked to an existing customer before Won.');
-   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
-   if(stage==='Won'&&!payload.p_order)throw Error('Select an existing customer-linked sales order');
-   const {error}=await ctx.db.rpc('gr_pipeline_move',payload);if(error)throw error;
+   const stage=fd.get('stage');
+   if(stage==='Won'&&!l.customer_id)throw Error('Link this lead to a customer before Won.');
+   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+     p_products:firstMove?fd.getAll('products'):[],p_tags:firstMove?fd.getAll('tags'):[],
+     p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
+   if(stage==='Won'&&!payload.p_order)throw Error('Select the linked Sales Order');
+   if(stage==='Quotation'&&!payload.p_due)throw Error('Choose quotation follow-up date');
+   const {error}=await ctx.db.rpc('gr_pipeline_move_with_interests',payload);
+   if(error)throw error;
   });
   const select=d.querySelector('select[name=stage]');select.value=next;
-  const controls=()=>{const stage=select.value;const due=d.querySelector('input[name=due]');if(due){due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation'}const order=d.querySelector('select[name=order]');if(order){order.closest('label').hidden=stage!=='Won';order.required=stage==='Won'}};
+  const controls=()=>{
+   const stage=select.value,due=d.querySelector('input[name=due]'),order=d.querySelector('select[name=order]');
+   due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation';
+   order.closest('label').hidden=stage!=='Won';order.required=stage==='Won';
+  };
   select.onchange=controls;controls();
  }
  async function act(ctx,b){
