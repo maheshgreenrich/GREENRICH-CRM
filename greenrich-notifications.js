@@ -10,6 +10,8 @@ window.GreenRichNotify=(()=>{
  return (message,kind)=>{
   const t=document.querySelector('#toast');if(!t)return;
   t.textContent=String(message??'');t.dataset.kind=['success','error','warning','info'].includes(kind)?kind:classify(message);
+  t.setAttribute('role',t.dataset.kind==='error'||t.dataset.kind==='warning'?'alert':'status');
+  t.setAttribute('aria-live',t.dataset.kind==='error'||t.dataset.kind==='warning'?'assertive':'polite');
   t.classList.add('show');clearTimeout(timeout);
   timeout=setTimeout(()=>t.classList.remove('show'),t.dataset.kind==='error'?8500:4500);
  };
