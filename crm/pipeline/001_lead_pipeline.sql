@@ -178,7 +178,11 @@ begin
  if p_value is null or p_value<0 or p_value>9999999999999999.99 then raise exception 'Invalid lead value'; end if;
  if p_customer is not null and not exists(select 1 from public.gr_crm_customers where id=p_customer) then raise exception 'Customer not found'; end if;
  if p_product is not null and not exists(select 1 from public.gr_crm_records where company_id=p_company and kind='products' and record_id=p_product) then raise exception 'Product not found'; end if;
- if p_legacy_id is not null and p_legacy_id !~* '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}
+ if p_legacy_id is not null and p_legacy_id !~* '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$' then
+   raise exception 'Invalid legacy lead ID'; end if;
+ v_id=coalesce(p_legacy_id,gen_random_uuid()::text);
+ if exists(select 1 from public.gr_crm_records where company_id=p_company and kind='leads' and record_id=v_id) then
+   raise exception 'This lead is already stored in CRM'; end if;
  insert into public.gr_lead_pipeline(company_id,lead_id,title,contact,mobile,email,source,product_id,tag_ids,customer_id,assigned_to,expected_value,notes,created_by)
  values(p_company,v_id,btrim(p_title),coalesce(p_contact,''),coalesce(p_mobile,''),coalesce(p_email,''),coalesce(p_source,''),p_product,coalesce(p_tags,'{}'),p_customer,p_assignee,p_value,coalesce(p_note,''),auth.uid());
  insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
@@ -191,7 +195,7 @@ begin
  return v_id;
 end $$;
 revoke all on function public.gr_pipeline_create(text,text,text,uuid,text,text,numeric,text,text,text[],uuid,text,text) from public;
-grant execute on function public.gr_pipeline_create(text,text,text,uuid,text,text,numeric,text,text,text[],uuid,text) to authenticated;
+grant execute on function public.gr_pipeline_create(text,text,text,uuid,text,text,numeric,text,text,text[],uuid,text,text) to authenticated;
 
 create or replace function public.gr_pipeline_assign(p_company text,p_lead text,p_employee uuid,p_note text)
 returns void language plpgsql security definer set search_path=''
