@@ -312,3 +312,23 @@ begin
 end $adv$;
 revoke all on function public.gr_pipeline_advance(text,text,text,text,text[],text[],text,timestamptz,text) from public,anon,authenticated;
 grant execute on function public.gr_pipeline_advance(text,text,text,text,text[],text[],text,timestamptz,text) to authenticated;
+
+-- Only the currently authorized salesperson/Admin can read an imported
+-- lead's form answers. The original import audit table remains Admin-only.
+create or replace function public.gr_pipeline_source_answers(p_company text,p_lead text)
+returns jsonb language plpgsql stable security definer set search_path=''
+as $answers$
+declare v_assignee uuid;
+begin
+ select assigned_to into v_assignee from public.gr_lead_pipeline
+ where company_id=p_company and lead_id=p_lead;
+ if not found or not public.gr_lead_can(p_company,v_assignee,'view')
+ then raise exception 'Lead access denied';end if;
+ return coalesce((select jsonb_agg(jsonb_build_object('raw_answers',raw_answers,
+  'normalized_answers',normalized_answers,'row_number',row_number) order by created_at desc)
+  from (select raw_answers,normalized_answers,row_number,created_at
+        from public.gr_sheet_import_rows where company_id=p_company and lead_id=p_lead
+        order by created_at desc limit 5) x),'[]'::jsonb);
+end $answers$;
+revoke all on function public.gr_pipeline_source_answers(text,text) from public,anon,authenticated;
+grant execute on function public.gr_pipeline_source_answers(text,text) to authenticated;
