@@ -156,6 +156,212 @@ begin
  ('STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE')) then raise exception 'Invalid workflow step';end if;
  if 'JOBWORK'=any(p_steps) and not (p_steps @> array['ISSUE','RECEIVE','VENDOR_PO','RM_RECEIPT']::text[]) then raise exception 'Job work requires vendor PO, material issue, receipt';end if;
  if 'RECEIVE'=any(p_steps) and array_position(p_steps,'RECEIVE')>array_position(p_steps,'QC') then raise exception 'Receive before QC';end if;
+ if 'JOBWORK'=any(p_steps) and not (
+ array_position(p_steps,'VENDOR_PO')<array_position(p_steps,'RM_RECEIPT')
+ and array_position(p_steps,'RM_RECEIPT')<array_position(p_steps,'ISSUE')
+ and array_position(p_steps,'ISSUE')<array_position(p_steps,'JOBWORK')
+ and array_position(p_steps,'JOBWORK')<array_position(p_steps,'RECEIVE')
+ ) then raise exception 'Vendor PO → RM receipt → issue → job work → processed receipt sequence required';end if;
+ if 'INSPECTION'=any(p_steps) and array_position(p_steps,'INSPECTION')>array_position(p_steps,'QC') then raise exception 'Inspection must precede final QC';end if;
+ if 'STICKER'=any(p_steps) and array_position(p_steps,'STICKER')>array_position(p_steps,'QC') then raise exception 'Sticker must precede final QC';end if;
+ if exists(select 1 from jsonb_array_elements(p_parts) x where
+ length(trim(coalesce(x->>'name','')))<2 or length(trim(coalesce(x->>'code','')))<2
+ or coalesce(x->>'qty','') !~ '^[0-9]+(\\.[0-9]{1,3})?
+ v_id:=gen_random_uuid();v_product:=gen_random_uuid()::text;
+ insert into public.gr_pilot_products(id,company_id,crm_product_id,sku,name,parts,steps,created_by)
+ values(v_id,p_company,v_product,upper(trim(p_sku)),trim(p_name),p_parts,p_steps,auth.uid());
+ insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
+ values(p_company,'products',v_product,jsonb_build_object('id',v_product,'company_id',p_company,
+ 'sku',upper(trim(p_sku)),'name','[PILOT] '||trim(p_name),'brand','ERP PILOT',
+ 'category','Training / Not for sale','tax',0,'price',0,'inclusive',false,
+ 'active',false,'stock',0,'is_pilot',true,'pilot_product_id',v_id,
+ 'description','TEST workflow product — not sellable; stock updated only by pilot QC/dispatch'),auth.uid());
+ return v_id;
+end $$;
+
+create or replace function public.gr_pilot_start_order(p_product uuid,p_qty int,p_customer text)
+returns uuid language plpgsql security definer set search_path=''
+as $$
+declare p public.gr_pilot_products%rowtype; v_id uuid;
+begin
+ select * into p from public.gr_pilot_products where id=p_product;
+ if not found or not public.gr_ops_allowed(p.company_id,'work_order','create') then raise exception 'Product unavailable';end if;
+ if p_qty not between 1 and 100 then raise exception 'Quantity must be 1–100';end if;
+ if length(trim(coalesce(p_customer,''))) not between 3 and 120 then raise exception 'Pilot customer label required';end if;
+ insert into public.gr_pilot_orders(company_id,product_id,customer_name,qty,created_by)
+ values(p.company_id,p.id,'[TEST] '||trim(p_customer),p_qty,auth.uid()) returning id into v_id;
+ return v_id;
+end $$;
+
+create or replace function public.gr_pilot_update_vendor(p_company text,p_vendor text,p_name text,p_mobile text,p_address text,p_gstin text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v public.gr_ops_records%rowtype; v_new jsonb;
+begin
+ if not public.gr_ops_allowed(p_company,'vendor','edit') then raise exception 'Purchase vendor edit permission required';end if;
+ if length(trim(coalesce(p_name,'')))<3 then raise exception 'Vendor name required';end if;
+ if nullif(trim(coalesce(p_mobile,'')),'') is not null and p_mobile !~ '^\+?[0-9 ]{10,16}$'
+ then raise exception 'Use a valid mobile number';end if;
+ if nullif(trim(coalesce(p_gstin,'')),'') is not null and upper(trim(p_gstin)) !~ '^[0-9]{2}[A-Z0-9]{13}$'
+ then raise exception 'GSTIN format invalid';end if;
+ select * into v from public.gr_ops_records where company_id=p_company and kind='vendor' and record_id=p_vendor for update;
+ if not found then raise exception 'Vendor not found';end if;
+ v_new:=v.payload||jsonb_build_object('name',trim(p_name),'phone',trim(coalesce(p_mobile,'')),
+ 'location',trim(coalesce(p_address,'')),'gstin',upper(trim(coalesce(p_gstin,''))));
+ update public.gr_ops_records set payload=v_new,updated_at=now()
+ where company_id=p_company and kind='vendor' and record_id=p_vendor;
+ insert into public.gr_pilot_vendor_history(company_id,vendor_id,actor,old_payload,new_payload)
+ values(p_company,p_vendor,auth.uid(),v.payload,v_new);
+end $$;
+
+create or replace function public.gr_pilot_step(p_order uuid,p_note text,p_details jsonb default '{}'::jsonb)
+returns text language plpgsql security definer set search_path=''
+as $$
+declare o public.gr_pilot_orders%rowtype;p public.gr_pilot_products%rowtype;
+ v_step text;v_available int;v_received int;v_issued numeric(18,3);
+ v_used numeric(18,3);v_scrap numeric(18,3);v_vendor numeric(18,3);v_returned numeric(18,3);
+ v_vendor_id text;v_stock int;v_product_stock int; v_po text;
+begin
+ select * into o from public.gr_pilot_orders where id=p_order for update;
+ if not found then raise exception 'Order not found';end if;
+ if not public.gr_ops_allowed(o.company_id,'work_order','edit') then raise exception 'Operations edit permission required';end if;
+ select * into p from public.gr_pilot_products where id=o.product_id and company_id=o.company_id;
+ v_step:=p.steps[o.cursor+1];
+ if v_step is null or o.status='COMPLETED' then raise exception 'Workflow already completed';end if;
+ if length(trim(coalesce(p_note,'')))<3 then raise exception 'Enter a short activity note';end if;
+ if p_details is null or jsonb_typeof(p_details)<>'object' then raise exception 'Expected a details object';end if;
+ if v_step='STOCK_CHECK' then
+   select coalesce(sum(qty_change),0) into v_available from public.gr_pilot_stock_events where company_id=o.company_id and product_id=o.product_id;
+   if v_available>=o.qty then raise exception 'Stock is already available. This pilot follows the shortage/production path; use fulfilment instead';end if;
+ elsif v_step='VENDOR_PO' then
+   if not public.gr_ops_allowed(o.company_id,'purchase_order','create') then raise exception 'Purchase PO create permission required';end if;
+   v_vendor_id:=trim(coalesce(p_details->>'vendor_id',''));
+   if not exists(select 1 from public.gr_ops_records where company_id=o.company_id and kind='vendor' and record_id=v_vendor_id)
+   then raise exception 'Choose an existing vendor in this company';end if;
+   v_po:='PILOT-PO-'||left(o.id::text,8);
+   insert into public.gr_pilot_pos(company_id,order_id,vendor_id,number,created_by)
+   values(o.company_id,o.id,v_vendor_id,v_po,auth.uid());
+ elsif v_step='RM_RECEIPT' then
+   v_issued:=(p_details->>'received_kg')::numeric(18,3);
+   if v_issued<=0 or v_issued>100000 then raise exception 'Enter positive raw-material quantity received (kg)';end if;
+   if not exists(select 1 from public.gr_pilot_pos where order_id=o.id) then raise exception 'Vendor PO is required';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'WAREHOUSE','RM_RECEIPT',v_issued);
+ elsif v_step='ISSUE' then
+   v_issued:=(p_details->>'issued')::numeric(18,3);
+   if v_issued<=0 then raise exception 'Enter positive material issued kg';end if;
+   if v_issued>(select coalesce(sum(qty_change),0) from public.gr_pilot_material_events
+     where order_id=o.id and location='WAREHOUSE') then raise exception 'Cannot issue more RM than warehouse stock';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'WAREHOUSE','ISSUE',-v_issued),
+         (o.company_id,o.id,'VENDOR','ISSUE',v_issued);
+ elsif v_step='JOBWORK' then
+   v_issued:=(p_details->>'issued')::numeric(18,3);
+   v_used:=(p_details->>'net_used')::numeric(18,3);
+   v_scrap:=(p_details->>'scrap')::numeric(18,3);
+   v_vendor:=(p_details->>'vendor_balance')::numeric(18,3);
+   v_returned:=(p_details->>'returned')::numeric(18,3);
+   if least(v_issued,v_used,v_scrap,v_vendor,v_returned)<0 or
+     v_issued <> v_used+v_scrap+v_vendor+v_returned
+   then raise exception 'Issued must equal net consumption + scrap + vendor stock + returned stock';end if;
+   if not exists(select 1 from public.gr_pilot_events e where e.order_id=o.id and e.step='ISSUE'
+      and (e.details->>'issued')::numeric(18,3)=v_issued)
+   then raise exception 'Job work issued quantity must match issue challan';end if;
+   if (select coalesce(sum(qty_change),0) from public.gr_pilot_material_events where order_id=o.id and location='VENDOR')<v_used+v_scrap+v_returned
+   then raise exception 'Insufficient vendor-held raw material';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'VENDOR','CONSUMED',-v_used),
+     (o.company_id,o.id,'VENDOR','SCRAP',-v_scrap);
+   if v_returned>0 then
+    insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+    values(o.company_id,o.id,'VENDOR','RETURN',-v_returned),(o.company_id,o.id,'WAREHOUSE','RETURN',v_returned);
+   end if;
+   if (select coalesce(sum(qty_change),0) from public.gr_pilot_material_events where order_id=o.id and location='VENDOR')<>v_vendor
+   then raise exception 'Vendor balance must match material movements';end if;
+ elsif v_step='RECEIVE' then
+   v_received:=(p_details->>'accepted_qty')::int;
+   if v_received<o.qty then raise exception 'Accepted goods must cover production quantity';end if;
+ elsif v_step='INSPECTION' or v_step='QC' then
+   if p_details->>'result'<>'PASS' then raise exception 'Inspection/QC failed: resolve NCR/rework before advancing';end if;
+ elsif v_step='STOCK' then
+   if not exists(select 1 from public.gr_pilot_events where order_id=o.id and step='QC' and details->>'result'='PASS')
+   then raise exception 'QC PASS required before stock receipt';end if;
+   -- Serialize stock posting across all orders for this product.
+   perform pg_advisory_xact_lock(hashtextextended('gr-pilot:'||p.id::text,0));
+   insert into public.gr_pilot_stock_events(company_id,product_id,order_id,movement,qty_change)
+   values(o.company_id,p.id,o.id,'QC_ACCEPTED',o.qty);
+   select coalesce(sum(qty_change),0) into v_stock from public.gr_pilot_stock_events
+    where company_id=o.company_id and product_id=p.id;
+   perform set_config('gr.pilot_stock_post','posting',true);
+   update public.gr_crm_records set payload=jsonb_set(payload,'{stock}',to_jsonb(v_stock)),updated_at=now()
+   where company_id=o.company_id and kind='products' and record_id=p.crm_product_id;
+   if not found then raise exception 'CRM pilot product missing';end if;
+   perform set_config('gr.pilot_stock_post','',true);
+ elsif v_step='DISPATCH' then
+   perform pg_advisory_xact_lock(hashtextextended('gr-pilot:'||p.id::text,0));
+   select coalesce(sum(qty_change),0) into v_stock from public.gr_pilot_stock_events where company_id=o.company_id and product_id=p.id;
+   if v_stock<o.qty then raise exception 'Insufficient finished stock to dispatch';end if;
+   insert into public.gr_pilot_stock_events(company_id,product_id,order_id,movement,qty_change)
+   values(o.company_id,p.id,o.id,'PILOT_DISPATCH',-o.qty);
+   perform set_config('gr.pilot_stock_post','posting',true);
+   update public.gr_crm_records set payload=jsonb_set(payload,'{stock}',to_jsonb(v_stock-o.qty)),updated_at=now()
+   where company_id=o.company_id and kind='products' and record_id=p.crm_product_id;
+   if not found then raise exception 'CRM pilot product missing';end if;
+   perform set_config('gr.pilot_stock_post','',true);
+ elsif v_step='SERVICE' then
+   insert into public.gr_pilot_service(company_id,order_id,ticket,details)
+   values(o.company_id,o.id,'PILOT-SVC-'||left(o.id::text,8),p_note);
+ end if;
+ insert into public.gr_pilot_events(company_id,order_id,step,note,details,actor)
+ values(o.company_id,o.id,v_step,trim(p_note),p_details,auth.uid());
+ update public.gr_pilot_orders set cursor=cursor+1,status=case when o.cursor+1=array_length(p.steps,1) then 'COMPLETED' else status end,updated_at=now() where id=o.id;
+ return v_step;
+end $$;
+revoke all on function public.gr_pilot_product_create(text,text,text,jsonb,text[]) from public,anon;
+revoke all on function public.gr_pilot_start_order(uuid,int,text) from public,anon;
+revoke all on function public.gr_pilot_update_vendor(text,text,text,text,text,text) from public,anon;
+revoke all on function public.gr_pilot_step(uuid,text,jsonb) from public,anon;
+grant execute on function public.gr_pilot_product_create(text,text,text,jsonb,text[]) to authenticated;
+grant execute on function public.gr_pilot_start_order(uuid,int,text) to authenticated;
+grant execute on function public.gr_pilot_update_vendor(text,text,text,text,text,text) to authenticated;
+grant execute on function public.gr_pilot_step(uuid,text,jsonb) to authenticated;
+
+-- Seed one intentionally inactive TEST SKU with 0 stock and one test SO.
+-- The sample vendor is existing *draft* Sivaji Enterprises; no fictitious GSTIN or phone.
+with fresh as (
+ insert into public.gr_pilot_products(company_id,crm_product_id,sku,name,parts,steps)
+ values('grow-india','pilot-fg-home-40','PILOT-HOME-40','Home Composter 40L - Workflow Test',
+ '[{"code":"PART-01","name":"Collection tab","qty":1,"uom":"nos"},{"code":"PART-02","name":"Lid/top cap","qty":1,"uom":"nos"},{"code":"PART-03","name":"Inner tray","qty":1,"uom":"nos"}]'::jsonb,
+ array['STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'])
+ on conflict(company_id,sku) do nothing returning id,company_id,crm_product_id
+),
+products as (
+ insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
+ select company_id,'products',crm_product_id,
+ jsonb_build_object('id',crm_product_id,'company_id',company_id,'sku','PILOT-HOME-40',
+ 'name','[PILOT] Home Composter 40L','brand','ERP PILOT',
+ 'price',0,'tax',0,'stock',0,'active',false,'inclusive',false,
+ 'category','Training / Not for sale','is_pilot',true,
+ 'description','TEST only. Stock updates from posted QC receipt and demo dispatch.'),
+ (select p.id from public.gr_profiles p join public.gr_roles r on r.id=p.role_id where r.name='Admin' and p.active order by p.id limit 1)
+ from fresh on conflict(company_id,kind,record_id) do nothing returning record_id
+)
+insert into public.gr_pilot_orders(company_id,product_id,customer_name,qty)
+select p.company_id,p.id,'[TEST] Sample Customer (no real commitment)',1 from fresh p
+where not exists(select 1 from public.gr_pilot_orders o where o.product_id=p.id)
+on conflict do nothing;
+
+-- Supabase Postgres Changes: publish only the small pilot order table to enable cross-device refresh.
+do $block$
+begin
+ if exists(select 1 from pg_publication where pubname='supabase_realtime')
+ and not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='gr_pilot_orders') then
+  alter publication supabase_realtime add table public.gr_pilot_orders;
+ end if;
+end $block$;
+
+ or (x->>'qty')::numeric<=0)
+ then raise exception 'Each part needs code, name and a positive quantity';end if;
  v_id:=gen_random_uuid();v_product:=gen_random_uuid()::text;
  insert into public.gr_pilot_products(id,company_id,crm_product_id,sku,name,parts,steps,created_by)
  values(v_id,p_company,v_product,upper(trim(p_sku)),trim(p_name),p_parts,p_steps,auth.uid());
