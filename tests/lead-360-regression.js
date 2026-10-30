@@ -7,7 +7,7 @@ const html=fs.readFileSync('secure.html','utf8');
 const sql=fs.readFileSync('supabase/migrations/20261030214000_lead_first_move_interests.sql','utf8');
 for(const s of [profile,leads,contacts])new vm.Script(s);
 assert.ok(html.includes('greenrich-lead-profile.js?v=20261030-lead360-1'));
-assert.ok(html.includes('greenrich-lead-pipeline.js?v=20261030-lead360-1'));
+assert.ok(html.includes('greenrich-lead-pipeline.js?v=20261030-lead360-2'));
 assert.ok(html.includes('greenrich-contacts.js?v=20261030-lead360-1'));
 assert.ok(html.indexOf('greenrich-lead-profile.js?v=')<html.indexOf('greenrich-contacts.js?v='));
 assert.ok(contacts.includes('data-contact-lead-profile'));
