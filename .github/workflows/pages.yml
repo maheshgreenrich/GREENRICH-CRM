@@ -33,6 +33,8 @@ jobs:
           node tests/sidebar-logo-responsive.js
           node --check greenrich-operations.js
           node --check greenrich-workflow-training.js
+          node --check greenrich-erp-pilot.js
+          node tests/connected-erp-pilot.js
           node tests/operations-product-workflow-training.js
           node --check greenrich-operations-seed.js
           node tests/operations-workflow-mapping.js
