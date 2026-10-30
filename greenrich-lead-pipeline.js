@@ -21,6 +21,8 @@
 
  const styles=`
 
+ .gr-lead-full-screen{position:fixed;inset:0;z-index:1200;overflow:auto;background:#f4f7fc;padding:clamp(12px,3vw,35px);overscroll-behavior:contain}
+ .gr-lead-full-screen .grlp{max-width:1400px;margin:0 auto}
  .gl-won-search{display:grid;gap:7px;margin:9px 0}
  .gl-won-search input{width:100%;border:1px solid #cbd8e9;border-radius:8px;padding:10px}
  .gr-won-celebrate{position:fixed;inset:0;z-index:9999;pointer-events:none;display:grid;place-items:center;background:#0b245047;animation:grwonfade 3.4s forwards}
@@ -212,7 +214,7 @@
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
      ''+
      (l.next_followup_at&&l.stage!=='Won'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(dates(l.next_followup_at))+'</b></div>':'')+
-     '<div class="gl-card-line"><span>Priority</span><b>'+escape(l.lead_heat||'Warm')+'</b></div>'+
+     (l.stage==='Won'?'':'<div class="gl-card-line"><span>Priority</span><b>'+escape(l.lead_heat||'Warm')+'</b></div>')+
      '<div class="gl-card-actions gl-icon-row">'+contactIcons(l)+
      ico('quick','Quick view','quick',l)+ico('stage','Move stage','move',l)+ico('history','History','detail',l)+
      (ctx.canViewTeam?ico('assign','Assign employee','assign',l):'')+
@@ -265,10 +267,16 @@
   const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
   const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&
    ['Issued','Confirmed','Approved','Completed','Dispatched'].includes(o.payload?.status));
-  const orderSelect='<div class="gl-won-search"><label>Search issued Sales Order ID<input type="search" name="order_search" placeholder="Type SO number, customer or amount…" autocomplete="off"></label></div>'+
+  const orderSelect='<div class="gl-won-search"><label>Search Sales Order ID, customer or mobile<input type="search" name="order_search" placeholder="SO ID, customer name, mobile, amount…" autocomplete="off" aria-label="Search issued Sales Orders"></label></div>'+
    '<label>Issued Sales Order — required for Won<select name="order">'+
-    '<option value="">Choose customer-linked SO</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+
-      escape(o.payload?.internal_order_id||o.record_id)+' · '+escape(o.payload?.customer_name||l.contact)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
+    '<option value="">Select exact customer-linked Sales Order</option>'+orders.map(o=>{
+      const customer=ctx.customers.find(c=>c.id===o.payload?.customer_id);
+      const text=[o.payload?.internal_order_id||o.payload?.order_id||o.record_id,
+        customer?.name||o.payload?.customer_name||'Customer not linked',
+        customer?.mobile||o.payload?.customer_mobile||'',money(o.payload?.total),
+        o.payload?.date||o.payload?.order_date||'',o.payload?.status||''].filter(Boolean).join(' · ');
+      return '<option value="'+escape(o.record_id)+'">'+escape(text)+'</option>';
+    }).join('')+'</select></label>';
   const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
   const firstFields=first?'<div class="gl-first-interests"><h4>Required when moving from New</h4>'+
    '<fieldset><legend>Interested products *</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
@@ -296,7 +304,7 @@
         p_due_at:due,p_heat:fd.get('heat')
       });
    if(error)throw error;
-   if(stage==='Won')setTimeout(()=>celebrateWon(l.contact||l.title),180);
+   if(stage==='Won'){notify(ctx,'Lead converted to customer and Sales Order linked successfully.');setTimeout(()=>celebrateWon(l.contact||l.title),180);}
   });
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
@@ -306,14 +314,18 @@
    d.querySelector('.gl-won-search').hidden=!won;
   };stage.onchange=controls;controls();
   const search=d.querySelector('[name=order_search]');
+  const orderPicker=d.querySelector('[name=order]');
+  const allOrderOptions=[...orderPicker.options].map(option=>option.cloneNode(true));
   search?.addEventListener('input',()=>{
-    const term=search.value.toLowerCase().trim();
-    [...d.querySelector('[name=order]').options].forEach(option=>{
-      if(!option.value)return;
-      option.hidden=!!term&&!option.textContent.toLowerCase().includes(term);
-    });
-    const chosen=d.querySelector('[name=order]');
-    if(chosen.selectedOptions[0]?.hidden)chosen.value='';
+    const term=search.value.toLowerCase().trim(),selected=orderPicker.value;
+    const matches=allOrderOptions.filter(option=>!option.value||option.textContent.toLowerCase().includes(term));
+    orderPicker.replaceChildren(...matches.map(option=>option.cloneNode(true)));
+    if(selected&&[...orderPicker.options].some(option=>option.value===selected))orderPicker.value=selected;
+    else orderPicker.value='';
+    if(matches.length===1&&term){
+      const empty=document.createElement('option');empty.value='';empty.disabled=true;
+      empty.textContent='No matching issued Sales Order';orderPicker.append(empty);
+    }
   });
  }
  async function act(ctx,b){
@@ -322,7 +334,18 @@
    if(!window.GreenRichSheetManager){notify(ctx,'Lead integrations module failed to load. Refresh GreenRich ONE.');return}
    void window.GreenRichSheetManager.open(ctx).catch(e=>notify(ctx,e.message));return;
   }
-  if(action==='profile'||action==='quick'){if(!l)return;await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,quick:action==='quick'});return;}
+  if(action==='profile'||action==='quick'){
+    if(!l)return;
+    if(action==='quick'){await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,quick:true});return}
+    const page=document.createElement('div');page.className='gr-lead-full-screen';
+    page.setAttribute('role','region');page.setAttribute('aria-label','Lead full profile');
+    const previous=document.activeElement,scrollY=window.scrollY;
+    document.body.append(page);
+    const close=()=>{page.remove();previous?.focus?.({preventScroll:true});window.scrollTo(0,scrollY)};
+    try{await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,host:page,onClose:close})}
+    catch(error){close();notify(ctx,'Could not open lead profile: '+error.message)}
+    return;
+   }
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
    if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
