@@ -51,7 +51,7 @@ window.GreenRichSheetManager=(function(){
    '<div class="panel"><b>'+d.sources.filter(x=>x.enabled).length+' active sources</b> · '+dupes.length+' possible duplicates · '+err.length+' skipped rows'+
    '<p class="muted">Separate enquiries are retained even if phone/email matches. Same sheet-row retries are not duplicated.</p>'+
    '<div class="actions">'+[['sources','Connected Sheets'],['leads','Duplicate Leads'],['contacts','Duplicate Contacts'],['errors','Skipped Rows']].map(([id,label])=>'<button class="'+(st.tab===id?'primary':'secondary')+'" data-act="tab-'+id+'">'+label+'</button>').join('')+'</div></div>';
-  st.root.innerHTML=heading()+'<div class="gsi">'+head+(st.tab==='sources'?sources(st):st.tab==='errors'?skipped(st):duplicates(st))+
+  st.root.innerHTML=heading()+'<div class="gsi">'+head+(st.tab==='sources'?sources(st):st.tab==='errors'?skipped(st):st.tab==='history'?history(st):duplicates(st))+
    '<div class="panel muted">Run the updated central Apps Script in your existing Google Apps Script project. The Google account running it needs access to every connected Sheet. Sync runs about every five minutes after the trigger is authorized.</div></div>';
   st.root.querySelectorAll('[data-act]').forEach(el=>el.onclick=()=>void act(st,el.dataset.act,el.dataset.id));
  }
@@ -68,7 +68,17 @@ window.GreenRichSheetManager=(function(){
     '<button class="secondary" data-act="history" data-id="'+s.id+'">History</button></td></tr>').join('')+
    '</tbody></table></div></div>';
  }
- function duplicates(st){
+ function history(st){
+  const source=st.data.sources.find(x=>x.id===st.selectedSource);
+  const rows=st.data.imports.filter(x=>x.connection_id===st.selectedSource);
+  return '<div class="panel"><div class="bar"><h3>Import History — '+esc(source?.tab_name||'')+'</h3><button class="secondary" data-act="tab-sources">Back to sheets</button></div>'+
+    '<div class="scroll"><table><thead><tr><th>Row</th><th>Outcome</th><th>Customer / Lead</th><th>Imported</th><th>Details</th></tr></thead><tbody>'+
+    rows.map(x=>'<tr><td>'+x.row_number+'</td><td>'+(x.import_error?esc(x.import_error):x.duplicate_type==='none'?'New lead':'Duplicate '+esc(x.duplicate_type))+
+     '</td><td>'+esc(x.normalized_answers?.name||'—')+'<br><span class="muted">'+esc(x.normalized_answers?.phone||'')+'</span></td><td>'+esc(day(x.created_at))+
+     '</td><td><button class="secondary" data-act="original" data-id="'+x.id+'">Original answers</button></td></tr>').join('')+
+    '</tbody></table></div>'+(rows.length?'':'No imported rows recorded for this sheet yet.')+'</div>';
+ }
+  function duplicates(st){
   const wants=st.tab==='leads'?['lead','both']:['contact','both'];
   const rows=st.data.imports.filter(x=>wants.includes(x.duplicate_type));
   return '<div class="panel"><h3>'+(st.tab==='leads'?'Duplicate Leads':'Duplicate Contacts')+'</h3>'+
@@ -154,7 +164,7 @@ window.GreenRichSheetManager=(function(){
   if(a==='add'){edit(st);return}
   if(a==='edit'){edit(st,st.data.sources.find(x=>x.id===id));return}
   if(a==='credentials'){await window.GreenRichMetaSync.open(st.ctx);return}
-  if(a==='history'){st.tab='errors';draw(st);return}
+  if(a==='history'){st.selectedSource=id;st.tab='history';draw(st);return}
   if(a==='original'){original(st,id);return}
   if(a==='pause'){
    const s=st.data.sources.find(x=>x.id===id);
