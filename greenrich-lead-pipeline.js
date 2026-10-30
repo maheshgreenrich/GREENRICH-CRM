@@ -72,6 +72,15 @@
  .gl-dialog label{display:flex;flex-direction:column;gap:5px;color:#526783;font-size:13px;margin:12px 0}
  .gl-dialog input,.gl-dialog select,.gl-dialog textarea{font:inherit;padding:10px;border-radius:9px;border:1px solid #ccd9e8;width:100%;box-sizing:border-box}
  .gl-dialog textarea{min-height:115px}.gl-dialog .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:14px}
+
+ .gl-customer-timeline{padding:20px!important;max-width:100%;overflow:hidden}
+ .gl-customer-timeline>h3{font-size:17px!important;line-height:1.4!important;margin:0 0 5px!important}
+ .gl-customer-timeline>article{font-size:12.5px!important;color:#4b6180}
+ .gl-customer-timeline>article>b{font-size:13px!important;font-weight:700!important;color:#1c437d!important}
+ .gl-customer-timeline .gl-hist{max-height:none!important;overflow:visible!important;display:grid;gap:5px}
+ .gl-customer-timeline .gl-hist article{font-size:12px!important;padding:9px 11px!important;background:#f9fbff;border-radius:8px;border:1px solid #e4ebf5;line-height:1.5!important}
+ .gl-customer-timeline .gl-hist strong{font-size:13px!important;line-height:1.4!important;font-weight:650!important;color:#28528a!important}
+ .gl-customer-timeline .gl-hist p{font-size:12px!important;line-height:1.6!important;margin:4px 0 0!important}
  .gl-hist{max-height:250px;overflow:auto;margin-top:10px}.gl-hist article{border-bottom:1px solid #e2e8f0;padding:8px 0;font-size:12px}
  .gl-follow-table{width:100%;border-collapse:collapse;font-size:13px}.gl-follow-table th,.gl-follow-table td{padding:12px;text-align:left;border-bottom:1px solid #e5ebf5}
  @media(max-width:680px){.gl-main{grid-template-columns:repeat(2,1fr)}.gl-column{flex-basis:82vw}}
