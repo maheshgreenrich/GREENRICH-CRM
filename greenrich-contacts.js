@@ -22,7 +22,7 @@
  const stages=['New','Contacted','Qualified','Quotation','Won','Lost'];
  const FILE_TYPES=['.xlsx','.xls','.csv'];
  const headerMap=new Map(FIELDS.flatMap(([key,label])=>[[key.toLowerCase(),key],[label.toLowerCase(),key]]));
- let root=null,db=null,context=null,sources=[],mode='all',search='',tag=[],source=[],product=[],start='',end='',countLimit=1000,busy=false;
+ let root=null,db=null,context=null,sources=[],mode='all',search='',tag=[],source=[],product=[],companyFilter='all',stageFilter='all',start='',end='',countLimit=1000,busy=false;
  let exportSheetPromise=null,lastCompanyScope='';
  const notify=s=>{const t=root?.querySelector('#gr-contact-status');if(t){t.hidden=false;t.textContent=s}context?.notify?.(s)};
  const opts=(rows,current='',all='')=>(all?'<option value="all">'+esc(all)+'</option>':'')+rows.map(([v,label])=>'<option value="'+esc(v)+'" '+(String(current)===String(v)?' selected':'')+'>'+esc(label)+'</option>').join('');
@@ -35,13 +35,17 @@
  const mark=kind=>'<span class="gr-contact-kind '+kind+'">'+(kind==='lead'?'Lead':'Customer')+'</span>';
  const safeDate=v=>String(v||'').slice(0,10);
  function allRecords(){
-  return [...customers().map(x=>({...x,_kind:'customer',_companyId:''})),
-   ...leads().map(x=>({...x,_kind:'lead',_companyId:x._companyId||x.company_id||''}))];
+  const converted=leads().filter(l=>l.stage==='Won'&&l.customer_id);
+  return [...customers().map(x=>({...x,_kind:'customer',_companyId:'',_wonLead:converted.find(l=>l.customer_id===x.id)||null})),
+   ...leads().filter(l=>!(l.stage==='Won'&&l.customer_id)).map(x=>({...x,_kind:'lead',_companyId:x._companyId||x.company_id||''}))];
  }
  function visibleRecords(){
   const term=search.toLowerCase();
   return allRecords().filter(row=>{
    if(mode!=='all'&&row._kind!==mode)return false;
+   if(companyFilter!=='all'&&row._kind==='lead'&&row._companyId!==companyFilter)return false;
+   if(companyFilter!=='all'&&row._kind==='customer'&&row._wonLead&&row._wonLead.company_id!==companyFilter)return false;
+   if(stageFilter!=='all'&&(row._kind==='lead'?row.stage!==stageFilter:stageFilter!=='Won'||!row._wonLead))return false;
    if(source.length&&!source.some(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'')===String(row.source||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'')))return false;
    if(tag.length&&!tag.some(x=>(row.tag_ids||[]).includes(x)))return false;
    if(product.length&&!product.some(id=>row.product_id===id||
@@ -101,7 +105,7 @@
     '<td>'+esc(phone(r.mobile)||r.mobile||'—')+'<small>'+esc(phone(r.mobile2)||r.mobile2||'')+'</small></td>'+
     '<td>'+esc(r.email||'—')+'</td><td>'+esc(r.source||'—')+'</td>'+
     '<td>'+tagNames(r).map(x=>'<span class="gr-contact-tag">'+esc(x)+'</span>').join('')+'</td>'+
-    '<td>'+esc(r._kind==='lead'?(r.stage||'New'):(r.type||'Individual'))+
+    '<td>'+esc(r._kind==='lead'?(r.stage||'New'):(r._wonLead?'Won · Customer':r.type||'Individual'))+
     '<small>'+(r._kind==='lead'?esc(companyLabel(r._companyId)):'Shared across companies')+'</small></td>'+
     '<td>'+esc(safeDate(r.created_at)||'—')+'</td><td>'+window.GreenRichActionMenu.wrap(actions)+'</td></tr>';
   }).join('')||'<tr><td colspan="9" class="gr-contact-empty">No matching contacts. Change the filters or add a record.</td></tr>';
@@ -112,6 +116,8 @@
   const scope=context?.selectedCompany?.()||'all';
   if(lastCompanyScope!==scope){product=[];lastCompanyScope=scope}
   const kind=root.querySelector('#gr-contact-kind');if(kind)kind.value=mode;
+  const cmp=root.querySelector('#gr-contact-company');if(cmp)cmp.value=companyFilter;
+  const stage=root.querySelector('#gr-contact-stage');if(stage)stage.value=stageFilter;
   const q=root.querySelector('#gr-contact-search');if(q&&q.value!==search)q.value=search;
   draw();
  }
@@ -358,7 +364,7 @@
   finally{if(btn)btn.disabled=false;const pick=root.querySelector('#gr-contact-file');if(pick)pick.value=''}
  }
  function markup(){
-  return '<style>.gr-contact-multi{position:relative;min-width:180px;align-self:end}.gr-contact-multi summary{cursor:pointer;background:#fff;border:1px solid #d2e0f0;border-radius:8px;padding:13px;font-size:13px;color:#315378}.gr-contact-multi>div{position:absolute;z-index:25;top:100%;left:0;background:#fff;border:1px solid #d2e0f0;border-radius:8px;padding:10px;min-width:195px;max-height:230px;overflow:auto;box-shadow:0 8px 20px #142f5027}.gr-contact-multi label{display:flex;flex-direction:row!important;gap:7px;align-items:center;font-size:13px;padding:4px}.gr-contact-multi input{width:15px;height:15px}</style><div class="gr-contact-manager"><div class="gr-contact-top"><div><span>CONTACT MANAGEMENT</span><h2>Customers & Leads</h2><p>One searchable directory · shared customers and company-scoped enquiries</p></div>'+
+  return '<style>.gr-contact-multi{position:relative;min-width:175px;align-self:end;max-width:100%}.gr-contact-multi summary{height:47px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:white;border:1px solid #d2e0f0;border-radius:9px;padding:0 12px;font-size:13px;color:#315378;list-style:none}.gr-contact-multi summary:after{content:"⌄";font-size:16px}.gr-contact-multi>div{position:absolute;z-index:40;top:calc(100% + 4px);left:0;background:white;border:1px solid #d2e0f0;border-radius:10px;padding:8px;min-width:235px;max-width:320px;max-height:240px;overflow:auto;box-shadow:0 10px 24px #142f5027}.gr-contact-multi label{display:flex!important;flex-direction:row!important;gap:11px;align-items:center!important;font-size:13px;padding:9px 7px!important;margin:0!important;line-height:1.35;white-space:normal;cursor:pointer}.gr-contact-multi input[type="checkbox"]{appearance:auto!important;display:block!important;width:17px!important;height:17px!important;min-width:17px!important;max-width:17px!important;flex:0 0 17px!important;padding:0!important;margin:0!important;border:0!important;accent-color:#245ab2}.gr-contact-lead-page{background:#f5f8fc;padding:12px 16px;border-radius:12px;min-height:70vh}.gr-contact-manager[hidden]{display:none!important}</style><div class="gr-contact-manager"><div class="gr-contact-top"><div><span>CONTACT MANAGEMENT</span><h2>Customers & Leads</h2><p>One searchable directory · shared customers and company-scoped enquiries</p></div>'+
    '<div class="gr-contact-add">'+
    '<button class="gr-contact-primary" type="button" data-contact-add="customer">+ Add Customer</button>'+
    '<button class="gr-contact-primary alt" type="button" data-contact-add="lead">+ Add Lead (Pipeline)</button></div></div>'+
@@ -370,6 +376,8 @@
    '<button type="button" data-contact-template="lead">Lead Excel Template</button></div>'+
    '<div class="gr-contact-filters"><label>Search<input id="gr-contact-search" placeholder="Name, mobile, email, company, enquiry…" type="search"></label>'+
    '<label>Record type<select id="gr-contact-kind">'+opts([['all','Customers + leads'],['customer','Customers only'],['lead','Leads only']],mode)+'</select></label>'+
+   '<label>Company<select id="gr-contact-company">'+opts([['all','All companies'],...context.companyIds.map(id=>[id,companyLabel(id)])],companyFilter)+'</select></label>'+
+   '<label>Lead stage<select id="gr-contact-stage">'+opts([['all','All stages'],...stages.map(st=>[st,st])],stageFilter)+'</select></label>'+
    '<details class="gr-contact-multi"><summary>Approved sources</summary><div id="gr-contact-source-options"></div></details>'+
    '<details class="gr-contact-multi"><summary>Approved tags</summary><div id="gr-contact-tag-options"></div></details>'+
    '<details class="gr-contact-multi"><summary>Company products</summary><div id="gr-contact-product-options"></div></details>'+
@@ -382,6 +390,15 @@
    '<input id="gr-contact-file" type="file" accept=".xlsx,.xls,.csv" hidden>'+
    '<dialog id="gr-contact-dialog"><div class="gr-contact-dialog-head"><h2 id="gr-contact-dialog-title">Add contact</h2><button type="button" data-contact-close aria-label="Close form">×</button></div><form id="gr-contact-form"></form></dialog></div>';
  }
+ async function openLeadProfile(company,id){
+  const directory=root?.querySelector('.gr-contact-manager');if(!directory)return;
+  root.querySelector('.gr-contact-lead-page')?.remove();
+  const page=document.createElement('section');page.className='gr-contact-lead-page';
+  directory.hidden=true;root.append(page);
+  const back=()=>{page.remove();directory.hidden=false};
+  try{await window.GreenRichLeadProfile.open({db,company,leadId:id,host:page,onClose:back})}
+  catch(e){back();notify('Unable to open Lead Details: '+e.message)}
+ }
  function mount(container,config){
   db=config.db;context=config;root=container;
   if(!container)return;
@@ -393,28 +410,29 @@
    if(btn.dataset.contactEdit){openForm(btn.dataset.contactKind,btn.dataset.contactEdit,btn.dataset.contactCompany);return}
    if(btn.dataset.contactDelete){if(btn.dataset.contactKind==='lead')return notify('Lead deletion is disabled; move the lead to Lost in the pipeline.');await removeRecord(btn.dataset.contactKind,btn.dataset.contactDelete,btn.dataset.contactCompany);return}
    if(btn.dataset.contactProfile){context.openProfile(btn.dataset.contactProfile);return}
-   if(btn.dataset.contactLeadProfile){await window.GreenRichLeadProfile.open({
-     db,company:btn.dataset.contactCompany,leadId:btn.dataset.contactLeadProfile
-   });return}
+   if(btn.dataset.contactLeadProfile){await openLeadProfile(btn.dataset.contactCompany,btn.dataset.contactLeadProfile);return}
    if(btn.dataset.contactClose!==undefined){container.querySelector('#gr-contact-dialog').close();return}
    if(btn.dataset.contactImport){if(btn.dataset.contactImport==='lead'){window.GreenRichCRM?.switchPage?.('leads');window.GreenRichShell?.setPageWithoutRemount?.('leads');notify('Import leads in the pipeline after selecting a salesperson.');return;}const file=container.querySelector('#gr-contact-file');file.dataset.kind=btn.dataset.contactImport;file.click();return}
    if(btn.dataset.contactExport){if(!context.permission(btn.dataset.contactExport,'export'))return notify('You do not have export permission.');try{await excelReady();download('greenrich-'+btn.dataset.contactExport+'-'+today(),visibleRecords().filter(r=>r._kind===btn.dataset.contactExport))}catch(e){notify(e.message)}return}
    if(btn.dataset.contactTemplate){try{await excelReady();const example=btn.dataset.contactTemplate==='lead'?{_kind:'lead',name:'Example Lead',mobile:'+919876543210',mobile2:'+919123456780',email:'example@example.com',company:'Sample Business',type:'Retailer',source:'Website',products:'Composter',enquiry_details:'Interested in quote',address1:'Sample address',city:'Coimbatore',state:'Tamil Nadu',pincode:'641001',title:'Composter enquiry',stage:'New',company_id:context.companyIds[0],notes:'Replace or delete sample row'}:{_kind:'customer',name:'Example Customer',mobile:'+919876543210',mobile2:'+919123456780',email:'example@example.com',company:'Sample Business',type:'Business',source:'Direct',address1:'Sample address',city:'Coimbatore',state:'Tamil Nadu',pincode:'641001',notes:'Replace or delete sample row'};download('greenrich-'+btn.dataset.contactTemplate+'-template',[example])}catch(e){notify(e.message)}return}
-   if(btn.id==='gr-contact-clear'){mode='all';search='';source=[];tag=[];product=[];start='';end='';for(const id of ['#gr-contact-from','#gr-contact-to'])root.querySelector(id).value='';render()}
+   if(btn.id==='gr-contact-clear'){mode='all';search='';source=[];tag=[];product=[];companyFilter='all';stageFilter='all';start='';end='';for(const id of ['#gr-contact-from','#gr-contact-to'])root.querySelector(id).value='';render()}
   });
   const file=container.querySelector('#gr-contact-file');file.onchange=()=>{if(file.files?.[0])void importFile(file.dataset.kind,file.files[0])};
   container.addEventListener('change',event=>{
    const el=event.target.closest('[data-contact-multi]');if(!el)return;
    const kind=el.dataset.contactMulti;
    const values=[...container.querySelectorAll('[data-contact-multi="'+kind+'"]:checked')].map(x=>x.value);
-   if(kind==='source')source=values;else if(kind==='tag')tag=values;else product=values;draw();
+   if(kind==='source')source=values;else if(kind==='tag')tag=values;else product=values;
+   draw();container.querySelector('[data-contact-multi="'+kind+'"]')?.closest('details')?.setAttribute('open','');
   });
-  for(const [key,id] of [['mode','gr-contact-kind'],['start','gr-contact-from'],['end','gr-contact-to'],['search','gr-contact-search']]){
+  container.addEventListener('toggle',e=>{const d=e.target;if(d.matches?.('.gr-contact-multi')&&d.open)container.querySelectorAll('.gr-contact-multi').forEach(x=>{if(x!==d)x.open=false})},true);
+  document.addEventListener('pointerdown',e=>{if(container.isConnected&&!e.target.closest?.('.gr-contact-multi'))container.querySelectorAll('.gr-contact-multi').forEach(d=>d.open=false)});
+  for(const [key,id] of [['mode','gr-contact-kind'],['companyFilter','gr-contact-company'],['stageFilter','gr-contact-stage'],['start','gr-contact-from'],['end','gr-contact-to'],['search','gr-contact-search']]){
    const input=container.querySelector('#'+id);
-   input.addEventListener(id==='gr-contact-search'?'input':'change',()=>{if(key==='mode')mode=input.value;else if(key==='source')source=input.value;else if(key==='tag')tag=input.value;else if(key==='start')start=input.value;else if(key==='end')end=input.value;else search=input.value;draw()});
+   input.addEventListener(id==='gr-contact-search'?'input':'change',()=>{if(key==='mode')mode=input.value;else if(key==='companyFilter')companyFilter=input.value;else if(key==='stageFilter')stageFilter=input.value;else if(key==='source')source=input.value;else if(key==='tag')tag=input.value;else if(key==='start')start=input.value;else if(key==='end')end=input.value;else search=input.value;draw()});
   }
   void loadSources();render();
  }
  function setMode(next){mode=next==='lead'?'lead':next==='customer'?'customer':'all';render()}
- window.GreenRichContacts={mount,render,setMode,openForm,phone,readSheet,parseImport,columns:HEADERS,visibleRecords};
+ window.GreenRichContacts={mount,render,setMode,openForm,openLeadProfile,phone,readSheet,parseImport,columns:HEADERS,visibleRecords};
 })();

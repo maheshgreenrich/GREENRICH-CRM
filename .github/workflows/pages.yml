@@ -57,6 +57,7 @@ jobs:
           node --check greenrich-lead-pipeline.js
           node --check greenrich-lead-profile.js
           node tests/lead-360-regression.js
+          node tests/sales-queue-ux.js
           node --check greenrich-meta-sync.js
           node --check greenrich-sheet-manager.js
           node --check meta-sync-setup.js

@@ -15,7 +15,7 @@
  .gl-row label{font-size:12px;color:#516b86;display:flex;flex-direction:column;gap:5px}
  .gl-row input,.gl-row select{height:36px;min-width:128px;border:1px solid #d3e0ef;border-radius:8px;padding:5px 9px;background:white}
  .gl-row button,.gl-head button,.gl-card button,.gl-dialog button{width:auto!important;font-size:12px!important;padding:8px 12px!important;min-height:34px!important;border-radius:8px!important}
- .gl-main{display:grid;grid-template-columns:repeat(4,minmax(135px,1fr));gap:11px;margin:8px 0 18px}
+ .gl-main{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:11px;margin:8px 0 18px}
  .gl-stat{padding:15px;background:#fff;border:1px solid #dde6f2;border-radius:12px;display:flex;flex-direction:column;gap:5px}
  .gl-stat span{font-size:12px;color:#64748b}.gl-stat strong{font-size:21px;color:#17365c}
  .gl-board{display:flex;gap:13px;overflow-x:auto;padding:5px 2px 14px;scrollbar-width:thin;align-items:stretch}
@@ -31,7 +31,11 @@
  .gl-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
  .gl-card button{border:1px solid #d9e3f1;background:white;color:#265193}
  .gl-card .gl-name-link{border:0!important;padding:0!important;background:transparent!important;text-align:left;font-weight:700;font-size:14px!important;color:#17365e!important;cursor:pointer}
- .gl-card .gl-card-actions a{font-size:12px;border:1px solid #d9e3f1;padding:8px 10px;text-decoration:none;color:#265193;border-radius:7px;background:#fff}
+ .gl-icon-row{gap:7px!important;align-items:center}
+ .gl-card .gl-icon-row .gl-action-icon{width:36px!important;height:36px!important;min-width:36px!important;display:inline-flex!important;align-items:center;justify-content:center;padding:0!important;border:1px solid #cbdbee!important;border-radius:9px!important;text-decoration:none;color:#24549b;background:#f9fbff;cursor:pointer}
+ .gl-card .gl-icon-row .gl-action-icon:hover{background:#e8f1ff}
+ .gl-first-interests input[type="checkbox"]{width:18px!important;height:18px!important;min-width:18px!important;padding:0!important;flex:0 0 18px!important}
+ .gl-multi-options input[type="checkbox"]{width:17px!important;height:17px!important;min-width:17px!important;padding:0!important;flex:0 0 17px!important}
  .gl-multi{position:relative;min-width:137px;align-self:flex-end;font-size:12px}
  .gl-multi summary{height:36px;padding:8px 10px;background:#fff;border:1px solid #d3e0ef;border-radius:8px;cursor:pointer;list-style:none}
  .gl-multi summary:after{content:' ▾';float:right}.gl-multi-options{position:absolute;z-index:20;top:37px;left:0;width:max(190px,100%);max-height:220px;overflow:auto;background:white;border:1px solid #c7d9eb;border-radius:9px;box-shadow:0 9px 25px #142f5030;padding:9px}
@@ -86,8 +90,27 @@
    (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<a title="Email" href="mailto:'+escape(l.email)+'">✉ Email</a>':'')+
    (digits.length>=10&&digits.length<=15?'<a title="WhatsApp" rel="noopener noreferrer" target="_blank" href="https://wa.me/'+digits+'">WhatsApp</a>':'');
  };
+ const icons={
+  call:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.91.68 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.25a2 2 0 0 1 2.11-.45c.9.33 1.85.56 2.81.68A2 2 0 0 1 22 16.92z"/>',
+  email:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+  whatsapp:'<path d="M21 11.5a8.4 8.4 0 0 1-9 9 9.2 9.2 0 0 1-4-.9L3 21l1.4-4.6A9 9 0 1 1 21 11.5z"/><path d="M9 9c1 3 3 5 6 6"/>',
+  stage:'<path d="m4 7 4-4 4 4M8 3v14m12 0-4 4-4-4m4 4V7"/>',
+  history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',
+  assign:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 12-5m5-2v8m-4-4h8"/>',
+  quick:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  order:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8m-8 4h8m-8 4h4"/>'
+ };
+ const symbol=id=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[id]+'</svg>';
+ const ico=(id,label,action,l)=>'<button type="button" class="gl-action-icon" title="'+escape(label)+'" aria-label="'+escape(label)+
+   '" data-gl-action="'+action+'" data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+symbol(id)+'</button>';
+ const contactIcons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
+  const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'');
+  return (digits.length>=10?'<a class="gl-action-icon" title="Call" aria-label="Call" href="tel:'+escape(m)+'">'+symbol('call')+'</a>':'')+
+   (email?'<a class="gl-action-icon" title="Email" aria-label="Email" href="mailto:'+escape(l.email)+'">'+symbol('email')+'</a>':'')+
+   (digits.length>=10&&digits.length<=15?'<a class="gl-action-icon" target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/'+digits+'">'+symbol('whatsapp')+'</a>':'');
+ };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
- const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Unassigned':'Employee');
+ const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Common sales queue':'Employee');
  const labelProduct=(ctx,lead)=>{
   const sku=ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name;
   const p=ctx.leadPayloads?.get(lead.company_id+':'+lead.lead_id)||{};
@@ -98,11 +121,12 @@
   const f=ctx.filters;const timestamp=Date.parse(l.created_at||'');
   const fromTime=f.from?new Date(f.from).getTime():null,toTime=f.to?new Date(f.to).getTime():null;
   return (f.company==='all'||l.company_id===f.company)&&
-   (f.person==='all'||l.assigned_to===f.person)&&
+   (f.person==='all'||(f.person==='common'?l.assigned_to===null:l.assigned_to===f.person))&&
    (fromTime===null||timestamp>=fromTime)&&(toTime===null||timestamp<=toTime)&&
    (!f.product?.length||f.product.includes(l.product_id))&&
    (!f.source?.length||f.source.some(label=>matchesApproved(l.source,label)))&&
    (!f.tag?.length||f.tag.some(id=>l.tag_ids?.includes(id)))&&
+   (!f.heat?.length||f.heat.includes(l.lead_heat||'Warm'))&&
    (!f.search||[l.title,l.contact,l.mobile,l.email,l.source,name(ctx,l.assigned_to)].join(' ').toLowerCase().includes(f.search.toLowerCase()));
  });
  const choices=(array,current)=>array.map(([v,t])=>'<option value="'+escape(v)+'" '+(v===current?'selected':'')+'>'+escape(t)+'</option>').join('');
@@ -119,7 +143,8 @@
    choiceMulti('product',uniqueProducts.map(p=>[p.record_id,p.payload?.name||p.record_id]),f.product,'All products')+
    choiceMulti('source',ctx.approvedSources.map(x=>[x.name,x.name]),f.source,'Approved sources')+
    choiceMulti('tag',ctx.approvedTags.map(x=>[x.id,x.name]),f.tag,'Approved tags')+
-   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
+   choiceMulti('heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']],f.heat,'Lead priority')+
+   (ctx.admin?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],['common','Common queue'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
    '<label>Search<input data-gl-filter="search" placeholder="Name, mobile, email…" value="'+escape(f.search)+'"></label>'+
    '</div>';
  }
@@ -128,10 +153,21 @@
  function draw(ctx){
   const root=ctx.root;if(!root?.isConnected)return;
   const rows=picked(ctx),wins=rows.filter(l=>l.stage==='Won'),quoted=rows.filter(l=>l.stage==='Quotation');
-  const stat=[['Visible leads',rows.length],['Quotation follow-ups',quoted.length],['Won sales orders',wins.filter(l=>l.won_order_id).length],['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
-  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
+  const localDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+  const today=localDay(Date.now());
+  const dueTime=l=>l.next_followup_at?new Date(l.next_followup_at).getTime():l.next_followup?new Date(l.next_followup+'T23:59:59+05:30').getTime():NaN;
+  const due=rows.filter(l=>l.stage!=='Won'&&Number.isFinite(dueTime(l)));
+  const todayDue=due.filter(l=>localDay(dueTime(l))===today).length;
+  const overdue=due.filter(l=>dueTime(l)<Date.now()&&localDay(dueTime(l))!==today).length;
+  const newToday=rows.filter(l=>localDay(l.created_at)===today).length;
+  const stat=[['New leads today',newToday],['Not yet contacted',rows.filter(l=>l.stage==='New').length],
+    ['Visible leads',rows.length],['Qualified',rows.filter(l=>l.stage==='Qualified').length],
+    ['Follow-ups today',todayDue],['Overdue follow-ups',overdue],
+    ['Won sales orders',wins.filter(l=>l.won_order_id).length],
+    ['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
+  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import Leads Excel / CSV','import')+
     (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
-    button('Won sales history','history')+button('Sheet Integrations / Duplicates','metasync')+'</div></div>'+
+    button('Won sales history','history')+(ctx.admin?button('Sheet Integrations / Duplicates','metasync'):'')+'</div></div>'+
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
@@ -145,12 +181,12 @@
      ''+
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
      ''+
-     (l.stage==='Quotation'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(l.next_followup||'Not set')+'</b></div>':'')+
-     '<div class="gl-card-actions">'+contactButtons(l)+button('Quick view','quick','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     (l.stage==='Quotation'?button('Create Sales Order','order','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
-     (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
+     (l.next_followup_at&&l.stage!=='Won'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(dates(l.next_followup_at))+'</b></div>':'')+
+     '<div class="gl-card-line"><span>Priority</span><b>'+escape(l.lead_heat||'Warm')+'</b></div>'+
+     '<div class="gl-card-actions gl-icon-row">'+contactIcons(l)+
+     ico('quick','Quick view','quick',l)+ico('stage','Move stage','move',l)+ico('history','History','detail',l)+
+     (ctx.canViewTeam?ico('assign','Assign employee','assign',l):'')+
+     (l.stage==='Quotation'?ico('order','Create Sales Order','order',l):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
   root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;
    if(el.dataset.glFilter==='company')ctx.filters.product=[];
@@ -158,9 +194,10 @@
   root.querySelectorAll('[data-gl-multi]').forEach(el=>el.onchange=()=>{
     const group=el.dataset.glMulti;
     ctx.filters[group]=[...root.querySelectorAll('[data-gl-multi="'+group+'"]:checked')].map(x=>x.value);
-    draw(ctx);
+    draw(ctx);root.querySelector('.gl-multi [data-gl-multi="'+group+'"]')?.closest('details')?.setAttribute('open','');
   });
   root.querySelectorAll('button[data-gl-action]').forEach(el=>el.onclick=()=>act(ctx,el));
+  root.querySelectorAll('.gl-multi').forEach(d=>d.ontoggle=()=>{if(d.open)root.querySelectorAll('.gl-multi').forEach(o=>{if(o!==d)o.open=false})});
   root.querySelectorAll('.gl-card').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:card.dataset.lead,company:card.dataset.company}));e.dataTransfer.effectAllowed='move'}));
   root.querySelectorAll('.gl-column').forEach(col=>{
     col.ondragover=e=>{e.preventDefault();col.classList.add('over')};
@@ -194,42 +231,43 @@
    l.stage==='Qualified'?['Quotation','Lost']:
    l.stage==='Quotation'?['Won','Lost']:
    l.stage==='Lost'?['Contacted']:[];
-  if(!allowed.length){notify(ctx,'Won is complete. Reopening requires an authorized correction.');return}
-  const next=allowed.includes(to)?to:allowed[0];
-  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id);
-  const orderSelect='<label>Linked Sales Order (required for Won)<select name="order"><option value="">Select existing sales order</option>'+
-    orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
-  const firstMove=l.stage==='New';
+  if(!allowed.length){notify(ctx,'Won leads are closed. Ask Admin if a correction is needed.');return}
+  const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
+  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id&&o.payload?.status!=='Cancelled');
+  const orderSelect='<label>Issued Sales Order — required for Won<select name="order">'+
+    '<option value="">Choose customer-linked SO</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+
+      escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
   const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
-  const formChoices=firstMove?'<div class="gl-first-interests"><h4>Product & Tags — first stage update only</h4>'+
-   '<p class="gl-caption">Choose one or more approved products and tags when first contacting or qualifying this enquiry.</p>'+
-   '<fieldset><legend>Interested products</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
+  const firstFields=first?'<div class="gl-first-interests"><h4>Required when moving from New</h4>'+
+   '<fieldset><legend>Interested products *</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
      (p.record_id===l.product_id?'checked':'')+'>'+escape(p.payload?.name||p.record_id)+'</label>').join('')+'</fieldset>'+
-   '<fieldset><legend>Tags approved in Settings</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
+   '<fieldset><legend>Approved tags *</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
      ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
-  const body='<p class="gl-caption">'+escape(l.title)+' · Current: '+escape(l.stage)+'</p>'+
-   selectFld('Move to stage','stage',allowed.map(s=>[s,s]))+formChoices+noteFld()+
-   fld('Next follow-up date','due','date','',false)+orderSelect+
-   '<p class="gl-note">'+(l.stage==='New'?'First movement may be Contacted, Qualified, Quotation or Lost. Later forward movements follow the pipeline order.':
-   'Allowed next stages are listed above. For Won, link a customer and create their Sales Order first.')+'</p>';
+  const dateInput='<label>Next follow-up date and time *<input name="due" type="datetime-local" required value="'+
+    escape(l.next_followup_at?new Date(l.next_followup_at).toLocaleString('sv-SE',{timeZone:'Asia/Kolkata'}).replace(' ','T').slice(0,16):'')+'"></label>';
+  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
+   selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
+   firstFields+noteFld()+
+   selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+dateInput+orderSelect+
+   '<p class="gl-note">Won is allowed only after the customer-linked Sales Order has been issued. All other stages need a follow-up date and time.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
-   const stage=fd.get('stage');
-   if(stage==='Won'&&!l.customer_id)throw Error('Link this lead to a customer before Won.');
-   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
-     p_products:firstMove?fd.getAll('products'):[],p_tags:firstMove?fd.getAll('tags'):[],
-     p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
-   if(stage==='Won'&&!payload.p_order)throw Error('Select the linked Sales Order');
-   if(stage==='Quotation'&&!payload.p_due)throw Error('Choose quotation follow-up date');
-   const {error}=await ctx.db.rpc('gr_pipeline_move_with_interests',payload);
-   if(error)throw error;
+   const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
+   if(first&&(!products.length||!tags.length))throw Error('Select at least one product and tag before leaving New.');
+   if(stage==='Won'&&!l.customer_id)throw Error('Link or create the customer from their full details before marking Won.');
+   if(stage==='Won'&&!fd.get('order'))throw Error('Choose an issued customer-linked Sales Order.');
+   if(stage!=='Won'&&!fd.get('due'))throw Error('Next follow-up date and time required.');
+   const due=fd.get('due')?new Date(fd.get('due')).toISOString():null;
+   const {error}=await ctx.db.rpc('gr_pipeline_advance',{
+    p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+    p_products:products,p_tags:tags,p_order:stage==='Won'?fd.get('order'):null,
+    p_due_at:stage==='Won'?null:due,p_heat:fd.get('heat')
+   });if(error)throw error;
   });
-  const select=d.querySelector('select[name=stage]');select.value=next;
-  const controls=()=>{
-   const stage=select.value,due=d.querySelector('input[name=due]'),order=d.querySelector('select[name=order]');
-   due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation';
-   order.closest('label').hidden=stage!=='Won';order.required=stage==='Won';
-  };
-  select.onchange=controls;controls();
+  const stage=d.querySelector('[name=stage]');stage.value=next;
+  const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
+  const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
+   due.closest('label').hidden=won;due.required=!won;order.closest('label').hidden=!won;order.required=won;
+  };stage.onchange=controls;controls();
  }
  async function act(ctx,b){
   const action=b.dataset.glAction,l=getLead(ctx,b.dataset.id,b.dataset.company);
@@ -258,8 +296,8 @@
   }
   if(action==='assign'){
    const people=ctx.staff.filter(p=>p.company_id===l.company_id);
-   dialog(ctx,'Assign lead to employee',selectFld('Salesperson','person',people.map(p=>[p.id,p.full_name]))+noteFld(),async fd=>{
-    const {error}=await ctx.db.rpc('gr_pipeline_assign',{p_company:l.company_id,p_lead:l.lead_id,p_employee:fd.get('person'),p_note:fd.get('note')});if(error)throw error;
+   dialog(ctx,'Assign lead to employee',selectFld('Salesperson','person',[['','Common — any Sales user'],...people.map(p=>[p.id,p.full_name])])+noteFld(),async fd=>{
+    const {error}=await ctx.db.rpc('gr_pipeline_assign',{p_company:l.company_id,p_lead:l.lead_id,p_employee:fd.get('person')||null,p_note:fd.get('note')});if(error)throw error;
    });return;
   }
   if(action==='history'){
@@ -302,7 +340,7 @@
   if(action==='new'||action==='import'){
    const companies=ctx.companyIds,defaultCompany=ctx.filters.company!=='all'?ctx.filters.company:companies[0];
    const staff=ctx.staff.filter(p=>p.company_id===defaultCompany);
-   const assignee=selectFld('Assign to sales employee *','assignee',[['','Choose a salesperson'],...staff.map(p=>[p.id,p.full_name])]);
+   const assignee=selectFld('Assign to sales employee','assignee',[['','Common — all Sales users'],...staff.map(p=>[p.id,p.full_name])],false);
    const common=selectFld('Company *','company',companies.map(c=>[c,companyText(ctx,c)]))+assignee;
    if(action==='new'){
     const products=ctx.products.filter(p=>p.company_id===defaultCompany);
@@ -315,32 +353,52 @@
       '<label><input type="checkbox" name="tags" value="'+escape(t.id)+'">'+escape(t.name)+'</label>').join('')+'</fieldset>'+
      fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
-     if(!fd.get('assignee'))throw Error('A sales employee must be assigned before creating the lead');
-     const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee'),
+     if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can create Common leads. Select yourself.');
+     const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee')||null,
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
       p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
-    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
+    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
-    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Every imported row will be assigned to the selected salesperson. Import creates only New leads.</p>'+
-    '<label>Choose CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>',async fd=>{
-      const file=fd.get('file');if(!file?.size)throw Error('Choose a CSV file');
-      if(file.size>2000000)throw Error('CSV must be under 2 MB');
-      const raw=await file.text(),rows=parseCSV(raw);if(rows.length>500)throw Error('Import a maximum of 500 leads per batch');
-      const headers=rows.shift().map(x=>x.toLowerCase().trim()),titleIdx=headers.indexOf('title');
-      if(titleIdx<0)throw Error('CSV must contain a title column');
-      if(!fd.get('assignee'))throw Error('Choose a salesperson before importing');
-      let success=0,errors=[];
-      for(const cells of rows){if(!cells.some(x=>x.trim()))continue;const val=n=>cells[headers.indexOf(n)]||'';
-       const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:val('title'),p_contact:val('contact'),
-       p_assignee:fd.get('assignee'),p_source:(ctx.approvedSources.find(s=>matchesApproved(s.name,val('source')))?.name||''),p_product:(ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===val('product_id'))?val('product_id'):null),p_value:val('value')||0,p_mobile:val('mobile'),
-       p_email:val('email'),p_tags:val('tags').split(';').filter(Boolean),p_note:val('notes')});
-       if(error){errors.push(error.message);if(errors.length>15)break}else success++;
+    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Admin may choose Common, otherwise select your Sales account. All imported records start in New.</p>'+
+    '<label>Choose Excel or CSV file<input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required></label>',async fd=>{
+      const file=fd.get('file');if(!file?.size)throw Error('Choose an Excel or CSV file');
+      if(file.size>3000000)throw Error('Import file must be below 3 MB');
+      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can import Common leads. Select your Sales login.');
+      let items=[];
+      if(/\.(xlsx|xls)$/i.test(file.name)){
+       if(!window.GreenRichContacts?.readSheet)throw Error('Excel importer unavailable. Refresh GreenRich ONE.');
+       const parsed=await window.GreenRichContacts.readSheet(file);
+       items=parsed.map(p=>({
+        title:p.title||p.products||p.enquiry_details||p.name||'Excel enquiry',
+        contact:p.name||p.contact||'',mobile:p.mobile||'',email:p.email||'',
+        source:p.source||'',product_id:p.product_id||'',value:p.value||'0',
+        tags:p.tags||'',notes:[p.notes,p.enquiry_details,p.company,p.address1,p.city].filter(Boolean).join(' | ')
+       }));
+      }else{
+       const raw=await file.text(),lines=parseCSV(raw),headers=(lines.shift()||[]).map(x=>x.toLowerCase().trim());
+       if(!headers.includes('title'))throw Error('CSV requires a title column');
+       items=lines.filter(x=>x.some(v=>v.trim())).map(cells=>Object.fromEntries(headers.map((h,i)=>[h,cells[i]||''])));
       }
-      notify(ctx,'Imported '+success+' leads'+(errors.length?'; '+errors.length+' errors. First: '+errors[0]:''));
+      if(items.length>500)throw Error('Import a maximum of 500 leads');
+      let success=0,errors=[];
+      for(const lead of items){
+       const approved=ctx.approvedSources.find(src=>matchesApproved(src.name,lead.source))?.name||'';
+       const product=ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===lead.product_id)?lead.product_id:null;
+       const ids=String(lead.tags||'').split(/[;,]/).map(t=>t.trim()).filter(Boolean).map(t=>
+         ctx.approvedTags.find(tag=>tag.id===t||tag.name.toLowerCase()===t.toLowerCase())?.id).filter(Boolean);
+       const {error}=await ctx.db.rpc('gr_pipeline_create',{
+        p_company:fd.get('company'),p_title:lead.title||'Imported lead',p_contact:lead.contact||'',
+        p_assignee:fd.get('assignee')||null,p_source:approved,p_product:product,
+        p_value:Number(lead.value)||0,p_mobile:lead.mobile||'',p_email:lead.email||'',
+        p_tags:ids,p_note:lead.notes||'Imported using CRM spreadsheet importer'
+       });
+       if(error){errors.push(error.message);if(errors.length>=15)break}else success++;
+      }
+      notify(ctx,'Imported '+success+' enquiries'+(errors.length?'; '+errors.length+' rejected. First: '+errors[0]:''));
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]');comp.value=defaultCompany;
-    comp.onchange=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'')};comp.onchange();return;
+    comp.onchange=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId};comp.onchange();return;
   }
  }
  function parseCSV(raw){const rows=[];let row=[],field='',quoted=false;for(let i=0;i<raw.length;i++){const c=raw[i];
@@ -356,12 +414,26 @@
   // The Leads template contains only a loading marker. Replace it with the actual board.
   root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
+  document.addEventListener('pointerdown',event=>{
+    if(root.isConnected&&!event.target.closest?.('.gl-multi'))
+      root.querySelectorAll('.gl-multi').forEach(d=>d.open=false);
+  });
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
-  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},
+  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
-  return state;
+  const reminded=new Set();
+  const checkReminders=()=>{
+   if(!board.isConnected){clearInterval(tick);return}
+   const now=Date.now(),due=state.leads.filter(l=>l.stage!=='Won'&&l.next_followup_at&&
+     new Date(l.next_followup_at).getTime()<=now&&new Date(l.next_followup_at).getTime()>now-86400000&&
+     !reminded.has(l.company_id+':'+l.lead_id));
+   due.forEach(l=>reminded.add(l.company_id+':'+l.lead_id));
+   if(due.length)notify(state,due.length+' follow-up'+(due.length>1?'s are':' is')+' due. Open Leads & CRM to call.');
+  };
+  const tick=setInterval(checkReminders,60000);
+  checkReminders();return state;
  }
  async function mountFollowups(root,ctx){
   if(!root)return;
@@ -372,7 +444,7 @@
  async function mountShared(ctx){
   const key=ctx.userId+'|'+ctx.companyIds.join(',');
   if(cache.has(key))return cache.get(key);
-  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
+  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
   await query(state);cache.set(key,state);return state;
  }
  async function renderCustomerTimeline(root,db,customerId,companies,staffName){
