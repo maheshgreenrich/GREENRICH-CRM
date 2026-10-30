@@ -58,17 +58,18 @@
  }
  async function query(ctx){
   const cs=ctx.companyIds;
-  const [leads,staff,orders,customers,products,sources,tags]=await Promise.all([
+  const [leads,staff,orders,customers,products,sources,tags,leadData]=await Promise.all([
    allRows(ctx.db,'gr_lead_pipeline','*',q=>q.in('company_id',cs)),
    Promise.all(cs.map(async co=>{const {data,error}=await ctx.db.rpc('gr_pipeline_staff',{p_company:co});if(error)throw error;return (data||[]).map(p=>({...p,company_id:co}))})),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','sales').limit(1000),
    ctx.db.from('gr_crm_customers').select('id,name,mobile').order('name').limit(1000),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000),
    ctx.db.from('gr_crm_sources').select('id,name,active').eq('active',true).order('name'),
-   ctx.db.from('gr_crm_tags').select('id,name').order('name')
+   ctx.db.from('gr_crm_tags').select('id,name').order('name'),
+   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','leads').limit(1000)
   ]);
-  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;if(sources.error)throw sources.error;if(tags.error)throw tags.error;
-  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];ctx.approvedSources=sources.data||[];ctx.approvedTags=tags.data||[];
+  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;if(sources.error)throw sources.error;if(tags.error)throw tags.error;if(leadData.error)throw leadData.error;
+  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];ctx.approvedSources=sources.data||[];ctx.approvedTags=tags.data||[];ctx.leadPayloads=new Map((leadData.data||[]).map(r=>[r.company_id+':'+r.record_id,r.payload||{}]));
   ctx.canViewTeam=ctx.staff.some(p=>p.id!==ctx.userId&&p.manager_id===ctx.userId)||ctx.admin||ctx.scope==='all'||ctx.scope==='team';
  }
  const normalizedSource=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'');
@@ -87,7 +88,11 @@
  };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
  const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Unassigned':'Employee');
- const labelProduct=(ctx,lead)=>ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name||lead.product_id||'—';
+ const labelProduct=(ctx,lead)=>{
+  const sku=ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name;
+  const p=ctx.leadPayloads?.get(lead.company_id+':'+lead.lead_id)||{};
+  return sku||p.product_interest||p.products||p.enquiry_details?.product_interest||p.enquiry_details?.requirement||lead.product_id||'—';
+ };
  const saleTotal=(ctx,lead)=>Number(ctx.orders.find(o=>o.company_id===lead.company_id&&o.record_id===lead.won_order_id)?.payload?.total)||0;
  const picked=(ctx)=>ctx.leads.filter(l=>{
   const f=ctx.filters;const timestamp=Date.parse(l.created_at||'');
