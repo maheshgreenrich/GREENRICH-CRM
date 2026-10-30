@@ -25,13 +25,15 @@
   const co=input('#gr-exec-company')||'all',source=input('#gr-exec-source')||'all',
    channel=input('#gr-exec-channel')||'all',product=input('#gr-exec-product')||'all',
    tag=input('#gr-exec-tag')||'all',stage=input('#gr-exec-stage')||'all',
-   person=input('#gr-exec-person')||'all',status=input('#gr-exec-order-status')||'all';
+   person=input('#gr-exec-person')||'all',status=input('#gr-exec-order-status')||'all',
+   customerType=input('#gr-exec-customer-type')||'all';
+  const customerIds=new Set(records.customers.filter(c=>customerType==='all'||c.type===customerType).map(c=>c.id));
   const visible=r=>co==='all'||r.company_id===co;
   const leadOk=l=>visible(l)&&inRange(l.created_at||l.date||l.followup,from,to)&&
    (source==='all'||l.source===source)&&(stage==='all'||l.stage===stage)&&
    (tag==='all'||(l.tag_ids||[]).includes(tag))&&
    (product==='all'||l.product_id===product||(l.product_interest_ids||[]).includes(product))&&
-   (person==='all'||l.assigned_to===person);
+   (person==='all'||l.assigned_to===person)&&(customerType==='all'||customerIds.has(l.customer_id));
   const leads=records.leads.filter(leadOk);
   const hasLeadScope=source!=='all'||tag!=='all'||person!=='all'||stage!=='all';
   const permittedOrders=new Set(leads.filter(l=>l.won_order_id).map(l=>l.won_order_id));
@@ -39,11 +41,11 @@
   const restricted=['Sales','Telecaller'].includes(role);
   const sales=records.sales.filter(r=>visible(r)&&inRange(r.date,from,to)&&
    (channel==='all'||r.channel_name===channel)&&(status==='all'||r.status===status)&&
-   (product==='all'||r.product_id===product)&&
+   (product==='all'||r.product_id===product)&&(customerType==='all'||customerIds.has(r.customer_id))&&
    (!hasLeadScope||permittedOrders.has(r.id))&&(!restricted||assignedOrders.has(r.id)));
   return {sales,leads,dispatch:records.dispatch.filter(r=>visible(r)&&inRange(r.approved_at||r.order_date,from,to)),
    products:records.products.filter(r=>visible(r)&&(product==='all'||r.id===product||r.sku===product)),
-   customers:records.customers,from,to,restricted};
+   customers:records.customers.filter(c=>customerIds.has(c.id)),from,to,restricted};
  }
  function draw(){
   if(!host)return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
@@ -53,7 +55,7 @@
   const pending=f.sales.filter(s=>!linked(s)&&s.approval_status!=='Approved'&&!['Cancelled','Returned'].includes(s.status)).length;
   const calls=leads.filter(l=>/telecall|telephone|phone call/i.test(l.source||''));const followups=leads.filter(l=>l.stage!=='Won'&&l.next_followup_at);const now=Date.now();
   const cards={
-   attendance:()=>box('attendance','Attendance today','Read-only live attendance totals',ring([['Present',records.attendance.filter(x=>x.status==='present').length],['Half day',records.attendance.filter(x=>x.status==='half_day').length],['Other',records.attendance.filter(x=>!['present','half_day'].includes(x.status)).length]])),
+   attendance:()=>box('attendance','Attendance · '+(input('#gr-exec-attendance-date')||today()),'Read-only attendance for selected date',ring([['Present',records.attendance.filter(x=>x.status==='present').length],['Half day',records.attendance.filter(x=>x.status==='half_day').length],['Other',records.attendance.filter(x=>!['present','half_day'].includes(x.status)).length]])),
    sales:()=>box('sales','Sales summary','Revenue, orders and units',stats([['Total revenue',money(sum(sales,'total'))],['Orders',fmt(salesCount)],['Units sold',fmt(sum(sales,'qty'))],['Today sales',money(sum(sales.filter(s=>s.date===today()),'total'))]])+bars([['Taxable sales',sum(sales,'taxable')],['GST',sum(sales,'tax_amount')],['Shipping',sum(sales,'shipping_charge')]],money)),
    day_sales:()=>box('day_sales','Day-wise sales','Total revenue per sales date',bars(group(sales,s=>s.date||'Unknown',s=>Number(s.total)||0),money)),
    channel_sales:()=>box('channel_sales','Sales channels','Sales revenue by channel',bars(group(sales,s=>s.channel_name||'Other',s=>Number(s.total)||0),money)),
@@ -80,12 +82,20 @@
    accounts:()=>box('accounts','Accounting overview','Financial posting module',
      '<div class="gr-exec-empty">Accounting totals are unavailable: the accounting ledger tables have not yet been installed. No financial numbers are estimated.</div>')
   };
-  host.querySelector('#gr-exec-kpis').innerHTML=[
-   ['Sales revenue',money(sum(sales,'total'))],['Sales orders',fmt(salesCount)],
-   ['Visible leads',fmt(leads.length)],['Follow-ups due',fmt(followups.filter(l=>new Date(l.next_followup_at).getTime()<=now).length)]
-  ].map(([label,value])=>'<div class="gr-kpi"><span>'+e(label)+'</span><strong>'+e(value)+'</strong></div>').join('');
+  const canSeeSales=['sales','day_sales','company_sales','channel_sales','recent','order_status'].some(id=>widgets.includes(id));
+  const canSeeLeads=['leads','followups','conversion','telecaller','salespeople'].some(id=>widgets.includes(id));
+  const kpis=[
+   ...(canSeeSales?[['Sales revenue',money(sum(sales,'total'))],['Sales orders',fmt(salesCount)]]:[]),
+   ...(canSeeLeads?[['Visible leads',fmt(leads.length)]]:[]),
+   ...(widgets.includes('followups')?[['Follow-ups due',fmt(followups.filter(l=>new Date(l.next_followup_at).getTime()<=now).length)]]:[])
+  ];
+  host.querySelector('#gr-exec-kpis').innerHTML=kpis.map(([label,value])=>'<div class="gr-kpi"><span>'+e(label)+'</span><strong>'+e(value)+'</strong></div>').join('');
   host.querySelector('#gr-exec-panels').innerHTML=widgets.filter(id=>cards[id]).map(id=>cards[id]()).join('')||'<div class="gr-exec-empty">No charts enabled for your account. Ask the administrator to choose your dashboard widgets.</div>';
-  host.querySelector('#gr-exec-count').textContent=fmt(f.sales.length)+' sales · '+fmt(leads.length)+' leads · '+fmt(dispatch.length)+' dispatch orders';
+  host.querySelector('#gr-exec-count').textContent=[
+   ...(canSeeSales?[fmt(f.sales.length)+' sales']:[]),
+   ...(canSeeLeads?[fmt(leads.length)+' leads']:[]),
+   ...(widgets.includes('dispatch')?[fmt(dispatch.length)+' dispatch orders']:[])
+  ].join(' · ')||'Your dashboard';
  }
  function fillChoices(id,label,values){const el=host.querySelector(id),before=el.value;el.innerHTML='<option value="all">'+e(label)+'</option>'+values.map(v=>'<option value="'+e(v)+'">'+e(v)+'</option>').join('');if([...el.options].some(o=>o.value===before))el.value=before}
  function namedChoices(id,label,values){const el=host.querySelector(id);if(!el)return;const before=el.value;
@@ -118,6 +128,7 @@
   if(allow('dispatch'))out.push(['Dispatch',f.dispatch.map(x=>({Company:company(x.company_id),
     Order:x.source_sale_id,Status:x.status,Date:x.order_date}))]);
   if(allow('customers'))out.push(['Customers',f.customers.map(x=>({Name:x.name,Type:x.type,Created:x.created_at}))]);
+  if(allow('attendance'))out.push(['Attendance',records.attendance.map(x=>({Date:x.attendance_date,EmployeeID:x.user_id,Status:x.status}))]);
   return out;
  };
  async function exportExcel(){
@@ -165,10 +176,10 @@
    const [crm,dispatch,att,prefs,customers,leadPipeline,staffRows,tagRows]=await Promise.all([
     paged('CRM',(a,b)=>client.from('gr_crm_records').select('company_id,kind,payload').in('company_id',companyIds).in('kind',['sales','products','leads']).range(a,b)),
     paged('Dispatch',(a,b)=>client.from('gr_dispatch_orders').select('company_id,source_sale_id,status,approved_at,order_date').in('company_id',companyIds).range(a,b)),
-    client.from('gr_attendance').select('user_id,status').eq('attendance_date',today()),
+    client.from('gr_attendance').select('user_id,status,attendance_date').eq('attendance_date',input('#gr-exec-attendance-date')||today()),
     client.from('gr_dashboard_preferences').select('widgets').eq('user_id',userId).maybeSingle(),
     client.from('gr_crm_customers').select('id,name,type,created_at').limit(1000),
-    paged('Pipeline',(a,b)=>client.from('gr_lead_pipeline').select('company_id,lead_id,stage,source,tag_ids,product_id,assigned_to,created_at,updated_at,next_followup_at,won_order_id').in('company_id',companyIds).range(a,b)),
+    paged('Pipeline',(a,b)=>client.from('gr_lead_pipeline').select('company_id,lead_id,customer_id,stage,source,tag_ids,product_id,assigned_to,created_at,updated_at,next_followup_at,won_order_id').in('company_id',companyIds).range(a,b)),
     Promise.all(companyIds.map(c=>client.rpc('gr_pipeline_staff',{p_company:c}))),
     client.from('gr_crm_tags').select('id,name').limit(500)
    ]);
@@ -182,6 +193,7 @@
    namedChoices('#gr-exec-product','All products',[...new Map(records.products.filter(x=>x.id||x.sku).map(x=>[x.id||x.sku,[x.id||x.sku,x.name||x.sku||x.id]])).values()]);
    namedChoices('#gr-exec-tag','All tags',tagRows.error?[]:(tagRows.data||[]).map(x=>[x.id,x.name]));
    fillChoices('#gr-exec-stage','All stages',['New','Contacted','Qualified','Quotation','Won','Lost']);
+    fillChoices('#gr-exec-customer-type','All customer types',[...new Set(records.customers.map(c=>c.type).filter(Boolean))].sort());
    fillChoices('#gr-exec-order-status','All statuses',[...new Set(records.sales.map(x=>x.status).filter(Boolean))].sort());
    namedChoices('#gr-exec-person','All salespeople',isAdmin?staff.map(p=>[p.id,p.full_name]):[]);
    host.querySelector('#gr-exec-loading').hidden=true;draw();
@@ -197,14 +209,14 @@
    '<label>Lead source<select id="gr-exec-source"><option value="all">All sources</option></select></label><label>Sales channel<select id="gr-exec-channel"><option value="all">All channels</option></select></label>'+
    '<label>Product<select id="gr-exec-product"><option value="all">All products</option></select></label>'+
    '<label>Tags<select id="gr-exec-tag"><option value="all">All tags</option></select></label>'+
-   '<label>Lead stage<select id="gr-exec-stage"><option value="all">All stages</option></select></label>'+
+   '<label>Lead stage<select id="gr-exec-stage"><option value="all">All stages</option></select></label><label>Customer type<select id="gr-exec-customer-type"><option value="all">All customer types</option></select></label>'+
    '<label>Sales Order status<select id="gr-exec-order-status"><option value="all">All statuses</option></select></label>'+
    (isAdmin?'<label>Salesperson<select id="gr-exec-person"><option value="all">All salespeople</option></select></label>':'')+
-   '<label>From<input type="date" id="gr-exec-from"></label><label>To<input type="date" id="gr-exec-to"></label><div class="gr-exec-actions"><button id="gr-exec-reset" type="button">Reset</button><button id="gr-exec-refresh" type="button">↻ Refresh</button>'+(canExport?'<button id="gr-exec-excel" type="button">Export Excel</button><button id="gr-exec-pdf" type="button">Export PDF</button>':'')+'</div></div>'+
+   '<label>From<input type="date" id="gr-exec-from"></label><label>To<input type="date" id="gr-exec-to"></label><label>Attendance day<input type="date" id="gr-exec-attendance-date" value="'+today()+'"></label><div class="gr-exec-actions"><button id="gr-exec-reset" type="button">Reset</button><button id="gr-exec-refresh" type="button">↻ Refresh</button>'+(canExport?'<button id="gr-exec-excel" type="button">Export Excel</button><button id="gr-exec-pdf" type="button">Export PDF</button>':'')+'</div></div>'+
    '<div class="gr-exec-loading" id="gr-exec-loading">Loading charts from GreenRich cloud…</div><div class="gr-exec-kpis" id="gr-exec-kpis"></div><div class="gr-exec-grid" id="gr-exec-panels"></div><p class="gr-exec-note">All figures are based on accessible records. Company/module RLS and Admin-set widget visibility apply. Stock is current, not historical.</p></div>';
   const co=host.querySelector('#gr-exec-company');if(companyIds.length===1){co.value=companyIds[0];co.disabled=true}else if(companyIds.includes(selected))co.value=selected;
-  host.querySelectorAll('.gr-exec-filters input,.gr-exec-filters select').forEach(el=>el.addEventListener('change',()=>{if(el.type==='date')host.querySelector('#gr-exec-period').value='custom';draw()}));
-  host.querySelector('#gr-exec-reset').onclick=()=>{host.querySelector('#gr-exec-period').value='month';co.value=companyIds.includes(selected)?selected:'all';for(const id of ['#gr-exec-source','#gr-exec-channel','#gr-exec-product','#gr-exec-tag','#gr-exec-stage','#gr-exec-order-status','#gr-exec-person']){const el=host.querySelector(id);if(el)el.value='all'}for(const id of ['#gr-exec-from','#gr-exec-to'])host.querySelector(id).value='';draw()};
+  host.querySelectorAll('.gr-exec-filters input,.gr-exec-filters select').forEach(el=>el.addEventListener('change',()=>{if(el.id==='gr-exec-attendance-date'){void refresh();return}if(el.type==='date')host.querySelector('#gr-exec-period').value='custom';draw()}));
+  host.querySelector('#gr-exec-reset').onclick=()=>{host.querySelector('#gr-exec-period').value='month';co.value=companyIds.includes(selected)?selected:'all';for(const id of ['#gr-exec-source','#gr-exec-channel','#gr-exec-product','#gr-exec-tag','#gr-exec-stage','#gr-exec-order-status','#gr-exec-person','#gr-exec-customer-type']){const el=host.querySelector(id);if(el)el.value='all'}for(const id of ['#gr-exec-from','#gr-exec-to'])host.querySelector(id).value='';host.querySelector('#gr-exec-attendance-date').value=today();void refresh()};
   host.querySelector('#gr-exec-refresh').onclick=()=>void refresh();
   if(canExport){
    host.querySelector('#gr-exec-excel').onclick=()=>void exportExcel();
