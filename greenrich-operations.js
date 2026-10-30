@@ -21,7 +21,7 @@
   service:{label:'Installation, warranty & service',module:'customers',fields:[['customer','Customer name','text',true],['product_code','Product code','text'],['serial_batch','Serial / batch','text'],['installation_date','Installation date','date'],['warranty_end','Warranty end date','date'],['technician','Assigned technician','text'],['status','Service stage','select:Installation pending,Installed,Ticket open,In service,Resolved,AMC follow-up'],['notes','Site, ticket, complaint / consumable','textarea']]}
  };
  const TABS=[
-  ['overview','Process overview',null],['training','Learn Production · Demo','stock'],['material','Materials / RM','stock'],['vendor','Vendors','purchase'],['bom','BOM & routing','stock'],
+  ['overview','Process overview',null],['pilot','Connected Order-to-Stock · Pilot','stock'],['training','Learn Production · Demo','stock'],['material','Materials / RM','stock'],['vendor','Vendors','purchase'],['bom','BOM & routing','stock'],
   ['work_order','Production','stock'],['requisition','Purchase requests','purchase'],['purchase_order','Purchase orders','purchase'],
   ['goods_receipt','Material receipts','purchase'],['job_work','Job work','purchase'],['qc','Quality control','stock'],
   ['dispatch_check','Dispatch release','dispatch'],['receivable','Collections','accounts'],['service','After-sales service','customers']
@@ -40,7 +40,7 @@
  ];
  let host=null,db=null,companyIds=[],companyScope='all',caps={},isAdmin=false,kind='overview',rows=[],version=0,channel=null,refreshTimer=null;
  const companyName=id=>id==='grow-india'?'GreenRich Grow India Pvt Ltd':'GreenRich Enviro Solutions Pvt Ltd';
- const allowedType=id=>id==='overview'||(id==='training'?Boolean(caps.stock?.view):Boolean(caps[TYPES[id]?.module]?.view));
+ const allowedType=id=>id==='overview'||(['training','pilot'].includes(id)?Boolean(caps.stock?.view):Boolean(caps[TYPES[id]?.module]?.view));
  const canEdit=(id,action)=>isAdmin||Boolean(caps[TYPES[id]?.module]?.[action]);
  const allKind=id=>rows.filter(r=>r.kind===id).map(r=>({...r.payload,_companyId:r.company_id,_savedAt:r.updated_at}));
  const scopeRows=id=>allKind(id).filter(r=>companyScope==='all'||r._companyId===companyScope);
@@ -149,7 +149,13 @@
    button.setAttribute('aria-current',button.dataset.opsTab===kind?'page':'false');
   });
   if(kind==='overview')drawOverview();
-  else if(kind==='training'){
+  else if(kind==='pilot'){
+   const body=host.querySelector('#gr-ops-body');
+   if(!window.GreenRichPilot){body.textContent='Connected ERP pilot failed to load. Please refresh.';return;}
+   void window.GreenRichPilot.mount(body,{client:db,companies:companyIds,selection:companyScope,
+      canEdit:Boolean(caps.stock?.edit && caps.stock?.create)})
+    .catch(e=>{body.textContent='Pilot loading failed: '+e.message});
+  }else if(kind==='training'){
    const body=host.querySelector('#gr-ops-body');
    if(!window.GreenRichWorkflowTraining){body.textContent='Training module could not load. Refresh the application.';return;}
    void window.GreenRichWorkflowTraining.mount(body,{client:db,companies:companyIds,selection:companyScope,
