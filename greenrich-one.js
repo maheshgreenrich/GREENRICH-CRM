@@ -298,7 +298,7 @@ async function permissionPage(c){
  const builtin=new Set(['Admin','Director','Sales','Telecaller','Marketing','Operation','Accounts','Developer']);
  function draw(){
   const selected=select.value,role=roles.find(x=>x.id===selected);$('#deleteRole').disabled=!role||builtin.has(role.name)||people.some(p=>p.role_id===selected);
-  $('#permBody').innerHTML=modules.map(m=>'<tr><td>'+esc(labels[m])+'</td>'+act.map(action=>{
+  $('#permBody').innerHTML=modules.filter(m=>m!=='operations').map(m=>'<tr><td>'+esc(labels[m])+'</td>'+act.map(action=>{
    const p=permissions.find(x=>x.role_id===selected&&x.module===m&&x.action===action);
    const locked=role?.name==='Admin';
    return '<td><label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-module="'+m+'" data-action="'+action+'" '+(p?.allowed?'checked':'')+' '+(locked?'disabled':'')+'> Allow</label><select data-module="'+m+'" data-action="'+action+'" '+(locked?'disabled':'')+'>'+['own','team','all'].map(v=>'<option value="'+v+'" '+((p?.data_scope||'own')===v?'selected':'')+'>'+v+'</option>').join('')+'</select></td>'

@@ -7,6 +7,12 @@ on:
       - 'styles.css'
       - 'app.js'
       - 'greenrich-one.js'
+      - 'greenrich-operations.js'
+      - 'greenrich-operations-seed.js'
+      - 'greenrich-operations.css'
+      - 'tests/operations-workflow-mapping.js'
+      - 'supabase/migrations/20261030110000_ops_workflow_records.sql'
+      - 'docs/operations-customization-guide.md'
       - 'greenrich-company-admin.js'
       - 'greenrich-customer-tags.js'
       - 'greenrich-shared-customers.js'
@@ -91,6 +97,9 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          node --check greenrich-operations.js
+          node --check greenrich-operations-seed.js
+          node tests/operations-workflow-mapping.js
           node --check greenrich-company-admin.js
           node --check greenrich-customer-tags.js
           node --check greenrich-shared-customers.js
