@@ -1,7 +1,7 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','dispatch','stock','operations','purchase','accounts','settings'];
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','operations','purchase','accounts','settings'];
 const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
 const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
 const crmAccess=()=>({
@@ -18,6 +18,7 @@ const crmAccess=()=>({
 const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||(m==='operations'&&(can('stock')||can('purchase')||can('dispatch')||can('accounts')))||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='customers'&&crmAccess().customers)||
+ (m==='orders'&&crmAccess().sales)||
  (m==='dispatch'&&crmAccess().dispatch)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
@@ -212,7 +213,7 @@ async function crmWorkspace(container,view,adminTools=false){
  await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'),roleName()==='Admin'||can('sales','approve')||can('orders','approve'),roleName()==='Admin'||can('dispatch','edit')||can('stock','edit')||can('orders','edit'),{
  customer:Object.fromEntries(['view','create','edit','delete','export'].map(action=>[action,roleName()==='Admin'||can('customers',action)])),
  lead:Object.fromEntries(['view','create','edit','delete','export'].map(action=>[action,roleName()==='Admin'||can('leads',action)]))
-});
+},{userId:user.id,admin:roleName()==='Admin',scope:permissions.find(p=>p.role_id===profile.role_id&&p.module==='leads'&&p.action==='view')?.data_scope||'own'});
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
@@ -298,7 +299,7 @@ async function users(c){
 }
 async function permissionPage(c){
  if(roleName()!=='Admin')throw Error('Admin only');
- c.innerHTML='<div class="panel"><div class="row"><h2>Manage User Roles</h2><button class="blue" id="addRole">+ Add New Role</button></div><p>Create custom roles, edit their capabilities, and remove unused custom roles. Built-in roles cannot be deleted.</p><div class="row"><label>Choose role <select id="roleSelect">'+roles.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select></label><button class="secondary" id="deleteRole">Delete Selected Role</button></div><div id="roleFeedback" class="notice" hidden></div></div><div class="panel"><h2>Capabilities & Record Access</h2><p>Each action has its own access scope: Own, Team or All. Scope applies to data access only where the module has server-side rules. Unconnected ERP modules are not secure yet.</p><div class="tablewrap"><table><thead><tr><th>Module</th>'+act.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody id="permBody"></tbody></table></div></div>';
+ c.innerHTML='<div class="panel"><div class="row"><h2>Manage User Roles</h2><button class="blue" id="addRole">+ Add New Role</button></div><p>Create custom roles, edit their capabilities, and remove unused custom roles. Built-in roles cannot be deleted.</p><div class="row"><label>Choose role <select id="roleSelect">'+roles.map(r=>'<option value="'+esc(r.id)+'">'+esc(r.name)+'</option>').join('')+'</select></label><button class="secondary" id="deleteRole">Delete Selected Role</button></div><div id="roleFeedback" class="notice" hidden></div></div><div class="panel"><h2>Capabilities & Record Access</h2><p>Each action has its own access scope: Own, Team or All. For Leads & CRM: Own shows assigned leads, Team includes employees reporting to you, and All shows every lead in the assigned company. Give Sales staff View/Create/Edit as needed. Only managers with Team/All Edit access can reassign leads. Every stage movement records a required conversation note. Other unconnected ERP modules may not enforce these scopes yet.</p><div class="tablewrap"><table><thead><tr><th>Module</th>'+act.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody id="permBody"></tbody></table></div></div>';
  const select=$('#roleSelect'),feedback=$('#roleFeedback');
  const note=msg=>{feedback.hidden=false;feedback.textContent=msg;toast(msg)};
  const builtin=new Set(['Admin','Director','Sales','Telecaller','Marketing','Operation','Accounts','Developer']);

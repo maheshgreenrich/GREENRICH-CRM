@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
-let root=null,allowedTabs=[],adminMode=false,allowDashboardExport=false,allowInvoiceIssue=false,contactCapabilities={};
+let root=null,allowedTabs=[],adminMode=false,allowDashboardExport=false,allowInvoiceIssue=false,contactCapabilities={},pipelineConfig={};
 const $=s=>root?.querySelector(s), all=s=>root?[...root.querySelectorAll(s)]:[], legacyKey='greenrich-crm-v2';
 let activeCompany='grow-india',activeCompanyName='GreenRich Grow India Pvt Ltd',companyScope='grow-india',permittedCompanies=['grow-india'];
 const storageKey=()=>activeCompany==='grow-india'?legacyKey:legacyKey+'::'+activeCompany;
@@ -68,8 +68,8 @@ function channelName(s){return s.channel_name||nameOf('channels',s.channel_id)}
 function productName(s){return s.product_name||nameOf('products',s.product_id)}
 function customerName(s){return s.customer_name||nameOf('customers',s.customer_id)}
 function el(tag,props={}){let e=document.createElement(tag);Object.entries(props).forEach(([k,v])=>k==='text'?e.textContent=v:e.setAttribute(k,v));return e}
-const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales & Orders','Track sales across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Capture enquiries, opportunities and deal stages.','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],dispatch:['Dispatch','Approved orders, packing and courier tracking.','Dispatch queue','sales'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
-function navigate(p){if(!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#page-heading').textContent=titles[p][0];$('#page-subtitle').textContent=titles[p][1];$('#primary-action').textContent=titles[p][2];$('#primary-action').hidden=p==='reports'||p==='dispatch'||p==='customers'||(adminMode&&p==='dashboard');render();root?.scrollIntoView({block:'start'})}
+const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales Orders','Track sales orders across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Capture enquiries, opportunities and deal stages.','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],dispatch:['Dispatch','Approved orders, packing and courier tracking.','Dispatch queue','sales'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
+function navigate(p){if(!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#page-heading').textContent=titles[p][0];$('#page-subtitle').textContent=titles[p][1];$('#primary-action').textContent=titles[p][2];$('#primary-action').hidden=p==='reports'||p==='dispatch'||p==='customers'||p==='leads'||(adminMode&&p==='dashboard');render();root?.scrollIntoView({block:'start'})}
 function fillSelect(sel,rows,emptyLabel='None'){let old=sel.value;sel.replaceChildren();sel.append(el('option',{value:'',text:emptyLabel}));rows.forEach(r=>sel.append(el('option',{value:r.id,text:r.name||r.title})));if([...sel.options].some(o=>o.value===old))sel.value=old}
 
 function channelFilters(){
@@ -456,6 +456,9 @@ function renderCustomerProfile(){
   onInvoice:(id,owner)=>void openSaleInvoice(id,owner),
   onRefresh:()=>renderCustomerProfile()
  });
+ if(customer?.id&&window.GreenRichLeadPipeline?.renderCustomerTimeline)
+  void window.GreenRichLeadPipeline.renderCustomerTimeline(area,pipelineConfig.client,customer.id,permittedCompanies,
+   id=>id===pipelineConfig.userId?'Me':'Sales employee').catch(error=>console.warn('Lead history unavailable',error));
 }
 function openCustomerProfile(customerId='',saleId=''){
  const customer=data.customers.find(c=>c.id===customerId);
@@ -480,7 +483,28 @@ function renderTables(){
  $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(p.active?'good':'warn')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
  $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
 }
-function render(){if(page==='dashboard')renderDashboard();else if(page==='dispatch')window.GreenRichSalesOps?.renderDispatch();else {renderTables();if(page==='customers'){window.GreenRichContacts?.render();if(currentCustomerId||currentSourceSaleId)renderCustomerProfile()}}}
+function render(){
+ if(page==='dashboard')renderDashboard();
+ else if(page==='dispatch')window.GreenRichSalesOps?.renderDispatch();
+ else {
+  renderTables();
+  if(page==='leads'&&window.GreenRichLeadPipeline){
+   void window.GreenRichLeadPipeline.mount($('#leads'),{
+    ...pipelineConfig,db:pipelineConfig.client,companyIds:scopedCompanyIds(),
+    companyNames:Object.fromEntries(companyChoices.map(c=>[c.id,companyLabel(c.id)])),notify:toast
+   }).catch(e=>toast(e.message));
+  }
+  if(page==='tasks'&&window.GreenRichLeadPipeline){
+   let host=$('#gr-quotation-followups');
+   if(!host){host=document.createElement('section');host.id='gr-quotation-followups';host.className='card';$('#tasks').prepend(host);}
+   void window.GreenRichLeadPipeline.mountFollowups(host,{
+    ...pipelineConfig,db:pipelineConfig.client,companyIds:scopedCompanyIds(),
+    companyNames:Object.fromEntries(companyChoices.map(c=>[c.id,companyLabel(c.id)])),notify:toast
+   }).catch(e=>{host.textContent='Quotation follow-ups could not load: '+e.message});
+  }
+  if(page==='customers'){window.GreenRichContacts?.render();if(currentCustomerId||currentSourceSaleId)renderCustomerProfile()}
+ }
+}
 const specs={
  products:[['company_id','Company','companies',true],['name','Product name','text',true],['sku','SKU / code','text',true],['hsn','HSN / SAC code (for invoice)','text'],['brand','Brand','text'],['category','Category','text'],['price','Default unit price (₹)','number',true],['tax','Default GST / tax %','number',true],['stock','Current stock quantity','number',true],['inclusive','Price includes GST?','select','',[['true','Yes – inclusive'],['false','No – exclusive']]],['active','Status','select','',[['true','Active'],['false','Inactive']]],['description','Description / notes','textarea']],
  channels:[['company_id','Company','companies',true],['name','Channel name','text',true],['type','Channel type','select','',[['Marketplace','Marketplace'],['E-commerce','E-commerce'],['Retail','Retail'],['Distributor','Distributor'],['Wholesale','Wholesale'],['Other','Other']]],['active','Status','select','',[['true','Active'],['false','Inactive']]]],
@@ -597,6 +621,21 @@ function openEditor(k,id=''){
  }
  if(k==='customers'){$('#f-company_id')?.remove();} // Customer records belong to the currently active company.
  $('#editor').showModal();
+}
+function createOrderForLead(lead){
+ if(!lead?.customer_id)return toast('Link a shared customer to this lead first.');
+ if(!permittedCompanies.includes(lead.company_id))return toast('Company access denied.');
+ navigate('sales');window.GreenRichShell?.setPageWithoutRemount?.('orders');
+ openEditor('sales');
+ const co=$('#f-company_id');if(co){co.value=lead.company_id;co.dispatchEvent(new Event('change'))}
+ const customer=$('#f-customer_id');if(customer){customer.value=lead.customer_id;
+  const person=editorData().customers.find(c=>c.id===lead.customer_id);
+  $('#gr-customer-selected').textContent=person?'Selected: '+person.name:'Choose this customer in the picker';
+ }
+ if(lead.product_id&&$('#f-product_id')){$('#f-product_id').value=lead.product_id;$('#f-product_id').dispatchEvent(new Event('change'))}
+ if($('#f-notes'))$('#f-notes').value='Linked quotation / lead: '+lead.title+' ('+lead.lead_id+')';
+ const link=document.createElement('input');link.type='hidden';link.name='lead_id';link.value=lead.lead_id;$('#editor-form').append(link);
+ toast('Complete the Sales Order fields and save. Then return to the lead and mark Won using the saved order.');
 }
 async function saveEditor(event){
  event.preventDefault();
@@ -776,7 +815,8 @@ function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>n
   if(channel&&root.contains(channel))showChannelOrders(channel.dataset.channelDrill);
  });$('#import-sales-btn').onclick=()=>{if(!adminMode)return toast('Only Admin can import sales');if(companyScope==='all')return toast('Select one company in the top selector before importing');$('#upload-sales').click()};$('#upload-sales').onchange=e=>e.target.files[0]&&importSales(e.target.files[0]);$('#download-template').onclick=()=>excelDownload('greenrich-sales-template',[{'Date':date(),'Order ID':'AMZ-001','Channel':'Amazon','Customer':'','Product':'USE EXISTING PRODUCT NAME','SKU':'','Quantity':2,'Unit Price':199,'Tax %':5,'Tax Inclusive':'Yes','Taxable Amount':'','Tax Amount':'','Total Amount':'','Order Status':'Completed','Notes':'Example — replace this row'}],salesHeaders);$('#download-backup').onclick=()=>{if(companyScope==='all')return toast('Select one company to back up its CRM records');download('greenrich-backup-'+date()+'.json',new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))};$('#restore-backup').onclick=()=>{if(!adminMode)return toast('Only Admin can restore backups');if(companyScope==='all')return toast('Select one company before restoring its backup');$('#upload-backup').click()};$('#upload-backup').onchange=async e=>{if(!adminMode){e.target.value='';return toast('Only Admin can restore backups')}let f=e.target.files[0];if(!f)return;try{let obj=JSON.parse(await f.text());if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(obj[k])))throw Error('Backup format invalid');if(!confirm('Restore this backup to shared CRM? It will apply to synced cloud records and can update or remove existing records.'))return;data=obj;persist();render();toast('Backup restoration queued for cloud sync')}catch(e){toast(e.message)}finally{e.target.value=''}}}
 window.GreenRichCRM={
- mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false,companyIds=['grow-india'],issueAllowed=false,approveAllowed=false,dispatchAllowed=false,contactAccess={})=>{
+ mount:async(container,view,allowed,companyId='grow-india',companyName='GreenRich Grow India Pvt Ltd',adminTools=false,client=null,isAdmin=false,exportAllowed=false,companyIds=['grow-india'],issueAllowed=false,approveAllowed=false,dispatchAllowed=false,contactAccess={},leadPipelineAccess={})=>{
+  pipelineConfig={...leadPipelineAccess,client};
   contactCapabilities=contactAccess||{};
   permittedCompanies=[...new Set((Array.isArray(companyIds)?companyIds:[]).filter(id=>companyChoices.some(c=>c.id===id)))];
   if(!permittedCompanies.length)throw Error('No company access. Contact the Admin.');
@@ -843,6 +883,7 @@ window.GreenRichCRM={
  },
  switchPage:view=>{if(allowedTabs.includes(view))navigate(view)},
  openCustomerProfile:(id,saleId='')=>openCustomerProfile(id,saleId),
+ createOrderForLead,
  refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
  unmount:()=>{window.GreenRichCRMCloud?.stop?.();charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
 };
