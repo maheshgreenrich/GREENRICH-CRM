@@ -1,0 +1,22 @@
+/* Shared GreenRich ONE logo setup (admin only) */
+.gr-logo-settings{max-width:960px;margin-top:0!important;display:grid;gap:19px}
+.gr-logo-settings-head h2{font-size:19px!important;color:#173c72!important;margin:0 0 7px!important}
+.gr-logo-settings-head p{font-size:12px!important;line-height:1.6!important;color:#7187a5!important;margin:0!important}
+.gr-logo-settings-body{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(280px,1.4fr);gap:22px}
+.gr-logo-current{display:flex;flex-direction:column;align-items:center;gap:11px;
+ border:1px solid #dfebf8;background:#f6faff;border-radius:13px;padding:22px 16px}
+.gr-logo-current>span{font-weight:700;font-size:11px;color:#4c6b9a;letter-spacing:.03em}
+.gr-logo-preview{display:grid;place-items:center;width:128px;height:128px;max-width:100%;border:1px solid #cad9f0;
+ border-radius:22px;background:#fff;box-shadow:0 3px 15px #19366d10;overflow:hidden}
+.gr-logo-preview>img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+.gr-logo-preview>strong{font-size:58px!important;color:#2455aa!important;font-weight:750}
+.gr-logo-current>small{text-align:center;font-size:11px;line-height:1.55;color:#6983a6}
+#grLogoForm{display:flex;flex-direction:column;gap:12px;min-width:0}
+#grLogoForm>label{font-size:12px;font-weight:700;color:#3c5a89}
+#grLogoFile{font-size:12px!important;padding:12px!important;background:#fbfdff!important;border:1px dashed #cbdcf2!important}
+.gr-logo-hint,.gr-logo-privacy{font-size:11px!important;color:#7387a5!important;line-height:1.6!important;margin:0!important}
+.gr-logo-actions{display:flex;flex-wrap:wrap;gap:10px}
+.gr-logo-actions button{width:auto!important;min-height:41px!important;padding:10px 14px!important;font-size:12px!important}
+.gr-logo-status{min-height:23px;font-size:11px;line-height:1.6;font-weight:650;color:#285996}
+.gr-logo-privacy{padding:11px 13px;background:#f7faff;border-radius:10px}
+@media(max-width:730px){.gr-logo-settings-body{grid-template-columns:1fr}.gr-logo-current{padding:18px}.gr-logo-preview{height:105px;width:105px}}

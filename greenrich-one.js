@@ -43,7 +43,7 @@ async function enter(){
   $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();configureCompanySelector();
   document.title='GreenRich ONE · '+(company?.company_name||'CRM');
   if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
-  show('app');navigation();
+  show('app');window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
   // Attendance status is useful but should never block dashboard navigation or first paint.
   void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
   await render();
@@ -90,8 +90,8 @@ function configureCompanySelector(){
 }
 function navigation(){
  const visible=modules.filter(canOpenPage);
- $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
- $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){$('#sidebar').classList.remove('open');return}page=b.dataset.page;$('#sidebar').classList.remove('open');navigation();void render()});
+ $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-label="'+esc(labels[m])+'" title="'+esc(labels[m])+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
+ $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){window.GreenRichSidebar?.collapseMobile();return}page=b.dataset.page;window.GreenRichSidebar?.collapseMobile();navigation();void render()});
 }
 async function attendanceQuick(){
  const area=$('#attendanceQuick');
@@ -347,6 +347,7 @@ async function settings(c){
   openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
+   openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
    configureCompanySelector();
@@ -365,5 +366,5 @@ window.GreenRichShell={
   page=target;navigation();$('#title').textContent=labels[target];
  }
 };
-$('#hamburger').onclick=()=>$('#sidebar').classList.toggle('open');start().catch(e=>{show('setup');toast(e.message)});
+$('#hamburger').onclick=()=>window.GreenRichSidebar?.toggle();start().catch(e=>{show('setup');toast(e.message)});
 })();

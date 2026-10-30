@@ -1,0 +1,75 @@
+/* 2026 GreenRich ONE responsive collapsible navigation, separate from Attendance */
+#app.app{--gr-sidebar-wide:270px;--gr-sidebar-narrow:72px}
+#app aside#sidebar{flex:0 0 var(--gr-sidebar-wide);width:var(--gr-sidebar-wide);min-width:0;
+ padding:20px 12px 15px;gap:5px;overflow:hidden;transition:width .18s ease,flex-basis .18s ease,transform .18s ease;
+ scrollbar-width:none!important}
+#app aside#sidebar::-webkit-scrollbar,#app aside#sidebar #nav::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+#app aside#sidebar #nav{display:flex;flex-direction:column;gap:4px;flex:1 1 auto;min-height:0;
+ overflow-y:auto!important;overflow-x:hidden!important;scrollbar-width:none!important;
+ padding:3px 0 10px!important;margin:0!important;overscroll-behavior:contain}
+#app aside#sidebar #nav button{display:flex;align-items:center;gap:12px;flex:0 0 auto;min-height:44px;
+ padding:11px 12px;border-radius:10px;text-align:left;width:100%;min-width:0!important;white-space:normal}
+#app aside#sidebar #nav button>span{min-width:0;line-height:1.3}
+#app aside#sidebar .gr-sidebar-head{display:flex;align-items:center;justify-content:space-between;
+ gap:4px;flex:0 0 auto;min-height:48px}
+#app aside#sidebar .gr-sidebar-head .logo{display:flex;align-items:center;flex:1 1 auto;
+ gap:9px;min-width:0;padding:3px 4px!important;margin:0!important}
+#app aside#sidebar .gr-sidebar-head .gr-brand-mark{width:38px;height:38px;flex:0 0 38px;border-radius:11px;overflow:hidden}
+#app aside#sidebar .gr-sidebar-head .gr-brand-name{font-size:17px!important;white-space:nowrap}
+#app aside#sidebar .gr-sidebar-head .gr-brand-image{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+#app aside#sidebar .gr-sidebar-head .gr-brand-image[hidden]{display:none!important}
+#app aside#sidebar .gr-sidebar-head .gr-brand-mark.gr-has-logo{background:#fff;border-color:#dee9f7;box-shadow:0 2px 9px #061c405c}
+#app aside#sidebar .gr-sidebar-caption{display:block;padding:9px 8px 13px!important;
+ white-space:normal;font-size:9.5px;color:#91abcf;line-height:1.4;letter-spacing:.08em}
+#app aside#sidebar #grSidebarToggle{display:grid!important;place-items:center;flex:0 0 31px!important;
+ width:31px!important;height:35px!important;min-width:31px!important;
+ border:1px solid #486081!important;background:#1a365a!important;color:#d8e8ff!important;
+ border-radius:9px!important;padding:0!important}
+#app aside#sidebar #grSidebarToggle svg{width:18px;height:18px;display:block;stroke:currentColor;fill:none;stroke-width:1.75}
+#app aside#sidebar #grSidebarToggle:hover{background:#2a4b79!important;color:white!important}
+#app aside#sidebar .bottom{padding:9px 2px 0;flex:0 0 auto;margin-top:0}
+#app aside#sidebar .bottom #logout{display:flex!important;align-items:center;justify-content:flex-start;
+ gap:12px;width:100%!important;min-height:43px!important;padding:10px 12px!important;
+ background:#274a86;color:#eaf2ff;border-radius:10px;font-size:13px;font-weight:600}
+#app aside#sidebar .bottom #logout svg{width:20px;height:20px;min-width:20px;stroke:currentColor;fill:none;stroke-width:1.7}
+#app aside#sidebar .bottom #logout span{white-space:nowrap;overflow:hidden}
+#app.gr-sidebar-collapsed aside#sidebar{flex-basis:var(--gr-sidebar-narrow)!important;width:var(--gr-sidebar-narrow)!important;padding:18px 8px 14px!important}
+#app.gr-sidebar-collapsed aside#sidebar .gr-sidebar-head{display:flex;flex-direction:column;gap:9px;min-height:94px;justify-content:flex-start}
+#app.gr-sidebar-collapsed aside#sidebar .gr-sidebar-head .logo{flex:0 0 auto;justify-content:center;padding:0!important;width:100%}
+#app.gr-sidebar-collapsed aside#sidebar .gr-sidebar-head .gr-brand-name,
+#app.gr-sidebar-collapsed aside#sidebar .gr-sidebar-caption,
+#app.gr-sidebar-collapsed aside#sidebar #nav button>span,
+#app.gr-sidebar-collapsed aside#sidebar .bottom #logout>span{display:none!important}
+#app.gr-sidebar-collapsed aside#sidebar #grSidebarToggle{width:38px!important;height:32px!important;flex:0 0 32px!important}
+#app.gr-sidebar-collapsed aside#sidebar #grSidebarToggle svg{transform:rotate(180deg)}
+#app.gr-sidebar-collapsed aside#sidebar #nav{padding:3px 0 8px!important}
+#app.gr-sidebar-collapsed aside#sidebar #nav button{justify-content:center!important;
+ width:100%!important;height:46px!important;min-height:46px!important;padding:11px 0!important}
+#app.gr-sidebar-collapsed aside#sidebar #nav .gr-menu-icon{width:21px;height:21px;min-width:21px}
+#app.gr-sidebar-collapsed aside#sidebar .bottom{padding:8px 0 0!important}
+#app.gr-sidebar-collapsed aside#sidebar .bottom #logout{justify-content:center!important;width:100%!important;padding:10px 0!important}
+#app #grSidebarBackdrop{display:none}
+#app #grSidebarBackdrop[hidden]{display:none!important}
+#app aside#sidebar #nav button:focus-visible,
+#app aside#sidebar #grSidebarToggle:focus-visible,
+#app aside#sidebar .bottom #logout:focus-visible{outline:2px solid #a8c9ff;outline-offset:1px}
+@media(max-width:760px){
+ #app.app{--gr-sidebar-wide:min(270px,86vw);--gr-sidebar-narrow:66px}
+ #app aside#sidebar{position:fixed!important;left:0;top:0;bottom:0;z-index:8!important;
+ transform:none!important;max-width:86vw;height:100dvh!important;min-height:0!important;
+ box-shadow:3px 0 18px #061e3a30}
+ #app.gr-sidebar-collapsed aside#sidebar{max-width:66px;box-shadow:1px 0 8px #071b3530}
+ #app .main{margin-left:var(--gr-sidebar-narrow);min-width:0;width:calc(100% - var(--gr-sidebar-narrow));flex:1}
+ #app #grSidebarBackdrop:not([hidden]){display:block;position:fixed;inset:0;z-index:7;background:#0d244166}
+ #app .main>header.gr-app-header #hamburger{display:grid!important;place-items:center!important;
+ width:34px!important;height:34px!important;padding:0!important;min-width:34px!important;
+ font-size:20px!important;background:#eef4ff!important;border:1px solid #dce7f7!important;color:#23539d!important}
+ #app.gr-sidebar-expanded aside#sidebar{box-shadow:6px 0 34px #041c425c}
+}
+@media(min-width:761px){
+ #app aside#sidebar{position:sticky;top:0;height:100vh}
+ #app .main{margin-left:0;min-width:0}
+}
+@media(prefers-reduced-motion:reduce){
+ #app aside#sidebar{transition:none!important}
+}

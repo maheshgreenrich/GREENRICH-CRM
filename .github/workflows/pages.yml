@@ -7,6 +7,12 @@ on:
       - 'styles.css'
       - 'app.js'
       - 'greenrich-one.js'
+      - 'greenrich-sidebar.js'
+      - 'greenrich-sidebar.css'
+      - 'greenrich-branding.js'
+      - 'greenrich-branding.css'
+      - 'tests/sidebar-logo-responsive.js'
+      - 'supabase/migrations/20261030133000_sidebar_logo_settings.sql'
       - 'greenrich-operations.js'
       - 'greenrich-operations-seed.js'
       - 'greenrich-operations.css'
@@ -97,6 +103,9 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          node --check greenrich-sidebar.js
+          node --check greenrich-branding.js
+          node tests/sidebar-logo-responsive.js
           node --check greenrich-operations.js
           node --check greenrich-operations-seed.js
           node tests/operations-workflow-mapping.js
