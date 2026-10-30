@@ -1,8 +1,8 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','dispatch','stock','purchase','accounts','settings'];
-const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','sales','tasks','orders','dispatch','stock','operations','purchase','accounts','settings'];
+const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
 const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
@@ -15,7 +15,7 @@ const crmAccess=()=>({
  channels:roleName()==='Admin',
  reports:roleName()==='Admin'
 });
-const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||
+const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||(m==='operations'&&(can('stock')||can('purchase')||can('dispatch')||can('accounts')))||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='customers'&&crmAccess().customers)||
  (m==='dispatch'&&crmAccess().dispatch)||
@@ -63,6 +63,7 @@ const menuIcons={
  marketing:'<path d="m3 11 18-7-7 18-3-9-8-2Zm8 2 10-9"/>',
  orders:'<path d="M4 7h16l-1 13H5L4 7ZM8 7a4 4 0 0 1 8 0"/>',
  stock:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/>',
+ operations:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7zM11 7h2M7 11v2M17 11v2"/>',
  purchase:'<path d="M3 4h2l2.2 11h11l2.1-8H6M10 20h.01M18 20h.01"/>',
  accounts:'<rect x="2" y="5" width="20" height="16" rx="2"/><path d="M2 10h20M16 15h3"/>',
  settings:'<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .8 1.4-2 2-.9-.9a8 8 0 0 1-2.3 1l-.3 1.5h-3l-.3-1.5a8 8 0 0 1-2.3-1l-.9.9-2-2 .8-1.4a8 8 0 0 1-.4-2.5L5 12l1.6-.5a8 8 0 0 1 .4-2.5L6.2 7.6l2-2 .9.9a8 8 0 0 1 2.3-1l.3-1.5h3l.3 1.5a8 8 0 0 1 2.3 1l.9-.9 2 2-.8 1.4a8 8 0 0 1 .4 2.5L21 12l-1.6.5a8 8 0 0 1 0 2.5Z"/>',
@@ -170,6 +171,7 @@ async function render(){
   if(page==='dashboard')await dashboard(c);
   else if(page==='attendance')await attendance(c);
   else if(page==='settings'){crmCache=null;await settings(c)}
+  else if(page==='operations')await operations(c)
   else if(crmMap[page])await crmWorkspace(c,crmMap[page]);
   else await placeholder(c)
  }catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
@@ -350,6 +352,10 @@ async function settings(c){
    configureCompanySelector();
   }
  });
+}
+async function operations(c){
+ if(!window.GreenRichOperations)throw Error('Operations module is missing. Refresh GreenRich ONE.');
+ await window.GreenRichOperations.mount(c,{client:db,companies:window.GreenRichCompanies.allowed(),selection:window.GreenRichCompanies.selected(user.id),role:roleName(),can});
 }
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. Sales & CRM features are available in this same workspace. Connected CRM records are shared across authorized browsers and devices.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
 $('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
