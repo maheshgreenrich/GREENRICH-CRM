@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Meta Leads Connection | GreenRich ONE</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,sans-serif;color:#183352;background:#f3f6fa}
+body{margin:0}header{background:#122d51;color:white;padding:17px 24px;display:flex;justify-content:space-between;align-items:center;gap:15px}
+header b{font-size:19px}header a{color:#eef5ff;text-decoration:none;font-size:13px}
+main{max-width:810px;margin:40px auto;padding:0 16px}
+.card{background:#fff;border:1px solid #d8e3f0;border-radius:14px;padding:25px;box-shadow:0 4px 20px #1a385012}
+h1{font-size:23px;margin:0 0 8px}p{color:#55708d;line-height:1.5}
+button{background:#2556af;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-weight:600;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}a{color:#2659ab}
+#message{padding:12px;background:#edf5fd;border-radius:9px;margin:15px 0;font-size:14px;white-space:pre-wrap}
+dialog.gl-dialog{box-sizing:border-box;border:1px solid #d4dfec;border-radius:14px;max-width:650px;width:94%;max-height:89vh;overflow:auto;padding:24px;color:#1a395c}
+dialog.gl-dialog::backdrop{background:#0a19358c}
+dialog.gl-dialog label{display:block;font-size:13px;margin:11px 0}
+dialog.gl-dialog input,dialog.gl-dialog select,dialog.gl-dialog textarea{display:block;width:100%;margin-top:5px;box-sizing:border-box;border:1px solid #c7d8ea;border-radius:7px;padding:9px;color:#17365a;background:#fff}
+dialog.gl-dialog button{margin:8px 8px 8px 0}dialog.gl-dialog a{word-break:break-word}
+</style>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script defer src="greenrich-public-config.js?v=shared-login-1"></script>
+<script defer src="greenrich-meta-sync.js?v=20261030-meta-sync-2"></script>
+<script defer src="meta-sync-setup.js?v=20261030-meta-direct-1"></script>
+</head>
+<body>
+<header><b>GreenRich ONE</b><a href="./secure.html?grBuild=20261030-meta-direct-1">Back to Leads &amp; CRM</a></header>
+<main>
+<div class="card">
+<h1>Connect Meta Ads Google Sheet</h1>
+<p>Import new Meta enquiries from your existing Google Sheet into the assigned employee's Leads &amp; CRM pipeline.</p>
+<div id="message" role="status" aria-live="polite">Checking your GreenRich ONE login and Admin access…</div>
+<button id="setup" type="button" disabled>Open Meta Leads Sync Setup</button>
+<p>This page uses your existing GreenRich ONE sign-in. Only a company Administrator can configure this connection.</p>
+<p><a href="https://docs.google.com/spreadsheets/d/1oyrt_jUpmOCoHDJYecdvipyHGL0BKeeG00jVOqs3GdI/edit" target="_blank" rel="noopener noreferrer">Open the connected “meta leads” Google Sheet</a></p>
+</div></main></body></html>
