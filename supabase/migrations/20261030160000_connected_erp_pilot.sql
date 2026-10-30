@@ -60,6 +60,17 @@ create table if not exists public.gr_pilot_stock_events(
  foreign key(product_id,company_id) references public.gr_pilot_products(id,company_id),
  foreign key(order_id,company_id) references public.gr_pilot_orders(id,company_id)
 );
+create table if not exists public.gr_pilot_material_events(
+ id bigint generated always as identity primary key,
+ company_id text not null,
+ order_id uuid not null,
+ material_code text not null default 'RM-PILOT-SHEET',
+ location text not null check(location in ('WAREHOUSE','VENDOR')),
+ movement text not null check(movement in ('RM_RECEIPT','ISSUE','CONSUMED','SCRAP','RETURN')),
+ qty_change numeric(18,3) not null check(qty_change<>0),
+ at timestamptz not null default now(),
+ foreign key(order_id,company_id) references public.gr_pilot_orders(id,company_id)
+);
 create table if not exists public.gr_pilot_service(
  id uuid primary key default gen_random_uuid(),
  company_id text not null,
@@ -89,17 +100,19 @@ alter table public.gr_pilot_events enable row level security;
 alter table public.gr_pilot_pos enable row level security;
 alter table public.gr_pilot_stock_events enable row level security;
 alter table public.gr_pilot_service enable row level security;
+alter table public.gr_pilot_material_events enable row level security;
 alter table public.gr_pilot_vendor_history enable row level security;
 create policy "pilot read products" on public.gr_pilot_products for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot read orders" on public.gr_pilot_orders for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot read events" on public.gr_pilot_events for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot read pos" on public.gr_pilot_pos for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot read stock" on public.gr_pilot_stock_events for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
+create policy "pilot read material" on public.gr_pilot_material_events for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot read service" on public.gr_pilot_service for select to authenticated using(public.gr_ops_allowed(company_id,'work_order','view'));
 create policy "pilot vendor audit read" on public.gr_pilot_vendor_history for select to authenticated using(public.gr_ops_allowed(company_id,'vendor','view'));
-grant select on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_vendor_history to authenticated;
-revoke all on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_vendor_history from anon;
-revoke insert,update,delete on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_vendor_history from authenticated;
+grant select on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_material_events,public.gr_pilot_vendor_history to authenticated;
+revoke all on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_material_events,public.gr_pilot_vendor_history from anon;
+revoke insert,update,delete on public.gr_pilot_products,public.gr_pilot_orders,public.gr_pilot_events,public.gr_pilot_pos,public.gr_pilot_stock_events,public.gr_pilot_service,public.gr_pilot_material_events,public.gr_pilot_vendor_history from authenticated;
 
 -- A database trigger forbids entering manual stock on pilot SKUs.
 -- Only the transactional stage posting RPC can set the scoped posting flag.
@@ -140,8 +153,8 @@ begin
  array_position(p_steps,'STOCK')<array_position(p_steps,'DISPATCH') and
  array_position(p_steps,'DISPATCH')<array_position(p_steps,'SERVICE')) then raise exception 'QC → Stock → Dispatch → Service ordering required';end if;
  if exists(select 1 from unnest(p_steps) v where v not in
- ('STOCK_CHECK','VENDOR_PO','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE')) then raise exception 'Invalid workflow step';end if;
- if 'JOBWORK'=any(p_steps) and not (p_steps @> array['ISSUE','RECEIVE','VENDOR_PO']::text[]) then raise exception 'Job work requires vendor PO, material issue, receipt';end if;
+ ('STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE')) then raise exception 'Invalid workflow step';end if;
+ if 'JOBWORK'=any(p_steps) and not (p_steps @> array['ISSUE','RECEIVE','VENDOR_PO','RM_RECEIPT']::text[]) then raise exception 'Job work requires vendor PO, material issue, receipt';end if;
  if 'RECEIVE'=any(p_steps) and array_position(p_steps,'RECEIVE')>array_position(p_steps,'QC') then raise exception 'Receive before QC';end if;
  v_id:=gen_random_uuid();v_product:=gen_random_uuid()::text;
  insert into public.gr_pilot_products(id,company_id,crm_product_id,sku,name,parts,steps,created_by)
@@ -217,9 +230,20 @@ begin
    v_po:='PILOT-PO-'||left(o.id::text,8);
    insert into public.gr_pilot_pos(company_id,order_id,vendor_id,number,created_by)
    values(o.company_id,o.id,v_vendor_id,v_po,auth.uid());
+ elsif v_step='RM_RECEIPT' then
+   v_issued:=(p_details->>'received_kg')::numeric(18,3);
+   if v_issued<=0 or v_issued>100000 then raise exception 'Enter positive raw-material quantity received (kg)';end if;
+   if not exists(select 1 from public.gr_pilot_pos where order_id=o.id) then raise exception 'Vendor PO is required';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'WAREHOUSE','RM_RECEIPT',v_issued);
  elsif v_step='ISSUE' then
    v_issued:=(p_details->>'issued')::numeric(18,3);
    if v_issued<=0 then raise exception 'Enter positive material issued kg';end if;
+   if v_issued>(select coalesce(sum(qty_change),0) from public.gr_pilot_material_events
+     where order_id=o.id and location='WAREHOUSE') then raise exception 'Cannot issue more RM than warehouse stock';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'WAREHOUSE','ISSUE',-v_issued),
+         (o.company_id,o.id,'VENDOR','ISSUE',v_issued);
  elsif v_step='JOBWORK' then
    v_issued:=(p_details->>'issued')::numeric(18,3);
    v_used:=(p_details->>'net_used')::numeric(18,3);
@@ -232,6 +256,17 @@ begin
    if not exists(select 1 from public.gr_pilot_events e where e.order_id=o.id and e.step='ISSUE'
       and (e.details->>'issued')::numeric(18,3)=v_issued)
    then raise exception 'Job work issued quantity must match issue challan';end if;
+   if (select coalesce(sum(qty_change),0) from public.gr_pilot_material_events where order_id=o.id and location='VENDOR')<v_used+v_scrap+v_returned
+   then raise exception 'Insufficient vendor-held raw material';end if;
+   insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+   values(o.company_id,o.id,'VENDOR','CONSUMED',-v_used),
+     (o.company_id,o.id,'VENDOR','SCRAP',-v_scrap);
+   if v_returned>0 then
+    insert into public.gr_pilot_material_events(company_id,order_id,location,movement,qty_change)
+    values(o.company_id,o.id,'VENDOR','RETURN',-v_returned),(o.company_id,o.id,'WAREHOUSE','RETURN',v_returned);
+   end if;
+   if (select coalesce(sum(qty_change),0) from public.gr_pilot_material_events where order_id=o.id and location='VENDOR')<>v_vendor
+   then raise exception 'Vendor balance must match material movements';end if;
  elsif v_step='RECEIVE' then
    v_received:=(p_details->>'accepted_qty')::int;
    if v_received<o.qty then raise exception 'Accepted goods must cover production quantity';end if;
@@ -286,7 +321,7 @@ with fresh as (
  insert into public.gr_pilot_products(company_id,crm_product_id,sku,name,parts,steps)
  values('grow-india','pilot-fg-home-40','PILOT-HOME-40','Home Composter 40L - Workflow Test',
  '[{"code":"PART-01","name":"Collection tab","qty":1,"uom":"nos"},{"code":"PART-02","name":"Lid/top cap","qty":1,"uom":"nos"},{"code":"PART-03","name":"Inner tray","qty":1,"uom":"nos"}]'::jsonb,
- array['STOCK_CHECK','VENDOR_PO','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'])
+ array['STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'])
  on conflict(company_id,sku) do nothing returning id,company_id,crm_product_id
 ),
 products as (
