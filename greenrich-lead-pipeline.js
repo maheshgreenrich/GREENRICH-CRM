@@ -231,42 +231,43 @@
    l.stage==='Qualified'?['Quotation','Lost']:
    l.stage==='Quotation'?['Won','Lost']:
    l.stage==='Lost'?['Contacted']:[];
-  if(!allowed.length){notify(ctx,'Won is complete. Reopening requires an authorized correction.');return}
-  const next=allowed.includes(to)?to:allowed[0];
-  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id);
-  const orderSelect='<label>Linked Sales Order (required for Won)<select name="order"><option value="">Select existing sales order</option>'+
-    orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
-  const firstMove=l.stage==='New';
+  if(!allowed.length){notify(ctx,'Won leads are closed. Ask Admin if a correction is needed.');return}
+  const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
+  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id&&o.payload?.status!=='Cancelled');
+  const orderSelect='<label>Issued Sales Order — required for Won<select name="order">'+
+    '<option value="">Choose customer-linked SO</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+
+      escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
   const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
-  const formChoices=firstMove?'<div class="gl-first-interests"><h4>Product & Tags — first stage update only</h4>'+
-   '<p class="gl-caption">Choose one or more approved products and tags when first contacting or qualifying this enquiry.</p>'+
-   '<fieldset><legend>Interested products</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
+  const firstFields=first?'<div class="gl-first-interests"><h4>Required when moving from New</h4>'+
+   '<fieldset><legend>Interested products *</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
      (p.record_id===l.product_id?'checked':'')+'>'+escape(p.payload?.name||p.record_id)+'</label>').join('')+'</fieldset>'+
-   '<fieldset><legend>Tags approved in Settings</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
+   '<fieldset><legend>Approved tags *</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
      ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
-  const body='<p class="gl-caption">'+escape(l.title)+' · Current: '+escape(l.stage)+'</p>'+
-   selectFld('Move to stage','stage',allowed.map(s=>[s,s]))+formChoices+noteFld()+
-   fld('Next follow-up date','due','date','',false)+orderSelect+
-   '<p class="gl-note">'+(l.stage==='New'?'First movement may be Contacted, Qualified, Quotation or Lost. Later forward movements follow the pipeline order.':
-   'Allowed next stages are listed above. For Won, link a customer and create their Sales Order first.')+'</p>';
+  const dateInput='<label>Next follow-up date and time *<input name="due" type="datetime-local" required value="'+
+    escape(l.next_followup_at?new Date(l.next_followup_at).toLocaleString('sv-SE',{timeZone:'Asia/Kolkata'}).replace(' ','T').slice(0,16):'')+'"></label>';
+  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
+   selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
+   firstFields+noteFld()+
+   selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+dateInput+orderSelect+
+   '<p class="gl-note">Won is allowed only after the customer-linked Sales Order has been issued. All other stages need a follow-up date and time.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
-   const stage=fd.get('stage');
-   if(stage==='Won'&&!l.customer_id)throw Error('Link this lead to a customer before Won.');
-   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
-     p_products:firstMove?fd.getAll('products'):[],p_tags:firstMove?fd.getAll('tags'):[],
-     p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
-   if(stage==='Won'&&!payload.p_order)throw Error('Select the linked Sales Order');
-   if(stage==='Quotation'&&!payload.p_due)throw Error('Choose quotation follow-up date');
-   const {error}=await ctx.db.rpc('gr_pipeline_move_with_interests',payload);
-   if(error)throw error;
+   const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
+   if(first&&(!products.length||!tags.length))throw Error('Select at least one product and tag before leaving New.');
+   if(stage==='Won'&&!l.customer_id)throw Error('Link or create the customer from their full details before marking Won.');
+   if(stage==='Won'&&!fd.get('order'))throw Error('Choose an issued customer-linked Sales Order.');
+   if(stage!=='Won'&&!fd.get('due'))throw Error('Next follow-up date and time required.');
+   const due=fd.get('due')?new Date(fd.get('due')).toISOString():null;
+   const {error}=await ctx.db.rpc('gr_pipeline_advance',{
+    p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+    p_products:products,p_tags:tags,p_order:stage==='Won'?fd.get('order'):null,
+    p_due_at:stage==='Won'?null:due,p_heat:fd.get('heat')
+   });if(error)throw error;
   });
-  const select=d.querySelector('select[name=stage]');select.value=next;
-  const controls=()=>{
-   const stage=select.value,due=d.querySelector('input[name=due]'),order=d.querySelector('select[name=order]');
-   due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation';
-   order.closest('label').hidden=stage!=='Won';order.required=stage==='Won';
-  };
-  select.onchange=controls;controls();
+  const stage=d.querySelector('[name=stage]');stage.value=next;
+  const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
+  const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
+   due.closest('label').hidden=won;due.required=!won;order.closest('label').hidden=!won;order.required=won;
+  };stage.onchange=controls;controls();
  }
  async function act(ctx,b){
   const action=b.dataset.glAction,l=getLead(ctx,b.dataset.id,b.dataset.company);
@@ -295,8 +296,8 @@
   }
   if(action==='assign'){
    const people=ctx.staff.filter(p=>p.company_id===l.company_id);
-   dialog(ctx,'Assign lead to employee',selectFld('Salesperson','person',people.map(p=>[p.id,p.full_name]))+noteFld(),async fd=>{
-    const {error}=await ctx.db.rpc('gr_pipeline_assign',{p_company:l.company_id,p_lead:l.lead_id,p_employee:fd.get('person'),p_note:fd.get('note')});if(error)throw error;
+   dialog(ctx,'Assign lead to employee',selectFld('Salesperson','person',[['','Common — any Sales user'],...people.map(p=>[p.id,p.full_name])])+noteFld(),async fd=>{
+    const {error}=await ctx.db.rpc('gr_pipeline_assign',{p_company:l.company_id,p_lead:l.lead_id,p_employee:fd.get('person')||null,p_note:fd.get('note')});if(error)throw error;
    });return;
   }
   if(action==='history'){
@@ -339,7 +340,7 @@
   if(action==='new'||action==='import'){
    const companies=ctx.companyIds,defaultCompany=ctx.filters.company!=='all'?ctx.filters.company:companies[0];
    const staff=ctx.staff.filter(p=>p.company_id===defaultCompany);
-   const assignee=selectFld('Assign to sales employee *','assignee',[['','Choose a salesperson'],...staff.map(p=>[p.id,p.full_name])]);
+   const assignee=selectFld('Assign to sales employee','assignee',[['','Common — all Sales users'],...staff.map(p=>[p.id,p.full_name])],false);
    const common=selectFld('Company *','company',companies.map(c=>[c,companyText(ctx,c)]))+assignee;
    if(action==='new'){
     const products=ctx.products.filter(p=>p.company_id===defaultCompany);
@@ -352,27 +353,27 @@
       '<label><input type="checkbox" name="tags" value="'+escape(t.id)+'">'+escape(t.name)+'</label>').join('')+'</fieldset>'+
      fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
-     if(!fd.get('assignee'))throw Error('A sales employee must be assigned before creating the lead');
-     const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee'),
+     if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can create Common leads. Select yourself.');
+     const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee')||null,
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
       p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
-    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
+    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
-    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Every imported row will be assigned to the selected salesperson. Import creates only New leads.</p>'+
+    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Admin may choose Common, otherwise select your Sales account. All imported records start in New.</p>'+
     '<label>Choose CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>',async fd=>{
       const file=fd.get('file');if(!file?.size)throw Error('Choose a CSV file');
       if(file.size>2000000)throw Error('CSV must be under 2 MB');
       const raw=await file.text(),rows=parseCSV(raw);if(rows.length>500)throw Error('Import a maximum of 500 leads per batch');
       const headers=rows.shift().map(x=>x.toLowerCase().trim()),titleIdx=headers.indexOf('title');
       if(titleIdx<0)throw Error('CSV must contain a title column');
-      if(!fd.get('assignee'))throw Error('Choose a salesperson before importing');
+      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can import into Common. Select yourself.');
       let success=0,errors=[];
       for(const cells of rows){if(!cells.some(x=>x.trim()))continue;const val=n=>cells[headers.indexOf(n)]||'';
        const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:val('title'),p_contact:val('contact'),
        p_assignee:fd.get('assignee'),p_source:(ctx.approvedSources.find(s=>matchesApproved(s.name,val('source')))?.name||''),p_product:(ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===val('product_id'))?val('product_id'):null),p_value:val('value')||0,p_mobile:val('mobile'),
-       p_email:val('email'),p_tags:val('tags').split(';').filter(Boolean),p_note:val('notes')});
+       p_email:val('email'),p_tags:val('tags').split(';').map(x=>x.trim()).filter(id=>ctx.approvedTags.some(t=>t.id===id||t.name.toLowerCase()===id.toLowerCase())).map(id=>ctx.approvedTags.find(t=>t.id===id||t.name.toLowerCase()===id.toLowerCase()).id),p_note:val('notes')});
        if(error){errors.push(error.message);if(errors.length>15)break}else success++;
       }
       notify(ctx,'Imported '+success+' leads'+(errors.length?'; '+errors.length+' errors. First: '+errors[0]:''));
