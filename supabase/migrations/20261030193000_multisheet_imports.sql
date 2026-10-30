@@ -309,7 +309,7 @@ end $$;
 -- Report source-specific Google permission errors without exposing integration secrets.
 create or replace function public.gr_sheet_sync_report_error(p_token text,p_connection uuid,p_error text)
 returns void language plpgsql security definer set search_path=''
-as $
+as $report$
 declare v_admin uuid;
 begin
  v_admin:=public.gr_sheet_token_admin(p_token);
@@ -318,7 +318,7 @@ begin
  where c.id=p_connection and c.created_by=v_admin and c.enabled
  and exists(select 1 from public.gr_profiles p where p.id=v_admin and c.company_id=any(p.company_ids));
  if not found then raise exception 'Source not authorized';end if;
-end $;
+end $report$;
 revoke all on function public.gr_sheet_sync_report_error(text,uuid,text) from public,anon,authenticated;
 grant execute on function public.gr_sheet_sync_report_error(text,uuid,text) to anon,authenticated;
 
