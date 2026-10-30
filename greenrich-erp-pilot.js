@@ -54,6 +54,9 @@ window.GreenRichPilot=(function(){
   const res=await Promise.all(q);
   const err=res.find(r=>r.error)?.error;if(err)throw err;
   [ctx.products,ctx.orders,ctx.events,ctx.pos,ctx.stock,ctx.service,ctx.materials,ctx.vendors]=res.map(r=>r.data||[]);
+  // Keep the unfinished practice SO first; completed system example is selectable.
+  ctx.orders.sort((a,b)=>Number(a.status==='COMPLETED')-Number(b.status==='COMPLETED')||
+    new Date(b.created_at).getTime()-new Date(a.created_at).getTime());
   if(!ctx.products.some(p=>p.id===ctx.pid))ctx.pid=ctx.products[0]?.id;
   if(!ctx.orders.some(o=>o.id===ctx.oid))ctx.oid=ctx.orders.find(o=>o.product_id===ctx.pid)?.id;
  }
@@ -68,6 +71,7 @@ window.GreenRichPilot=(function(){
   const o=orders.find(o=>o.id===ctx.oid)||orders[0];if(p)ctx.pid=p.id;if(o)ctx.oid=o.id;
   const po=ctx.pos.find(x=>x.order_id===o?.id);
   const movements=ctx.materials.filter(x=>x.order_id===o?.id);
+  const fgMovements=ctx.stock.filter(x=>x.order_id===o?.id);
   const ware=movements.filter(x=>x.location==='WAREHOUSE').reduce((v,x)=>v+Number(x.qty_change),0);
   const ven=movements.filter(x=>x.location==='VENDOR').reduce((v,x)=>v+Number(x.qty_change),0);
   const events=ctx.events.filter(e=>e.order_id===o?.id);
@@ -186,7 +190,7 @@ window.GreenRichPilot=(function(){
  }
  async function mount(root,{client,companies,selection,canEdit}){
   root.innerHTML='<p>Loading connected ERP pilot from Supabase…</p>';
-  const ctx={root,db:client,companies,company:selection||'all',canEdit,products:[],orders:[],events:[],pos:[],stock:[],service:[],materials:[],vendors:[],pid:null,oid:null,vendorId:null};
+  const ctx={root,db:client,companies,company:selection||'all',canEdit,products:[],orders:[],events:[],pos:[],stock:[],service:[],materials:[],vendors:[],pid:null,oid:null,vendorId:'vendor-sivaji-enterprises'};
   try{await reload(ctx);if(root._pilotChannel)await client.removeChannel(root._pilotChannel);
    const channel=client.channel('gr-pilot-'+Math.random().toString(36).slice(2))
    .on('postgres_changes',{event:'*',schema:'public',table:'gr_pilot_orders'},()=>void reload(ctx).catch(()=>{}))
