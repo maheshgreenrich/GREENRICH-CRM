@@ -165,7 +165,7 @@
     ['Follow-ups today',todayDue],['Overdue follow-ups',overdue],
     ['Won sales orders',wins.filter(l=>l.won_order_id).length],
     ['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
-  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
+  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import Leads Excel / CSV','import')+
     (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
     button('Won sales history','history')+(ctx.admin?button('Sheet Integrations / Duplicates','metasync'):'')+'</div></div>'+
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
@@ -362,21 +362,41 @@
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
     '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Admin may choose Common, otherwise select your Sales account. All imported records start in New.</p>'+
-    '<label>Choose CSV file<input type="file" name="file" accept=".csv,text/csv" required></label>',async fd=>{
-      const file=fd.get('file');if(!file?.size)throw Error('Choose a CSV file');
-      if(file.size>2000000)throw Error('CSV must be under 2 MB');
-      const raw=await file.text(),rows=parseCSV(raw);if(rows.length>500)throw Error('Import a maximum of 500 leads per batch');
-      const headers=rows.shift().map(x=>x.toLowerCase().trim()),titleIdx=headers.indexOf('title');
-      if(titleIdx<0)throw Error('CSV must contain a title column');
-      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can import into Common. Select yourself.');
-      let success=0,errors=[];
-      for(const cells of rows){if(!cells.some(x=>x.trim()))continue;const val=n=>cells[headers.indexOf(n)]||'';
-       const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:val('title'),p_contact:val('contact'),
-       p_assignee:fd.get('assignee'),p_source:(ctx.approvedSources.find(s=>matchesApproved(s.name,val('source')))?.name||''),p_product:(ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===val('product_id'))?val('product_id'):null),p_value:val('value')||0,p_mobile:val('mobile'),
-       p_email:val('email'),p_tags:val('tags').split(';').map(x=>x.trim()).filter(id=>ctx.approvedTags.some(t=>t.id===id||t.name.toLowerCase()===id.toLowerCase())).map(id=>ctx.approvedTags.find(t=>t.id===id||t.name.toLowerCase()===id.toLowerCase()).id),p_note:val('notes')});
-       if(error){errors.push(error.message);if(errors.length>15)break}else success++;
+    '<label>Choose Excel or CSV file<input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required></label>',async fd=>{
+      const file=fd.get('file');if(!file?.size)throw Error('Choose an Excel or CSV file');
+      if(file.size>3000000)throw Error('Import file must be below 3 MB');
+      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can import Common leads. Select your Sales login.');
+      let items=[];
+      if(/\.(xlsx|xls)$/i.test(file.name)){
+       if(!window.GreenRichContacts?.readSheet)throw Error('Excel importer unavailable. Refresh GreenRich ONE.');
+       const parsed=await window.GreenRichContacts.readSheet(file);
+       items=parsed.map(p=>({
+        title:p.title||p.products||p.enquiry_details||p.name||'Excel enquiry',
+        contact:p.name||p.contact||'',mobile:p.mobile||'',email:p.email||'',
+        source:p.source||'',product_id:p.product_id||'',value:p.value||'0',
+        tags:p.tags||'',notes:[p.notes,p.enquiry_details,p.company,p.address1,p.city].filter(Boolean).join(' | ')
+       }));
+      }else{
+       const raw=await file.text(),lines=parseCSV(raw),headers=(lines.shift()||[]).map(x=>x.toLowerCase().trim());
+       if(!headers.includes('title'))throw Error('CSV requires a title column');
+       items=lines.filter(x=>x.some(v=>v.trim())).map(cells=>Object.fromEntries(headers.map((h,i)=>[h,cells[i]||''])));
       }
-      notify(ctx,'Imported '+success+' leads'+(errors.length?'; '+errors.length+' errors. First: '+errors[0]:''));
+      if(items.length>500)throw Error('Import a maximum of 500 leads');
+      let success=0,errors=[];
+      for(const lead of items){
+       const approved=ctx.approvedSources.find(src=>matchesApproved(src.name,lead.source))?.name||'';
+       const product=ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===lead.product_id)?lead.product_id:null;
+       const ids=String(lead.tags||'').split(/[;,]/).map(t=>t.trim()).filter(Boolean).map(t=>
+         ctx.approvedTags.find(tag=>tag.id===t||tag.name.toLowerCase()===t.toLowerCase())?.id).filter(Boolean);
+       const {error}=await ctx.db.rpc('gr_pipeline_create',{
+        p_company:fd.get('company'),p_title:lead.title||'Imported lead',p_contact:lead.contact||'',
+        p_assignee:fd.get('assignee')||null,p_source:approved,p_product:product,
+        p_value:Number(lead.value)||0,p_mobile:lead.mobile||'',p_email:lead.email||'',
+        p_tags:ids,p_note:lead.notes||'Imported using CRM spreadsheet importer'
+       });
+       if(error){errors.push(error.message);if(errors.length>=15)break}else success++;
+      }
+      notify(ctx,'Imported '+success+' enquiries'+(errors.length?'; '+errors.length+' rejected. First: '+errors[0]:''));
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]');comp.value=defaultCompany;
     comp.onchange=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId};comp.onchange();return;
   }
