@@ -251,7 +251,7 @@ begin
  next_followup=case when p_stage='Quotation' then p_due when v.stage='Quotation' then null else next_followup end,
  updated_at=now()
  where company_id=p_company and lead_id=p_lead;
- update public.gr_crm_records set payload=jsonb_set(jsonb_set(payload,'{stage}',to_jsonb(p_stage)),'{won_order_id}',to_jsonb(p_order)),
+ update public.gr_crm_records set payload=jsonb_set(jsonb_set(payload,'{stage}',to_jsonb(p_stage)),'{won_order_id}',coalesce(to_jsonb(p_order),'null'::jsonb)),
  updated_at=now() where company_id=p_company and kind='leads' and record_id=p_lead;
  insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
  values(p_company,p_lead,auth.uid(),'STAGE_CHANGED',v.stage,p_stage,btrim(p_note));
