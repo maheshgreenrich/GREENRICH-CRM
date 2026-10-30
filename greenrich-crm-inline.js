@@ -843,7 +843,8 @@ window.GreenRichCRM={
   $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
   bind();
   if(!window.GreenRichContacts)throw Error('Contact manager module missing. Refresh the page.');
-  window.GreenRichContacts.mount($('#gr-contact-management'),{db:client,customers:()=>data.customers,tags:()=>data.tags,leads:()=>scopeRows('leads'),companyIds:permittedCompanies,selectedCompany:()=>companyScope,companyLabel,notify:toast,
+  window.GreenRichContacts.mount($('#gr-contact-management'),{db:client,customers:()=>data.customers,tags:()=>data.tags,leads:()=>scopeRows('leads'),
+    products:()=>scopeRows('products').map(p=>({...p,company_id:p.company_id||p._companyId})),companyIds:permittedCompanies,selectedCompany:()=>companyScope,companyLabel,notify:toast,
     openProfile:id=>openCustomerProfile(id),
     afterCustomerSave:()=>{attachSharedCustomers(data);render()},
     permission:(kind,action)=>Boolean(isAdmin||contactCapabilities[kind]?.[action])

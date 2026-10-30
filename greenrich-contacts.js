@@ -22,13 +22,14 @@
  const stages=['New','Contacted','Qualified','Quotation','Won','Lost'];
  const FILE_TYPES=['.xlsx','.xls','.csv'];
  const headerMap=new Map(FIELDS.flatMap(([key,label])=>[[key.toLowerCase(),key],[label.toLowerCase(),key]]));
- let root=null,db=null,context=null,sources=[],mode='all',search='',tag='all',source='all',start='',end='',countLimit=1000,busy=false;
- let exportSheetPromise=null;
+ let root=null,db=null,context=null,sources=[],mode='all',search='',tag=[],source=[],product=[],start='',end='',countLimit=1000,busy=false;
+ let exportSheetPromise=null,lastCompanyScope='';
  const notify=s=>{const t=root?.querySelector('#gr-contact-status');if(t){t.hidden=false;t.textContent=s}context?.notify?.(s)};
  const opts=(rows,current='',all='')=>(all?'<option value="all">'+esc(all)+'</option>':'')+rows.map(([v,label])=>'<option value="'+esc(v)+'" '+(String(current)===String(v)?' selected':'')+'>'+esc(label)+'</option>').join('');
  const tags=()=>context?.tags?.()||[];
  const customers=()=>context?.customers?.()||[];
  const leads=()=>context?.leads?.()||[];
+ const products=()=>context?.products?.()||[];
  const tagNames=r=>(r.tag_ids||[]).map(id=>tags().find(t=>t.id===id)?.name).filter(Boolean);
  const companyLabel=id=>context?.companyLabel?.(id)||id;
  const mark=kind=>'<span class="gr-contact-kind '+kind+'">'+(kind==='lead'?'Lead':'Customer')+'</span>';
@@ -41,8 +42,11 @@
   const term=search.toLowerCase();
   return allRecords().filter(row=>{
    if(mode!=='all'&&row._kind!==mode)return false;
-   if(source!=='all'&&row.source!==source)return false;
-   if(tag!=='all'&&!(row.tag_ids||[]).includes(tag))return false;
+   if(source.length&&!source.some(x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'')===String(row.source||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'')))return false;
+   if(tag.length&&!tag.some(x=>(row.tag_ids||[]).includes(x)))return false;
+   if(product.length&&!product.some(id=>row.product_id===id||
+      (row.product_interest_ids||[]).includes(id)||
+      products().some(p=>p.id===id&&String(row.products||'').toLowerCase().includes(String(p.name||'').toLowerCase()))))return false;
    const created=safeDate(row.created_at||row.date);
    if(start&&(!created||created<start))return false;
    if(end&&(!created||created>end))return false;
@@ -62,13 +66,19 @@
  }
  function renderFilters(){
   if(!root)return;
-  for(const [id,choices,label,current] of [
-   ['#gr-contact-source',[...new Set([...sources.map(x=>x.name),...allRecords().map(x=>x.source)].filter(Boolean))].sort().map(s=>[s,s]),'All sources',source],
-   ['#gr-contact-tag',tags().map(t=>[t.id,t.name]),'All tags',tag]
+  for(const [id,options,selected] of [
+   ['gr-contact-source-options',sources.filter(x=>x.active).map(x=>[x.name,x.name]),source],
+   ['gr-contact-tag-options',tags().map(t=>[t.id,t.name]),tag],
+   ['gr-contact-product-options',products().filter(p=>{
+      const scope=context.selectedCompany();return (scope==='all'||p.company_id===scope)&&p.active!==false
+    }).map(p=>[p.id,p.name||p.id]),product]
   ]){
-   const el=root.querySelector(id);if(!el)continue;
-   el.innerHTML=opts(choices,current,label);
-   el.value=[...el.options].some(o=>o.value===current)?current:'all';
+   const el=root.querySelector('#'+id);if(!el)continue;
+   el.innerHTML=options.map(([value,label])=>'<label><input type="checkbox" data-contact-multi="'+(id.includes('source')?'source':id.includes('product')?'product':'tag')+
+    '" value="'+esc(value)+'" '+(selected.includes(value)?'checked':'')+'>'+esc(label)+'</label>').join('')||
+    '<small>No approved options. Configure them in Settings.</small>';
+   const summary=el.closest('details')?.querySelector('summary');if(summary)summary.textContent=
+     (id.includes('source')?'Approved sources':id.includes('product')?'Company products':'Approved tags')+(selected.length?' ('+selected.length+')':'');
   }
  }
  function draw(){
@@ -85,7 +95,8 @@
    const actions='<button type="button" data-contact-edit="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!edit?'disabled':'')+'>Edit</button>'+
     '<button type="button" data-contact-delete="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!remove?'disabled':'')+'>Delete</button>';
    return '<tr><td>'+mark(r._kind)+'</td>'+
-    '<td>'+(r._kind==='customer'?'<button type="button" data-contact-profile="'+id+'" class="gr-contact-link">'+esc(r.name||'—')+'</button>':'<strong>'+esc(r.name||r.contact||r.title||'—')+'</strong>')+
+    '<td>'+(r._kind==='customer'?'<button type="button" data-contact-profile="'+id+'" class="gr-contact-link">'+esc(r.name||'—')+'</button>':
+      '<button type="button" data-contact-lead-profile="'+id+'" data-contact-company="'+owner+'" class="gr-contact-link">'+esc(r.name||r.contact||r.title||'—')+'</button>')+
     '<small>'+esc(r.company||'')+'</small></td>'+
     '<td>'+esc(phone(r.mobile)||r.mobile||'—')+'<small>'+esc(phone(r.mobile2)||r.mobile2||'')+'</small></td>'+
     '<td>'+esc(r.email||'—')+'</td><td>'+esc(r.source||'—')+'</td>'+
@@ -98,6 +109,8 @@
  }
  function render(){
   if(!root)return;
+  const scope=context?.selectedCompany?.()||'all';
+  if(lastCompanyScope!==scope){product=[];lastCompanyScope=scope}
   const kind=root.querySelector('#gr-contact-kind');if(kind)kind.value=mode;
   const q=root.querySelector('#gr-contact-search');if(q&&q.value!==search)q.value=search;
   draw();
@@ -129,7 +142,7 @@
    field('email','Email',false,null,record.email),
    field('company','Company name',false,null,record.company),
    field('type','Customer type',false,types.map(x=>[x,x]),record.type||'Individual'),
-   field('source','Customer source',false,[[ '', 'Select source'], ...[...new Set([...sources.map(x=>x.name),record.source].filter(Boolean))].map(s=>[s,s])],record.source||''),
+   field('source','Customer source',false,[[ '', 'Select source'], ...sources.filter(x=>x.active).map(s=>[s.name,s.name])],record.source||''),
    '<fieldset class="gr-contact-tags"><legend>Tags</legend>'+(tags().length?tags().map(t=>'<label><input type="checkbox" name="tag_ids" value="'+esc(t.id)+'" '+((record.tag_ids||[]).includes(t.id)?'checked':'')+'><span>'+esc(t.name)+'</span></label>').join(''):'<p>Admin can add tags in Settings → Customer Tags.</p>')+'</fieldset>',
    ...(kind==='lead'?[
     field('company_id','GreenRich company',true,[['','Select company'],...context.companyIds.map(c=>[c,companyLabel(c)])],owner||(context.selectedCompany()==='all'?'':context.selectedCompany())),
@@ -345,7 +358,7 @@
   finally{if(btn)btn.disabled=false;const pick=root.querySelector('#gr-contact-file');if(pick)pick.value=''}
  }
  function markup(){
-  return '<div class="gr-contact-manager"><div class="gr-contact-top"><div><span>CONTACT MANAGEMENT</span><h2>Customers & Leads</h2><p>One searchable directory · shared customers and company-scoped enquiries</p></div>'+
+  return '<style>.gr-contact-multi{position:relative;min-width:180px;align-self:end}.gr-contact-multi summary{cursor:pointer;background:#fff;border:1px solid #d2e0f0;border-radius:8px;padding:13px;font-size:13px;color:#315378}.gr-contact-multi>div{position:absolute;z-index:25;top:100%;left:0;background:#fff;border:1px solid #d2e0f0;border-radius:8px;padding:10px;min-width:195px;max-height:230px;overflow:auto;box-shadow:0 8px 20px #142f5027}.gr-contact-multi label{display:flex;flex-direction:row!important;gap:7px;align-items:center;font-size:13px;padding:4px}.gr-contact-multi input{width:15px;height:15px}</style><div class="gr-contact-manager"><div class="gr-contact-top"><div><span>CONTACT MANAGEMENT</span><h2>Customers & Leads</h2><p>One searchable directory · shared customers and company-scoped enquiries</p></div>'+
    '<div class="gr-contact-add">'+
    '<button class="gr-contact-primary" type="button" data-contact-add="customer">+ Add Customer</button>'+
    '<button class="gr-contact-primary alt" type="button" data-contact-add="lead">+ Add Lead (Pipeline)</button></div></div>'+
@@ -357,8 +370,9 @@
    '<button type="button" data-contact-template="lead">Lead Excel Template</button></div>'+
    '<div class="gr-contact-filters"><label>Search<input id="gr-contact-search" placeholder="Name, mobile, email, company, enquiry…" type="search"></label>'+
    '<label>Record type<select id="gr-contact-kind">'+opts([['all','Customers + leads'],['customer','Customers only'],['lead','Leads only']],mode)+'</select></label>'+
-   '<label>Source<select id="gr-contact-source"><option value="all">All sources</option></select></label>'+
-   '<label>Tags<select id="gr-contact-tag"><option value="all">All tags</option></select></label>'+
+   '<details class="gr-contact-multi"><summary>Approved sources</summary><div id="gr-contact-source-options"></div></details>'+
+   '<details class="gr-contact-multi"><summary>Approved tags</summary><div id="gr-contact-tag-options"></div></details>'+
+   '<details class="gr-contact-multi"><summary>Company products</summary><div id="gr-contact-product-options"></div></details>'+
    '<label>From date<input type="date" id="gr-contact-from"></label>'+
    '<label>To date<input type="date" id="gr-contact-to"></label>'+
    '<button type="button" id="gr-contact-clear">Reset filters</button></div>'+
@@ -379,14 +393,23 @@
    if(btn.dataset.contactEdit){openForm(btn.dataset.contactKind,btn.dataset.contactEdit,btn.dataset.contactCompany);return}
    if(btn.dataset.contactDelete){if(btn.dataset.contactKind==='lead')return notify('Lead deletion is disabled; move the lead to Lost in the pipeline.');await removeRecord(btn.dataset.contactKind,btn.dataset.contactDelete,btn.dataset.contactCompany);return}
    if(btn.dataset.contactProfile){context.openProfile(btn.dataset.contactProfile);return}
+   if(btn.dataset.contactLeadProfile){await window.GreenRichLeadProfile.open({
+     db,company:btn.dataset.contactCompany,leadId:btn.dataset.contactLeadProfile
+   });return}
    if(btn.dataset.contactClose!==undefined){container.querySelector('#gr-contact-dialog').close();return}
    if(btn.dataset.contactImport){if(btn.dataset.contactImport==='lead'){window.GreenRichCRM?.switchPage?.('leads');window.GreenRichShell?.setPageWithoutRemount?.('leads');notify('Import leads in the pipeline after selecting a salesperson.');return;}const file=container.querySelector('#gr-contact-file');file.dataset.kind=btn.dataset.contactImport;file.click();return}
    if(btn.dataset.contactExport){if(!context.permission(btn.dataset.contactExport,'export'))return notify('You do not have export permission.');try{await excelReady();download('greenrich-'+btn.dataset.contactExport+'-'+today(),visibleRecords().filter(r=>r._kind===btn.dataset.contactExport))}catch(e){notify(e.message)}return}
    if(btn.dataset.contactTemplate){try{await excelReady();const example=btn.dataset.contactTemplate==='lead'?{_kind:'lead',name:'Example Lead',mobile:'+919876543210',mobile2:'+919123456780',email:'example@example.com',company:'Sample Business',type:'Retailer',source:'Website',products:'Composter',enquiry_details:'Interested in quote',address1:'Sample address',city:'Coimbatore',state:'Tamil Nadu',pincode:'641001',title:'Composter enquiry',stage:'New',company_id:context.companyIds[0],notes:'Replace or delete sample row'}:{_kind:'customer',name:'Example Customer',mobile:'+919876543210',mobile2:'+919123456780',email:'example@example.com',company:'Sample Business',type:'Business',source:'Direct',address1:'Sample address',city:'Coimbatore',state:'Tamil Nadu',pincode:'641001',notes:'Replace or delete sample row'};download('greenrich-'+btn.dataset.contactTemplate+'-template',[example])}catch(e){notify(e.message)}return}
-   if(btn.id==='gr-contact-clear'){mode='all';search='';source='all';tag='all';start='';end='';for(const id of ['#gr-contact-from','#gr-contact-to'])root.querySelector(id).value='';render()}
+   if(btn.id==='gr-contact-clear'){mode='all';search='';source=[];tag=[];product=[];start='';end='';for(const id of ['#gr-contact-from','#gr-contact-to'])root.querySelector(id).value='';render()}
   });
   const file=container.querySelector('#gr-contact-file');file.onchange=()=>{if(file.files?.[0])void importFile(file.dataset.kind,file.files[0])};
-  for(const [key,id] of [['mode','gr-contact-kind'],['source','gr-contact-source'],['tag','gr-contact-tag'],['start','gr-contact-from'],['end','gr-contact-to'],['search','gr-contact-search']]){
+  container.addEventListener('change',event=>{
+   const el=event.target.closest('[data-contact-multi]');if(!el)return;
+   const kind=el.dataset.contactMulti;
+   const values=[...container.querySelectorAll('[data-contact-multi="'+kind+'"]:checked')].map(x=>x.value);
+   if(kind==='source')source=values;else if(kind==='tag')tag=values;else product=values;draw();
+  });
+  for(const [key,id] of [['mode','gr-contact-kind'],['start','gr-contact-from'],['end','gr-contact-to'],['search','gr-contact-search']]){
    const input=container.querySelector('#'+id);
    input.addEventListener(id==='gr-contact-search'?'input':'change',()=>{if(key==='mode')mode=input.value;else if(key==='source')source=input.value;else if(key==='tag')tag=input.value;else if(key==='start')start=input.value;else if(key==='end')end=input.value;else search=input.value;draw()});
   }

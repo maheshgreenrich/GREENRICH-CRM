@@ -30,7 +30,17 @@
  .gl-card-line{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin:7px 0}
  .gl-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
  .gl-card button{border:1px solid #d9e3f1;background:white;color:#265193}
- .gl-card button:focus-visible,.gl-row button:focus-visible{outline:3px solid #87aefa}
+ .gl-card .gl-name-link{border:0!important;padding:0!important;background:transparent!important;text-align:left;font-weight:700;font-size:14px!important;color:#17365e!important;cursor:pointer}
+ .gl-card .gl-card-actions a{font-size:12px;border:1px solid #d9e3f1;padding:8px 10px;text-decoration:none;color:#265193;border-radius:7px;background:#fff}
+ .gl-multi{position:relative;min-width:137px;align-self:flex-end;font-size:12px}
+ .gl-multi summary{height:36px;padding:8px 10px;background:#fff;border:1px solid #d3e0ef;border-radius:8px;cursor:pointer;list-style:none}
+ .gl-multi summary:after{content:' ▾';float:right}.gl-multi-options{position:absolute;z-index:20;top:37px;left:0;width:max(190px,100%);max-height:220px;overflow:auto;background:white;border:1px solid #c7d9eb;border-radius:9px;box-shadow:0 9px 25px #142f5030;padding:9px}
+ .gl-multi-options label{display:flex;flex-direction:row;align-items:center;gap:8px;padding:5px 2px}
+ .gl-multi-options input{width:15px;height:15px;min-width:15px}
+ .gl-first-interests fieldset{border:1px solid #dbe5f1;border-radius:8px;margin:9px 0;padding:11px;max-height:180px;overflow:auto}
+ .gl-first-interests fieldset label{display:inline-flex;margin:4px 10px 4px 0;flex-direction:row;align-items:center;gap:6px}
+ .gl-first-interests input{width:16px!important;height:16px!important}
+  .gl-card button:focus-visible,.gl-row button:focus-visible{outline:3px solid #87aefa}
  .gl-note{padding:13px;border-radius:10px;background:#fff7e8;border:1px solid #efd9a6;color:#805b18;font-size:13px}
  .gl-dialog{border:1px solid #cfdbed;border-radius:14px;box-shadow:0 15px 60px #15355935;padding:23px;max-width:min(590px,94vw);max-height:90vh;overflow:auto}
  .gl-dialog::backdrop{background:#112f5280}.gl-dialog h3{margin:0 0 10px;font-size:19px}
@@ -48,17 +58,33 @@
  }
  async function query(ctx){
   const cs=ctx.companyIds;
-  const [leads,staff,orders,customers,products]=await Promise.all([
+  const [leads,staff,orders,customers,products,sources,tags]=await Promise.all([
    allRows(ctx.db,'gr_lead_pipeline','*',q=>q.in('company_id',cs)),
    Promise.all(cs.map(async co=>{const {data,error}=await ctx.db.rpc('gr_pipeline_staff',{p_company:co});if(error)throw error;return (data||[]).map(p=>({...p,company_id:co}))})),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','sales').limit(1000),
    ctx.db.from('gr_crm_customers').select('id,name,mobile').order('name').limit(1000),
-   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000)
+   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000),
+   ctx.db.from('gr_crm_sources').select('id,name,active').eq('active',true).order('name'),
+   ctx.db.from('gr_crm_tags').select('id,name').order('name')
   ]);
-  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;
-  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];
+  if(orders.error)throw orders.error;if(customers.error)throw customers.error;if(products.error)throw products.error;if(sources.error)throw sources.error;if(tags.error)throw tags.error;
+  ctx.leads=leads;ctx.staff=staff.flat();ctx.orders=orders.data||[];ctx.customers=customers.data||[];ctx.products=products.data||[];ctx.approvedSources=sources.data||[];ctx.approvedTags=tags.data||[];
   ctx.canViewTeam=ctx.staff.some(p=>p.id!==ctx.userId&&p.manager_id===ctx.userId)||ctx.admin||ctx.scope==='all'||ctx.scope==='team';
  }
+ const normalizedSource=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'').replace(/ads$/,'');
+ const matchesApproved=(s,approved)=>normalizedSource(s)===normalizedSource(approved);
+ const choiceMulti=(key,items,selected,label)=>'<details class="gl-multi"><summary>'+escape(label)+
+   (selected?.length?' ('+selected.length+')':'')+'</summary><div class="gl-multi-options">'+
+   (items.length?items.map(([value,caption])=>'<label><input type="checkbox" data-gl-multi="'+escape(key)+'" value="'+escape(value)+'" '+
+     (selected?.includes(value)?'checked':'')+'>'+escape(caption)+'</label>').join(''):'<small>No approved choices</small>')+
+   '</div></details>';
+ const leadLink=(l,caption)=>'<button type="button" class="gl-name-link" data-gl-action="profile" data-id="'+escape(l.lead_id)+
+   '" data-company="'+escape(l.company_id)+'">'+escape(caption||l.contact||l.title)+'</button>';
+ const contactButtons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
+  return (digits.length>=10?'<a title="Call" href="tel:'+escape(m)+'">☎ Call</a>':'')+
+   (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<a title="Email" href="mailto:'+escape(l.email)+'">✉ Email</a>':'')+
+   (digits.length>=10&&digits.length<=15?'<a title="WhatsApp" rel="noopener noreferrer" target="_blank" href="https://wa.me/'+digits+'">WhatsApp</a>':'');
+ };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
  const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Unassigned':'Employee');
  const labelProduct=(ctx,lead)=>ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name||lead.product_id||'—';
@@ -69,26 +95,27 @@
   return (f.company==='all'||l.company_id===f.company)&&
    (f.person==='all'||l.assigned_to===f.person)&&
    (fromTime===null||timestamp>=fromTime)&&(toTime===null||timestamp<=toTime)&&
-   (!f.product||l.product_id===f.product)&&
-   (!f.source||l.source===f.source)&&(!f.tag||l.tag_ids?.includes(f.tag))&&
+   (!f.product?.length||f.product.includes(l.product_id))&&
+   (!f.source?.length||f.source.some(label=>matchesApproved(l.source,label)))&&
+   (!f.tag?.length||f.tag.some(id=>l.tag_ids?.includes(id)))&&
    (!f.search||[l.title,l.contact,l.mobile,l.email,l.source,name(ctx,l.assigned_to)].join(' ').toLowerCase().includes(f.search.toLowerCase()));
  });
  const choices=(array,current)=>array.map(([v,t])=>'<option value="'+escape(v)+'" '+(v===current?'selected':'')+'>'+escape(t)+'</option>').join('');
  const button=(label,action,attrs='')=>'<button type="button" data-gl-action="'+escape(action)+'" '+attrs+'>'+escape(label)+'</button>';
  function buildFilters(ctx){
-  const f=ctx.filters,persons=[...new Map(ctx.staff.map(p=>[p.id,p])).values()],owners=ctx.canViewTeam?persons:[];
-  const products=[...new Map(ctx.products.map(p=>[p.record_id,p])).values()].filter(p=>ctx.leads.some(l=>l.product_id===p.record_id));
-  const sources=[...new Set(ctx.leads.map(l=>l.source).filter(Boolean))].sort();
-  const tags=[...new Set(ctx.leads.flatMap(l=>l.tag_ids||[]))].sort();
+  const f=ctx.filters,people=[...new Map(ctx.staff.map(p=>[p.id,p])).values()];
+  const currentCompany=f.company;
+  const products=ctx.products.filter(p=>(currentCompany==='all'||p.company_id===currentCompany)&&p.payload?.active!==false);
+  const uniqueProducts=[...new Map(products.map(p=>[p.record_id,p])).values()];
   return '<div class="gl-row" aria-label="Lead filters">'+
    '<label>From date & time<input type="datetime-local" data-gl-filter="from" value="'+escape(f.from)+'"></label>'+
    '<label>To date & time<input type="datetime-local" data-gl-filter="to" value="'+escape(f.to)+'"></label>'+
    '<label>Company<select data-gl-filter="company">'+choices([['all','All assigned companies'],...ctx.companyIds.map(id=>[id,companyText(ctx,id)])],f.company)+'</select></label>'+
-   '<label>Product<select data-gl-filter="product">'+choices([['','All products'],...products.map(p=>[p.record_id,p.payload?.name||p.record_id])],f.product)+'</select></label>'+
-   '<label>Source<select data-gl-filter="source">'+choices([['','All sources'],...sources.map(s=>[s,s])],f.source)+'</select></label>'+
-   '<label>Tags<select data-gl-filter="tag">'+choices([['','All tags'],...tags.map(t=>[t,t])],f.tag)+'</select></label>'+
-   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All visible salespeople'],...owners.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
-   '<label>Search<input data-gl-filter="search" placeholder="Name, phone, email…" value="'+escape(f.search)+'"></label>'+
+   choiceMulti('product',uniqueProducts.map(p=>[p.record_id,p.payload?.name||p.record_id]),f.product,'All products')+
+   choiceMulti('source',ctx.approvedSources.map(x=>[x.name,x.name]),f.source,'Approved sources')+
+   choiceMulti('tag',ctx.approvedTags.map(x=>[x.id,x.name]),f.tag,'Approved tags')+
+   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
+   '<label>Search<input data-gl-filter="search" placeholder="Name, mobile, email…" value="'+escape(f.search)+'"></label>'+
    '</div>';
  }
  const showMessage=(ctx,e)=>notify(ctx,e?.message||String(e));
@@ -103,21 +130,31 @@
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
-    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"><strong>'+escape(l.title)+'</strong><p>'+escape(l.contact||l.mobile||'No contact recorded')+'</p>'+
+    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+leadLink(l,l.contact||l.title)+
+     '<div class="gl-card-line"><span>Mobile</span><span>'+escape(l.mobile||'—')+'</span></div>'+
+     '<div class="gl-card-line"><span>Email</span><span>'+escape(l.email||'—')+'</span></div>'+
+     '<div class="gl-card-line"><span>Product enquiry</span><span>'+escape(labelProduct(ctx,l))+'</span></div>'+
      (l.import_duplicate_type&&l.import_duplicate_type!=='none'?'<div class="gl-card-line" style="background:#fff4df;padding:6px;border-radius:6px;color:#8a5611"><b>Possible duplicate '+escape(l.import_duplicate_type)+(l.import_duplicate_review==='pending'?' · Review pending':' · '+escape(l.import_duplicate_review))+'</b></div>':'')+
      '<div class="gl-card-line"><span>Salesperson</span><b>'+escape(name(ctx,l.assigned_to))+'</b></div>'+
-     '<div class="gl-card-line"><span>Company</span><span>'+escape(companyText(ctx,l.company_id))+'</span></div>'+
-     '<div class="gl-card-line"><span>Value</span><b>'+escape(money(l.expected_value))+'</b></div>'+
+     ''+
+     ''+
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
-     '<div class="gl-card-line"><span>Product</span><span>'+escape(labelProduct(ctx,l))+'</span></div>'+
+     ''+
      (l.stage==='Quotation'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(l.next_followup||'Not set')+'</b></div>':'')+
-     '<div class="gl-card-actions">'+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
+     '<div class="gl-card-actions">'+contactButtons(l)+button('Quick view','quick','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      (l.stage==='Quotation'?button('Create Sales Order','order','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
-  root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;draw(ctx)});
+  root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;
+   if(el.dataset.glFilter==='company')ctx.filters.product=[];
+   draw(ctx)});
+  root.querySelectorAll('[data-gl-multi]').forEach(el=>el.onchange=()=>{
+    const group=el.dataset.glMulti;
+    ctx.filters[group]=[...root.querySelectorAll('[data-gl-multi="'+group+'"]:checked')].map(x=>x.value);
+    draw(ctx);
+  });
   root.querySelectorAll('button[data-gl-action]').forEach(el=>el.onclick=()=>act(ctx,el));
   root.querySelectorAll('.gl-card').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:card.dataset.lead,company:card.dataset.company}));e.dataTransfer.effectAllowed='move'}));
   root.querySelectorAll('.gl-column').forEach(col=>{
@@ -131,7 +168,7 @@
   const quoted=ctx.leads.filter(l=>l.stage==='Quotation');
   root.innerHTML='<div class="gl-head"><h3>Quotation Follow-ups ('+quoted.length+')</h3><span class="gl-caption">Active quotations only. Won and Lost leads disappear automatically.</span></div>'+
    '<div style="overflow:auto"><table class="gl-follow-table"><thead><tr><th>Lead</th><th>Salesperson</th><th>Company</th><th>Value</th><th>Due</th><th>History</th></tr></thead><tbody>'+
-   (quoted.length?quoted.map(l=>'<tr><td>'+escape(l.title)+'</td><td>'+escape(name(ctx,l.assigned_to))+'</td><td>'+escape(companyText(ctx,l.company_id))+'</td><td>'+money(l.expected_value)+'</td><td>'+escape(l.next_followup||'Not set')+'</td><td>'+button('View history','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+'</td></tr>').join(''):'<tr><td colspan="6">No active quotation follow-ups.</td></tr>')+
+   (quoted.length?quoted.map(l=>'<tr><td>'+leadLink(l,l.contact||l.title)+'</td><td>'+escape(name(ctx,l.assigned_to))+'</td><td>'+escape(companyText(ctx,l.company_id))+'</td><td>'+money(l.expected_value)+'</td><td>'+escape(l.next_followup||'Not set')+'</td><td>'+button('View history','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+'</td></tr>').join(''):'<tr><td colspan="6">No active quotation follow-ups.</td></tr>')+
    '</tbody></table></div>';
   root.querySelectorAll('[data-gl-action]').forEach(b=>b.onclick=()=>act(ctx,b));
  }
@@ -147,22 +184,46 @@
  const noteFld=()=>'<label>Conversation details / reason (required)<textarea name="note" maxlength="4000" required placeholder="What was discussed? What is the next action?"></textarea></label>';
  const getLead=(ctx,id,company)=>ctx.leads.find(l=>l.lead_id===id&&l.company_id===company);
  function move(ctx,l,to){
-  const next=to||stages[stages.indexOf(l.stage)+1]||'Contacted';
+  const allowed=l.stage==='New'?['Contacted','Qualified','Quotation','Lost']:
+   l.stage==='Contacted'?['Qualified','Lost']:
+   l.stage==='Qualified'?['Quotation','Lost']:
+   l.stage==='Quotation'?['Won','Lost']:
+   l.stage==='Lost'?['Contacted']:[];
+  if(!allowed.length){notify(ctx,'Won is complete. Reopening requires an authorized correction.');return}
+  const next=allowed.includes(to)?to:allowed[0];
   const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id);
-  const orderSelect='<label>Linked Sales Order (required to mark Won)<select name="order"><option value="">Select existing sales order</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
-  const body='<p class="gl-caption">'+escape(l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
-   selectFld('Move to stage','stage',stages.filter(s=>s!==l.stage).map(s=>[s,s]))+noteFld()+
-   fld('Next follow-up date','due','date','',true)+orderSelect+
-   '<p class="gl-note">For Won: create a Sales Order for the linked customer first, then select it here.</p>';
+  const orderSelect='<label>Linked Sales Order (required for Won)<select name="order"><option value="">Select existing sales order</option>'+
+    orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
+  const firstMove=l.stage==='New';
+  const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
+  const formChoices=firstMove?'<div class="gl-first-interests"><h4>Product & Tags — first stage update only</h4>'+
+   '<p class="gl-caption">Choose one or more approved products and tags when first contacting or qualifying this enquiry.</p>'+
+   '<fieldset><legend>Interested products</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
+     (p.record_id===l.product_id?'checked':'')+'>'+escape(p.payload?.name||p.record_id)+'</label>').join('')+'</fieldset>'+
+   '<fieldset><legend>Tags approved in Settings</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
+     ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
+  const body='<p class="gl-caption">'+escape(l.title)+' · Current: '+escape(l.stage)+'</p>'+
+   selectFld('Move to stage','stage',allowed.map(s=>[s,s]))+formChoices+noteFld()+
+   fld('Next follow-up date','due','date','',false)+orderSelect+
+   '<p class="gl-note">'+(l.stage==='New'?'First movement may be Contacted, Qualified, Quotation or Lost. Later forward movements follow the pipeline order.':
+   'Allowed next stages are listed above. For Won, link a customer and create their Sales Order first.')+'</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
-   const stage=fd.get('stage');if(!stage)throw Error('Select a stage');
-   if(stage==='Won'&&!l.customer_id)throw Error('This lead must be linked to an existing customer before Won.');
-   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
-   if(stage==='Won'&&!payload.p_order)throw Error('Select an existing customer-linked sales order');
-   const {error}=await ctx.db.rpc('gr_pipeline_move',payload);if(error)throw error;
+   const stage=fd.get('stage');
+   if(stage==='Won'&&!l.customer_id)throw Error('Link this lead to a customer before Won.');
+   const payload={p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+     p_products:firstMove?fd.getAll('products'):[],p_tags:firstMove?fd.getAll('tags'):[],
+     p_order:stage==='Won'?fd.get('order')||null:null,p_due:stage==='Quotation'?fd.get('due')||null:null};
+   if(stage==='Won'&&!payload.p_order)throw Error('Select the linked Sales Order');
+   if(stage==='Quotation'&&!payload.p_due)throw Error('Choose quotation follow-up date');
+   const {error}=await ctx.db.rpc('gr_pipeline_move_with_interests',payload);
+   if(error)throw error;
   });
   const select=d.querySelector('select[name=stage]');select.value=next;
-  const controls=()=>{const stage=select.value;const due=d.querySelector('input[name=due]');if(due){due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation'}const order=d.querySelector('select[name=order]');if(order){order.closest('label').hidden=stage!=='Won';order.required=stage==='Won'}};
+  const controls=()=>{
+   const stage=select.value,due=d.querySelector('input[name=due]'),order=d.querySelector('select[name=order]');
+   due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation';
+   order.closest('label').hidden=stage!=='Won';order.required=stage==='Won';
+  };
   select.onchange=controls;controls();
  }
  async function act(ctx,b){
@@ -171,6 +232,7 @@
    if(!window.GreenRichSheetManager){notify(ctx,'Lead integrations module failed to load. Refresh GreenRich ONE.');return}
    void window.GreenRichSheetManager.open(ctx).catch(e=>notify(ctx,e.message));return;
   }
+  if(action==='profile'||action==='quick'){if(!l)return;await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,quick:action==='quick'});return;}
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
    if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
@@ -240,15 +302,18 @@
    if(action==='new'){
     const products=ctx.products.filter(p=>p.company_id===defaultCompany);
     const fields=common+fld('Lead title *','title','text','',true)+fld('Contact name','contact')+fld('Mobile (+91)','mobile','tel')+
-     fld('Email','email','email')+fld('Lead source','source')+
+     fld('Email','email','email')+selectFld('Approved source','source',[['','Select approved source'],...ctx.approvedSources.map(s=>[s.name,s.name])],false)+
      selectFld('Product','product',[['','None'],...products.map(p=>[p.record_id,p.payload?.name||p.record_id])],false)+
      selectFld('Existing customer','customer',[['','Not linked'],...ctx.customers.map(c=>[c.id,c.name])],false)+
-     fld('Expected value ₹','value','number','0')+fld('Tags (comma-separated)','tags')+fld('Initial enquiry notes','note');
+     fld('Expected value ₹','value','number','0')+
+     '<fieldset class="gl-first-interests"><legend>Approved tags</legend>'+ctx.approvedTags.map(t=>
+      '<label><input type="checkbox" name="tags" value="'+escape(t.id)+'">'+escape(t.name)+'</label>').join('')+'</fieldset>'+
+     fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
      if(!fd.get('assignee'))throw Error('A sales employee must be assigned before creating the lead');
      const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee'),
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
-      p_email:fd.get('email'),p_tags:String(fd.get('tags')||'').split(',').map(x=>x.trim()).filter(Boolean),p_note:fd.get('note')});if(error)throw error;
+      p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
     comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
    }
@@ -264,7 +329,7 @@
       let success=0,errors=[];
       for(const cells of rows){if(!cells.some(x=>x.trim()))continue;const val=n=>cells[headers.indexOf(n)]||'';
        const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:val('title'),p_contact:val('contact'),
-       p_assignee:fd.get('assignee'),p_source:val('source'),p_product:val('product_id')||null,p_value:val('value')||0,p_mobile:val('mobile'),
+       p_assignee:fd.get('assignee'),p_source:(ctx.approvedSources.find(s=>matchesApproved(s.name,val('source')))?.name||''),p_product:(ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===val('product_id'))?val('product_id'):null),p_value:val('value')||0,p_mobile:val('mobile'),
        p_email:val('email'),p_tags:val('tags').split(';').filter(Boolean),p_note:val('notes')});
        if(error){errors.push(error.message);if(errors.length>15)break}else success++;
       }
@@ -287,7 +352,7 @@
   root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
-  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},
+  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
@@ -302,7 +367,7 @@
  async function mountShared(ctx){
   const key=ctx.userId+'|'+ctx.companyIds.join(',');
   if(cache.has(key))return cache.get(key);
-  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
+  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
   await query(state);cache.set(key,state);return state;
  }
  async function renderCustomerTimeline(root,db,customerId,companies,staffName){
