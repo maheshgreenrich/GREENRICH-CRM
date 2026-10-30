@@ -127,21 +127,31 @@
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
-    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"><strong>'+escape(l.title)+'</strong><p>'+escape(l.contact||l.mobile||'No contact recorded')+'</p>'+
+    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+leadLink(l,l.contact||l.title)+
+     '<div class="gl-card-line"><span>Mobile</span><span>'+escape(l.mobile||'—')+'</span></div>'+
+     '<div class="gl-card-line"><span>Email</span><span>'+escape(l.email||'—')+'</span></div>'+
+     '<div class="gl-card-line"><span>Product enquiry</span><span>'+escape(labelProduct(ctx,l))+'</span></div>'+
      (l.import_duplicate_type&&l.import_duplicate_type!=='none'?'<div class="gl-card-line" style="background:#fff4df;padding:6px;border-radius:6px;color:#8a5611"><b>Possible duplicate '+escape(l.import_duplicate_type)+(l.import_duplicate_review==='pending'?' · Review pending':' · '+escape(l.import_duplicate_review))+'</b></div>':'')+
      '<div class="gl-card-line"><span>Salesperson</span><b>'+escape(name(ctx,l.assigned_to))+'</b></div>'+
-     '<div class="gl-card-line"><span>Company</span><span>'+escape(companyText(ctx,l.company_id))+'</span></div>'+
-     '<div class="gl-card-line"><span>Value</span><b>'+escape(money(l.expected_value))+'</b></div>'+
+     ''+
+     ''+
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
-     '<div class="gl-card-line"><span>Product</span><span>'+escape(labelProduct(ctx,l))+'</span></div>'+
+     ''+
      (l.stage==='Quotation'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(l.next_followup||'Not set')+'</b></div>':'')+
-     '<div class="gl-card-actions">'+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
+     '<div class="gl-card-actions">'+contactButtons(l)+button('Quick view','quick','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      (l.stage==='Quotation'?button('Create Sales Order','order','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
-  root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;draw(ctx)});
+  root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;
+   if(el.dataset.glFilter==='company')ctx.filters.product=[];
+   draw(ctx)});
+  root.querySelectorAll('[data-gl-multi]').forEach(el=>el.onchange=()=>{
+    const group=el.dataset.glMulti;
+    ctx.filters[group]=[...root.querySelectorAll('[data-gl-multi="'+group+'"]:checked')].map(x=>x.value);
+    draw(ctx);
+  });
   root.querySelectorAll('button[data-gl-action]').forEach(el=>el.onclick=()=>act(ctx,el));
   root.querySelectorAll('.gl-card').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:card.dataset.lead,company:card.dataset.company}));e.dataTransfer.effectAllowed='move'}));
   root.querySelectorAll('.gl-column').forEach(col=>{
@@ -155,7 +165,7 @@
   const quoted=ctx.leads.filter(l=>l.stage==='Quotation');
   root.innerHTML='<div class="gl-head"><h3>Quotation Follow-ups ('+quoted.length+')</h3><span class="gl-caption">Active quotations only. Won and Lost leads disappear automatically.</span></div>'+
    '<div style="overflow:auto"><table class="gl-follow-table"><thead><tr><th>Lead</th><th>Salesperson</th><th>Company</th><th>Value</th><th>Due</th><th>History</th></tr></thead><tbody>'+
-   (quoted.length?quoted.map(l=>'<tr><td>'+escape(l.title)+'</td><td>'+escape(name(ctx,l.assigned_to))+'</td><td>'+escape(companyText(ctx,l.company_id))+'</td><td>'+money(l.expected_value)+'</td><td>'+escape(l.next_followup||'Not set')+'</td><td>'+button('View history','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+'</td></tr>').join(''):'<tr><td colspan="6">No active quotation follow-ups.</td></tr>')+
+   (quoted.length?quoted.map(l=>'<tr><td>'+leadLink(l,l.contact||l.title)+'</td><td>'+escape(name(ctx,l.assigned_to))+'</td><td>'+escape(companyText(ctx,l.company_id))+'</td><td>'+money(l.expected_value)+'</td><td>'+escape(l.next_followup||'Not set')+'</td><td>'+button('View history','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+'</td></tr>').join(''):'<tr><td colspan="6">No active quotation follow-ups.</td></tr>')+
    '</tbody></table></div>';
   root.querySelectorAll('[data-gl-action]').forEach(b=>b.onclick=()=>act(ctx,b));
  }
@@ -195,6 +205,7 @@
    if(!window.GreenRichSheetManager){notify(ctx,'Lead integrations module failed to load. Refresh GreenRich ONE.');return}
    void window.GreenRichSheetManager.open(ctx).catch(e=>notify(ctx,e.message));return;
   }
+  if(action==='profile'||action==='quick'){if(!l)return;await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id});return;}
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
    if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
