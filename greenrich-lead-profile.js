@@ -60,7 +60,8 @@ window.GreenRichLeadProfile=(function(){
      '<span class="chip">Possible duplicate '+esc(lead.import_duplicate_type)+' — '+esc(lead.import_duplicate_review)+'</span>':'';
    const result='<div class="head"><div><h2>'+esc(p.name||lead.contact||lead.title)+'</h2><span class="chip">'+esc(lead.stage)+'</span> '+dup+
       '<p class="muted">'+esc(company==='grow-india'?'GreenRich Grow India Pvt Ltd':'GreenRich Enviro Solutions Pvt Ltd')+'</p></div>'+
-      '<div class="actions">'+links+(quick?'<button type="button" data-full>Full page view</button>':'')+
+      '<div class="actions">'+links+(!lead.customer_id&&!quick?'<button type="button" data-link-customer>Link existing customer</button>':'')+
+       (quick?'<button type="button" data-full>Full page view</button>':'')+
        '<button type="button" data-close>'+(inline?'← Back to Customers':'Close')+'</button></div></div>'+
       '<div class="grid"><section class="panel"><h3>Customer & Lead Information</h3>'+
        kv('Name',p.name||lead.contact||lead.title)+kv('Mobile',lead.mobile)+kv('Email',lead.email)+
@@ -68,10 +69,10 @@ window.GreenRichLeadProfile=(function(){
        kv('Source',lead.source)+kv('Brand',p.brand)+kv('Tags',(lead.tag_ids||[]).map(id=>tagMap.get(id)||id).join(', '))+
        kv('Created',date(lead.created_at))+kv('Linked customer',cust?.name||'Not linked')+
        '</section><section class="panel"><h3>Sales & Assignment</h3>'+
-       kv('Current stage',lead.stage)+kv('Current salesperson',person(lead.assigned_to))+
+       kv('Current stage',lead.stage)+kv('Lead priority',lead.lead_heat||'Warm')+kv('Current salesperson',person(lead.assigned_to))+
        kv('Employees updating lead history',actors.length)+
        kv('Employees',actors.length?actors.map(person).join(', '):'No conversation updates recorded')+
-       kv('Next follow-up',lead.next_followup)+kv('Expected value','₹'+Number(lead.expected_value||0).toLocaleString('en-IN'))+
+       kv('Next follow-up',lead.next_followup_at?date(lead.next_followup_at):lead.next_followup)+kv('Expected value','₹'+Number(lead.expected_value||0).toLocaleString('en-IN'))+
        kv('Sales Order',sale?.payload?.internal_order_id||lead.won_order_id||'Not linked')+
        '<p class="muted">Activity records do not prove that telephone calls took place.</p></section></div>'+
       '<section class="panel"><h3>Original Ads / Google Sheet Form Answers</h3>'+
@@ -86,6 +87,25 @@ window.GreenRichLeadProfile=(function(){
        '<p>No activity recorded yet.</p>')+'</section>');
    d.innerHTML='<style>'+css+'</style>'+result;
    d.querySelector('[data-close]').onclick=close;
+   const linker=d.querySelector('[data-link-customer]');
+   if(linker)linker.onclick=async()=>{
+     const people=(customer.data||[]).filter(x=>x.name);
+     if(!people.length){alert('Create a customer in Customers before linking this lead.');return}
+     const chooser=document.createElement('dialog');
+     chooser.style.cssText='width:min(470px,92vw);border:1px solid #d4e2f1;border-radius:12px;padding:20px';
+     chooser.innerHTML='<h3>Link a customer before issuing an SO</h3><form>'+
+       '<label>Existing customer<select name="customer" style="width:100%;padding:10px">'+
+       people.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></label>'+
+       '<label>Reason<textarea name="note" required style="width:100%;min-height:72px">Linked lead for Sales Order preparation</textarea></label>'+
+       '<button type="submit">Link customer</button> <button type="button" data-cancel>Cancel</button></form>';
+     document.body.append(chooser);chooser.onclose=()=>chooser.remove();chooser.querySelector('[data-cancel]').onclick=()=>chooser.close();
+     chooser.querySelector('form').onsubmit=async e=>{
+      e.preventDefault();const fd=new FormData(e.target);
+      const {error}=await db.rpc('gr_pipeline_link_customer',{p_company:company,p_lead:leadId,p_customer:fd.get('customer'),p_note:fd.get('note')});
+      if(error){alert(error.message);return}
+      chooser.close();linker.textContent='Customer linked — refresh to view';linker.disabled=true;
+     };chooser.showModal();
+   };
    const full=d.querySelector('[data-full]');
    if(full)full.onclick=()=>{close();window.GreenRichCRM?.switchPage?.('customers');
      window.GreenRichShell?.setPageWithoutRemount?.('customers');
@@ -93,7 +113,7 @@ window.GreenRichLeadProfile=(function(){
    };
   }catch(e){
    d.innerHTML='<style>'+css+'</style><section class="panel"><h2>Lead Details unavailable</h2><p>'+esc(e.message)+'</p><button type="button" data-close>Close</button></section>';
-   d.querySelector('[data-close]').onclick=()=>d.close();
+   d.querySelector('[data-close]').onclick=close;
   }
  }
  return {open};
