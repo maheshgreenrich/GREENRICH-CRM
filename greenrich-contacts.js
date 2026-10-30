@@ -23,7 +23,7 @@
  const FILE_TYPES=['.xlsx','.xls','.csv'];
  const headerMap=new Map(FIELDS.flatMap(([key,label])=>[[key.toLowerCase(),key],[label.toLowerCase(),key]]));
  let root=null,db=null,context=null,sources=[],mode='all',search='',tag=[],source=[],product=[],start='',end='',countLimit=1000,busy=false;
- let exportSheetPromise=null;
+ let exportSheetPromise=null,lastCompanyScope='';
  const notify=s=>{const t=root?.querySelector('#gr-contact-status');if(t){t.hidden=false;t.textContent=s}context?.notify?.(s)};
  const opts=(rows,current='',all='')=>(all?'<option value="all">'+esc(all)+'</option>':'')+rows.map(([v,label])=>'<option value="'+esc(v)+'" '+(String(current)===String(v)?' selected':'')+'>'+esc(label)+'</option>').join('');
  const tags=()=>context?.tags?.()||[];
@@ -109,6 +109,8 @@
  }
  function render(){
   if(!root)return;
+  const scope=context?.selectedCompany?.()||'all';
+  if(lastCompanyScope!==scope){product=[];lastCompanyScope=scope}
   const kind=root.querySelector('#gr-contact-kind');if(kind)kind.value=mode;
   const q=root.querySelector('#gr-contact-search');if(q&&q.value!==search)q.value=search;
   draw();
