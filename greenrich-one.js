@@ -354,6 +354,7 @@ async function settings(c){
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
    openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
    openSources:host=>window.GreenRichSources.mount(host,{db,notify:toast}),
+   openSheetIntegrations:host=>window.GreenRichSheetManager.mount(host,{db,companyIds:window.GreenRichCompanies.allowed(),notify:toast}),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
    configureCompanySelector();
