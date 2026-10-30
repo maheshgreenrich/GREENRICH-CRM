@@ -40,7 +40,7 @@
  ];
  let host=null,db=null,companyIds=[],companyScope='all',caps={},isAdmin=false,kind='overview',rows=[],version=0,channel=null,refreshTimer=null;
  const companyName=id=>id==='grow-india'?'GreenRich Grow India Pvt Ltd':'GreenRich Enviro Solutions Pvt Ltd';
- const allowedType=id=>id==='overview'||Boolean(caps[TYPES[id]?.module]?.view);
+ const allowedType=id=>id==='overview'||(id==='training'?Boolean(caps.stock?.view):Boolean(caps[TYPES[id]?.module]?.view));
  const canEdit=(id,action)=>isAdmin||Boolean(caps[TYPES[id]?.module]?.[action]);
  const allKind=id=>rows.filter(r=>r.kind===id).map(r=>({...r.payload,_companyId:r.company_id,_savedAt:r.updated_at}));
  const scopeRows=id=>allKind(id).filter(r=>companyScope==='all'||r._companyId===companyScope);
