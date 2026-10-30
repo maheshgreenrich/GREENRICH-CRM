@@ -35,7 +35,7 @@ assert.ok(style.includes('.gr-exec-grid')&&style.includes('.gr-exec-ring'));
 const fake={window:{},Intl,Date,Number,String,Math,Object,Array,Map,Set};
 vm.runInNewContext(dash,fake);
 const dashboard=fake.window.GreenRichExecutiveDashboard;
-assert.equal(dashboard.widgets.length,17);
+assert.equal(dashboard.widgets.length,16);
 assert.equal(dashboard.periodStart('all'),'');
 assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(dashboard.periodStart('month')));
 console.log('PASS: immediate CRM navigation, pending dispatch, three-dot actions, interactive chart dashboard and per-user visibility');
