@@ -27,7 +27,7 @@
   if(access.error)throw Error('Admin authorization failed: '+access.error.message);
   const staff=staffRows.flat();
   if(!staff.length)throw Error('No eligible sales employee found. Create or authorize a Sales user first.');
-  if(!window.GreenRichMetaSync?.open)throw Error('Meta setup module could not load.');
+  if(!window.GreenRichSheetManager?.open)throw Error('Multi-sheet integration module could not load.');
   const ctx={db,companyIds,staff,admin:true,companyNames:{
     'grow-india':'GreenRich Grow India Pvt Ltd',
     'enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'
@@ -35,7 +35,7 @@
   show('Signed in as '+profile.full_name+'. Select a company and salesperson to configure automatic Meta lead import.');
   button.disabled=false;
   button.addEventListener('click',()=>{
-   void window.GreenRichMetaSync.open(ctx).catch(e=>show('Unable to open setup: '+e.message));
+   void window.GreenRichSheetManager.open(ctx).catch(e=>show('Unable to open setup: '+e.message));
   });
  }
  ready().catch(e=>{
