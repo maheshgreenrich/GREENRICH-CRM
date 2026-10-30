@@ -180,9 +180,10 @@ window.GreenRichSheetManager=(function(){
  }
  function open(ctx){
   const d=document.createElement('dialog');d.className='gsi';d.style.cssText='width:min(1180px,96vw);max-height:95vh;overflow:auto';
-  document.body.append(d);d.onclose=()=>d.remove();
-  mount(d,ctx);const b=document.createElement('button');b.className='secondary';b.textContent='Close';b.onclick=()=>d.close();
-  d.append(b);d.showModal();return Promise.resolve();
+  const content=document.createElement('section');
+  const b=document.createElement('button');b.className='secondary';b.textContent='Close integrations';b.onclick=()=>d.close();
+  d.append(content,b);document.body.append(d);d.onclose=()=>d.remove();
+  mount(content,ctx);d.showModal();return Promise.resolve();
  }
  return {mount,open};
 })();
