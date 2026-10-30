@@ -72,3 +72,12 @@
 @media(max-width:1050px){.gr-ops-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:780px){.gr-ops-flow{grid-template-columns:1fr}.gr-ops-banner{padding:17px}.gr-ops-surface{padding:15px}}
 @media(max-width:540px){.gr-ops-metrics{gap:8px}.gr-ops-metric{padding:12px}.gr-ops-form-buttons{flex-wrap:wrap}.gr-ops-dialog form{grid-template-columns:1fr;padding:14px}.gr-ops-dialog>header{padding:14px}}
+
+.gr-ops-plan{display:grid;gap:16px;padding:18px 20px;background:#fff;border:1px solid #dbe7f7;border-radius:14px}
+.gr-ops-plan>div:first-child h3{font-size:15px!important;color:#214879!important;margin:0 0 7px}
+.gr-ops-plan>div:first-child p{font-size:11px!important;color:#7086a4!important;line-height:1.6!important;margin:0}
+.gr-ops-plan-fields{display:flex;align-items:end;gap:11px;flex-wrap:wrap}
+.gr-ops-plan-fields label{display:grid;gap:7px;flex:1;min-width:155px;font-size:11px;font-weight:650;color:#55729a}
+.gr-ops-plan-fields select,.gr-ops-plan-fields input{width:100%!important;min-width:0!important;border-radius:9px;border:1px solid #d8e5f5;padding:10px 11px;height:42px!important;color:#294c7e!important;font-size:11.5px!important}
+.gr-ops-plan-ready{display:grid;gap:11px}.gr-ops-plan-ready>strong{font-size:12px;color:#20663f}
+@media(max-width:620px){.gr-ops-plan{padding:15px}.gr-ops-plan-fields label{min-width:100%}}
