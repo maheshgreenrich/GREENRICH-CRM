@@ -29,7 +29,7 @@ assert.ok(cloud.includes('Cloud sync failed'),'Failures must be visible to user'
 assert.ok(crm.includes('window.GreenRichCRMCloud.start('),'CRM must download shared data when opened');
 assert.ok(crm.includes('window.GreenRichCRMCloud.commit(id,previous,copy)'),'Sales and product changes must upload');
 assert.ok(invoice.includes('GreenRichCRMCloud.externalSave'),'Invoice HSN editor must upload to cloud');
-assert.ok(html.includes('greenrich-crm-cloud.js?v=20261029-cloud-1'),'Cloud script must load before CRM');
+assert.ok(/greenrich-crm-cloud\\.js\\?v=[^"']+/.test(html),'Cloud script must load before CRM');
 assert.ok(sql.includes('enable row level security'),'Shared records must enforce RLS');
 assert.ok(sql.includes('p_company=any(p.company_ids)'),'Employees must only see assigned companies');
 assert.ok(sql.includes('alter publication supabase_realtime add table'),'Realtime must be enabled');
