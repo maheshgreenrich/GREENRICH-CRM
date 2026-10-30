@@ -64,10 +64,11 @@
  const labelProduct=(ctx,lead)=>ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name||lead.product_id||'—';
  const saleTotal=(ctx,lead)=>Number(ctx.orders.find(o=>o.company_id===lead.company_id&&o.record_id===lead.won_order_id)?.payload?.total)||0;
  const picked=(ctx)=>ctx.leads.filter(l=>{
-  const f=ctx.filters;let date=String(l.created_at||'').slice(0,10);
+  const f=ctx.filters;const timestamp=Date.parse(l.created_at||'');
+  const fromTime=f.from?new Date(f.from).getTime():null,toTime=f.to?new Date(f.to).getTime():null;
   return (f.company==='all'||l.company_id===f.company)&&
    (f.person==='all'||l.assigned_to===f.person)&&
-   (!f.from||date>=f.from)&&(!f.to||date<=f.to)&&
+   (fromTime===null||timestamp>=fromTime)&&(toTime===null||timestamp<=toTime)&&
    (!f.product||l.product_id===f.product)&&
    (!f.source||l.source===f.source)&&(!f.tag||l.tag_ids?.includes(f.tag))&&
    (!f.search||[l.title,l.contact,l.mobile,l.email,l.source,name(ctx,l.assigned_to)].join(' ').toLowerCase().includes(f.search.toLowerCase()));
@@ -80,8 +81,8 @@
   const sources=[...new Set(ctx.leads.map(l=>l.source).filter(Boolean))].sort();
   const tags=[...new Set(ctx.leads.flatMap(l=>l.tag_ids||[]))].sort();
   return '<div class="gl-row" aria-label="Lead filters">'+
-   '<label>From<input type="date" data-gl-filter="from" value="'+escape(f.from)+'"></label>'+
-   '<label>To<input type="date" data-gl-filter="to" value="'+escape(f.to)+'"></label>'+
+   '<label>From date & time<input type="datetime-local" data-gl-filter="from" value="'+escape(f.from)+'"></label>'+
+   '<label>To date & time<input type="datetime-local" data-gl-filter="to" value="'+escape(f.to)+'"></label>'+
    '<label>Company<select data-gl-filter="company">'+choices([['all','All assigned companies'],...ctx.companyIds.map(id=>[id,companyText(ctx,id)])],f.company)+'</select></label>'+
    '<label>Product<select data-gl-filter="product">'+choices([['','All products'],...products.map(p=>[p.record_id,p.payload?.name||p.record_id])],f.product)+'</select></label>'+
    '<label>Source<select data-gl-filter="source">'+choices([['','All sources'],...sources.map(s=>[s,s])],f.source)+'</select></label>'+
