@@ -31,7 +31,7 @@ create table if not exists public.gr_lead_stage_history (
  company_id text not null,
  lead_id text not null,
  actor_id uuid not null references public.gr_profiles(id),
- event_type text not null check(event_type in ('CREATED','ASSIGNED','STAGE_CHANGED')),
+ event_type text not null check(event_type in ('CREATED','ASSIGNED','STAGE_CHANGED','CUSTOMER_LINKED')),
  old_stage text,
  new_stage text,
  old_assignee uuid,
@@ -214,7 +214,7 @@ grant execute on function public.gr_pipeline_assign(text,text,uuid,text) to auth
 
 -- Drag/drop always asks for and persists a note. Won requires a pre-existing sales order
 -- for the linked CRM customer; stage transitions NEVER pretend to have created an order.
-create or replace function public.gr_pipeline_move(p_company text,p_lead text,p_stage text,p_note text,p_order text default null)
+create or replace function public.gr_pipeline_move(p_company text,p_lead text,p_stage text,p_note text,p_order text default null,p_due date default null)
 returns void language plpgsql security definer set search_path=''
 as $$
 declare v public.gr_lead_pipeline%rowtype;
@@ -226,6 +226,7 @@ begin
  if p_stage=v.stage then raise exception 'Choose a different stage'; end if;
  if nullif(btrim(coalesce(p_note,'')),'') is null then raise exception 'Enter the conversation details before moving'; end if;
  if length(p_note)>4000 then raise exception 'Conversation note too long'; end if;
+ if p_stage='Quotation' and p_due is null then raise exception 'Set a quotation follow-up date'; end if;
  if p_stage='Won' then
    if v.stage<>'Quotation' then raise exception 'Move to Quotation before Won'; end if;
    if v.customer_id is null then raise exception 'Link an existing customer before winning'; end if;
@@ -241,15 +242,37 @@ begin
  else raise exception 'Move one stage at a time; Lost can return to Contacted'; end if;
  update public.gr_lead_pipeline
  set stage=p_stage,won_order_id=case when p_stage='Won' then p_order else null end,
- won_at=case when p_stage='Won' then now() else null end,updated_at=now()
+ won_at=case when p_stage='Won' then now() else null end,
+ next_followup=case when p_stage='Quotation' then p_due when v.stage='Quotation' then null else next_followup end,
+ updated_at=now()
  where company_id=p_company and lead_id=p_lead;
  update public.gr_crm_records set payload=jsonb_set(jsonb_set(payload,'{stage}',to_jsonb(p_stage)),'{won_order_id}',to_jsonb(p_order)),
  updated_at=now() where company_id=p_company and kind='leads' and record_id=p_lead;
  insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
  values(p_company,p_lead,auth.uid(),'STAGE_CHANGED',v.stage,p_stage,btrim(p_note));
 end $$;
-revoke all on function public.gr_pipeline_move(text,text,text,text,text) from public;
-grant execute on function public.gr_pipeline_move(text,text,text,text,text) to authenticated;
+revoke all on function public.gr_pipeline_move(text,text,text,text,text,date) from public;
+grant execute on function public.gr_pipeline_move(text,text,text,text,text,date) to authenticated;
+
+-- Link an existing shared customer to the lead before converting it to Won.
+create or replace function public.gr_pipeline_link_customer(p_company text,p_lead text,p_customer uuid,p_note text)
+returns void language plpgsql security definer set search_path=''
+as $
+declare v public.gr_lead_pipeline%rowtype;
+begin
+ select * into v from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead for update;
+ if not found or not public.gr_lead_can(p_company,v.assigned_to,'edit') then raise exception 'Lead not found or permission denied'; end if;
+ if nullif(btrim(coalesce(p_note,'')),'') is null then raise exception 'Enter customer linking notes'; end if;
+ if not exists(select 1 from public.gr_crm_customers where id=p_customer) then raise exception 'Existing customer not found'; end if;
+ if v.stage='Won' then raise exception 'Won leads cannot change linked customer'; end if;
+ update public.gr_lead_pipeline set customer_id=p_customer,updated_at=now() where company_id=p_company and lead_id=p_lead;
+ update public.gr_crm_records set payload=jsonb_set(payload,'{customer_id}',to_jsonb(p_customer)),updated_at=now()
+ where company_id=p_company and kind='leads' and record_id=p_lead;
+ insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
+ values(p_company,p_lead,auth.uid(),'CUSTOMER_LINKED',v.stage,v.stage,btrim(p_note));
+end $;
+revoke all on function public.gr_pipeline_link_customer(text,text,uuid,text) from public;
+grant execute on function public.gr_pipeline_link_customer(text,text,uuid,text) to authenticated;
 
 -- Pre-existing CRM legacy table has broader policies. Do not expose this RPC as a
 -- complete replacement for those permissions until legacy lead insert/update/delete
