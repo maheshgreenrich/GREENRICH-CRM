@@ -9,7 +9,7 @@ const direct=fs.readFileSync('meta-sync.html','utf8');
 const setup=fs.readFileSync('meta-sync-setup.js','utf8');
 new vm.Script(leads);new vm.Script(wizard);new vm.Script(google);
 new vm.Script(setup);
-assert.ok(direct.includes('meta-sync-setup.js?v=20261030-meta-direct-1'),'Direct CRM admin fallback page must load');
+assert.ok(direct.includes('meta-sync-setup.js?v=20261030-multisheet-1'),'Direct CRM admin fallback page must load');
 assert.ok(direct.includes('greenrich-meta-sync.js?v=20261030-meta-sync-2'),'Direct CRM page must load secure wizard');
 assert.ok(setup.includes("db.rpc('gr_meta_sheet_status'"),'Direct page must use server authorization');
 assert.ok(page.includes('greenrich-meta-sync.js?v=20261030-meta-sync-2'));
