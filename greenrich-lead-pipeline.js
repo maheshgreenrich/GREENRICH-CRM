@@ -15,7 +15,7 @@
  .gl-row label{font-size:12px;color:#516b86;display:flex;flex-direction:column;gap:5px}
  .gl-row input,.gl-row select{height:36px;min-width:128px;border:1px solid #d3e0ef;border-radius:8px;padding:5px 9px;background:white}
  .gl-row button,.gl-head button,.gl-card button,.gl-dialog button{width:auto!important;font-size:12px!important;padding:8px 12px!important;min-height:34px!important;border-radius:8px!important}
- .gl-main{display:grid;grid-template-columns:repeat(4,minmax(135px,1fr));gap:11px;margin:8px 0 18px}
+ .gl-main{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:11px;margin:8px 0 18px}
  .gl-stat{padding:15px;background:#fff;border:1px solid #dde6f2;border-radius:12px;display:flex;flex-direction:column;gap:5px}
  .gl-stat span{font-size:12px;color:#64748b}.gl-stat strong{font-size:21px;color:#17365c}
  .gl-board{display:flex;gap:13px;overflow-x:auto;padding:5px 2px 14px;scrollbar-width:thin;align-items:stretch}
@@ -31,7 +31,11 @@
  .gl-card-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
  .gl-card button{border:1px solid #d9e3f1;background:white;color:#265193}
  .gl-card .gl-name-link{border:0!important;padding:0!important;background:transparent!important;text-align:left;font-weight:700;font-size:14px!important;color:#17365e!important;cursor:pointer}
- .gl-card .gl-card-actions a{font-size:12px;border:1px solid #d9e3f1;padding:8px 10px;text-decoration:none;color:#265193;border-radius:7px;background:#fff}
+ .gl-icon-row{gap:7px!important;align-items:center}
+ .gl-card .gl-icon-row .gl-action-icon{width:36px!important;height:36px!important;min-width:36px!important;display:inline-flex!important;align-items:center;justify-content:center;padding:0!important;border:1px solid #cbdbee!important;border-radius:9px!important;text-decoration:none;color:#24549b;background:#f9fbff;cursor:pointer}
+ .gl-card .gl-icon-row .gl-action-icon:hover{background:#e8f1ff}
+ .gl-first-interests input[type="checkbox"]{width:18px!important;height:18px!important;min-width:18px!important;padding:0!important;flex:0 0 18px!important}
+ .gl-multi-options input[type="checkbox"]{width:17px!important;height:17px!important;min-width:17px!important;padding:0!important;flex:0 0 17px!important}
  .gl-multi{position:relative;min-width:137px;align-self:flex-end;font-size:12px}
  .gl-multi summary{height:36px;padding:8px 10px;background:#fff;border:1px solid #d3e0ef;border-radius:8px;cursor:pointer;list-style:none}
  .gl-multi summary:after{content:' ▾';float:right}.gl-multi-options{position:absolute;z-index:20;top:37px;left:0;width:max(190px,100%);max-height:220px;overflow:auto;background:white;border:1px solid #c7d9eb;border-radius:9px;box-shadow:0 9px 25px #142f5030;padding:9px}
@@ -86,8 +90,27 @@
    (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<a title="Email" href="mailto:'+escape(l.email)+'">✉ Email</a>':'')+
    (digits.length>=10&&digits.length<=15?'<a title="WhatsApp" rel="noopener noreferrer" target="_blank" href="https://wa.me/'+digits+'">WhatsApp</a>':'');
  };
+ const icons={
+  call:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.35 1.91.68 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.25a2 2 0 0 1 2.11-.45c.9.33 1.85.56 2.81.68A2 2 0 0 1 22 16.92z"/>',
+  email:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+  whatsapp:'<path d="M21 11.5a8.4 8.4 0 0 1-9 9 9.2 9.2 0 0 1-4-.9L3 21l1.4-4.6A9 9 0 1 1 21 11.5z"/><path d="M9 9c1 3 3 5 6 6"/>',
+  stage:'<path d="m4 7 4-4 4 4M8 3v14m12 0-4 4-4-4m4 4V7"/>',
+  history:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',
+  assign:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 12-5m5-2v8m-4-4h8"/>',
+  quick:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+  order:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8m-8 4h8m-8 4h4"/>'
+ };
+ const symbol=id=>'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+icons[id]+'</svg>';
+ const ico=(id,label,action,l)=>'<button type="button" class="gl-action-icon" title="'+escape(label)+'" aria-label="'+escape(label)+
+   '" data-gl-action="'+action+'" data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+symbol(id)+'</button>';
+ const contactIcons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
+  const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'');
+  return (digits.length>=10?'<a class="gl-action-icon" title="Call" aria-label="Call" href="tel:'+escape(m)+'">'+symbol('call')+'</a>':'')+
+   (email?'<a class="gl-action-icon" title="Email" aria-label="Email" href="mailto:'+escape(l.email)+'">'+symbol('email')+'</a>':'')+
+   (digits.length>=10&&digits.length<=15?'<a class="gl-action-icon" target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/'+digits+'">'+symbol('whatsapp')+'</a>':'');
+ };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
- const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Unassigned':'Employee');
+ const name=(ctx,id)=>ctx.staff.find(p=>p.id===id)?.full_name||(!id?'Common sales queue':'Employee');
  const labelProduct=(ctx,lead)=>{
   const sku=ctx.products.find(p=>p.company_id===lead.company_id&&p.record_id===lead.product_id)?.payload?.name;
   const p=ctx.leadPayloads?.get(lead.company_id+':'+lead.lead_id)||{};
@@ -98,11 +121,12 @@
   const f=ctx.filters;const timestamp=Date.parse(l.created_at||'');
   const fromTime=f.from?new Date(f.from).getTime():null,toTime=f.to?new Date(f.to).getTime():null;
   return (f.company==='all'||l.company_id===f.company)&&
-   (f.person==='all'||l.assigned_to===f.person)&&
+   (f.person==='all'||(f.person==='common'?l.assigned_to===null:l.assigned_to===f.person))&&
    (fromTime===null||timestamp>=fromTime)&&(toTime===null||timestamp<=toTime)&&
    (!f.product?.length||f.product.includes(l.product_id))&&
    (!f.source?.length||f.source.some(label=>matchesApproved(l.source,label)))&&
    (!f.tag?.length||f.tag.some(id=>l.tag_ids?.includes(id)))&&
+   (!f.heat?.length||f.heat.includes(l.lead_heat||'Warm'))&&
    (!f.search||[l.title,l.contact,l.mobile,l.email,l.source,name(ctx,l.assigned_to)].join(' ').toLowerCase().includes(f.search.toLowerCase()));
  });
  const choices=(array,current)=>array.map(([v,t])=>'<option value="'+escape(v)+'" '+(v===current?'selected':'')+'>'+escape(t)+'</option>').join('');
@@ -119,7 +143,8 @@
    choiceMulti('product',uniqueProducts.map(p=>[p.record_id,p.payload?.name||p.record_id]),f.product,'All products')+
    choiceMulti('source',ctx.approvedSources.map(x=>[x.name,x.name]),f.source,'Approved sources')+
    choiceMulti('tag',ctx.approvedTags.map(x=>[x.id,x.name]),f.tag,'Approved tags')+
-   (ctx.canViewTeam?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
+   choiceMulti('heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']],f.heat,'Lead priority')+
+   (ctx.admin?'<label>Salesperson<select data-gl-filter="person">'+choices([['all','All active salespeople'],['common','Common queue'],...people.map(p=>[p.id,p.full_name])],f.person)+'</select></label>':'')+
    '<label>Search<input data-gl-filter="search" placeholder="Name, mobile, email…" value="'+escape(f.search)+'"></label>'+
    '</div>';
  }
@@ -128,7 +153,18 @@
  function draw(ctx){
   const root=ctx.root;if(!root?.isConnected)return;
   const rows=picked(ctx),wins=rows.filter(l=>l.stage==='Won'),quoted=rows.filter(l=>l.stage==='Quotation');
-  const stat=[['Visible leads',rows.length],['Quotation follow-ups',quoted.length],['Won sales orders',wins.filter(l=>l.won_order_id).length],['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
+  const localDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
+  const today=localDay(Date.now());
+  const dueTime=l=>l.next_followup_at?new Date(l.next_followup_at).getTime():l.next_followup?new Date(l.next_followup+'T23:59:59+05:30').getTime():NaN;
+  const due=rows.filter(l=>l.stage!=='Won'&&l.stage!=='Lost'&&Number.isFinite(dueTime(l)));
+  const todayDue=due.filter(l=>localDay(dueTime(l))===today).length;
+  const overdue=due.filter(l=>dueTime(l)<Date.now()&&localDay(dueTime(l))!==today).length;
+  const newToday=rows.filter(l=>localDay(l.created_at)===today).length;
+  const stat=[['New leads today',newToday],['Not yet contacted',rows.filter(l=>l.stage==='New').length],
+    ['Visible leads',rows.length],['Qualified',rows.filter(l=>l.stage==='Qualified').length],
+    ['Follow-ups today',todayDue],['Overdue follow-ups',overdue],
+    ['Won sales orders',wins.filter(l=>l.won_order_id).length],
+    ['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
   root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
     (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
     button('Won sales history','history')+button('Sheet Integrations / Duplicates','metasync')+'</div></div>'+
@@ -145,12 +181,12 @@
      ''+
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
      ''+
-     (l.stage==='Quotation'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(l.next_followup||'Not set')+'</b></div>':'')+
-     '<div class="gl-card-actions">'+contactButtons(l)+button('Quick view','quick','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
-     (l.stage==='Quotation'?button('Create Sales Order','order','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
-     (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
+     (l.next_followup_at&&l.stage!=='Won'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(dates(l.next_followup_at))+'</b></div>':'')+
+     '<div class="gl-card-line"><span>Priority</span><b>'+escape(l.lead_heat||'Warm')+'</b></div>'+
+     '<div class="gl-card-actions gl-icon-row">'+contactIcons(l)+
+     ico('quick','Quick view','quick',l)+ico('stage','Move stage','move',l)+ico('history','History','detail',l)+
+     (ctx.canViewTeam?ico('assign','Assign employee','assign',l):'')+
+     (l.stage==='Quotation'?ico('order','Create Sales Order','order',l):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
   root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;
    if(el.dataset.glFilter==='company')ctx.filters.product=[];
@@ -158,9 +194,10 @@
   root.querySelectorAll('[data-gl-multi]').forEach(el=>el.onchange=()=>{
     const group=el.dataset.glMulti;
     ctx.filters[group]=[...root.querySelectorAll('[data-gl-multi="'+group+'"]:checked')].map(x=>x.value);
-    draw(ctx);
+    draw(ctx);root.querySelector('.gl-multi [data-gl-multi="'+group+'"]')?.closest('details')?.setAttribute('open','');
   });
   root.querySelectorAll('button[data-gl-action]').forEach(el=>el.onclick=()=>act(ctx,el));
+  root.querySelectorAll('.gl-multi').forEach(d=>d.ontoggle=()=>{if(d.open)root.querySelectorAll('.gl-multi').forEach(o=>{if(o!==d)o.open=false})});
   root.querySelectorAll('.gl-card').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:card.dataset.lead,company:card.dataset.company}));e.dataTransfer.effectAllowed='move'}));
   root.querySelectorAll('.gl-column').forEach(col=>{
     col.ondragover=e=>{e.preventDefault();col.classList.add('over')};
@@ -357,7 +394,7 @@
   root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
-  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},
+  const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
@@ -372,7 +409,7 @@
  async function mountShared(ctx){
   const key=ctx.userId+'|'+ctx.companyIds.join(',');
   if(cache.has(key))return cache.get(key);
-  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
+  const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
   await query(state);cache.set(key,state);return state;
  }
  async function renderCustomerTimeline(root,db,customerId,companies,staffName){
