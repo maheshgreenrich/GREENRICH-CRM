@@ -200,3 +200,24 @@ aside .logo{
  #app .main>header.gr-app-header .gr-header-controls .profile{min-width:90px!important;max-width:40vw!important}
  #app .main>header.gr-app-header .gr-header-controls #headerCompanySelect{font-size:10.5px!important}
 }
+
+ /* Color-coded globally shared notifications and protected exact-time reminder */
+ #toast{z-index:3000!important;max-width:min(420px,92vw);min-width:210px;box-shadow:0 12px 34px #122a4c35;opacity:0;transform:translateY(9px);transition:opacity .2s,transform .2s;border:1px solid transparent;font-weight:600;line-height:1.45}
+ #toast.show{opacity:1;transform:translateY(0)}
+ #toast[data-kind=success]{background:#dcfce7!important;color:#14532d!important;border-color:#86efac}
+ #toast[data-kind=error]{background:#fee2e2!important;color:#991b1b!important;border-color:#fca5a5}
+ #toast[data-kind=warning]{background:#fef3c7!important;color:#92400e!important;border-color:#fcd34d}
+ #toast[data-kind=info]{background:#dbeafe!important;color:#1e40af!important;border-color:#93c5fd}
+ .gr-due-modal{width:min(580px,95vw);max-height:90vh;overflow:auto;padding:0;border:2px solid #edb45c;border-radius:17px;box-shadow:0 28px 90px #10213b66;color:#193a61;font:14px/1.55 Inter,system-ui}
+ .gr-due-modal::backdrop{background:#172c4b9c}
+ .gr-due-head{padding:18px 22px;background:#fff0cc;border-bottom:1px solid #f2c672}
+ .gr-due-head h2{margin:4px 0;font-size:21px;color:#94540c}
+ .gr-due-content{display:grid;gap:10px;padding:19px 22px}
+ .gr-due-content p{margin:0}.gr-due-last{background:#f5f8fd;padding:10px;border-radius:9px}
+ .gr-due-content form{display:grid;gap:13px}
+ .gr-due-content label{display:grid;gap:7px;font-weight:650}
+ .gr-due-content input,.gr-due-content textarea{border:1px solid #cad9ec;border-radius:9px;padding:10px;width:100%;box-sizing:border-box;font:inherit}
+ .gr-due-content textarea{min-height:85px}.gr-due-actions{display:flex;gap:8px;justify-content:end;flex-wrap:wrap}
+ .gr-due-actions button,.gr-due-actions a{border:1px solid #bfcee3;border-radius:9px;background:white;padding:10px 14px;color:#264a8d;text-decoration:none;font-weight:650;cursor:pointer}
+ .gr-due-actions button{background:#2557be;color:white}.gr-due-error{color:#9f1239;font-weight:600}
+ 

@@ -11,7 +11,7 @@ assert.ok(crm.includes('navigate(allowedTabs.includes(view)?view:allowedTabs[0])
 assert.ok(crm.indexOf('navigate(allowedTabs.includes(view)?view:allowedTabs[0])')<crm.indexOf('await window.GreenRichSharedCustomers.ready'),'Show page before any network requests');
 assert.ok(crm.includes('const operationsReady=window.GreenRichSalesOps.mount'),'Dispatch retrieval must not delay first paint');
 assert.ok(crm.includes('switchPage:view=>'),'Public in-workspace navigation required');
-assert.ok(ui.includes('greenrich-dashboard.js?v=20261030-fast-1'),'Dashboard asset should load');
+assert.ok(ui.includes('greenrich-dashboard.js?v=20261030-modernbi-1'),'Dashboard asset should load');
 assert.ok(ui.includes('greenrich-actions.js?v=20261030-fast-1'),'Action menu should load');
 assert.ok(ui.includes('<option>Pending</option><option>Packed</option>'),'Dispatch must start pending');
 assert.ok(operations.includes("const sequence=['Pending','Packed','Shipped','Delivered']"),'Courier workflow stages must be ordered');
@@ -35,7 +35,7 @@ assert.ok(style.includes('.gr-exec-grid')&&style.includes('.gr-exec-ring'));
 const fake={window:{},Intl,Date,Number,String,Math,Object,Array,Map,Set};
 vm.runInNewContext(dash,fake);
 const dashboard=fake.window.GreenRichExecutiveDashboard;
-assert.equal(dashboard.widgets.length,10);
+assert.equal(dashboard.widgets.length,16);
 assert.equal(dashboard.periodStart('all'),'');
 assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(dashboard.periodStart('month')));
 console.log('PASS: immediate CRM navigation, pending dispatch, three-dot actions, interactive chart dashboard and per-user visibility');

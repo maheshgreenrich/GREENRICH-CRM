@@ -8,7 +8,28 @@
  const dates=x=>x?new Date(x).toLocaleString('en-IN'):'—';
  const contexts=new WeakMap();
  const notify=(ctx,s)=>ctx.notify?.(s);
+ const celebrateWon=(name)=>{
+  const cover=document.createElement('div');cover.className='gr-won-celebrate';
+  cover.innerHTML='<div class="gr-won-message"><div style="font-size:39px">🏆🎉</div><strong>Fantastic sale!</strong><p>'+
+    escape(name||'Customer')+' converted to Won</p><small>Keep up the great work!</small></div>';
+  const palette=['#16a34a','#2563eb','#f59e0b','#f43f5e','#8b5cf6'];
+  for(let i=0;i<60;i++){const p=document.createElement('span');p.className='gr-won-piece';
+    p.style.left=(i*73%100)+'%';p.style.background=palette[i%palette.length];
+    p.style.animationDelay=(i%8)*.08+'s';p.style.transform='rotate('+(i*42)+'deg)';cover.append(p)}
+  document.body.append(cover);setTimeout(()=>cover.remove(),3500);
+ };
+
  const styles=`
+
+ .gl-won-search{display:grid;gap:7px;margin:9px 0}
+ .gl-won-search input{width:100%;border:1px solid #cbd8e9;border-radius:8px;padding:10px}
+ .gr-won-celebrate{position:fixed;inset:0;z-index:9999;pointer-events:none;display:grid;place-items:center;background:#0b245047;animation:grwonfade 3.4s forwards}
+ .gr-won-message{padding:26px 42px;background:white;border:2px solid #67e8a5;border-radius:20px;box-shadow:0 24px 80px #092c4c66;text-align:center;color:#14532d;animation:grwonpop .4s ease-out}
+ .gr-won-message strong{display:block;font-size:26px;line-height:1.3}
+ .gr-won-piece{position:absolute;top:-30px;width:9px;height:16px;animation:grwonfall 2.9s linear forwards}
+ @keyframes grwonfall{to{transform:translateY(110vh) rotate(840deg)}}
+ @keyframes grwonpop{from{transform:scale(.72);opacity:0}to{transform:scale(1);opacity:1}}
+ @keyframes grwonfade{0%,70%{opacity:1}100%{opacity:0}}
  .gl-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:13px}
  .gl-head h3{margin:0;font-size:18px;color:#102c55}.gl-caption{font-size:12px;color:#637791}
  .gl-row{display:flex;gap:9px;align-items:end;flex-wrap:wrap;margin:14px 0}
@@ -51,6 +72,15 @@
  .gl-dialog label{display:flex;flex-direction:column;gap:5px;color:#526783;font-size:13px;margin:12px 0}
  .gl-dialog input,.gl-dialog select,.gl-dialog textarea{font:inherit;padding:10px;border-radius:9px;border:1px solid #ccd9e8;width:100%;box-sizing:border-box}
  .gl-dialog textarea{min-height:115px}.gl-dialog .actions{display:flex;justify-content:flex-end;gap:9px;margin-top:14px}
+
+ .gl-customer-timeline{padding:20px!important;max-width:100%;overflow:hidden}
+ .gl-customer-timeline>h3{font-size:17px!important;line-height:1.4!important;margin:0 0 5px!important}
+ .gl-customer-timeline>article{font-size:12.5px!important;color:#4b6180}
+ .gl-customer-timeline>article>b{font-size:13px!important;font-weight:700!important;color:#1c437d!important}
+ .gl-customer-timeline .gl-hist{max-height:none!important;overflow:visible!important;display:grid;gap:5px}
+ .gl-customer-timeline .gl-hist article{font-size:12px!important;padding:9px 11px!important;background:#f9fbff;border-radius:8px;border:1px solid #e4ebf5;line-height:1.5!important}
+ .gl-customer-timeline .gl-hist strong{font-size:13px!important;line-height:1.4!important;font-weight:650!important;color:#28528a!important}
+ .gl-customer-timeline .gl-hist p{font-size:12px!important;line-height:1.6!important;margin:4px 0 0!important}
  .gl-hist{max-height:250px;overflow:auto;margin-top:10px}.gl-hist article{border-bottom:1px solid #e2e8f0;padding:8px 0;font-size:12px}
  .gl-follow-table{width:100%;border-collapse:collapse;font-size:13px}.gl-follow-table th,.gl-follow-table td{padding:12px;text-align:left;border-bottom:1px solid #e5ebf5}
  @media(max-width:680px){.gl-main{grid-template-columns:repeat(2,1fr)}.gl-column{flex-basis:82vw}}
@@ -233,10 +263,12 @@
    l.stage==='Lost'?['Contacted']:[];
   if(!allowed.length){notify(ctx,'Won leads are closed. Ask Admin if a correction is needed.');return}
   const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
-  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id&&o.payload?.status!=='Cancelled');
-  const orderSelect='<label>Issued Sales Order — required for Won<select name="order">'+
+  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&
+   ['Issued','Confirmed','Approved','Completed','Dispatched'].includes(o.payload?.status));
+  const orderSelect='<div class="gl-won-search"><label>Search issued Sales Order ID<input type="search" name="order_search" placeholder="Type SO number, customer or amount…" autocomplete="off"></label></div>'+
+   '<label>Issued Sales Order — required for Won<select name="order">'+
     '<option value="">Choose customer-linked SO</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+
-      escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
+      escape(o.payload?.internal_order_id||o.record_id)+' · '+escape(o.payload?.customer_name||l.contact)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
   const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
   const firstFields=first?'<div class="gl-first-interests"><h4>Required when moving from New</h4>'+
    '<fieldset><legend>Interested products *</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
@@ -248,26 +280,41 @@
   const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
    selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
    firstFields+noteFld()+
-   selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+dateInput+orderSelect+
-   '<p class="gl-note">Won is allowed only after the customer-linked Sales Order has been issued. All other stages need a follow-up date and time.</p>';
+   '<div class="gl-move-heat">'+selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+'</div>'+dateInput+orderSelect+
+   '<p class="gl-note">Search and select an issued Sales Order. GreenRich verifies the order customer against this lead before Won conversion. All other stages need a follow-up date and time.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
    const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
    if(first&&(!products.length||!tags.length))throw Error('Select at least one product and tag before leaving New.');
-   if(stage==='Won'&&!l.customer_id)throw Error('Link or create the customer from their full details before marking Won.');
    if(stage==='Won'&&!fd.get('order'))throw Error('Choose an issued customer-linked Sales Order.');
    if(stage!=='Won'&&!fd.get('due'))throw Error('Next follow-up date and time required.');
    const due=fd.get('due')?new Date(fd.get('due')).toISOString():null;
-   const {error}=await ctx.db.rpc('gr_pipeline_advance',{
-    p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
-    p_products:products,p_tags:tags,p_order:stage==='Won'?fd.get('order'):null,
-    p_due_at:stage==='Won'?null:due,p_heat:fd.get('heat')
-   });if(error)throw error;
+   const {error}=stage==='Won'
+     ?await ctx.db.rpc('gr_pipeline_win_with_order',{p_company:l.company_id,p_lead:l.lead_id,p_order:fd.get('order'),p_note:fd.get('note')})
+     :await ctx.db.rpc('gr_pipeline_advance',{
+        p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+        p_products:products,p_tags:tags,p_order:null,
+        p_due_at:due,p_heat:fd.get('heat')
+      });
+   if(error)throw error;
+   if(stage==='Won')setTimeout(()=>celebrateWon(l.contact||l.title),180);
   });
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
   const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
    due.closest('label').hidden=won;due.required=!won;order.closest('label').hidden=!won;order.required=won;
+   d.querySelector('.gl-move-heat').hidden=won;
+   d.querySelector('.gl-won-search').hidden=!won;
   };stage.onchange=controls;controls();
+  const search=d.querySelector('[name=order_search]');
+  search?.addEventListener('input',()=>{
+    const term=search.value.toLowerCase().trim();
+    [...d.querySelector('[name=order]').options].forEach(option=>{
+      if(!option.value)return;
+      option.hidden=!!term&&!option.textContent.toLowerCase().includes(term);
+    });
+    const chosen=d.querySelector('[name=order]');
+    if(chosen.selectedOptions[0]?.hidden)chosen.value='';
+  });
  }
  async function act(ctx,b){
   const action=b.dataset.glAction,l=getLead(ctx,b.dataset.id,b.dataset.company);
