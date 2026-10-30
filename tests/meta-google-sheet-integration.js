@@ -14,7 +14,7 @@ assert.ok(direct.includes('greenrich-meta-sync.js?v=20261030-meta-sync-2'),'Dire
 assert.ok(setup.includes("db.rpc('gr_meta_sheet_status'"),'Direct page must use server authorization');
 assert.ok(page.includes('greenrich-meta-sync.js?v=20261030-meta-sync-2'));
 assert.ok(page.indexOf('greenrich-meta-sync.js?v=')<page.indexOf('greenrich-lead-pipeline.js?v='));
-assert.ok(leads.includes("button('Won sales history','history')+button('Meta Leads Sync','metasync')"));
+assert.ok(leads.includes("button('Won sales history','history')+button('Sheet Integrations / Duplicates','metasync')"));
 assert.ok(leads.includes("window.GreenRichMetaSync.open(ctx)"));
 assert.ok(wizard.includes("gr_meta_sheet_configure")&&wizard.includes("gr_meta_sheet_status"));
 assert.ok(wizard.includes("const access=await ctx.db.rpc('gr_meta_sheet_status'"),'Role must be checked by backend');
