@@ -257,7 +257,7 @@ grant execute on function public.gr_pipeline_move(text,text,text,text,text,date)
 -- Link an existing shared customer to the lead before converting it to Won.
 create or replace function public.gr_pipeline_link_customer(p_company text,p_lead text,p_customer uuid,p_note text)
 returns void language plpgsql security definer set search_path=''
-as $
+as $$
 declare v public.gr_lead_pipeline%rowtype;
 begin
  select * into v from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead for update;
@@ -270,7 +270,7 @@ begin
  where company_id=p_company and kind='leads' and record_id=p_lead;
  insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
  values(p_company,p_lead,auth.uid(),'CUSTOMER_LINKED',v.stage,v.stage,btrim(p_note));
-end $;
+end $$;
 revoke all on function public.gr_pipeline_link_customer(text,text,uuid,text) from public;
 grant execute on function public.gr_pipeline_link_customer(text,text,uuid,text) to authenticated;
 
