@@ -32,6 +32,8 @@ jobs:
           node --check greenrich-branding.js
           node tests/sidebar-logo-responsive.js
           node --check greenrich-operations.js
+          node --check greenrich-workflow-training.js
+          node tests/operations-product-workflow-training.js
           node --check greenrich-operations-seed.js
           node tests/operations-workflow-mapping.js
           node --check greenrich-company-admin.js
