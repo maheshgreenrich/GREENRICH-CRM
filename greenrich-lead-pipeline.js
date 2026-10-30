@@ -263,7 +263,7 @@
    l.stage==='Lost'?['Contacted']:[];
   if(!allowed.length){notify(ctx,'Won leads are closed. Ask Admin if a correction is needed.');return}
   const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
-  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&o.payload?.customer_id===l.customer_id&&
+  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&
    ['Issued','Confirmed','Approved','Completed','Dispatched'].includes(o.payload?.status));
   const orderSelect='<div class="gl-won-search"><label>Search issued Sales Order ID<input type="search" name="order_search" placeholder="Type SO number, customer or amount…" autocomplete="off"></label></div>'+
    '<label>Issued Sales Order — required for Won<select name="order">'+
@@ -281,19 +281,21 @@
    selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
    firstFields+noteFld()+
    '<div class="gl-move-heat">'+selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+'</div>'+dateInput+orderSelect+
-   '<p class="gl-note">Won is allowed only after the customer-linked Sales Order has been issued. All other stages need a follow-up date and time.</p>';
+   '<p class="gl-note">Search and select an issued Sales Order. GreenRich verifies the order customer against this lead before Won conversion. All other stages need a follow-up date and time.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
    const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
    if(first&&(!products.length||!tags.length))throw Error('Select at least one product and tag before leaving New.');
-   if(stage==='Won'&&!l.customer_id)throw Error('Link or create the customer from their full details before marking Won.');
    if(stage==='Won'&&!fd.get('order'))throw Error('Choose an issued customer-linked Sales Order.');
    if(stage!=='Won'&&!fd.get('due'))throw Error('Next follow-up date and time required.');
    const due=fd.get('due')?new Date(fd.get('due')).toISOString():null;
-   const {error}=await ctx.db.rpc('gr_pipeline_advance',{
-    p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
-    p_products:products,p_tags:tags,p_order:stage==='Won'?fd.get('order'):null,
-    p_due_at:stage==='Won'?null:due,p_heat:fd.get('heat')
-   });if(error)throw error;
+   const {error}=stage==='Won'
+     ?await ctx.db.rpc('gr_pipeline_win_with_order',{p_company:l.company_id,p_lead:l.lead_id,p_order:fd.get('order'),p_note:fd.get('note')})
+     :await ctx.db.rpc('gr_pipeline_advance',{
+        p_company:l.company_id,p_lead:l.lead_id,p_stage:stage,p_note:fd.get('note'),
+        p_products:products,p_tags:tags,p_order:null,
+        p_due_at:due,p_heat:fd.get('heat')
+      });
+   if(error)throw error;
    if(stage==='Won')setTimeout(()=>celebrateWon(l.contact||l.title),180);
   });
   const stage=d.querySelector('[name=stage]');stage.value=next;
