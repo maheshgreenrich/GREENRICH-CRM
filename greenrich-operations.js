@@ -96,7 +96,51 @@
  }
  function bomInspector(){
   const drafts=scopeRows('bom'),missing=drafts.filter(l=>!(Number(l.qty)>0)||!l.parent_code||!l.child_code),validated=drafts.filter(l=>l.status==='Validated');
-  return '<div class="gr-ops-bom-review"><div><h3>FG-001 BOM verification</h3><p>'+drafts.length+' mapping lines · '+validated.length+' validated · '+missing.length+' with missing quantities or codes</p></div><p>No purchase or work-order demand is automatically released from draft lines. Confirm hierarchy, revision, UOM, source and material quantity before approving the BOM.</p></div>';
+  return '<div class="gr-ops-bom-review"><div><h3>Multi-level BOM verification</h3><p>'+drafts.length+' mapping lines · '+validated.length+' validated · '+missing.length+' with missing quantities or codes</p></div><p>No purchase or work-order demand is automatically released from draft lines. Confirm hierarchy, revision, UOM, source and material quantity before approving the BOM.</p></div>'+
+   '<div class="gr-ops-plan"><div><h3>Material requirement preview</h3><p>Explode FG → SFG → IM → RM after the full BOM for that product is validated. This is a read-only quantity preview, not a warehouse stock movement.</p></div>'+
+   '<div class="gr-ops-plan-fields"><label>Company<select id="gr-ops-plan-company">'+companyIds.map(id=>'<option value="'+id+'">'+esc(companyName(id))+'</option>').join('')+'</select></label>'+
+   '<label>Finished product<select id="gr-ops-plan-product">'+allKind('material').filter(m=>m.type==='FG').map(m=>'<option value="'+esc(m.code)+'" data-company="'+esc(m._companyId)+'">'+esc(m.code)+' — '+esc(m.name)+'</option>').join('')+'</select></label>'+
+   '<label>Build quantity<input id="gr-ops-plan-qty" type="number" min="1" step="1" value="1"></label><button type="button" class="gr-ops-primary" data-plan-bom="yes">Preview materials</button></div>'+
+   '<div id="gr-ops-plan-output" aria-live="polite"></div></div>';
+ }
+ function explodeBom(company,rootCode,count){
+  if(!companyIds.includes(company))throw Error('Company not assigned to this user');
+  if(!Number.isInteger(count)||count<=0)throw Error('Enter a positive whole-number production quantity');
+  const materials=allKind('material').filter(m=>m._companyId===company),bom=allKind('bom').filter(l=>l._companyId===company);
+  const byCode=new Map(materials.map(m=>[m.code,m]));
+  if(!byCode.has(rootCode))throw Error('Finished product not found for this company');
+  const totals=new Map();
+  function visit(code,qty,trail){
+   if(trail.includes(code))throw Error('BOM loop detected: '+[...trail,code].join(' → '));
+   if(trail.length>12)throw Error('BOM is too deep; check the structure');
+   const lines=bom.filter(x=>x.parent_code===code);
+   if(!lines.length){
+    if(code===rootCode)throw Error('No BOM links recorded for this finished product');
+    const item=byCode.get(code);if(!item)throw Error('Material '+code+' not found');
+    const previous=totals.get(code)||{code,name:item.name,qty:0,uom:item.uom||'—',source:item.source_type||'Unspecified'};
+    previous.qty+=qty;totals.set(code,previous);return;
+   }
+   const unapproved=lines.find(x=>x.status!=='Validated'||!(Number(x.qty)>0)||!x.uom);
+   if(unapproved)throw Error('BOM '+code+' has unapproved or incomplete line '+unapproved.child_code+'. Ask Operations to verify all lines first.');
+   for(const link of lines){
+    if(!byCode.has(link.child_code))throw Error('BOM references unknown material '+link.child_code);
+    visit(link.child_code,qty*Number(link.qty),[...trail,code]);
+   }
+  }
+  visit(rootCode,count,[]);
+  return [...totals.values()].sort((a,b)=>a.code.localeCompare(b.code));
+ }
+ function showBomPlan(){
+  const company=host.querySelector('#gr-ops-plan-company')?.value;
+  const product=host.querySelector('#gr-ops-plan-product')?.value;
+  const count=Number(host.querySelector('#gr-ops-plan-qty')?.value);
+  const area=host.querySelector('#gr-ops-plan-output');if(!area)return;
+  try{
+   const lines=explodeBom(company,product,count);
+   area.innerHTML='<div class="gr-ops-plan-ready"><strong>'+lines.length+' material requirements · '+count+' finished products</strong><div class="gr-ops-scroll"><table class="gr-ops-table"><thead><tr><th>Material code</th><th>Description</th><th>Calculated quantity</th><th>Unit</th><th>Source</th></tr></thead><tbody>'+
+    lines.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.name)+'</td><td>'+esc(Number(x.qty.toFixed(4)))+'</td><td>'+esc(x.uom)+'</td><td>'+esc(x.source)+'</td></tr>').join('')+
+    '</tbody></table></div></div>';
+  }catch(error){area.innerHTML='<div class="gr-ops-note">'+esc(error.message)+'</div>'}
  }
  function draw(){
   if(!host?.isConnected)return;
@@ -189,9 +233,11 @@
    const edit=event.target.closest('[data-edit-record]');if(edit){openEditor(edit.dataset.editRecord,edit.dataset.editCompany);return}
    if(event.target.closest('[data-cancel-record]')){host.querySelector('#gr-ops-editor').close();return}
    if(event.target.closest('[data-refresh]')){void reload();return}
-   if(event.target.closest('[data-import]')){void importExample()}
+   if(event.target.closest('[data-import]')){void importExample();return}
+   if(event.target.closest('[data-plan-bom]')){showBomPlan();return}
   });
   host.querySelector('#gr-ops-form').onsubmit=saveRecord;
+  host.addEventListener('change',event=>{if(event.target.id==='gr-ops-plan-company'){const id=event.target.value;host.querySelectorAll('#gr-ops-plan-product option').forEach(option=>{option.hidden=option.dataset.company!==id});const valid=[...host.querySelectorAll('#gr-ops-plan-product option')].find(option=>!option.hidden);if(valid)host.querySelector('#gr-ops-plan-product').value=valid.value;}});
   host.addEventListener('input',event=>{if(event.target.id==='gr-ops-search'){const term=event.target.value.toLowerCase();host.querySelectorAll('.gr-ops-table tbody tr').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(term))}});
   draw();await reload();
   if(host?.isConnected){
