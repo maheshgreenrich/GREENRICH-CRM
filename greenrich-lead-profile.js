@@ -5,13 +5,16 @@ window.GreenRichLeadProfile=(function(){
  const css='.grlp{font:13px/1.6 Inter,system-ui;color:#173454}.grlp h2{font-size:22px;margin:0}.grlp h3{font-size:16px}.grlp .muted{color:#64758a}.grlp .head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px}.grlp .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grlp .panel{background:#fff;border:1px solid #dbe5f1;padding:18px;border-radius:12px;margin:11px 0}.grlp .kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:7px;border-bottom:1px solid #edf2f7;padding:6px 0}.grlp .kv span:first-child{color:#62758a}.grlp .chip{display:inline-block;background:#e9f0fa;color:#214974;border-radius:30px;padding:3px 9px}.grlp .actions{display:flex;gap:7px;flex-wrap:wrap}.grlp .actions a,.grlp button{display:inline-block;border:1px solid #c7d8ef;background:#fff;border-radius:8px;padding:8px 11px;color:#2453a2;text-decoration:none;font-size:12px;cursor:pointer}.grlp .event{border-left:3px solid #cdddf2;padding:6px 12px;margin:10px 0}.grlp .answer{display:grid;grid-template-columns:180px 1fr;gap:9px;border-bottom:1px solid #e9eef5;padding:8px 0;overflow-wrap:anywhere}.grlp .scroll{overflow:auto;max-height:420px}@media(max-width:700px){.grlp .grid,.grlp .kv,.grlp .answer{grid-template-columns:1fr}}';
  const kv=(label,v)=>'<div class="kv"><span>'+esc(label)+'</span><span>'+esc(v??'—')+'</span></div>';
  let current=null;
- async function open({db,company,leadId,quick=false}){
+ async function open({db,company,leadId,quick=false,host=null,onClose=null}){
   if(!db||!company||!leadId)throw Error('Lead ID and company are required');
   if(current?.open)current.close();
-  const d=document.createElement('dialog');d.className='grlp';
-  d.style.cssText='width:min(1100px,96vw);max-width:none;max-height:95vh;overflow:auto;border:1px solid #d1dce9;border-radius:15px;padding:24px';
+  const inline=!!host,d=document.createElement(inline?'section':'dialog');
+  d.className='grlp'+(inline?' grlp-full':'');
+  d.style.cssText=inline?'min-height:70vh;padding:10px 4px':'width:min(680px,94vw);max-width:none;max-height:90vh;overflow:auto;border:1px solid #d1dce9;border-radius:15px;padding:24px';
+  const close=()=>{if(inline){d.remove();onClose?.()}else d.close()};
   d.innerHTML='<style>'+css+'</style><h2>Lead / Customer Details</h2><p>Loading…</p>';
-  document.body.append(d);current=d;d.onclose=()=>{if(current===d)current=null;d.remove()};d.showModal();
+  (host||document.body).append(d);current=d;
+  if(!inline){d.onclose=()=>{if(current===d)current=null;d.remove()};d.showModal()}
   try{
    const [l,h,r,orders,answers,customer,tags,products]=await Promise.all([
     db.from('gr_lead_pipeline').select('*').eq('company_id',company).eq('lead_id',leadId).maybeSingle(),
@@ -57,7 +60,8 @@ window.GreenRichLeadProfile=(function(){
      '<span class="chip">Possible duplicate '+esc(lead.import_duplicate_type)+' — '+esc(lead.import_duplicate_review)+'</span>':'';
    const result='<div class="head"><div><h2>'+esc(p.name||lead.contact||lead.title)+'</h2><span class="chip">'+esc(lead.stage)+'</span> '+dup+
       '<p class="muted">'+esc(company==='grow-india'?'GreenRich Grow India Pvt Ltd':'GreenRich Enviro Solutions Pvt Ltd')+'</p></div>'+
-      '<div class="actions">'+links+'<button type="button" data-close>Close</button></div></div>'+
+      '<div class="actions">'+links+(quick?'<button type="button" data-full>Full page view</button>':'')+
+       '<button type="button" data-close>'+(inline?'← Back to Customers':'Close')+'</button></div></div>'+
       '<div class="grid"><section class="panel"><h3>Customer & Lead Information</h3>'+
        kv('Name',p.name||lead.contact||lead.title)+kv('Mobile',lead.mobile)+kv('Email',lead.email)+
        kv('City',p.city)+kv('Address',p.address1||p.address)+kv('Product enquiry',productDisplay)+
@@ -81,7 +85,12 @@ window.GreenRichLeadProfile=(function(){
         (x.new_assignee?' · Assigned to '+esc(person(x.new_assignee)):'')+'</p><p>'+esc(x.note||'')+'</p></div>').join(''):
        '<p>No activity recorded yet.</p>')+'</section>');
    d.innerHTML='<style>'+css+'</style>'+result;
-   d.querySelector('[data-close]').onclick=()=>d.close();
+   d.querySelector('[data-close]').onclick=close;
+   const full=d.querySelector('[data-full]');
+   if(full)full.onclick=()=>{close();window.GreenRichCRM?.switchPage?.('customers');
+     window.GreenRichShell?.setPageWithoutRemount?.('customers');
+     window.GreenRichContacts?.openLeadProfile?.(company,leadId);
+   };
   }catch(e){
    d.innerHTML='<style>'+css+'</style><section class="panel"><h2>Lead Details unavailable</h2><p>'+esc(e.message)+'</p><button type="button" data-close>Close</button></section>';
    d.querySelector('[data-close]').onclick=()=>d.close();
