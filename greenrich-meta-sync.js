@@ -7,9 +7,12 @@ window.GreenRichMetaSync=(function(){
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const opts=(rows)=>rows.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
  async function open(ctx){
-  if(!ctx.admin){ctx.notify?.('Only an Admin can configure automated Meta leads.');return}
   const companies=ctx.companyIds||[];
   if(!companies.length)throw Error('No company access');
+  // Read-only authorization preflight. Do not trust a stale UI role flag.
+  // The database RPC authorizes only active Admin users in this company.
+  const access=await ctx.db.rpc('gr_meta_sheet_status',{p_company:companies[0]});
+  if(access.error)throw Error('Meta Leads Sync requires company Admin permission: '+access.error.message);
   const d=document.createElement('dialog');d.className='gl-dialog';
   d.style.cssText='width:min(650px,94vw);max-height:89vh;overflow:auto;padding:23px';
   d.innerHTML='<h3>Connect Meta Ads Google Sheet</h3>'+
