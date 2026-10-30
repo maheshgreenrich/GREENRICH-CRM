@@ -131,7 +131,7 @@
    field('source','Customer source',false,[[ '', 'Select source'], ...[...new Set([...sources.map(x=>x.name),record.source].filter(Boolean))].map(s=>[s,s])],record.source||''),
    '<fieldset class="gr-contact-tags"><legend>Tags</legend>'+(tags().length?tags().map(t=>'<label><input type="checkbox" name="tag_ids" value="'+esc(t.id)+'" '+((record.tag_ids||[]).includes(t.id)?'checked':'')+'><span>'+esc(t.name)+'</span></label>').join(''):'<p>Admin can add tags in Settings → Customer Tags.</p>')+'</fieldset>',
    ...(kind==='lead'?[
-    field('company_id','GreenRich company',true,context.companyIds.map(c=>[c,companyLabel(c)]),owner||context.selectedCompany()),
+    field('company_id','GreenRich company',true,[['','Select company'],...context.companyIds.map(c=>[c,companyLabel(c)])],owner||(context.selectedCompany()==='all'?'':context.selectedCompany())),
     field('title','Lead / enquiry title',false,null,record.title),
     field('products','Products interested in',false,null,record.products),
     field('enquiry_details','Enquiry-related details',false,null,record.enquiry_details),
@@ -317,10 +317,11 @@
    const inputRows=await readSheet(file);
    if(!inputRows.length)throw Error('The spreadsheet is empty.');
    let collection=customers().slice();
-   const owner=context.selectedCompany()==='all'?context.companyIds[0]:context.selectedCompany();
+   const owner=context.selectedCompany()==='all'?'':context.selectedCompany();
    const leadCollection=leads().slice();
    for(const [index,input] of inputRows.entries()){
     try{
+     if(kind==='lead'&&!input.company_id&&!owner)throw Error('Select one working company in the top selector, or provide GreenRich company in Excel.');
      const row=parseImport(input,kind,owner);
      if(kind==='customer'){
       if(duplicateCustomer(row,'',collection)){skipped++;continue}
