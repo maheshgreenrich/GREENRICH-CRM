@@ -144,7 +144,8 @@ from public.gr_profiles p join public.gr_roles r on p.role_id=r.id
 where p.active and p_company=any(p.company_ids)
 and (
   r.name in ('Sales','Telecaller')
-  or exists(select 1 from public.gr_role_permissions x where x.role_id=p.role_id and x.module='leads' and x.action='view' and x.allowed)
+  or (r.name not in ('Admin','Director','Marketing','Operation','Accounts','Office Admin','Developer')
+      and exists(select 1 from public.gr_role_permissions x where x.role_id=p.role_id and x.module='leads' and x.action='edit' and x.allowed))
 )
 and exists (select 1 from public.gr_profiles me where me.id=(select auth.uid()) and me.active and p_company=any(me.company_ids))
 and (
