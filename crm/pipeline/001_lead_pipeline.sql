@@ -114,7 +114,7 @@ select r.company_id,r.record_id,
       then (r.payload->>'value')::numeric(18,2) else 0 end,
  coalesce(r.payload->>'notes',''),
  case when (r.payload->>'followup')~'^\d{4}-\d{2}-\d{2}$' then (r.payload->>'followup')::date else null end,
- coalesce(r.created_at,now()),r.created_by
+ coalesce(case when (r.payload->>'created_at') ~ '^\\d{4}-\\d{2}-\\d{2}' then (r.payload->>'created_at')::timestamptz end, r.updated_at,now()),r.created_by
 from public.gr_crm_records r
 where r.kind='leads'
 on conflict(company_id,lead_id) do nothing;
