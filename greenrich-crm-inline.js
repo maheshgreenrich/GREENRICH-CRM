@@ -661,7 +661,10 @@ async function saveEditor(event){
    toast(editId?'Shared customer updated':'Customer saved for all GreenRich employees');
   }catch(error){toast('Unable to save shared customer: '+error.message)}
   return;
- }else if(editing==='leads')row.value=Number(row.value)||0;
+ }else if(editing==='leads'){
+  row.value=Number(row.value)||0;
+  row.created_at=old?.created_at||new Date().toISOString();
+ }
  if(editing!=='sales')row.id=editId||uid();
  if(old)Object.assign(old,row);else copy[editing].push(row);
  if(!saveCompanyData(targetId,copy))return;
