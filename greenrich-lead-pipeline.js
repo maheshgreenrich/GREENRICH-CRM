@@ -97,7 +97,9 @@
   const root=ctx.root;if(!root?.isConnected)return;
   const rows=picked(ctx),wins=rows.filter(l=>l.stage==='Won'),quoted=rows.filter(l=>l.stage==='Quotation');
   const stat=[['Visible leads',rows.length],['Quotation follow-ups',quoted.length],['Won sales orders',wins.filter(l=>l.won_order_id).length],['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
-  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+button('Won sales history','history')+'</div></div>'+
+  root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
+    (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
+    button('Won sales history','history')+'</div></div>'+
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
@@ -192,6 +194,38 @@
    const wins=picked(ctx).filter(x=>x.stage==='Won').sort((a,b)=>(b.won_at||'').localeCompare(a.won_at||''));
    const d=dialog(ctx,'Won sales history','<div class="gl-hist">'+(wins.length?wins.map(l=>'<article><b>'+escape(l.title)+'</b> · '+escape(name(ctx,l.assigned_to))+' · '+escape(companyText(ctx,l.company_id))+'<p>Order: '+escape(ctx.orders.find(o=>o.record_id===l.won_order_id)?.payload?.internal_order_id||l.won_order_id)+' · '+money(saleTotal(ctx,l))+'</p><small>'+escape(dates(l.won_at))+'</small></article>').join(''):'No won sales orders recorded')+'</div>',async()=>{});
    d.querySelector('[type=submit]').hidden=true;return;
+  }
+  if(action==='legacy'){
+   const companies=ctx.companyIds.filter(c=>!!localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+c));
+   const first=companies[0];if(!first)throw Error('No saved legacy leads remain');
+   const d=dialog(ctx,'Assign saved browser leads',
+    '<p class="gl-note">These old browser-only leads were preserved before updating security. Choose the responsible employee. Existing IDs are retained, and successful imports are removed from the backup only after saving.</p>'+
+    selectFld('Company','company',companies.map(c=>[c,companyText(ctx,c)]))+
+    selectFld('Assign to salesperson','assignee',[['','Choose salesperson'],...ctx.staff.filter(p=>p.company_id===first).map(p=>[p.id,p.full_name])]),
+    async fd=>{
+     const company=fd.get('company'),person=fd.get('assignee');
+     if(!person)throw Error('Choose a salesperson');
+     const key='greenrich-crm-pipeline-legacy-backup:'+company;
+     const raw=localStorage.getItem(key),records=JSON.parse(raw||'[]');
+     if(!Array.isArray(records))throw Error('Saved browser backup is invalid');
+     const remaining=[];let count=0;
+     for(const record of records){
+      const known=ctx.leads.some(l=>l.company_id===company&&l.lead_id===record.id);
+      if(known){count++;continue}
+      const {error}=await ctx.db.rpc('gr_pipeline_create',{
+       p_company:company,p_title:record.title||record.name||'Enquiry',p_contact:record.contact||record.name||'',
+       p_assignee:person,p_source:record.source||'',p_product:record.product_id||null,
+       p_value:Number(record.value)||0,p_mobile:record.mobile||'',p_email:record.email||'',
+       p_tags:record.tag_ids||[],p_customer:record.customer_id||null,p_note:record.notes||'Imported from saved browser records',
+       p_legacy_id:record.id
+      });
+      if(error){remaining.push(record);continue}count++;
+     }
+     if(remaining.length)localStorage.setItem(key,JSON.stringify(remaining));else localStorage.removeItem(key);
+     notify(ctx,'Imported '+count+' saved leads'+(remaining.length?'; '+remaining.length+' remain in protected browser backup':''));
+    });
+   const co=d.querySelector('[name=company]'),staff=d.querySelector('[name=assignee]');
+   co.onchange=()=>{staff.innerHTML=choices([['','Choose salesperson'],...ctx.staff.filter(p=>p.company_id===co.value).map(p=>[p.id,p.full_name])],'')};co.onchange();return;
   }
   if(action==='new'||action==='import'){
    const companies=ctx.companyIds,defaultCompany=ctx.filters.company!=='all'?ctx.filters.company:companies[0];
