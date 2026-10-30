@@ -156,7 +156,7 @@
   const localDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
   const today=localDay(Date.now());
   const dueTime=l=>l.next_followup_at?new Date(l.next_followup_at).getTime():l.next_followup?new Date(l.next_followup+'T23:59:59+05:30').getTime():NaN;
-  const due=rows.filter(l=>l.stage!=='Won'&&l.stage!=='Lost'&&Number.isFinite(dueTime(l)));
+  const due=rows.filter(l=>l.stage!=='Won'&&Number.isFinite(dueTime(l)));
   const todayDue=due.filter(l=>localDay(dueTime(l))===today).length;
   const overdue=due.filter(l=>dueTime(l)<Date.now()&&localDay(dueTime(l))!==today).length;
   const newToday=rows.filter(l=>localDay(l.created_at)===today).length;
@@ -167,7 +167,7 @@
     ['Won order value',money(wins.reduce((v,l)=>v+saleTotal(ctx,l),0))]];
   root.innerHTML='<div class="gl-head"><div><h3>Leads Pipeline</h3><div class="gl-caption">Assigned leads, quotation progress and sales history in one workspace</div></div><div class="gl-card-actions">'+button('+ New lead','new')+button('Import leads CSV','import')+
     (ctx.companyIds.some(co=>localStorage.getItem('greenrich-crm-pipeline-legacy-backup:'+co))?button('Assign saved leads','legacy'):'')+
-    button('Won sales history','history')+button('Sheet Integrations / Duplicates','metasync')+'</div></div>'+
+    button('Won sales history','history')+(ctx.admin?button('Sheet Integrations / Duplicates','metasync'):'')+'</div></div>'+
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
@@ -358,7 +358,7 @@
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
       p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
-    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
+    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
     '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Admin may choose Common, otherwise select your Sales account. All imported records start in New.</p>'+
@@ -378,7 +378,7 @@
       }
       notify(ctx,'Imported '+success+' leads'+(errors.length?'; '+errors.length+' errors. First: '+errors[0]:''));
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]');comp.value=defaultCompany;
-    comp.onchange=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'')};comp.onchange();return;
+    comp.onchange=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId};comp.onchange();return;
   }
  }
  function parseCSV(raw){const rows=[];let row=[],field='',quoted=false;for(let i=0;i<raw.length;i++){const c=raw[i];
@@ -394,12 +394,26 @@
   // The Leads template contains only a loading marker. Replace it with the actual board.
   root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
+  document.addEventListener('pointerdown',event=>{
+    if(root.isConnected&&!event.target.closest?.('.gl-multi'))
+      root.querySelectorAll('.gl-multi').forEach(d=>d.open=false);
+  });
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
   const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
-  return state;
+  const reminded=new Set();
+  const checkReminders=()=>{
+   if(!board.isConnected){clearInterval(tick);return}
+   const now=Date.now(),due=state.leads.filter(l=>l.stage!=='Won'&&l.next_followup_at&&
+     new Date(l.next_followup_at).getTime()<=now&&new Date(l.next_followup_at).getTime()>now-86400000&&
+     !reminded.has(l.company_id+':'+l.lead_id));
+   due.forEach(l=>reminded.add(l.company_id+':'+l.lead_id));
+   if(due.length)notify(state,due.length+' follow-up'+(due.length>1?'s are':' is')+' due. Open Leads & CRM to call.');
+  };
+  const tick=setInterval(checkReminders,60000);
+  checkReminders();return state;
  }
  async function mountFollowups(root,ctx){
   if(!root)return;
