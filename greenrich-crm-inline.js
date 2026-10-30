@@ -14,7 +14,7 @@ const initial=()=>({version:4,orderSequence:0,invoiceSequences:{},tags:[],produc
 let data;try{data=JSON.parse(localStorage.getItem(storageKey()))||initial();if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Invalid database')}catch{data=initial()}
 let page='dashboard',editId='',editing='',charts=[],currentCustomerId='',currentSourceSaleId='';
 const persist=()=>saveCompanyData(activeCompany,data);
-const toast=s=>{let n=$('#toast');n.textContent=s;n.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.remove('show'),4300)};
+const toast=(s,type)=>window.GreenRichNotify?.(s,type);
 const scopedCompanyIds=()=>companyScope==='all'?permittedCompanies:[companyScope];
 const scopeRows=k=>k==='customers'?data.customers:scopedCompanyIds().flatMap(companyId=>loadCompanyData(companyId)[k].map(row=>({...row,_companyId:companyId})));
 const ownerOf=(k,id)=>k==='customers'?activeCompany:(scopedCompanyIds().find(companyId=>loadCompanyData(companyId)[k].some(row=>row.id===id))||'');
