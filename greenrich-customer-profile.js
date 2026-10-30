@@ -82,7 +82,7 @@
     '<td><span class="gr360-status">'+esc(s.invoice_status||'Draft')+'</span><small>'+esc(s.invoice_number||'Not numbered')+'</small></td>'+
     '<td><span class="gr360-status '+(delivery?.status==='Delivered'?'delivered':'')+'">'+esc(delivery?.status||'Awaiting dispatch')+'</span>'+
     (delivery?.tracking_number?'<small>'+esc(delivery.courier_name||'Courier')+' · '+esc(delivery.tracking_number)+'</small>':'')+'</td>'+
-    '<td><div class="gr360-row-actions">'+linkButton('View invoice','invoice:'+key)+linkButton('WhatsApp','invoice-whatsapp:'+key)+linkButton('Email','invoice-email:'+key)+'</div></td></tr>';
+    '<td><div class="gr360-row-actions">'+window.GreenRichActionMenu.wrap(linkButton('View invoice','invoice:'+key)+linkButton('WhatsApp','invoice-whatsapp:'+key)+linkButton('Email','invoice-email:'+key))+'</div></td></tr>';
   }).join('')+'</tbody></table></div>';
  }
  function shipmentList(model){
