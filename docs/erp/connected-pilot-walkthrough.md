@@ -9,7 +9,7 @@ Open GreenRich ONE → Operations & Production → **Connected Order-to-Stock ·
 - Company: GreenRich Grow India Pvt Ltd
 - SKU: **PILOT-HOME-40**, description: *Home Composter 40L — Workflow Test*
 - New CRM product master record: **[PILOT] Home Composter 40L**, price ₹0, inactive, initial stock **0**
-- One company-scoped test SO: **[TEST] Sample Customer (no real commitment)**, quantity **1**
+- Two company-scoped TEST SOs: **[TEST] Sample Customer (no real commitment)**, quantity **1**, untouched at stock check; and **[TEST] Completed System Walkthrough**, quantity **1**, system-generated example with all 13 stages, vendor PO, stock +1/−1, and service ticket.
 - Demo BOM: collection tab ×1, lid/top cap ×1, inner tray ×1
 - Choose existing **Sivaji Enterprises** vendor draft; its mobile/address/GST are NOT verified and have not been fabricated
 - Vendor PO creates `PILOT-PO-xxxx` in dedicated pilot history and does not issue a legal/commercial purchase order
@@ -71,3 +71,7 @@ RLS scopes all reads to companies. Transaction functions enforce active role, re
 - No general multi-item production reservations, landed costs, batch/serial tracking or multiple warehouses are implemented.
 - Commercial Sales Orders remain on the existing Sales Orders page. Pilot test orders are intentionally separate to avoid polluting revenue/dispatch reports.
 - The example is a functional pilot for learning and testing. For commercial go-live, replace sample material sources with real approved BOM, opening stock, vendor details, departmental sign-offs and inventory audit controls.
+
+
+## Two-order demo data (added after initial migration)
+The database contains one **fresh** order for you to operate, plus one **completed** sample with system-generated notes. Select the completed order from the Sales Order dropdown to read all vendor/job-work/QC/service history; select the fresh order to advance the stages yourself. The completed sample leaves final finished stock at zero because its accepted +1 unit has been dispatched (−1). Its material ledger leaves 40 kg with the vendor. All entries are marked test data. No real supplier transaction has been issued.
