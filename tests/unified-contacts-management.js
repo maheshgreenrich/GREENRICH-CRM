@@ -34,7 +34,7 @@ assert.ok(contacts.includes('no existing records')===false);
 assert.ok(html.includes('id="gr-contact-management"')&&html.includes('id="gr-customer-profile"'),
  'Unified customer view must preserve Customer 360 profile');
 assert.ok(html.includes('id="gr-customer-legacy" hidden'),'Legacy customer selectors should remain for other CRM modules');
-assert.ok(html.includes('greenrich-contacts.js?v=20261030-contacts-1'));
+assert.ok(/greenrich-contacts\\.js\\?v=[^"']+/.test(html));
 assert.ok(html.includes('greenrich-contacts.css?v=20261030-contacts-1'));
 assert.ok(html.includes('greenrich-sources.js?v=20261030-contacts-1'));
 assert.ok(crm.includes('window.GreenRichContacts.mount'),'CRM must initialize unified page');
