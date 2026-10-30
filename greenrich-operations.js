@@ -21,7 +21,7 @@
   service:{label:'Installation, warranty & service',module:'customers',fields:[['customer','Customer name','text',true],['product_code','Product code','text'],['serial_batch','Serial / batch','text'],['installation_date','Installation date','date'],['warranty_end','Warranty end date','date'],['technician','Assigned technician','text'],['status','Service stage','select:Installation pending,Installed,Ticket open,In service,Resolved,AMC follow-up'],['notes','Site, ticket, complaint / consumable','textarea']]}
  };
  const TABS=[
-  ['overview','Process overview',null],['material','Materials / RM','stock'],['vendor','Vendors','purchase'],['bom','BOM & routing','stock'],
+  ['overview','Process overview',null],['training','Learn Production · Demo','stock'],['material','Materials / RM','stock'],['vendor','Vendors','purchase'],['bom','BOM & routing','stock'],
   ['work_order','Production','stock'],['requisition','Purchase requests','purchase'],['purchase_order','Purchase orders','purchase'],
   ['goods_receipt','Material receipts','purchase'],['job_work','Job work','purchase'],['qc','Quality control','stock'],
   ['dispatch_check','Dispatch release','dispatch'],['receivable','Collections','accounts'],['service','After-sales service','customers']
@@ -148,7 +148,14 @@
    button.classList.toggle('active',button.dataset.opsTab===kind);
    button.setAttribute('aria-current',button.dataset.opsTab===kind?'page':'false');
   });
-  if(kind==='overview')drawOverview();else drawTable();
+  if(kind==='overview')drawOverview();
+  else if(kind==='training'){
+   const body=host.querySelector('#gr-ops-body');
+   if(!window.GreenRichWorkflowTraining){body.textContent='Training module could not load. Refresh the application.';return;}
+   void window.GreenRichWorkflowTraining.mount(body,{client:db,companies:companyIds,selection:companyScope,
+    canWrite:Boolean(caps.stock?.create&&caps.stock?.edit)})
+   .catch(e=>{body.textContent='Unable to open training: '+e.message});
+  }else drawTable();
  }
  function options(field,type,value){
   if(type.startsWith('select:'))return '<select name="'+field+'" '+(value.required?'required':'')+'>'+type.slice(7).split(',').map(x=>'<option value="'+esc(x)+'" '+(x===value.current?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>';
