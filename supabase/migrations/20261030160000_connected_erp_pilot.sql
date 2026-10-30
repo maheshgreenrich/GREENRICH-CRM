@@ -110,7 +110,7 @@ begin
   select 1 from public.gr_pilot_products p where p.company_id=old.company_id and p.crm_product_id=old.record_id
  ) then
   if (new.payload->>'stock') is distinct from (old.payload->>'stock')
-  and current_setting('gr.pilot_stock_post',true) <> 'posting' then
+  and current_setting('gr.pilot_stock_post',true) is distinct from 'posting' then
    raise exception 'PILOT stock is calculated from QC receipt and dispatch, not manually editable';
   end if;
   if (new.payload->>'active') is distinct from (old.payload->>'active') and new.payload->>'active'='true'
