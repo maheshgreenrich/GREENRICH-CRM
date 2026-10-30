@@ -104,6 +104,7 @@
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
     rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"><strong>'+escape(l.title)+'</strong><p>'+escape(l.contact||l.mobile||'No contact recorded')+'</p>'+
+     (l.import_duplicate_type&&l.import_duplicate_type!=='none'?'<div class="gl-card-line" style="background:#fff4df;padding:6px;border-radius:6px;color:#8a5611"><b>Possible duplicate '+escape(l.import_duplicate_type)+(l.import_duplicate_review==='pending'?' · Review pending':' · '+escape(l.import_duplicate_review))+'</b></div>':'')+
      '<div class="gl-card-line"><span>Salesperson</span><b>'+escape(name(ctx,l.assigned_to))+'</b></div>'+
      '<div class="gl-card-line"><span>Company</span><span>'+escape(companyText(ctx,l.company_id))+'</span></div>'+
      '<div class="gl-card-line"><span>Value</span><b>'+escape(money(l.expected_value))+'</b></div>'+
