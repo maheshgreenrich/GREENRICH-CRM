@@ -5,7 +5,7 @@ window.GreenRichNotify=(()=>{
   const x=String(value||'').toLowerCase();
   return /error|failed|denied|invalid|unavailable|unable|not found|permission|cannot|could not|rejected/.test(x)?'error':
    /warning|overdue|required|missing|choose |must |pending|attention|duplicate/.test(x)?'warning':
-   /saved|success|updated|created|imported|exported|assigned|sent|completed|approved|won|converted|linked/.test(x)?'success':'info';
+   /saved|success|updated|created|imported|exported|assigned|sent|completed|approved|won|converted|linked|deleted|removed|edited|uploaded|synchroni[sz]ed|synced|check-in recorded|check-out recorded/.test(x)?'success':'info';
  };
  return (message,kind)=>{
   const t=document.querySelector('#toast');if(!t)return;
