@@ -278,7 +278,8 @@
    if(Date.now()-(existing.loadedAt||0)>2500){existing.loadedAt=Date.now();void refresh(existing).catch(e=>showMessage(existing,e))}
    return existing;
   }
-  root.querySelectorAll('.section-tools,.card.table-card').forEach(el=>{el.style.display='none'});
+  // The Leads template contains only a loading marker. Replace it with the actual board.
+  root.replaceChildren();
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
   const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},
