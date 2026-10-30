@@ -301,7 +301,6 @@ products as (
  from fresh on conflict(company_id,kind,record_id) do nothing returning record_id
 )
 insert into public.gr_pilot_orders(company_id,product_id,customer_name,qty)
-select p.company_id,p.id,'[TEST] Sample Customer (no real commitment)',1 from public.gr_pilot_products p
-where p.company_id='grow-india' and p.sku='PILOT-HOME-40'
-and not exists(select 1 from public.gr_pilot_orders o where o.product_id=p.id)
+select p.company_id,p.id,'[TEST] Sample Customer (no real commitment)',1 from fresh p
+where not exists(select 1 from public.gr_pilot_orders o where o.product_id=p.id)
 on conflict do nothing;
