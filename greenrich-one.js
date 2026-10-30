@@ -22,7 +22,7 @@ const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m=
  (m==='dispatch'&&crmAccess().dispatch)||
  (m==='tasks'&&crmAccess().tasks)||
  (m==='channels'&&crmAccess().channels);
-const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=x=>{let t=$('#toast');t.textContent=x;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)};const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
+const act=['view','create','edit','delete','approve','export'];const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const today=()=>new Date().toLocaleDateString('en-CA');const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const show=(id)=>['setup','login','app'].forEach(k=>$('#'+k).hidden=k!==id);const toast=(x,type)=>window.GreenRichNotify?.(x,type);const can=(m,a='view')=>profile&&((roleName()==='Admin')||permissions.some(p=>p.role_id===profile.role_id&&p.module===m&&p.action===a&&p.allowed));const roleName=()=>roles.find(r=>r.id===profile?.role_id)?.name||'Employee';
 const query=async(t)=>{let {data,error}=await db.from(t).select('*');if(error)throw Error(error.message);return data||[]};
 async function start(){const publicConfig=window.GREENRICH_PUBLIC_CONFIG;if(publicConfig?.supabaseUrl&&publicConfig?.publishableKey){localStorage.setItem('gr-supabase-url',publicConfig.supabaseUrl);localStorage.setItem('gr-supabase-key',publicConfig.publishableKey);}const url=localStorage.getItem('gr-supabase-url'),key=localStorage.getItem('gr-supabase-key');if(!url||!key){show('setup');return}if(!window.supabase){show('setup');toast('Authentication library unavailable');return}db=window.supabase.createClient(url,key);let {data}=await db.auth.getSession();if(data.session)await enter();else show('login')}
 async function enter(){
@@ -44,11 +44,11 @@ async function enter(){
   $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();configureCompanySelector();
   document.title='GreenRich ONE · '+(company?.company_name||'CRM');
   if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
-  show('app');window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
+  show('app');window.GreenRichFollowupAlarm?.start({db,userId:user.id,companyIds:window.GreenRichCompanies.allowed(),role:roleName()});window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
   // Attendance status is useful but should never block dashboard navigation or first paint.
   void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
   await render();
- }catch(e){await db.auth.signOut();show('login');toast(e.message)}
+ }catch(e){window.GreenRichFollowupAlarm?.stop();await db.auth.signOut();show('login');toast(e.message)}
 }
 const menuIcons={
  crm:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 2 5-7"/><circle cx="19" cy="6" r="1"/>',
@@ -181,7 +181,7 @@ async function render(){
 async function dashboard(c){
  if(!window.GreenRichExecutiveDashboard)throw Error('Dashboard not loaded. Refresh GreenRich ONE.');
  await window.GreenRichExecutiveDashboard.mount(c,{db,userId:user.id,
- companyIds:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),notify:toast});
+ companyIds:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),notify:toast,admin:roleName()==='Admin'});
 }
 async function attendance(c){
  if(!window.GreenRichAttendance)throw Error('Attendance module script has not loaded. Refresh GreenRich ONE.');
