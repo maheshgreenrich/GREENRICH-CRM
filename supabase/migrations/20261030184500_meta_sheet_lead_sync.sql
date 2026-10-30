@@ -162,4 +162,4 @@ revoke all on function public.gr_meta_sheet_ingest(text,text,text,jsonb) from pu
 grant execute on function public.gr_meta_sheet_configure(text,uuid,boolean) to authenticated;
 grant execute on function public.gr_meta_sheet_status(text) to authenticated;
 -- Deliberately anonymous for a headless Google Apps Script, protected by a 256-bit token.
-grant execute on function public.gr_meta_sheet_ingest(text,text,text,jsonb) to anon;
+grant execute on function public.gr_meta_sheet_ingest(text,text,text,jsonb) to anon,authenticated;
