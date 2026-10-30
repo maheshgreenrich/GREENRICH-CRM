@@ -70,6 +70,9 @@ jobs:
           node --check greenrich-dashboard.js
           node --check greenrich-actions.js
           node tests/executive-dashboard-and-dispatch.js
+          node --check greenrich-notifications.js
+          node --check greenrich-followup-alarm.js
+          node tests/modern-dashboard-won-followups.js
           node --check greenrich-customer-profile.js
           node tests/customer-360-profile.js
           node --check greenrich-sales-ops.js
