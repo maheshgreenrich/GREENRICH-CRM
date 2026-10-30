@@ -208,7 +208,10 @@ async function crmWorkspace(container,view,adminTools=false){
   crmCache={host,company:window.GreenRichCompanies?.selected(user?.id)||'grow-india'};
   container.append(host);container=host;
  }
- await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'),roleName()==='Admin'||can('sales','approve')||can('orders','approve'),roleName()==='Admin'||can('dispatch','edit')||can('stock','edit')||can('orders','edit'));
+ await window.GreenRichCRM.mount(container,view,allowed,window.GreenRichCompanies?.selected(user?.id)||'grow-india',window.GreenRichCompanies?.name(user?.id)||'GreenRich Grow India Pvt Ltd',adminTools===true,db,roleName()==='Admin',roleName()==='Admin'||can('sales','export')||can('orders','export'),window.GreenRichCompanies.allowed(),roleName()==='Admin'||can('sales','create')||can('sales','edit'),roleName()==='Admin'||can('sales','approve')||can('orders','approve'),roleName()==='Admin'||can('dispatch','edit')||can('stock','edit')||can('orders','edit'),{
+ customer:Object.fromEntries(['view','create','edit','delete','export'].map(action=>[action,roleName()==='Admin'||can('customers',action)])),
+ lead:Object.fromEntries(['view','create','edit','delete','export'].map(action=>[action,roleName()==='Admin'||can('leads',action)]))
+});
  // Draw the CRM immediately. Charts/Excel helpers load without blocking navigation.
  void loadCrmAssets().then(()=>window.GreenRichCRM?.refresh?.()).catch(()=>{});
 }
@@ -348,6 +351,7 @@ async function settings(c){
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
    openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
+   openSources:host=>window.GreenRichSources.mount(host,{db,notify:toast}),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
    configureCompanySelector();

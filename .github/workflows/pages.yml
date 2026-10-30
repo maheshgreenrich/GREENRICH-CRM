@@ -32,6 +32,11 @@ on:
       - 'greenrich-public-config.js'
       - 'tests/shared-login-regression.js'
       - 'greenrich-crm-inline.js'
+      - 'greenrich-contacts.js'
+      - 'greenrich-contacts.css'
+      - 'greenrich-sources.js'
+      - 'tests/unified-contacts-management.js'
+      - 'supabase/migrations/20261030153000_shared_crm_sources.sql'
       - 'greenrich-dashboard.js'
       - 'greenrich-dashboard.css'
       - 'greenrich-actions.js'
@@ -124,6 +129,9 @@ jobs:
           test -s greenrich-crm-inline.js
           test -s greenrich-crm-inline.css
           node --check greenrich-crm-inline.js
+          node --check greenrich-contacts.js
+          node --check greenrich-sources.js
+          node tests/unified-contacts-management.js
           node --check greenrich-dashboard.js
           node --check greenrich-actions.js
           node tests/executive-dashboard-and-dispatch.js
