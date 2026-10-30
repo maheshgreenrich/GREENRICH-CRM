@@ -69,6 +69,10 @@ begin
  then raise exception 'Manufactured products require Stickering and QC before stock'; end if;
  if p_type='DIRECT_RECEIPT' and not 'RECEIVE'=any(v_keys) then
  raise exception 'Ready-to-sell products must confirm physical receipt'; end if;
+ if p_type<>'DIRECT_RECEIPT' and array_position(v_keys,'STICKER')>array_position(v_keys,'QC') then
+ raise exception 'Stickering must come before QC'; end if;
+ if p_type='VENDOR_MADE' and not 'RECEIVE'=any(v_keys) then
+ raise exception 'Vendor-made goods need a physical receipt step'; end if;
  if p_type='MULTILEVEL' and not 'SFG'=any(v_keys) then raise exception 'Multilevel workflow must check SFG'; end if;
  if p_type='VENDOR_MADE' and not 'VENDOR_PO'=any(v_keys) then raise exception 'Vendor-made workflow must include a vendor PO'; end if;
  if exists(select 1 from jsonb_array_elements(p_parts) x where length(trim(coalesce(x->>'name','')))=0)
