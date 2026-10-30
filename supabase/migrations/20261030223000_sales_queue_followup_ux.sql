@@ -1,3 +1,6 @@
+-- Null means Common sales pool; individual assignments still reference active employees.
+alter table public.gr_sheet_connections alter column assigned_to drop not null;
+
 alter table public.gr_lead_pipeline add column if not exists lead_heat text not null default 'Warm' check(lead_heat in ('Cold','Warm','Hot'));
 
 alter table public.gr_lead_pipeline add column if not exists next_followup_at timestamptz;
