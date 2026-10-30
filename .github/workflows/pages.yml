@@ -56,6 +56,9 @@ jobs:
           test -s greenrich-lead-pipeline.js
           node --check greenrich-lead-pipeline.js
           node --check greenrich-meta-sync.js
+          node --check greenrich-sheet-manager.js
+          node --check meta-sync-setup.js
+          node tests/multi-sheet-lead-manager.js
           node tests/meta-google-sheet-integration.js
           node tests/lead-pipeline-page.js
           node --check greenrich-contacts.js
