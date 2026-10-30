@@ -24,7 +24,8 @@ window.GreenRichSheetManager=(function(){
   const r=await Promise.all([
    ctx.db.from('gr_sheet_connections').select('*').in('company_id',cs).order('created_at',{ascending:false}),
    ctx.db.from('gr_sheet_import_rows').select('*').in('company_id',cs).order('created_at',{ascending:false}).limit(700),
-   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(500)
+   ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(500),
+   ctx.db.from('gr_crm_sources').select('name').eq('active',true).order('name')
   ]);
   r.forEach(x=>{if(x.error)throw x.error});
   let staff=ctx.staff||[];
@@ -32,7 +33,7 @@ window.GreenRichSheetManager=(function(){
    const q=await ctx.db.rpc('gr_pipeline_staff',{p_company:company_id});
    if(q.error)throw q.error;return (q.data||[]).map(x=>({...x,company_id}));
   }));staff=p.flat()}
-  return {sources:r[0].data||[],imports:r[1].data||[],products:r[2].data||[],staff};
+  return {sources:r[0].data||[],imports:r[1].data||[],products:r[2].data||[],approvedSources:r[3].data||[],staff};
  }
  function mount(root,ctx){
   const st={root,ctx,tab:'sources',data:null};
@@ -112,13 +113,13 @@ window.GreenRichSheetManager=(function(){
   const ctx=st.ctx,company=s?.company_id||ctx.companyIds[0],m=s?.mapping||preset.simple;
   const companyOpts=ctx.companyIds.map(c=>[c,coName(c)]);
   const people=st.data.staff,products=st.data.products;
-  const peopleOpts=c=>people.filter(p=>p.company_id===c).map(p=>[p.id,p.full_name]);
+  const peopleOpts=c=>[['','Common — all Sales users'],...people.filter(p=>p.company_id===c).map(p=>[p.id,p.full_name])];
   const productOpts=c=>[['','Not confirmed'],...products.filter(p=>p.company_id===c).map(p=>[p.record_id,p.payload?.name||p.record_id])];
   const html='<p class="muted">Each Sheet/tab gets its own CRM field mapping and source. All original answers are retained even if not mapped.</p>'+
    '<div class="grid">'+select('Company','company',companyOpts,company)+
    input('Google Sheet URL','sheet_url',s?'https://docs.google.com/spreadsheets/d/'+s.sheet_id+'/edit':'')+
    input('Tab name','tab',s?.tab_name||'Sheet1')+
-   select('Lead source','source',[['Meta Ads','Meta Ads'],['Google Ads','Google Ads'],['TradeIndia','TradeIndia'],['IndiaMART','IndiaMART'],['Website','Website'],['Other','Other']],s?.source_name||'Meta Ads')+
+   select('Lead source','source',st.data.approvedSources.map(x=>[x.name,x.name]).concat(s&&!st.data.approvedSources.some(x=>x.name===s.source_name)?[[s.source_name,s.source_name+' (legacy source)']]:[]),s?.source_name||'Meta')+
    input('Brand','brand',s?.brand||'')+input('Product interest','product_interest',s?.product_interest||'')+
    select('Assign to employee','assignee',peopleOpts(company),s?.assigned_to)+
    select('CRM product (optional)','product',productOpts(company),s?.product_id||'')+
@@ -138,7 +139,7 @@ window.GreenRichSheetManager=(function(){
     p_product_id:f.get('product')||null,p_assignee:f.get('assignee'),p_mapping:map,
     p_header_row:Number(f.get('header')),p_first_row:Number(f.get('first')),
     p_import_mode:f.get('mode'),p_enabled:f.get('enabled')==='true'};
-   const r=await ctx.db.rpc('gr_sheet_admin_upsert',p);if(r.error)throw r.error;
+   const r=await ctx.db.rpc('gr_sheet_admin_upsert',{...p,p_assignee:p.p_assignee||null});if(r.error)throw r.error;
   });
   const form=d.querySelector('form');
   form.elements.template.onchange=e=>{const p=preset[e.target.value];if(p)F.forEach(([key])=>form.elements['map_'+key].value=p[key]||'')};
@@ -172,7 +173,7 @@ window.GreenRichSheetManager=(function(){
    const r=await st.ctx.db.rpc('gr_sheet_admin_upsert',{
     p_id:s.id,p_company:s.company_id,p_sheet_url:'https://docs.google.com/spreadsheets/d/'+s.sheet_id+'/edit',
     p_tab:s.tab_name,p_source:s.source_name,p_brand:s.brand,p_product_interest:s.product_interest,
-    p_product_id:s.product_id,p_assignee:s.assigned_to,p_mapping:s.mapping,
+    p_product_id:s.product_id,p_assignee:s.assigned_to||null,p_mapping:s.mapping,
     p_header_row:s.header_row,p_first_row:s.first_data_row,p_import_mode:s.import_mode,p_enabled:!s.enabled
    });if(r.error)alert(r.error.message);else await st.refresh();return;
   }
