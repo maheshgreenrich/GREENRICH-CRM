@@ -109,6 +109,7 @@
      (l.stage==='Quotation'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(l.next_followup||'Not set')+'</b></div>':'')+
      '<div class="gl-card-actions">'+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
+     button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
   root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;draw(ctx)});
@@ -169,6 +170,11 @@
       (data||[]).map(v=>'<article><b>'+escape(v.event_type.replace('_',' '))+'</b> · '+escape(v.old_stage||'')+' → '+escape(v.new_stage||'')+'<p>'+escape(v.note)+'</p><small>'+escape(dates(v.created_at))+'</small></article>').join('')+'</div>',async()=>{});
     d.querySelector('[type=submit]').hidden=true;return;
   }
+  if(action==='customer'){
+   dialog(ctx,'Link existing customer',selectFld('Customer','customer',ctx.customers.map(c=>[c.id,c.name]),true)+noteFld(),async fd=>{
+    const {error}=await ctx.db.rpc('gr_pipeline_link_customer',{p_company:l.company_id,p_lead:l.lead_id,p_customer:fd.get('customer'),p_note:fd.get('note')});if(error)throw error;
+   });return;
+  }
   if(action==='assign'){
    const people=ctx.staff.filter(p=>p.company_id===l.company_id);
    dialog(ctx,'Assign lead to employee',selectFld('Salesperson','person',people.map(p=>[p.id,p.full_name]))+noteFld(),async fd=>{
@@ -228,6 +234,7 @@
  async function mount(root,ctx){
   if(!root)return;
   let existing=contexts.get(root);if(existing)return existing;
+  root.querySelectorAll('.section-tools,.card.table-card').forEach(el=>{el.style.display='none'});
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
   const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},
@@ -239,7 +246,7 @@
  async function mountFollowups(root,ctx){
   if(!root)return;
   const state=await mountShared(ctx);
-  state.followRoot=root;await followups(state,root);
+  state.followRoot=root;await query(state);await followups(state,root);
  }
  const cache=new Map();
  async function mountShared(ctx){
