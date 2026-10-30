@@ -110,6 +110,7 @@
      '<div class="gl-card-actions">'+button('Move stage','move','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('History','detail','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
      button('Link customer','customer','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"')+
+     (l.stage==='Quotation'?button('Create Sales Order','order','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      (ctx.canViewTeam?button('Assign','assign','data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'"'):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
   root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;draw(ctx)});
@@ -147,8 +148,8 @@
   const orderSelect='<label>Linked Sales Order (required to mark Won)<select name="order"><option value="">Select existing sales order</option>'+orders.map(o=>'<option value="'+escape(o.record_id)+'">'+escape(o.payload?.internal_order_id||o.record_id)+' · '+money(o.payload?.total)+'</option>').join('')+'</select></label>';
   const body='<p class="gl-caption">'+escape(l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
    selectFld('Move to stage','stage',stages.filter(s=>s!==l.stage).map(s=>[s,s]))+noteFld()+
-   (next==='Quotation'?fld('Next follow-up date','due','date','',true):'')+
-   (next==='Won'?orderSelect+'<p class="gl-note">Create a Sales Order in the existing Sales Orders page first, linked to this lead’s customer. Then return and select it here.</p>':'');
+   fld('Next follow-up date','due','date','',true)+orderSelect+
+   '<p class="gl-note">For Won: create a Sales Order for the linked customer first, then select it here.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
    const stage=fd.get('stage');if(!stage)throw Error('Select a stage');
    if(stage==='Won'&&!l.customer_id)throw Error('This lead must be linked to an existing customer before Won.');
@@ -157,12 +158,17 @@
    const {error}=await ctx.db.rpc('gr_pipeline_move',payload);if(error)throw error;
   });
   const select=d.querySelector('select[name=stage]');select.value=next;
-  const controls=()=>{const stage=select.value;const due=d.querySelector('input[name=due]');if(due)due.closest('label').hidden=stage!=='Quotation';const order=d.querySelector('select[name=order]');if(order){order.closest('label').hidden=stage!=='Won';order.required=stage==='Won'}};
+  const controls=()=>{const stage=select.value;const due=d.querySelector('input[name=due]');if(due){due.closest('label').hidden=stage!=='Quotation';due.required=stage==='Quotation'}const order=d.querySelector('select[name=order]');if(order){order.closest('label').hidden=stage!=='Won';order.required=stage==='Won'}};
   select.onchange=controls;controls();
  }
  async function act(ctx,b){
   const action=b.dataset.glAction,l=getLead(ctx,b.dataset.id,b.dataset.company);
   if(action==='move'){move(ctx,l);return}
+  if(action==='order'){
+   if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
+   if(typeof window.GreenRichCRM?.createOrderForLead!=='function')throw Error('Sales Order editor is unavailable. Refresh the CRM.');
+   window.GreenRichCRM.createOrderForLead(l);return;
+  }
   if(action==='detail'){
     const {data,error}=await ctx.db.from('gr_lead_stage_history').select('*').eq('company_id',l.company_id).eq('lead_id',l.lead_id).order('created_at',{ascending:false}).limit(200);
     if(error)throw error;
@@ -182,7 +188,7 @@
    });return;
   }
   if(action==='history'){
-   const wins=ctx.leads.filter(x=>x.stage==='Won').sort((a,b)=>(b.won_at||'').localeCompare(a.won_at||''));
+   const wins=picked(ctx).filter(x=>x.stage==='Won').sort((a,b)=>(b.won_at||'').localeCompare(a.won_at||''));
    const d=dialog(ctx,'Won sales history','<div class="gl-hist">'+(wins.length?wins.map(l=>'<article><b>'+escape(l.title)+'</b> · '+escape(name(ctx,l.assigned_to))+' · '+escape(companyText(ctx,l.company_id))+'<p>Order: '+escape(ctx.orders.find(o=>o.record_id===l.won_order_id)?.payload?.internal_order_id||l.won_order_id)+' · '+money(saleTotal(ctx,l))+'</p><small>'+escape(dates(l.won_at))+'</small></article>').join(''):'No won sales orders recorded')+'</div>',async()=>{});
    d.querySelector('[type=submit]').hidden=true;return;
   }
@@ -233,14 +239,17 @@
  }if(field||row.length){row.push(field);rows.push(row)}return rows}
  async function mount(root,ctx){
   if(!root)return;
-  let existing=contexts.get(root);if(existing)return existing;
+  let existing=contexts.get(root);if(existing){
+   if(Date.now()-(existing.loadedAt||0)>2500){existing.loadedAt=Date.now();void refresh(existing).catch(e=>showMessage(existing,e))}
+   return existing;
+  }
   root.querySelectorAll('.section-tools,.card.table-card').forEach(el=>{el.style.display='none'});
   const style=document.createElement('style');style.textContent=styles;root.prepend(style);
   const board=document.createElement('div');board.className='gl-workspace';root.append(board);
   const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
-  try{await refresh(state)}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
+  try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
   return state;
  }
  async function mountFollowups(root,ctx){
@@ -255,5 +264,27 @@
   const state={...ctx,filters:{company:'all',person:'all',from:'',to:'',product:'',source:'',tag:'',search:''},leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false,root:null};
   await query(state);cache.set(key,state);return state;
  }
- window.GreenRichLeadPipeline={mount,mountFollowups};
+ async function renderCustomerTimeline(root,db,customerId,companies,staffName){
+  if(!root?.isConnected||!customerId)return;
+  const [res,check]=await Promise.all([
+    db.from('gr_lead_pipeline').select('company_id,lead_id,title,stage,assigned_to,updated_at').eq('customer_id',customerId).in('company_id',companies).order('updated_at',{ascending:false}).limit(100),
+    Promise.resolve(true)
+  ]);
+  if(res.error)return;
+  const holder=document.createElement('section');holder.className='gl-customer-timeline card';
+  holder.style.marginTop='16px';
+  holder.innerHTML='<h3>Lead stages & conversation history</h3><p class="gl-caption">Stage changes for leads linked to this customer.</p>';
+  for(const l of res.data||[]){
+   const {data,error}=await db.from('gr_lead_stage_history').select('event_type,old_stage,new_stage,note,created_at')
+    .eq('company_id',l.company_id).eq('lead_id',l.lead_id).order('created_at',{ascending:false}).limit(30);
+   if(error)continue;
+   const article=document.createElement('article');article.style.padding='10px';article.style.borderBottom='1px solid #e2e8f0';
+   article.innerHTML='<b>'+escape(l.title)+'</b> · '+escape(l.stage)+' · '+escape(staffName?.(l.assigned_to)||'Assigned employee')+
+    '<div class="gl-hist">'+(data||[]).map(e=>'<article><strong>'+escape(e.old_stage||'')+' → '+escape(e.new_stage||'')+'</strong> · '+escape(dates(e.created_at))+
+    '<p>'+escape(e.note)+'</p></article>').join('')+'</div>';
+   holder.append(article);
+  }
+  if(root.isConnected){root.querySelectorAll('.gl-customer-timeline').forEach(e=>e.remove());root.append(holder)}
+ }
+ window.GreenRichLeadPipeline={mount,mountFollowups,renderCustomerTimeline};
 })();
