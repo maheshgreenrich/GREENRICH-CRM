@@ -15,7 +15,7 @@
  const bars=(items,formatter=fmt)=>{const good=items.filter(x=>x[1]>0).slice(0,12),max=Math.max(1,...good.map(x=>x[1]));return good.length?'<div class="gr-exec-bars">'+good.map(([name,n])=>'<div class="gr-exec-bar"><div><span>'+e(name)+'</span><b>'+e(formatter(n))+'</b></div><section><i style="width:'+Math.max(3,Math.round(n/max*100))+'%"></i></section></div>').join('')+'</div>':'<div class="gr-exec-empty">No matching records</div>'};
  const ring=items=>{const colors=['#295dd5','#55a4ed','#15a6a1','#ffa347','#9278dd'],total=items.reduce((n,x)=>n+x[1],0);let x=0;const stops=items.map(([_,n],i)=>{const start=x;x+=total?n/total*360:0;return colors[i%colors.length]+' '+start+'deg '+x+'deg'});return '<div class="gr-exec-ring-wrap"><div class="gr-exec-ring" style="background:'+(total?'conic-gradient('+stops.join(',')+')':'#e7eefb')+'"><div><b>'+fmt(total)+'</b><small>Total</small></div></div><div class="gr-exec-ring-legend">'+items.map(([name,n],i)=>'<div><span><i style="background:'+colors[i%colors.length]+'"></i>'+e(name)+'</span><strong>'+fmt(n)+'</strong></div>').join('')+'</div></div>'};
  const stats=items=>'<div class="gr-exec-stats">'+items.map(([name,value])=>'<div><small>'+e(name)+'</small><strong>'+e(value)+'</strong></div>').join('')+'</div>';
- let host=null,client=null,companyIds=[],selected='all',userId='',notice=()=>{},records={sales:[],products:[],leads:[],dispatch:[],attendance:[],customers:[]},widgets=W.map(x=>x[0]),staff=[],isAdmin=false,role='',refreshing=false,refreshToken=0,interval=null;
+ let host=null,client=null,companyIds=[],selected='all',userId='',notice=()=>{},records={sales:[],products:[],leads:[],dispatch:[],attendance:[],customers:[]},widgets=W.map(x=>x[0]),staff=[],isAdmin=false,role='',canExport=false,refreshing=false,refreshToken=0,interval=null;
  async function paged(table,build){const all=[];for(let i=0;i<10000;i+=1000){const response=await build(i,i+999);if(response.error)throw Error(table+': '+response.error.message);all.push(...(response.data||[]));if((response.data||[]).length<1000)break}return all}
  const input=id=>host?.querySelector(id)?.value||'';
  const inRange=(str,from,to)=>{const d=String(str||'').slice(0,10);return d&&(!from||d>=from)&&(!to||d<=to)};
@@ -88,6 +88,72 @@
   host.querySelector('#gr-exec-count').textContent=fmt(f.sales.length)+' sales · '+fmt(leads.length)+' leads · '+fmt(dispatch.length)+' dispatch orders';
  }
  function fillChoices(id,label,values){const el=host.querySelector(id),before=el.value;el.innerHTML='<option value="all">'+e(label)+'</option>'+values.map(v=>'<option value="'+e(v)+'">'+e(v)+'</option>').join('');if([...el.options].some(o=>o.value===before))el.value=before}
+
+ const loadScript=async(url,verify)=>{
+  if(verify())return;
+  await new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src=url;script.async=true;script.onload=resolve;
+   script.onerror=()=>reject(Error('Report export library unavailable. Check internet access.'));
+   document.head.append(script);
+  });
+  if(!verify())throw Error('Export library failed to initialize');
+ };
+ const exportRows=()=>{
+  const f=filtered(),out=[];
+  const allow=(id)=>widgets.includes(id);
+  if(allow('sales')||allow('recent')||allow('day_sales')||allow('channel_sales')||allow('company_sales'))
+   out.push(['Sales Orders',f.sales.map(x=>({Company:company(x.company_id),'SO ID':x.internal_order_id||x.order_id,Date:x.date,
+    Customer:x.customer_name,Product:x.product_name,Channel:x.channel_name,Status:x.status,Value:x.total,Tax:x.tax_amount}))]);
+  if(allow('leads')||allow('conversion')||allow('followups')||allow('telecaller')||allow('salespeople'))
+   out.push(['Leads',f.leads.map(x=>({Company:company(x.company_id),Name:x.name||x.contact||x.title,
+    Source:x.source,Stage:x.stage,Salesperson:staff.find(p=>p.id===x.assigned_to)?.full_name||'Common',
+    Product:x.product_interest||x.product_id,Created:x.created_at,NextFollowup:x.next_followup_at}))]);
+  if(allow('stock'))out.push(['Stock',f.products.map(x=>({Company:company(x.company_id),Product:x.name||x.sku,
+   SKU:x.sku,Available:x.stock}))]);
+  if(allow('dispatch'))out.push(['Dispatch',f.dispatch.map(x=>({Company:company(x.company_id),
+    Order:x.source_sale_id,Status:x.status,Date:x.order_date}))]);
+  if(allow('customers'))out.push(['Customers',f.customers.map(x=>({Name:x.name,Type:x.type,Created:x.created_at}))]);
+  return out;
+ };
+ async function exportExcel(){
+  try{
+   if(!canExport)throw Error('Dashboard Excel export requires export permission');
+   const sheets=exportRows();if(!sheets.length)throw Error('No accessible widgets to export');
+   await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',()=>!!window.XLSX);
+   const book=XLSX.utils.book_new();
+   for(const [name,rows] of sheets){
+    const sheet=XLSX.utils.json_to_sheet(rows.length?rows:[{Notice:'No matching records'}]);
+    XLSX.utils.book_append_sheet(book,sheet,name.slice(0,31));
+   }
+   XLSX.writeFile(book,'greenrich-one-dashboard-'+today()+'.xlsx');
+   notice('Dashboard exported to Excel','success');
+  }catch(err){notice(err.message,'error')}
+ }
+ async function exportPdf(){
+  try{
+   if(!canExport)throw Error('Dashboard PDF export requires export permission');
+   await loadScript('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);
+   const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),sheets=exportRows();
+   const width=190;let y=17;
+   const line=(str,size=9)=>{
+    doc.setFontSize(size);const lines=doc.splitTextToSize(String(str||''),width);
+    for(const t of lines){if(y>277){doc.addPage();y=17}doc.text(t,12,y);y+=size*.45}
+   };
+   line('GREENRICH ONE — BUSINESS DASHBOARD',16);y+=3;
+   line('Generated: '+new Date().toLocaleString('en-IN')+' | Data based on currently accessible and filtered records',8);y+=7;
+   for(const [name,rows] of sheets){
+    if(y>260){doc.addPage();y=17}
+    line(name+' ('+rows.length+' records)',12);y+=3;
+    for(const row of rows.slice(0,200)){
+      line(Object.entries(row).slice(0,8).map(([k,v])=>k+': '+(v??'')).join(' | '),8);y+=2;
+    }
+    if(rows.length>200)line('Remaining '+(rows.length-200)+' records: download Excel for complete detail',8);
+    y+=7;
+   }
+   doc.save('greenrich-one-dashboard-'+today()+'.pdf');notice('Dashboard PDF exported','success');
+  }catch(err){notice(err.message,'error')}
+ }
+
  async function refresh(){
   if(!host?.isConnected||refreshing)return;refreshing=true;const seq=++refreshToken;
   try{
@@ -119,7 +185,7 @@
   finally{refreshing=false}
  }
  async function mount(container,config){
-  if(interval)clearInterval(interval);host=container;client=config.db;companyIds=config.companyIds;selected=config.selectedCompany;userId=config.userId;notice=config.notify||(()=>{});isAdmin=!!config.admin;role=config.role||'';
+  if(interval)clearInterval(interval);host=container;client=config.db;companyIds=config.companyIds;selected=config.selectedCompany;userId=config.userId;notice=config.notify||(()=>{});isAdmin=!!config.admin;role=config.role||'';canExport=!!config.canExport;
   container.innerHTML='<div class="gr-exec"><div class="gr-exec-heading"><div><span>GREENRICH ONE · BUSINESS INTELLIGENCE</span><h2>Performance overview</h2><p>Live operational charts from the shared GreenRich database</p></div><small id="gr-exec-count">Loading…</small></div>'+
    '<div class="gr-exec-filters"><label>Period<select id="gr-exec-period"><option value="today">Today</option><option value="week">This week</option><option value="month" selected>This month</option><option value="last30">Last 30 days</option><option value="all">All time</option><option value="custom">Custom dates</option></select></label>'+
    '<label>Company<select id="gr-exec-company"><option value="all">Both companies</option>'+companyIds.map(id=>'<option value="'+id+'">'+e(company(id))+'</option>').join('')+'</select></label>'+
@@ -129,12 +195,16 @@
    '<label>Lead stage<select id="gr-exec-stage"><option value="all">All stages</option></select></label>'+
    '<label>Sales Order status<select id="gr-exec-order-status"><option value="all">All statuses</option></select></label>'+
    (isAdmin?'<label>Salesperson<select id="gr-exec-person"><option value="all">All salespeople</option></select></label>':'')+
-   '<label>From<input type="date" id="gr-exec-from"></label><label>To<input type="date" id="gr-exec-to"></label><div class="gr-exec-actions"><button id="gr-exec-reset" type="button">Reset</button><button id="gr-exec-refresh" type="button">↻ Refresh</button><button id="gr-exec-excel" type="button">Export Excel</button><button id="gr-exec-pdf" type="button">Export PDF</button></div></div>'+
+   '<label>From<input type="date" id="gr-exec-from"></label><label>To<input type="date" id="gr-exec-to"></label><div class="gr-exec-actions"><button id="gr-exec-reset" type="button">Reset</button><button id="gr-exec-refresh" type="button">↻ Refresh</button>'+(canExport?'<button id="gr-exec-excel" type="button">Export Excel</button><button id="gr-exec-pdf" type="button">Export PDF</button>':'')+'</div></div>'+
    '<div class="gr-exec-loading" id="gr-exec-loading">Loading charts from GreenRich cloud…</div><div class="gr-exec-kpis" id="gr-exec-kpis"></div><div class="gr-exec-grid" id="gr-exec-panels"></div><p class="gr-exec-note">All figures are based on accessible records. Company/module RLS and Admin-set widget visibility apply. Stock is current, not historical.</p></div>';
   const co=host.querySelector('#gr-exec-company');if(companyIds.length===1){co.value=companyIds[0];co.disabled=true}else if(companyIds.includes(selected))co.value=selected;
   host.querySelectorAll('.gr-exec-filters input,.gr-exec-filters select').forEach(el=>el.addEventListener('change',()=>{if(el.type==='date')host.querySelector('#gr-exec-period').value='custom';draw()}));
   host.querySelector('#gr-exec-reset').onclick=()=>{host.querySelector('#gr-exec-period').value='month';co.value=companyIds.includes(selected)?selected:'all';for(const id of ['#gr-exec-source','#gr-exec-channel','#gr-exec-product','#gr-exec-tag','#gr-exec-stage','#gr-exec-order-status','#gr-exec-person']){const el=host.querySelector(id);if(el)el.value='all'}for(const id of ['#gr-exec-from','#gr-exec-to'])host.querySelector(id).value='';draw()};
   host.querySelector('#gr-exec-refresh').onclick=()=>void refresh();
+  if(canExport){
+   host.querySelector('#gr-exec-excel').onclick=()=>void exportExcel();
+   host.querySelector('#gr-exec-pdf').onclick=()=>void exportPdf();
+  }
   void refresh();interval=setInterval(()=>{if(host?.isConnected)void refresh()},60000);
  }
  async function preferences(container,{db,people,notify}){
