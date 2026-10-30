@@ -172,6 +172,7 @@ async function render(){
   else if(page==='attendance')await attendance(c);
   else if(page==='settings'){crmCache=null;await settings(c)}
   else if(page==='operations')await operations(c)
+  else if(page==='accounts')await window.GreenRichAccounts.mount(c,{db,companyId:window.GreenRichCompanies.selected(user.id)})
   else if(crmMap[page])await crmWorkspace(c,crmMap[page]);
   else await placeholder(c)
  }catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
