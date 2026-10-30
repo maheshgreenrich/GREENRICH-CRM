@@ -10,7 +10,7 @@ const leads=fs.readFileSync('greenrich-lead-pipeline.js','utf8');
 const setup=fs.readFileSync('meta-sync-setup.js','utf8');
 new vm.Script(js);new vm.Script(script);new vm.Script(settings);new vm.Script(core);new vm.Script(leads);new vm.Script(setup);
 assert.ok(html.includes('greenrich-sheet-manager.js?v=20261030-multisheet-1'),'Sheet manager loaded');
-assert.ok(html.includes('greenrich-lead-pipeline.js?v=20261030-multisheet-2'),'Kanban cache refreshed for duplicate badges');
+assert.ok(html.includes('greenrich-lead-pipeline.js?v=20261030-lead360-1'),'Kanban cache refreshed for duplicate badges');
 assert.ok(html.indexOf('greenrich-sheet-manager.js?v=')<html.indexOf('greenrich-lead-pipeline.js?v='),'Manager loaded before Leads');
 assert.ok(settings.includes("['sheets','Google Sheet Leads']"),'Settings includes Integrations tab');
 assert.ok(core.includes('openSheetIntegrations:'),'Core Settings connects manager');
