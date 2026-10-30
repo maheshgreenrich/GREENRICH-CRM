@@ -44,7 +44,7 @@ assert.ok(ops.includes('getDispatchRows:()=>dispatchRows.slice()'),'Customer mus
 assert.ok(shell.includes('window.GreenRichShell='),'Sidebar must sync with internal customer navigation');
 assert.ok(html.includes('id="gr-customer-directory"')&&html.includes('id="gr-customer-profile"'));
 assert.ok(html.includes('greenrich-customer-profile.js?v=20261030-actions-1'));
-assert.ok(html.includes('greenrich-customer-profile.css?v=20261029-profile-layout-1'));
+assert.ok(html.includes('greenrich-customer-profile.css?v=20261030-modernbi-1'));
 assert.ok(html.includes('class="gr-app-header"'));
 assert.ok(css.includes('.gr360-hero')&&css.includes('.gr360-chart')&&css.includes('.gr360-main-grid'),'Premium responsive customer layout');
 assert.ok(oneCss.includes('.gr-header-controls'),'Professional header styling required');
