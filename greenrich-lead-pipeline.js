@@ -302,15 +302,18 @@
    if(action==='new'){
     const products=ctx.products.filter(p=>p.company_id===defaultCompany);
     const fields=common+fld('Lead title *','title','text','',true)+fld('Contact name','contact')+fld('Mobile (+91)','mobile','tel')+
-     fld('Email','email','email')+fld('Lead source','source')+
+     fld('Email','email','email')+selectFld('Approved source','source',[['','Select approved source'],...ctx.approvedSources.map(s=>[s.name,s.name])],false)+
      selectFld('Product','product',[['','None'],...products.map(p=>[p.record_id,p.payload?.name||p.record_id])],false)+
      selectFld('Existing customer','customer',[['','Not linked'],...ctx.customers.map(c=>[c.id,c.name])],false)+
-     fld('Expected value ₹','value','number','0')+fld('Tags (comma-separated)','tags')+fld('Initial enquiry notes','note');
+     fld('Expected value ₹','value','number','0')+
+     '<fieldset class="gl-first-interests"><legend>Approved tags</legend>'+ctx.approvedTags.map(t=>
+      '<label><input type="checkbox" name="tags" value="'+escape(t.id)+'">'+escape(t.name)+'</label>').join('')+'</fieldset>'+
+     fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
      if(!fd.get('assignee'))throw Error('A sales employee must be assigned before creating the lead');
      const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee'),
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
-      p_email:fd.get('email'),p_tags:String(fd.get('tags')||'').split(',').map(x=>x.trim()).filter(Boolean),p_note:fd.get('note')});if(error)throw error;
+      p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
     comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Choose a salesperson'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
    }
@@ -326,7 +329,7 @@
       let success=0,errors=[];
       for(const cells of rows){if(!cells.some(x=>x.trim()))continue;const val=n=>cells[headers.indexOf(n)]||'';
        const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:val('title'),p_contact:val('contact'),
-       p_assignee:fd.get('assignee'),p_source:val('source'),p_product:val('product_id')||null,p_value:val('value')||0,p_mobile:val('mobile'),
+       p_assignee:fd.get('assignee'),p_source:(ctx.approvedSources.find(s=>matchesApproved(s.name,val('source')))?.name||''),p_product:(ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===val('product_id'))?val('product_id'):null),p_value:val('value')||0,p_mobile:val('mobile'),
        p_email:val('email'),p_tags:val('tags').split(';').filter(Boolean),p_note:val('notes')});
        if(error){errors.push(error.message);if(errors.length>15)break}else success++;
       }
