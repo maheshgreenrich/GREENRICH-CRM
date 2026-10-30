@@ -68,7 +68,7 @@ function channelName(s){return s.channel_name||nameOf('channels',s.channel_id)}
 function productName(s){return s.product_name||nameOf('products',s.product_id)}
 function customerName(s){return s.customer_name||nameOf('customers',s.customer_id)}
 function el(tag,props={}){let e=document.createElement(tag);Object.entries(props).forEach(([k,v])=>k==='text'?e.textContent=v:e.setAttribute(k,v));return e}
-const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales & Orders','Track sales across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Capture enquiries, opportunities and deal stages.','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],dispatch:['Dispatch','Approved orders, packing and courier tracking.','Dispatch queue','sales'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
+const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales Orders','Track sales orders across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Capture enquiries, opportunities and deal stages.','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],dispatch:['Dispatch','Approved orders, packing and courier tracking.','Dispatch queue','sales'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
 function navigate(p){if(!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#page-heading').textContent=titles[p][0];$('#page-subtitle').textContent=titles[p][1];$('#primary-action').textContent=titles[p][2];$('#primary-action').hidden=p==='reports'||p==='dispatch'||p==='customers'||p==='leads'||(adminMode&&p==='dashboard');render();root?.scrollIntoView({block:'start'})}
 function fillSelect(sel,rows,emptyLabel='None'){let old=sel.value;sel.replaceChildren();sel.append(el('option',{value:'',text:emptyLabel}));rows.forEach(r=>sel.append(el('option',{value:r.id,text:r.name||r.title})));if([...sel.options].some(o=>o.value===old))sel.value=old}
 
@@ -456,6 +456,9 @@ function renderCustomerProfile(){
   onInvoice:(id,owner)=>void openSaleInvoice(id,owner),
   onRefresh:()=>renderCustomerProfile()
  });
+ if(customer?.id&&window.GreenRichLeadPipeline?.renderCustomerTimeline)
+  void window.GreenRichLeadPipeline.renderCustomerTimeline(area,pipelineConfig.client,customer.id,permittedCompanies,
+   id=>id===pipelineConfig.userId?'Me':'Sales employee').catch(error=>console.warn('Lead history unavailable',error));
 }
 function openCustomerProfile(customerId='',saleId=''){
  const customer=data.customers.find(c=>c.id===customerId);
@@ -618,6 +621,21 @@ function openEditor(k,id=''){
  }
  if(k==='customers'){$('#f-company_id')?.remove();} // Customer records belong to the currently active company.
  $('#editor').showModal();
+}
+function createOrderForLead(lead){
+ if(!lead?.customer_id)return toast('Link a shared customer to this lead first.');
+ if(!permittedCompanies.includes(lead.company_id))return toast('Company access denied.');
+ navigate('sales');window.GreenRichShell?.setPageWithoutRemount?.('orders');
+ openEditor('sales');
+ const co=$('#f-company_id');if(co){co.value=lead.company_id;co.dispatchEvent(new Event('change'))}
+ const customer=$('#f-customer_id');if(customer){customer.value=lead.customer_id;
+  const person=editorData().customers.find(c=>c.id===lead.customer_id);
+  $('#gr-customer-selected').textContent=person?'Selected: '+person.name:'Choose this customer in the picker';
+ }
+ if(lead.product_id&&$('#f-product_id')){$('#f-product_id').value=lead.product_id;$('#f-product_id').dispatchEvent(new Event('change'))}
+ if($('#f-notes'))$('#f-notes').value='Linked quotation / lead: '+lead.title+' ('+lead.lead_id+')';
+ const link=document.createElement('input');link.type='hidden';link.name='lead_id';link.value=lead.lead_id;$('#editor-form').append(link);
+ toast('Complete the Sales Order fields and save. Then return to the lead and mark Won using the saved order.');
 }
 async function saveEditor(event){
  event.preventDefault();
@@ -865,6 +883,7 @@ window.GreenRichCRM={
  },
  switchPage:view=>{if(allowedTabs.includes(view))navigate(view)},
  openCustomerProfile:(id,saleId='')=>openCustomerProfile(id,saleId),
+ createOrderForLead,
  refresh:()=>{if(root?.isConnected&&page==='dashboard')render()},
  unmount:()=>{window.GreenRichCRMCloud?.stop?.();charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];root=null}
 };
