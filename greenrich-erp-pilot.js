@@ -1,10 +1,10 @@
 'use strict';
 /* One-page GreenRich ONE ERP pilot: real-time Supabase state, TEST data only. */
 window.GreenRichPilot=(function(){
- const LABELS={STOCK_CHECK:'Check Finished Stock',VENDOR_PO:'Create Vendor PO',ISSUE:'Issue Material to Vendor',JOBWORK:'Job Work & Wastage',RECEIVE:'Receive Processed Parts',ASSEMBLY:'Final Assembly',STICKER:'Stickering',INSPECTION:'Incoming Inspection',QC:'Final Quality Check',STOCK:'Automatic Finished Stock',DISPATCH:'Dispatch',SERVICE:'Service / Warranty'};
+ const LABELS={STOCK_CHECK:'Check Finished Stock',VENDOR_PO:'Create Vendor PO',RM_RECEIPT:'Receive Raw Materials in Warehouse',ISSUE:'Issue Material to Vendor',JOBWORK:'Job Work & Wastage',RECEIVE:'Receive Processed Parts',ASSEMBLY:'Final Assembly',STICKER:'Stickering',INSPECTION:'Incoming Inspection',QC:'Final Quality Check',STOCK:'Automatic Finished Stock',DISPATCH:'Dispatch',SERVICE:'Service / Warranty'};
  const TEMPLATES={
   SIMPLE:['STOCK_CHECK','ASSEMBLY','STICKER','QC','STOCK','DISPATCH','SERVICE'],
-  OUTSOURCED:['STOCK_CHECK','VENDOR_PO','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'],
+  OUTSOURCED:['STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'],
   DIRECT:['STOCK_CHECK','RECEIVE','INSPECTION','QC','STOCK','DISPATCH','SERVICE']
  };
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,11 +48,12 @@ window.GreenRichPilot=(function(){
    ctx.db.from('gr_pilot_pos').select('*').in('company_id',c).order('issued_at',{ascending:false}).limit(500),
    ctx.db.from('gr_pilot_stock_events').select('*').in('company_id',c).limit(500),
    ctx.db.from('gr_pilot_service').select('*').in('company_id',c).limit(500),
+   ctx.db.from('gr_pilot_material_events').select('*').in('company_id',c).limit(1000),
    ctx.db.from('gr_ops_records').select('company_id,record_id,payload').in('company_id',c).eq('kind','vendor').limit(500)
   ];
   const res=await Promise.all(q);
   const err=res.find(r=>r.error)?.error;if(err)throw err;
-  [ctx.products,ctx.orders,ctx.events,ctx.pos,ctx.stock,ctx.service,ctx.vendors]=res.map(r=>r.data||[]);
+  [ctx.products,ctx.orders,ctx.events,ctx.pos,ctx.stock,ctx.service,ctx.materials,ctx.vendors]=res.map(r=>r.data||[]);
   if(!ctx.products.some(p=>p.id===ctx.pid))ctx.pid=ctx.products[0]?.id;
   if(!ctx.orders.some(o=>o.id===ctx.oid))ctx.oid=ctx.orders.find(o=>o.product_id===ctx.pid)?.id;
  }
@@ -66,6 +67,9 @@ window.GreenRichPilot=(function(){
   const orders=ctx.orders.filter(o=>o.product_id===p?.id);
   const o=orders.find(o=>o.id===ctx.oid)||orders[0];if(p)ctx.pid=p.id;if(o)ctx.oid=o.id;
   const po=ctx.pos.find(x=>x.order_id===o?.id);
+  const movements=ctx.materials.filter(x=>x.order_id===o?.id);
+  const ware=movements.filter(x=>x.location==='WAREHOUSE').reduce((v,x)=>v+Number(x.qty_change),0);
+  const ven=movements.filter(x=>x.location==='VENDOR').reduce((v,x)=>v+Number(x.qty_change),0);
   const events=ctx.events.filter(e=>e.order_id===o?.id);
   const step=o&&p?.steps[o.cursor]||null;
   const companyFields=ctx.companies.length>1?'<label>Working company<select id="gp-company">'+opts([['all','Both companies'],...ctx.companies.map(x=>[x,x==='grow-india'?'Grow India':'Enviro Solutions'])],ctx.company)+'</select></label>':'';
@@ -76,6 +80,7 @@ window.GreenRichPilot=(function(){
   const vendor=ctx.vendors.find(v=>v.record_id===(po?.vendor_id||ctx.vendorId))||vendorRows[0];
   const vendorPOs=ctx.pos.filter(x=>x.company_id===vendor?.company_id&&x.vendor_id===vendor?.record_id);
   const form=step?'<form id="gp-step-form">'+(step==='VENDOR_PO'?'<label>Choose vendor<select name="vendor_id">'+opts(vendorRows.map(v=>[v.record_id,v.payload?.name||v.record_id]),po?.vendor_id)+'</select></label>':'')+
+    (step==='RM_RECEIPT'?'<label>Raw material received from supplier (kg)<input name="received_kg" type="number" min=".001" step=".001" value="50" required></label>':'')+
     (step==='ISSUE'?'<label>Material issued to vendor (kg)<input name="issued" type="number" min=".001" step=".001" value="50" required></label>':'')+
     (step==='JOBWORK'?'<p>Sample 50 kg lot: 8 kg used, 2 kg scrap, 40 kg remains at vendor.</p><div class="gp-options">'+
     [['issued','Issued','50'],['net_used','Net used','8'],['scrap','Scrap','2'],['vendor_balance','At vendor','40'],['returned','Returned','0']].map(([k,label,v])=>'<label>'+label+'<input name="'+k+'" type="number" min="0" step=".001" value="'+v+'" required></label>').join('')+'</div>':'')+
@@ -100,7 +105,7 @@ window.GreenRichPilot=(function(){
    (o?'<p>Customer: '+esc(o.customer_name)+'</p>':'')+
    '<div class="gp-alert">'+(step?'Next action: '+esc(LABELS[step]):'No outstanding workflow action')+'</div>'+ (o?form:'')+'</div>'+
    '<div class="gp-card"><h4>4. BOM / Material Requirements</h4><div class="gp-list"><table><thead><tr><th>Code</th><th>Part</th><th>Qty / FG</th><th>UOM</th></tr></thead><tbody>'+parts+'</tbody></table></div>'+
-   '<p>Example BOM for training. Does not deduct RM/SFG stock yet; material and job-work quantities are reconciled in the order steps.</p></div>'+
+   '<div class="gp-row"><span class="gp-tag">RM warehouse: '+esc(ware.toFixed(3))+' kg</span><span class="gp-tag">RM at vendor: '+esc(ven.toFixed(3))+' kg</span></div><p>These quantities are calculated from posted test RM receipts, issues, consumption, waste and returns.</p></div>'+
    '<div class="gp-card"><h4>5. Timestamped work history</h4><div class="gp-history">'+(events.length?events.map(e=>'<article><b>'+esc(LABELS[e.step])+'</b><br>'+esc(e.note)+'<br><small>'+esc(new Date(e.at).toLocaleString('en-IN'))+'</small></article>').join(''):'No activities recorded.')+'</div></div></div>'+
    '<div class="gp-vendor-col"><div class="gp-card"><h4>6. Vendor 360</h4>'+
    '<label>Supplier<select id="gp-vendor">'+opts(vendorRows.map(v=>[v.record_id,v.payload?.name||v.record_id]),vendor?.record_id)+'</select></label>'+
@@ -170,6 +175,7 @@ window.GreenRichPilot=(function(){
   const o=ctx.orders.find(x=>x.id===ctx.oid),p=ctx.products.find(x=>x.id===o?.product_id),step=stages(p)[o.cursor];
   const f=new FormData(e.currentTarget),d={};
   if(step==='VENDOR_PO')d.vendor_id=f.get('vendor_id');
+  if(step==='RM_RECEIPT')d.received_kg=f.get('received_kg');
   if(step==='ISSUE')d.issued=f.get('issued');
   if(step==='JOBWORK')for(const k of ['issued','net_used','scrap','vendor_balance','returned'])d[k]=f.get(k);
   if(step==='RECEIVE')d.accepted_qty=f.get('accepted_qty');
@@ -180,8 +186,9 @@ window.GreenRichPilot=(function(){
  }
  async function mount(root,{client,companies,selection,canEdit}){
   root.innerHTML='<p>Loading connected ERP pilot from Supabase…</p>';
-  const ctx={root,db:client,companies,company:selection||'all',canEdit,products:[],orders:[],events:[],pos:[],stock:[],service:[],vendors:[],pid:null,oid:null,vendorId:null};
-  try{await reload(ctx);const channel=client.channel('gr-pilot-'+Math.random().toString(36).slice(2))
+  const ctx={root,db:client,companies,company:selection||'all',canEdit,products:[],orders:[],events:[],pos:[],stock:[],service:[],materials:[],vendors:[],pid:null,oid:null,vendorId:null};
+  try{await reload(ctx);if(root._pilotChannel)await client.removeChannel(root._pilotChannel);
+   const channel=client.channel('gr-pilot-'+Math.random().toString(36).slice(2))
    .on('postgres_changes',{event:'*',schema:'public',table:'gr_pilot_orders'},()=>void reload(ctx).catch(()=>{}))
    .subscribe();root._pilotChannel=channel}catch(e){root.textContent='Pilot not ready: '+e.message+'; check the database migration';}
  }
