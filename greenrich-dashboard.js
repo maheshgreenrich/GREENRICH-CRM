@@ -63,7 +63,7 @@
    dispatch:()=>box('dispatch','Dispatch pipeline','Current courier stages',bars(['Pending','Packed','Shipped','Delivered'].map(status=>[status,dispatch.filter(d=>d.status===status||(status==='Pending'&&d.status==='Approved')).length]))),
    stock:()=>box('stock','Products & stock','Current inventory, regardless of selected dates',stats([['Products',fmt(f.products.length)],['Low stock ≤5',fmt(f.products.filter(p=>Number(p.stock)>=0&&Number(p.stock)<=5).length)],['Out of stock',fmt(f.products.filter(p=>Number(p.stock)===0).length)]])+bars(f.products.slice().sort((a,b)=>(Number(a.stock)||0)-(Number(b.stock)||0)).slice(0,7).map(p=>[(p.name||p.sku||'Product')+' · '+company(p.company_id),Number(p.stock)||0]))),
    telecaller:()=>box('telecaller','Telecaller & conversions','Recorded leads classified as telecalling',stats([['Telecalling leads',fmt(calls.length)],['Won / converted',fmt(calls.filter(l=>l.stage==='Won').length)],['Calls today','Not tracked']])+bars([['Won',calls.filter(l=>l.stage==='Won').length],['Not yet won',calls.filter(l=>l.stage!=='Won').length]])+'<p class="gr-exec-foot">Actual calls require logged CRM conversations or a dialer integration.</p>'),
-   customers:()=>box('customers','Customer overview','Authorized customer master',stats([['Customers',fmt(f.customers.length)],['New leads',fmt(leads.filter(l=>l.stage==='New').length)],['Converted leads',fmt(leads.filter(l=>l.stage==='Won').length)]])+ring(group(leads,l=>l.stage||'New'))),
+   customers:()=>box('customers','Customer overview','Shared customer master · not divided by company',stats([['Customers',fmt(f.customers.length)],['New leads',fmt(leads.filter(l=>l.stage==='New').length)],['Converted leads',fmt(leads.filter(l=>l.stage==='Won').length)]])+ring(group(leads,l=>l.stage||'New'))),
    followups:()=>box('followups','Follow-up activity','Pending, due and overdue leads',stats([['Follow-up scheduled',fmt(followups.length)],
     ['Due now',fmt(followups.filter(l=>new Date(l.next_followup_at).getTime()<=now).length)],
     ['Today',fmt(followups.filter(l=>String(l.next_followup_at||'').slice(0,10)===today()).length)],
@@ -88,6 +88,11 @@
   host.querySelector('#gr-exec-count').textContent=fmt(f.sales.length)+' sales · '+fmt(leads.length)+' leads · '+fmt(dispatch.length)+' dispatch orders';
  }
  function fillChoices(id,label,values){const el=host.querySelector(id),before=el.value;el.innerHTML='<option value="all">'+e(label)+'</option>'+values.map(v=>'<option value="'+e(v)+'">'+e(v)+'</option>').join('');if([...el.options].some(o=>o.value===before))el.value=before}
+ function namedChoices(id,label,values){const el=host.querySelector(id);if(!el)return;const before=el.value;
+   el.innerHTML='<option value="all">'+e(label)+'</option>'+values.map(([value,name])=>
+    '<option value="'+e(value)+'">'+e(name)+'</option>').join('');
+   if([...el.options].some(o=>o.value===before))el.value=before;
+ }
 
  const loadScript=async(url,verify)=>{
   if(verify())return;
@@ -174,11 +179,11 @@
    widgets=Array.isArray(prefs.data?.widgets)?prefs.data.widgets:W.map(x=>x[0]);
    fillChoices('#gr-exec-source','All sources',[...new Set(records.leads.map(x=>x.source).filter(Boolean))].sort());
    fillChoices('#gr-exec-channel','All channels',[...new Set(records.sales.map(x=>x.channel_name).filter(Boolean))].sort());
-   fillChoices('#gr-exec-product','All products',[...new Set(records.products.map(x=>x.id||x.sku).filter(Boolean))].sort());
-   fillChoices('#gr-exec-tag','All tags',tagRows.error?[]:(tagRows.data||[]).map(x=>x.id));
+   namedChoices('#gr-exec-product','All products',[...new Map(records.products.filter(x=>x.id||x.sku).map(x=>[x.id||x.sku,[x.id||x.sku,x.name||x.sku||x.id]])).values()]);
+   namedChoices('#gr-exec-tag','All tags',tagRows.error?[]:(tagRows.data||[]).map(x=>[x.id,x.name]));
    fillChoices('#gr-exec-stage','All stages',['New','Contacted','Qualified','Quotation','Won','Lost']);
    fillChoices('#gr-exec-order-status','All statuses',[...new Set(records.sales.map(x=>x.status).filter(Boolean))].sort());
-   fillChoices('#gr-exec-person','All salespeople',isAdmin?staff.map(p=>p.id):[]);
+   namedChoices('#gr-exec-person','All salespeople',isAdmin?staff.map(p=>[p.id,p.full_name]):[]);
    host.querySelector('#gr-exec-loading').hidden=true;draw();
    if(att.error)notice('Attendance summary unavailable to this role');
   }catch(error){const el=host?.querySelector('#gr-exec-loading');if(el){el.hidden=false;el.textContent='Unable to refresh dashboard: '+error.message}}
