@@ -299,7 +299,14 @@ begin
  then raise exception 'On first movement, choose at least one approved product and tag';end if;
  if p_stage<>'Won' and (p_due_at is null or p_due_at<=now())
  then raise exception 'Choose a future follow-up date and time';end if;
- if p_stage='Won' and p_order is null then raise exception 'Select the issued Sales Order before marking Won';end if;
+ if p_stage='Won' then
+  if p_order is null then raise exception 'Select the issued Sales Order before marking Won';end if;
+  if not exists(select 1 from public.gr_crm_records so
+    where so.company_id=p_company and so.kind='sales' and so.record_id=p_order
+      and so.payload->>'customer_id'=v.customer_id::text
+      and coalesce(so.payload->>'status','') in ('Issued','Confirmed','Approved','Completed','Dispatched'))
+  then raise exception 'The Sales Order must belong to this customer and be Issued, Confirmed or Approved';end if;
+ end if;
  perform public.gr_pipeline_move_with_interests(p_company,p_lead,p_stage,p_note,
    p_products,p_tags,p_order,case when p_stage='Quotation' then p_due_at::date else null end);
  update public.gr_lead_pipeline set lead_heat=p_heat,
@@ -332,3 +339,7 @@ begin
 end $answers$;
 revoke all on function public.gr_pipeline_source_answers(text,text) from public,anon,authenticated;
 grant execute on function public.gr_pipeline_source_answers(text,text) to authenticated;
+
+-- Make the audited advance workflow the only client-callable stage transition.
+revoke all on function public.gr_pipeline_move(text,text,text,text,text,date) from public,anon,authenticated;
+revoke all on function public.gr_pipeline_move_with_interests(text,text,text,text,text[],text[],text,date) from public,anon,authenticated;
