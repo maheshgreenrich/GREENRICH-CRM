@@ -10,7 +10,7 @@ assert.ok(html.includes('greenrich-workflow-training.js?v=20261030-training-1'),
 assert.ok(html.indexOf('greenrich-workflow-training.js?v=')<html.indexOf('greenrich-operations.js?v='),'Training needs to load before operations');
 assert.ok(ops.includes("['training','Learn Production · Demo','stock']"),'Training must be a tab inside Operations');
 assert.ok(ops.includes('GreenRichWorkflowTraining.mount('),'Operations should mount the trainer');
-assert.ok(ops.includes("id==='training'?Boolean(caps.stock?.view)"),'Permissions must allow the training tab to show');
+assert.ok(ops.includes("['training','pilot'].includes(id)?Boolean(caps.stock?.view)"),'Permissions must allow both training and pilot tabs through stock-view permission');
 for(const type of ['SIMPLE_ASSEMBLY','MULTILEVEL','VENDOR_MADE','DIRECT_RECEIPT','CUSTOM'])
  assert.ok(trainer.includes(type),'All configurable workflow templates need to exist');
 for(const stage of ['PARTS','SFG','RM','VENDOR_PO','JOBWORK','RECEIVE','ASSEMBLY','STICKER','QC','STOCK'])
