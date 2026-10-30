@@ -166,7 +166,9 @@ begin
  if 'STICKER'=any(p_steps) and array_position(p_steps,'STICKER')>array_position(p_steps,'QC') then raise exception 'Sticker must precede final QC';end if;
  if exists(select 1 from jsonb_array_elements(p_parts) x where
  length(trim(coalesce(x->>'name','')))<2 or length(trim(coalesce(x->>'code','')))<2
- or coalesce(x->>'qty','') !~ '^[0-9]+(\\.[0-9]{1,3})?
+ or jsonb_typeof(x->'qty') <> 'number'
+ or (case when jsonb_typeof(x->'qty')='number' then (x->>'qty')::numeric else 0 end)<=0)
+ then raise exception 'Each BOM part needs code, name and positive quantity';end if;
  v_id:=gen_random_uuid();v_product:=gen_random_uuid()::text;
  insert into public.gr_pilot_products(id,company_id,crm_product_id,sku,name,parts,steps,created_by)
  values(v_id,p_company,v_product,upper(trim(p_sku)),trim(p_name),p_parts,p_steps,auth.uid());
