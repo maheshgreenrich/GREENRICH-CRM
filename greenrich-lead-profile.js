@@ -21,7 +21,7 @@ window.GreenRichLeadProfile=(function(){
     db.from('gr_lead_stage_history').select('*').eq('company_id',company).eq('lead_id',leadId).order('created_at',{ascending:false}).limit(500),
     db.from('gr_crm_records').select('payload').eq('company_id',company).eq('kind','leads').eq('record_id',leadId).maybeSingle(),
     db.from('gr_crm_records').select('record_id,payload').eq('company_id',company).eq('kind','sales').limit(500),
-    db.from('gr_sheet_import_rows').select('raw_answers,normalized_answers,row_number').eq('company_id',company).eq('lead_id',leadId).limit(5),
+    db.rpc('gr_pipeline_source_answers',{p_company:company,p_lead:leadId}),
     db.from('gr_crm_customers').select('id,name').limit(500),
     db.from('gr_crm_tags').select('id,name').limit(500),
     db.from('gr_crm_records').select('record_id,payload').eq('company_id',company).eq('kind','products').limit(500)
@@ -47,8 +47,9 @@ window.GreenRichLeadProfile=(function(){
    const rawFields=raw.flatMap(row=>(row.raw_answers?.values||[]).map((a,i)=>({
     label:row.raw_answers?.headers?.[i]||'Column '+(i<26?String.fromCharCode(65+i):i+1),value:a
    })));
+   const normalizedFields=raw.flatMap(row=>Object.entries(row.normalized_answers||{}).map(([label,value])=>({label,value})));
    const mapped=p.enquiry_details&&typeof p.enquiry_details==='object'?Object.entries(p.enquiry_details).map(([label,value])=>({label,value})):[];
-   const fields=rawFields.length?rawFields:mapped;
+   const fields=rawFields.length?[...normalizedFields,...rawFields]:mapped;
    const phone=String(lead.mobile||'').replace(/[^+0-9]/g,'');
    const digits=phone.replace(/\D/g,'');
    const links=[
