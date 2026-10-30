@@ -1,5 +1,12 @@
 -- Phase 1 follow-up: controlled reversal, monthly locking, and trial-balance read model.
 -- Reversal is a new journal; original remains unchanged.
+create table if not exists public.acc_reversals(
+ original_journal_id uuid primary key references public.acc_journals(id),
+ reversal_journal_id uuid not null unique references public.acc_journals(id),
+ reason text not null,
+ actor_id uuid not null references public.gr_profiles(id),
+ created_at timestamptz not null default now()
+);
 create or replace function public.acc_reverse_journal(p_journal uuid,p_reason text)
 returns uuid language plpgsql security definer set search_path=public
 as $$
@@ -9,7 +16,7 @@ begin
  if not found then raise exception 'Journal not found'; end if;
  if not public.acc_can_access(j.company_id,'post') then raise exception 'Forbidden'; end if;
  if length(trim(coalesce(p_reason,'')))<8 then raise exception 'Reversal reason required (minimum 8 characters)'; end if;
- if exists(select 1 from public.acc_journals where reversal_of=p_journal) then raise exception 'Already reversed'; end if;
+ if exists(select 1 from public.acc_reversals where original_journal_id=p_journal) then raise exception 'Already reversed'; end if;
  select jsonb_agg(jsonb_build_object('account_id',account_id,'debit',credit::text,'credit',debit::text,
    'party_id',party_id,'cost_center',cost_center) order by id)
  into v_lines from public.acc_journal_lines where journal_id=p_journal;
