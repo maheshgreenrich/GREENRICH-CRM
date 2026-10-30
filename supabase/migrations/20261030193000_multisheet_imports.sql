@@ -56,6 +56,8 @@ create policy "admin only sheet review" on public.gr_sheet_import_rows for selec
  using(public.gr_meta_sheet_is_admin(company_id));
 revoke all on public.gr_sheet_connections,public.gr_sheet_import_rows from public,anon,authenticated;
 grant select on public.gr_sheet_connections,public.gr_sheet_import_rows to authenticated;
+-- Used as a caller-aware RLS predicate; safe to execute for signed-in users.
+grant execute on function public.gr_meta_sheet_is_admin(text) to authenticated;
 
 -- Only authenticated company Admin may create/change integration configuration.
 create or replace function public.gr_sheet_admin_upsert(
