@@ -1,0 +1,31 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict'),vm=require('node:vm');
+const get=path=>fs.readFileSync(path,'utf8');
+const html=get('secure.html'),app=get('greenrich-one.js'),crm=get('greenrich-crm-inline.js');
+const dashboard=get('greenrich-dashboard.js'),lead=get('greenrich-lead-pipeline.js'),profile=get('greenrich-lead-profile.js');
+const alarms=get('greenrich-followup-alarm.js'),notify=get('greenrich-notifications.js');
+const reminderSql=get('supabase/migrations/20261030234500_due_followup_responses.sql');
+const wonSql=get('supabase/migrations/20261030235500_won_by_issued_sales_order.sql');
+for(const source of [app,crm,dashboard,lead,profile,alarms,notify])new vm.Script(source);
+for(const file of ['greenrich-one','greenrich-lead-pipeline','greenrich-lead-profile','greenrich-dashboard','greenrich-crm-inline'])
+ assert.ok(html.includes(file+'.js?v=20261030-modernbi-1'),'Missing refreshed '+file);
+for(const file of ['greenrich-notifications','greenrich-followup-alarm'])
+ assert.ok(html.includes(file+'.js?v=20261030-modernbi-1'),'Missing new '+file);
+assert.ok(html.indexOf('greenrich-followup-alarm.js?v=')<html.indexOf('greenrich-one.js?v='));
+assert.ok(html.indexOf('greenrich-notifications.js?v=')<html.indexOf('greenrich-one.js?v='));
+assert.ok(app.includes('GreenRichFollowupAlarm?.start')&&app.includes('role:roleName()'));
+assert.ok(app.includes('canExport:roleName()'));
+assert.ok(notify.includes("error")&&notify.includes("warning")&&notify.includes("success"));
+assert.ok(lead.includes('gr_pipeline_win_with_order')&&lead.includes('data-full')===false);
+assert.ok(lead.includes('celebrateWon(l.contact')&&lead.includes('order_search'));
+assert.ok(lead.includes("d.querySelector('.gl-move-heat').hidden=won"));
+assert.ok(profile.includes('grlp-hero')&&profile.includes('grlp-stats'));
+assert.ok(reminderSql.includes('gr_lead_can')&&reminderSql.includes('gr_lead_stage_history'));
+assert.ok(wonSql.includes('right(phone1,10)=right(phone2,10)')&&wonSql.includes('gr_pipeline_advance'));
+assert.ok(alarms.includes("addEventListener('cancel',e=>e.preventDefault())")&&alarms.includes('gr_pipeline_followup_respond'));
+assert.ok(dashboard.includes('Export Excel')&&dashboard.includes('Export PDF'));
+assert.ok(dashboard.includes('gr_dashboard_preferences')&&dashboard.includes("canExport=!!config.canExport"));
+assert.ok(dashboard.includes("['accounts','Accounts status']")&&dashboard.includes('No financial numbers are estimated'));
+assert.ok(dashboard.includes("namedChoices('#gr-exec-product'")&&dashboard.includes("namedChoices('#gr-exec-tag'"));
+assert.ok(dashboard.includes("W.map(x=>x[0])")&&dashboard.includes("widgets.filter(id=>cards[id])"));
+console.log('PASS modern dashboard, exports, typed notifications, Won SO verification, full 360 page and persistent due reminders');
