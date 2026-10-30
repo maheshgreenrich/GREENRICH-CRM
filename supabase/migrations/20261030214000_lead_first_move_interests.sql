@@ -38,7 +38,7 @@ begin
  updated_at=now() where company_id=p_company and kind='leads' and record_id=p_lead;
  insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
  values(p_company,p_lead,auth.uid(),'STAGE_CHANGED',v.stage,p_stage,btrim(p_note));
-end $function$
+end $function$;
 
 
 create or replace function public.gr_pipeline_move_with_interests(
