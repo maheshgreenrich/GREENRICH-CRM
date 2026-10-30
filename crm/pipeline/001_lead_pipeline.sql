@@ -160,7 +160,8 @@ grant execute on function public.gr_pipeline_staff(text) to authenticated;
 create or replace function public.gr_pipeline_create(
  p_company text,p_title text,p_contact text,p_assignee uuid,p_source text default '',
  p_product text default null,p_value numeric default 0,p_mobile text default '',
- p_email text default '',p_tags text[] default '{}',p_customer uuid default null,p_note text default ''
+ p_email text default '',p_tags text[] default '{}',p_customer uuid default null,p_note text default '',
+ p_legacy_id text default null
 ) returns text language plpgsql security definer set search_path=''
 as $$
 declare v_id text; v_staff public.gr_profiles%rowtype; v_me public.gr_profiles%rowtype;
@@ -177,7 +178,110 @@ begin
  if p_value is null or p_value<0 or p_value>9999999999999999.99 then raise exception 'Invalid lead value'; end if;
  if p_customer is not null and not exists(select 1 from public.gr_crm_customers where id=p_customer) then raise exception 'Customer not found'; end if;
  if p_product is not null and not exists(select 1 from public.gr_crm_records where company_id=p_company and kind='products' and record_id=p_product) then raise exception 'Product not found'; end if;
- v_id=gen_random_uuid()::text;
+ if p_legacy_id is not null and p_legacy_id !~* '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}
+ insert into public.gr_lead_pipeline(company_id,lead_id,title,contact,mobile,email,source,product_id,tag_ids,customer_id,assigned_to,expected_value,notes,created_by)
+ values(p_company,v_id,btrim(p_title),coalesce(p_contact,''),coalesce(p_mobile,''),coalesce(p_email,''),coalesce(p_source,''),p_product,coalesce(p_tags,'{}'),p_customer,p_assignee,p_value,coalesce(p_note,''),auth.uid());
+ insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
+ values(p_company,'leads',v_id,jsonb_build_object('id',v_id,'company_id',p_company,'title',btrim(p_title),'contact',coalesce(p_contact,''),
+ 'mobile',coalesce(p_mobile,''),'email',coalesce(p_email,''),'source',coalesce(p_source,''),'product_id',p_product,
+ 'tag_ids',to_jsonb(coalesce(p_tags,'{}')),'customer_id',p_customer,'owner',v_staff.full_name,'assigned_to',p_assignee,
+ 'stage','New','value',p_value,'notes',coalesce(p_note,''),'created_at',now()),auth.uid());
+ insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,new_stage,new_assignee,note)
+ values(p_company,v_id,auth.uid(),'CREATED','New',p_assignee,'Lead assigned to '||v_staff.full_name);
+ return v_id;
+end $$;
+revoke all on function public.gr_pipeline_create(text,text,text,uuid,text,text,numeric,text,text,text[],uuid,text,text) from public;
+grant execute on function public.gr_pipeline_create(text,text,text,uuid,text,text,numeric,text,text,text[],uuid,text) to authenticated;
+
+create or replace function public.gr_pipeline_assign(p_company text,p_lead text,p_employee uuid,p_note text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v public.gr_lead_pipeline%rowtype; staff public.gr_profiles%rowtype;
+begin
+ select * into v from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead for update;
+ if not found then raise exception 'Lead not found'; end if;
+ if not public.gr_lead_can_manage(p_company,v.assigned_to) then raise exception 'Only Admin or permitted manager can reassign'; end if;
+ if nullif(btrim(coalesce(p_note,'')),'') is null then raise exception 'Assignment reason is required'; end if;
+ select * into staff from public.gr_profiles where id=p_employee and active and p_company=any(company_ids);
+ if not found or not exists(select 1 from public.gr_pipeline_staff(p_company) where id=p_employee) then raise exception 'Employee is not available for this company'; end if;
+ update public.gr_lead_pipeline set assigned_to=p_employee,updated_at=now() where company_id=p_company and lead_id=p_lead;
+ update public.gr_crm_records set payload=jsonb_set(jsonb_set(payload,'{owner}',to_jsonb(staff.full_name)),'{assigned_to}',to_jsonb(p_employee)),
+ updated_at=now() where company_id=p_company and kind='leads' and record_id=p_lead;
+ insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_assignee,new_assignee,note)
+ values(p_company,p_lead,auth.uid(),'ASSIGNED',v.assigned_to,p_employee,btrim(p_note));
+end $$;
+revoke all on function public.gr_pipeline_assign(text,text,uuid,text) from public;
+grant execute on function public.gr_pipeline_assign(text,text,uuid,text) to authenticated;
+
+-- Drag/drop always asks for and persists a note. Won requires a pre-existing sales order
+-- for the linked CRM customer; stage transitions NEVER pretend to have created an order.
+create or replace function public.gr_pipeline_move(p_company text,p_lead text,p_stage text,p_note text,p_order text default null,p_due date default null)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v public.gr_lead_pipeline%rowtype;
+begin
+ select * into v from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead for update;
+ if not found then raise exception 'Lead not found'; end if;
+ if not public.gr_lead_can(p_company,v.assigned_to,'edit') then raise exception 'Cannot change another employee''s lead'; end if;
+ if p_stage not in ('New','Contacted','Qualified','Quotation','Won','Lost') then raise exception 'Invalid stage'; end if;
+ if p_stage=v.stage then raise exception 'Choose a different stage'; end if;
+ if nullif(btrim(coalesce(p_note,'')),'') is null then raise exception 'Enter the conversation details before moving'; end if;
+ if length(p_note)>4000 then raise exception 'Conversation note too long'; end if;
+ if p_stage='Quotation' and p_due is null then raise exception 'Set a quotation follow-up date'; end if;
+ if p_stage='Won' then
+   if v.stage<>'Quotation' then raise exception 'Move to Quotation before Won'; end if;
+   if v.customer_id is null then raise exception 'Link an existing customer before winning'; end if;
+   if p_order is null or not exists(
+    select 1 from public.gr_crm_records r where r.company_id=p_company and r.kind='sales'
+    and r.record_id=p_order and r.payload->>'customer_id'=v.customer_id::text
+    and coalesce(r.payload->>'status','')<>'Cancelled'
+   ) then raise exception 'Select an existing sales order for the same customer before winning'; end if;
+ elsif p_stage='Contacted' and v.stage='Lost' then null;
+ elsif p_stage='Lost' and v.stage not in ('Won','Lost') then null;
+ elsif array_position(array['New','Contacted','Qualified','Quotation']::text[],p_stage)
+      =array_position(array['New','Contacted','Qualified','Quotation']::text[],v.stage)+1 then null;
+ else raise exception 'Move one stage at a time; Lost can return to Contacted'; end if;
+ update public.gr_lead_pipeline
+ set stage=p_stage,won_order_id=case when p_stage='Won' then p_order else null end,
+ won_at=case when p_stage='Won' then now() else null end,
+ next_followup=case when p_stage='Quotation' then p_due when v.stage='Quotation' then null else next_followup end,
+ updated_at=now()
+ where company_id=p_company and lead_id=p_lead;
+ update public.gr_crm_records set payload=jsonb_set(jsonb_set(payload,'{stage}',to_jsonb(p_stage)),'{won_order_id}',to_jsonb(p_order)),
+ updated_at=now() where company_id=p_company and kind='leads' and record_id=p_lead;
+ insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
+ values(p_company,p_lead,auth.uid(),'STAGE_CHANGED',v.stage,p_stage,btrim(p_note));
+end $$;
+revoke all on function public.gr_pipeline_move(text,text,text,text,text,date) from public;
+grant execute on function public.gr_pipeline_move(text,text,text,text,text,date) to authenticated;
+
+-- Link an existing shared customer to the lead before converting it to Won.
+create or replace function public.gr_pipeline_link_customer(p_company text,p_lead text,p_customer uuid,p_note text)
+returns void language plpgsql security definer set search_path=''
+as $$
+declare v public.gr_lead_pipeline%rowtype;
+begin
+ select * into v from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead for update;
+ if not found or not public.gr_lead_can(p_company,v.assigned_to,'edit') then raise exception 'Lead not found or permission denied'; end if;
+ if nullif(btrim(coalesce(p_note,'')),'') is null then raise exception 'Enter customer linking notes'; end if;
+ if not exists(select 1 from public.gr_crm_customers where id=p_customer) then raise exception 'Existing customer not found'; end if;
+ if v.stage='Won' then raise exception 'Won leads cannot change linked customer'; end if;
+ update public.gr_lead_pipeline set customer_id=p_customer,updated_at=now() where company_id=p_company and lead_id=p_lead;
+ update public.gr_crm_records set payload=jsonb_set(payload,'{customer_id}',to_jsonb(p_customer)),updated_at=now()
+ where company_id=p_company and kind='leads' and record_id=p_lead;
+ insert into public.gr_lead_stage_history(company_id,lead_id,actor_id,event_type,old_stage,new_stage,note)
+ values(p_company,p_lead,auth.uid(),'CUSTOMER_LINKED',v.stage,v.stage,btrim(p_note));
+end $$;
+revoke all on function public.gr_pipeline_link_customer(text,text,uuid,text) from public;
+grant execute on function public.gr_pipeline_link_customer(text,text,uuid,text) to authenticated;
+
+-- Pre-existing CRM legacy table has broader policies. Do not expose this RPC as a
+-- complete replacement for those permissions until legacy lead insert/update/delete
+-- paths are migrated to pipeline calls; their policies need hardening before release.
+ then raise exception 'Invalid legacy lead ID'; end if;
+ v_id=coalesce(p_legacy_id,gen_random_uuid()::text);
+ if exists(select 1 from public.gr_crm_records where company_id=p_company and kind='leads' and record_id=v_id) then
+   raise exception 'This lead is already stored in CRM'; end if;
  insert into public.gr_lead_pipeline(company_id,lead_id,title,contact,mobile,email,source,product_id,tag_ids,customer_id,assigned_to,expected_value,notes,created_by)
  values(p_company,v_id,btrim(p_title),coalesce(p_contact,''),coalesce(p_mobile,''),coalesce(p_email,''),coalesce(p_source,''),p_product,coalesce(p_tags,'{}'),p_customer,p_assignee,p_value,coalesce(p_note,''),auth.uid());
  insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
