@@ -46,8 +46,7 @@ create table if not exists public.gr_pilot_pos(
  status text not null default 'ISSUED',
  issued_at timestamptz not null default now(),
  created_by uuid references public.gr_profiles(id),
- foreign key(order_id,company_id) references public.gr_pilot_orders(id,company_id),
- foreign key(company_id,vendor_id) references public.gr_ops_records(company_id,record_id) -- vendor kind validated by RPC
+ foreign key(order_id,company_id) references public.gr_pilot_orders(id,company_id) -- vendor kind/company validated in server RPC
 );
 create table if not exists public.gr_pilot_stock_events(
  id bigint generated always as identity primary key,
@@ -291,13 +290,14 @@ with fresh as (
  on conflict(company_id,sku) do nothing returning id,company_id,crm_product_id
 ),
 products as (
- insert into public.gr_crm_records(company_id,kind,record_id,payload)
+ insert into public.gr_crm_records(company_id,kind,record_id,payload,created_by)
  select company_id,'products',crm_product_id,
  jsonb_build_object('id',crm_product_id,'company_id',company_id,'sku','PILOT-HOME-40',
  'name','[PILOT] Home Composter 40L','brand','ERP PILOT',
  'price',0,'tax',0,'stock',0,'active',false,'inclusive',false,
  'category','Training / Not for sale','is_pilot',true,
- 'description','TEST only. Stock updates from posted QC receipt and demo dispatch.')
+ 'description','TEST only. Stock updates from posted QC receipt and demo dispatch.'),
+ (select p.id from public.gr_profiles p join public.gr_roles r on r.id=p.role_id where r.name='Admin' and p.active order by p.id limit 1)
  from fresh on conflict(company_id,kind,record_id) do nothing returning record_id
 )
 insert into public.gr_pilot_orders(company_id,product_id,customer_name,qty)
