@@ -32,7 +32,7 @@ assert.ok(ops.includes('accepted_qty')&&ops.includes('rejected_qty'),'Incoming m
 assert.ok(ops.includes('quality_cleared')&&ops.includes('commercial_cleared')&&ops.includes('packing_slip'),'Dispatch checklist must include quality and Accounts');
 assert.ok(app.includes('operations:')&&app.includes("page==='operations'"),'Operations must be directly accessible from sidebar');
 assert.ok(html.includes('greenrich-operations-seed.js?v=20261030-ops-1'));
-assert.ok(html.includes('greenrich-operations.js?v=20261030-training-1'));
+assert.ok(html.includes('greenrich-operations.js?v=20261030-erp-pilot-1'));
 assert.ok(html.includes('greenrich-operations.css?v=20261030-ops-1'));
 assert.ok(html.includes('greenrich-workflow-training.js?v=20261030-training-1'),'Training module must load before Operations');
 assert.ok(css.includes('.gr-ops-flow')&&css.includes('.gr-ops-dialog'),'Operations workspace mobile layout');
