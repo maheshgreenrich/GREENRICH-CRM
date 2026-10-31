@@ -533,5 +533,5 @@ window.GreenRichFormBuilder=(()=>{
    redraw();
   })();
  }
- return {KEYS,TITLES,TYPES,defaults,schema,ready,mount,decorate,collect,saveAnswers,recentAnswers,validate};
+ return {KEYS,TITLES,TYPES,defaults,schema,ready,mount,decorate,collect,saveAnswers,recentAnswers,validate,matchesRule,matchesCondition};
 })();
