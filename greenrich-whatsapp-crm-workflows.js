@@ -143,12 +143,53 @@
    (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Lead ID</th><th>Template</th><th>State</th><th>Created</th></tr></thead><tbody>'+rules.slice(0,100).map(x=>
      '<tr><td>'+esc(x.lead_id)+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'Unknown')+'</td><td>Awaiting provider</td><td>'+date(x.created_at)+'</td></tr>').join('')+'</tbody></table></div>':empty('No welcome templates have been selected yet.'))+'</section>';
  }
+ function serviceTargets(){
+  return targets().filter(x=>{
+   const orderRecords=x.orders||[];
+   const orderDateFiltered=orderRecords.filter(o=>dateMatch(o.delivered_at||o.dispatched_at||o.order_date,serviceStart,serviceEnd));
+   const appropriateOrders=orderRecords.filter(o=>
+    (serviceOrder==='all'||o.order_id===serviceOrder||o.source_sale_id===serviceOrder)&&
+    (serviceDelivery==='all'||o.status===serviceDelivery)&&
+    (serviceProduct==='all'||String(o.product_name||'').toLowerCase()===serviceProduct.toLowerCase())&&
+    dateMatch(o.delivered_at||o.dispatched_at||o.order_date,serviceStart,serviceEnd));
+   const orderConstraint=serviceOrder!=='all'||serviceDelivery!=='all'||serviceProduct!=='all'||!!serviceStart||!!serviceEnd;
+   return (serviceCompany==='all'||x.company_id===serviceCompany)&&
+    (serviceType==='all'||x.type===serviceType)&&
+    (serviceSource==='all'||x.source===serviceSource)&&
+    (serviceTag==='all'||x.tags.includes(serviceTag))&&
+    (!orderConstraint||appropriateOrders.length>0)&&
+    (!serviceNeedle||[x.name,x.mobile,x.email,x.source,...orderRecords.map(o=>o.order_id)].some(y=>String(y||'').toLowerCase().includes(serviceNeedle)));
+  });
+ }
  function recurringView(){
-  const list=scoped(rows.recurring),co=cd();
-  return '<section class="grwc-panel">'+headers('Recurring service follow-ups','Save a WhatsApp template, customer, repeat interval and start date. Rules stay drafts until the provider is connected.',
-   can('create')?'<button data-create-service>+ New service follow-up</button>':'')+
-   (list.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Customer</th><th>Template</th><th>Every</th><th>Next due</th><th>State</th></tr></thead><tbody>'+list.map(r=>'<tr><td>'+esc(rows.customers.find(c=>c.id===r.customer_id)?.name||r.customer_id)+'</td><td>'+esc(rows.templates.find(t=>t.id===r.template_id)?.name||'—')+'</td><td>'+r.interval_days+' days</td><td>'+date(r.next_due)+'</td><td>Draft · not sending</td></tr>').join('')+'</tbody></table></div>':empty('No recurring service rules. Create one here or from a Customer 360 profile.'))+
-   '<div class="grwc-feature"><b>Customer 360</b><p>Each customer detail page will have its own “WhatsApp service follow-up” option. 7, 15, 30 or custom days are supported.</p></div></section>';
+  const list=scoped(rows.recurring),matches=serviceTargets(),keys=new Set(matches.map(x=>x.id));
+  serviceSelected=new Set([...serviceSelected].filter(x=>keys.has(x)));
+  const orderChoices=[...new Set(rows.dispatches.map(x=>x.order_id).filter(Boolean))].sort().map(x=>[x,x]);
+  const statusChoices=[...new Set(rows.dispatches.map(x=>x.status).filter(Boolean))].sort().map(x=>[x,x]);
+  return '<section class="grwc-panel">'+headers('After-sales & repeat service',
+   'Filter customers by order, product or delivery stage; choose recipients for delivery updates, service reminders, offers or cross-sell messages.')+
+   '<div class="grwc-filters">'+
+   sel('Company','grwc-service-company',app.companies.map(c=>[c,name(c)]),serviceCompany,'Both companies')+
+   sel('Contact type','grwc-service-type',[['Customer','Customer'],['Lead','Lead']],serviceType,'Both')+
+   sel('Source','grwc-service-source',byType(),serviceSource,'All sources')+
+   sel('Tags','grwc-service-tag',rows.tags.map(t=>[t.id,t.name]),serviceTag,'All tags')+
+   sel('Products','grwc-service-product',productChoices(),serviceProduct,'All products')+
+   sel('Sales Order ID','grwc-service-order',orderChoices,serviceOrder,'All orders')+
+   sel('Delivery status','grwc-service-delivery',statusChoices,serviceDelivery,'All delivery statuses')+
+   '<label>Order / dispatch from<input id="grwc-service-from" type="date" value="'+esc(serviceStart)+'"></label>'+
+   '<label>Order / dispatch to<input id="grwc-service-to" type="date" value="'+esc(serviceEnd)+'"></label>'+
+   '<label>Name / mobile / order<input id="grwc-service-search" type="search" placeholder="Search customer or order" value="'+esc(serviceNeedle)+'"></label></div>'+
+   '<div class="grwc-audience-summary"><b>'+matches.length+'</b> matching CRM records · <b>'+serviceSelected.size+'</b> selected. Only customers reliably linked to the chosen company may receive after-sales rules.</div>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-service-all>Select all loaded matching customers</button><button type="button" data-service-clear>Clear selection</button>'+
+   (can('create')?'<button type="button" data-service-bulk class="grwc-primary">Create repeat service drafts</button>':'')+
+   (can('create')?'<button data-create-service>+ Individual follow-up</button>':'')+'</div>'+
+   '<div class="grwc-tablewrap"><table><thead><tr><th>Select</th><th>Name</th><th>Type</th><th>Company</th><th>Mobile</th><th>Sales Order</th><th>Delivery</th></tr></thead><tbody>'+
+   matches.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-service-select="'+esc(x.id)+'" '+(serviceSelected.has(x.id)?'checked':'')+' '+(x.type!=='Customer'||!x.company_id?'disabled title="Link the customer to one company first"':'')+'></td><td>'+esc(x.name)+'</td><td>'+esc(x.type)+'</td><td>'+esc(name(x.company_id)||'Unassigned')+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.orders.map(y=>y.order_id).slice(0,3).join(', ')||'—')+'</td><td>'+esc(x.orders.map(y=>y.status).slice(0,3).join(', ')||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+   '<p class="grwc-muted">Showing 250 of '+matches.length+' loaded matches. Customers without a unique company assignment cannot be bulk-targeted. Saving a repeat rule does not send any WhatsApp messages.</p></section>'+
+   '<section class="grwc-panel">'+headers('Scheduled after-sales rules','Company-scoped drafts; intervals are retained as days, weeks or calendar months for future scheduling.')+
+   (list.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Customer</th><th>Purpose</th><th>Template</th><th>Every</th><th>Next date</th><th>State</th></tr></thead><tbody>'+
+   list.slice(0,200).map(r=>'<tr><td>'+esc(rows.customers.find(c=>c.id===r.customer_id)?.name||r.customer_id)+'</td><td>'+esc(r.service_reason||'service')+'</td><td>'+esc(rows.templates.find(t=>t.id===r.template_id)?.name||'—')+'</td><td>'+esc(r.interval_value||r.interval_days)+' '+esc(r.interval_unit||'days')+'</td><td>'+esc(date(r.next_due))+'</td><td>Draft · not sending</td></tr>').join('')+'</tbody></table></div>':empty('No after-sales follow-up rules saved yet.'))+
+   '<div class="grwc-notice">Automated sending needs approved templates, WhatsApp consent, a verified provider API and a scheduled processing function. These rules are safe drafts until those requirements are met.</div></section>';
  }
  function inboundView(){
   const rules=scoped(rows.inbound);
