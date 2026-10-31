@@ -15,7 +15,7 @@
  const options=(items,blank='None — do not send')=>'<option value="">'+esc(blank)+'</option>'+items.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
- const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Approved in screenshot · API unverified':'API unverified');
+ const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot · API unverified':'Unverified');
  const templateOptions=(c,connectionId='')=>templates(c).filter(t=>!connectionId||t.connection_id===connectionId).map(t=>[t.id,tmpl(t)]);
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
@@ -110,7 +110,7 @@
    '<label>To date<input id="grwc-date-to" type="date" value="'+esc(endDate)+'"></label>'+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
    '<div class="grwc-audience-summary"><b>'+list.length+'</b> loaded matching records · <b>'+chosen.length+'</b> selected · Marketing audience draft only. Sending requires provider verification and consent.</div>'+
-   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button><button type="button" data-record-optin>Record marketing consent</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
    '<p class="grwc-muted">The Company filter above is optional. Leave Both companies to select old customers without a company assignment. The chosen WhatsApp provider automatically identifies the sender company. Customers may be included regardless of previous company association, while leads must belong to the sender company. Only the first 250 of '+list.length+' loaded matches are displayed. Sending still requires recorded marketing opt-in and a verified provider connection.</p></section>'+
@@ -121,7 +121,7 @@
    '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+ 
    '<label>Optional campaign image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
    '<p class="grwc-muted grwc-span">Select customers, WhatsApp provider and existing template, plus an optional image. Customer company assignments are not needed. The provider determines the sender company. Other-company leads and invalid mobile numbers are excluded. This saves a draft, not a sent message; real sending requires verified provider access and recipient opt-in.</p>'+
-   '<button type="submit" class="grwc-primary">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" disabled title="Sending requires confirmed provider API, approved template components and marketing opt-in">Send WhatsApp marketing (not enabled)</button><button type="button" data-refresh-crm>Refresh template references</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
+   '<button type="submit" class="grwc-primary">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" class="grwc-primary" data-save-and-review>Save & Review Send</button><button type="button" data-confirm-template>Confirm approved template</button><button type="button" data-refresh-crm>Refresh template references</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
@@ -644,6 +644,58 @@
   await fetchAll();
   serviceDialog({customer:ctx.customer,companyId:ctx.companyId});
  }
+ async function secureSend(action,args){
+  const r=await app.db.functions.invoke('greenrich-whatsapp-send',{body:{action,...args}});
+  if(r.error)throw Error(r.error.message||'Secure sending backend unavailable');
+  if(!r.data?.ok)throw Error(r.data?.error||r.data?.blockers?.join('; ')||'WhatsApp request failed');
+  return r.data;
+ }
+ async function reviewCampaign(campaign){
+  if(!app.admin)return alert('Company Admin permission required to send campaigns.','warning');
+  const args={connection_id:campaign.connection_id,campaign_id:campaign.id};
+  try{
+   const status=await secureSend('check_campaign',args);
+   if(!status.ready)return alert('Cannot send yet: '+status.blockers.join('; ')+'. Eligible opted-in: '+status.eligible+' / '+status.selected+'.','warning');
+   if(!status.remaining)return alert('No unsubmitted opted-in contacts remaining.','info');
+   const batch=Math.min(status.remaining,3);
+   if(!window.confirm('Submit the approved marketing message to '+batch+' opted-in recipients? Provider charges may apply. '+(status.remaining-batch)+' remain for a separate confirmed batch.'))return;
+   const result=await secureSend('send_campaign',{...args,confirm:true});
+   alert('SocialBerries accepted '+result.accepted+' of '+result.attempted+' requests; '+result.remaining+' remaining. Acceptance is not delivery.','success');
+   await fetchAll();marketingDraw();
+  }catch(e){alert(e.message,'error')}
+ }
+ async function recordOptIn(){
+  const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
+  const companyId=campaignConnection(connectionId)?.company_id,people=companyId?campaignTargets(companyId):[];
+  if(!companyId)return alert('Select a WhatsApp provider first.','warning');
+  if(people.length!==1)return alert('Select exactly one customer or matching-company lead first.','warning');
+  const person=people[0];
+  if(!window.confirm('Record confirmed WhatsApp MARKETING consent from '+person.name+'? Do not proceed unless they actually opted in.'))return;
+  const source=window.prompt('Where and how did the customer opt in? (minimum 12 characters)');
+  if(!source)return;
+  const evidence=window.prompt('Evidence of opt-in: date, form, customer request, or other verified details (minimum 10 characters)');
+  if(!evidence)return;
+  try{
+   const done=await secureSend('record_consent',{connection_id:connectionId,contact_key:person.id,
+    consent_source:source,evidence_note:evidence,attested:true});
+   alert(done.message,'success');await fetchAll();marketingDraw();
+  }catch(error){alert(error.message,'error')}
+ }
+ async function confirmTemplate(){
+  const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
+  const templateId=form?.elements.template_id.value||'',t=rows.templates.find(x=>x.id===templateId&&x.connection_id===connectionId);
+  if(!t)return alert('Select your existing marketing template first.','warning');
+  if(!window.confirm('Confirm the actual approved MARKETING template in your SocialBerries account? This is a manual administrator attestation, not API verification.'))return;
+  const json=window.prompt('Paste COMPLETE approved SocialBerries MARKETING template JSON for '+t.name+' (ID '+t.provider_template_id+'), including BODY and optional IMAGE header');
+  if(!json)return;
+  const note=window.prompt('Record evidence: who checked the approved template, where and when?');
+  if(!note)return;
+  try{
+   const done=await secureSend('confirm_template',{connection_id:connectionId,template_id:templateId,
+    approved_json:json,confirmation_note:note,attested:true});
+   alert(done.message,'success');await fetchAll();marketingDraw();
+  }catch(error){alert(error.message,'error')}
+ }
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
   current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();
@@ -652,6 +704,10 @@
   try{await fetchAll();marketingDraw()}
   catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
   element.onclick=async e=>{
+   if(e.target.closest('[data-record-optin]')){await recordOptIn();return}
+   if(e.target.closest('[data-confirm-template]')){await confirmTemplate();return}
+   if(e.target.closest('[data-save-and-review]')){const form=element.querySelector('#grwc-audience-form');if(form){form.dataset.reviewAfter='1';form.requestSubmit()}return}
+   const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-refresh-crm]')){try{await fetchAll();marketingDraw();alert('Latest GreenRich template references and CRM data loaded. SocialBerries automatic template API is not connected.','success')}catch(error){alert(error.message,'error')}return}
@@ -701,8 +757,8 @@
     const consent=rows.consents||[];
     const blocked=checked.filter(x=>!consent.some(w=>w.company_id===c&&sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
     if(blocked.length)why.push('confirm WhatsApp marketing opt-in for '+blocked.length+' selected recipients');
-    why.push('activate an audited provider bulk-send adapter (currently disabled)');
-    alert('Sending is disabled. Requirements: '+why.join('; ')+'. No message was sent.','warning');
+    why.push('save a draft and use Review / Send for server-side credentials and approval verification');
+    alert('Audience check: '+why.join('; ')+'. No message sent.','info');
     return;
    }
    if(e.target.closest('[data-select-all-matching]')){
@@ -767,6 +823,7 @@
   };
   element.onsubmit=async e=>{
    if(e.target.id!=='grwc-audience-form')return;e.preventDefault();
+   const reviewAfter=e.target.dataset.reviewAfter==='1';delete e.target.dataset.reviewAfter;
    if(!can('create'))return alert('Marketing create permission required','error');
    const f=new FormData(e.target),connectionId=String(f.get('connection_id')||''),templateId=String(f.get('template_id')||'');
    const sender=campaignConnection(connectionId);
@@ -808,8 +865,8 @@
       .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
      if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
     }
-    alert('Campaign draft saved for '+matches.length+' selected CRM contacts'+(excluded?' ('+excluded+' invalid-phone contacts or other-company leads excluded)':'')+'. '+eligible.length+
-      ' have recorded marketing consent. No message sent.','success');
+    if(reviewAfter)await reviewCampaign(record);
+    else alert('Campaign draft saved for '+matches.length+' selected CRM contacts. '+eligible.length+' have recorded marketing consent. No messages sent. Use Review / Send after verification.','success');
     await fetchAll();marketingDraw();
    }catch(error){
     alert(error.message+(record?' (draft ID '+record.id+')':''),'error');
