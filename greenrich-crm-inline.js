@@ -829,8 +829,10 @@ async function saveEditor(event){
  if(old)Object.assign(old,row);else copy[editing].push(row);
  if(!saveCompanyData(targetId,copy))return;
  if(editing==='sales'&&Object.keys(fbExtra).length){
-  try{await window.GreenRichFormBuilder.saveAnswers(targetId,'sales_order',row.id,fbExtra)}
-  catch(e){toast('Sales Order saved; additional questions could not save: '+e.message,'warning')}
+  try{
+   await window.GreenRichCRMCloud.whenSynced(targetId);
+   await window.GreenRichFormBuilder.saveAnswers(targetId,'sales_order',row.id,fbExtra);
+  }catch(e){toast('Order kept in CRM; custom answers could not sync: '+e.message+'. Check cloud sync before re-entry.','warning')}
  }
  $('#editor').close();render();
  if(editing==='sales'&&targetId===activeCompany&&allowedTabs.includes('sales'))navigate('sales');
