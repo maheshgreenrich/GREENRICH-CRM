@@ -752,12 +752,42 @@
    if(companyId!==scope)return alert('Campaign company must match the audience company filter.','warning');
    const audienceIds=[...selected],matches=audience().filter(x=>audienceIds.includes(x.id)&&x.company_id===companyId);
    if(!matches.length)return alert('Select at least one CRM contact for this company.','warning');
+   const file=f.get('image');
+   const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
+   const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+   if(hasFile&&(!allowed[file.type]||file.size>5*1024*1024))
+    return alert('Choose a JPG, PNG or WebP campaign image under 5 MB.','warning');
+   if(hasFile&&!app.admin)
+    return alert('Only company Admin can upload a private campaign image.','warning');
+   const consent=rows.consents||[];
+   const eligible=matches.filter(x=>consent.some(w=>w.company_id===companyId&&
+    sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
+   let record=null;
    try{
-    await save('gr_wa_campaigns',{company_id:companyId,connection_id:connectionId,template_id:templateId,
-      name:String(f.get('name')||'').trim(),audience:{crm_ids:matches.map(x=>x.id),selection:'manual',source:'greenrich_crm'},status:'draft',
-      notes:'CRM recipient selection. Provider dispatch not connected; marketing consent required before sending.'});
-    alert('Campaign handoff draft saved ('+matches.length+' CRM contacts). Not sent.','success');await fetchAll();marketingDraw();
-   }catch(e){alert(e.message,'error')}
+    record=await save('gr_wa_campaigns',{
+      company_id:companyId,connection_id:connectionId,template_id:templateId,
+      name:String(f.get('name')||'').trim(),
+      audience:{crm_ids:matches.map(x=>x.id),selected_count:matches.length,
+       crm_consent_checked_count:eligible.length,selection:'manual',source:'greenrich_crm'},
+      status:'draft',
+      notes:'Not sent. Template requires verified approved components. Media images are private draft assets, not a provider-sent template header. Actual messaging requires opt-in and verified sender.'
+    });
+    if(hasFile){
+     const path=companyId+'/'+record.id+'/marketing.'+allowed[file.type];
+     const upload=await app.db.storage.from('gr-wa-campaign-images')
+      .upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});
+     if(upload.error)throw Error('Campaign draft saved, but image upload failed: '+upload.error.message);
+     const update=await app.db.from('gr_wa_campaigns')
+      .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
+     if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
+    }
+    alert('Campaign draft saved for '+matches.length+' selected CRM records. '+eligible.length+
+      ' have recorded marketing consent. No message sent.','success');
+    await fetchAll();marketingDraw();
+   }catch(error){
+    alert(error.message+(record?' (draft ID '+record.id+')':''),'error');
+    await fetchAll().catch(()=>{});
+   }
   };
  }
  async function mountSettings(element,ctx){
