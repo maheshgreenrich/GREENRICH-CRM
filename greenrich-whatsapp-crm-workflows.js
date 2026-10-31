@@ -361,7 +361,7 @@
    '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Screenshot: APPROVED · API unverified':'Not API-verified · '+(t.body?'Preview recorded':'Metadata only'))+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='admin_confirmed'?'Admin-confirmed':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot: approved claim · unverified':'Not verified · '+(t.body?'Preview recorded':'Metadata only'))+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-settings-confirm-template>Confirm existing approved template</button></div></div>'+
@@ -927,24 +927,22 @@
    const consent=rows.consents||[];
    const eligible=matches.filter(x=>consent.some(w=>w.company_id===companyId&&
     sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
-   // Validate the ready-to-send prerequisites before creating a draft.
-   // This prevents unusable duplicate drafts when a customer presses Send.
-   if(!eligible.length)return alert('Cannot send: '+matches.length+' selected recipient(s), but 0 have recorded marketing permission for '+name(companyId)+'. Record genuine permission once in Settings → WhatsApp Integration. Nothing was sent.','warning');
-   const verified=template.provider_approval==='approved'&&
-    ['verified_provider','admin_confirmed'].includes(template.provider_source)&&
-    template.provider_preview?.status==='APPROVED'&&Array.isArray(template.provider_preview?.components)&&!!template.body;
-   if(!verified)return alert('Cannot send: this template is only a reference, not confirmed full approved MARKETING content. Complete it once in Settings → WhatsApp Integration. Nothing was sent.','warning');
-   const header=template.provider_preview.components.find(c=>String(c.type).toUpperCase()==='HEADER');
-   if(hasFile&&String(header?.format).toUpperCase()!=='IMAGE')
-    return alert('This template has no approved image header. Remove the image or choose an image template.','warning');
-   if(!hasFile&&String(header?.format).toUpperCase()==='IMAGE')
-    return alert('This approved template requires an image. Select an image file to send.','warning');
+   // The server validates all sending requirements in one read-only request before any draft is created.
    const signature=JSON.stringify([companyId,connectionId,templateId,matches.map(x=>x.id).sort(),
     hasFile?[file.name,file.size,file.lastModified]:null]);
    let record=lastPrepared?.signature===signature?lastPrepared.record:null;
    sendBusy=true;
    const clicked=e.target.querySelector('[data-send-campaign]');if(clicked){clicked.disabled=true;clicked.textContent='Sending…'}
    try{
+    const readiness=await secureSend('preflight_marketing',{
+     connection_id:connectionId,template_id:templateId,crm_ids:matches.map(x=>x.id),has_image:hasFile
+    });
+    if(!readiness.ready){
+     const issues=readiness.blockers||[];
+     alert('Nothing sent. '+issues.map((x,i)=>(i+1)+'. '+x).join(' | ')+
+      '. Complete provider, approved template and customer permission setup once in Settings → WhatsApp Integration.','warning');
+     return;
+    }
     if(!record)record=await save('gr_wa_campaigns',{
       company_id:companyId,connection_id:connectionId,template_id:templateId,
       name:(rows.templates.find(t=>t.id===templateId)?.name||'WhatsApp campaign')+' · '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}),
