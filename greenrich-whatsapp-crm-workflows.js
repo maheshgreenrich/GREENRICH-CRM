@@ -675,12 +675,31 @@
   if(!r.data?.ok)throw Error(r.data?.error||r.data?.blockers?.join('; ')||'WhatsApp request failed');
   return r.data;
  }
+ function showReadinessGuide(campaign,status){
+  const dlg=document.createElement('dialog');dlg.className='grwc-dialog';
+  const selected=Number(status.selected)||0,eligible=Number(status.eligible)||0;
+  const blockers=(status.blockers||[]).map(x=>'<li>'+esc(x)+'</li>').join('');
+  dlg.innerHTML='<div class="grwc-dialog-head"><h3>Campaign sending checklist</h3><button type="button" data-close>×</button></div>'+
+   '<div class="grwc-dialog-fields">'+
+   '<p class="grwc-notice grwc-span"><b>'+esc(campaign.name||'Saved campaign')+'</b> — '+eligible+' / '+selected+
+   ' selected contacts have recorded marketing opt-in for this sender. <b>No message sent.</b></p>'+
+   '<div class="grwc-span"><b>Requirements to complete:</b><ol>'+blockers+'</ol></div>'+
+   '<p class="grwc-muted grwc-span">Only record real customer permission, and paste a complete approved MARKETING template from your SocialBerries account. After provider testing, an admin must enable SB_ENABLE_MARKETING_SEND=true in Supabase Secrets. Saving or reviewing drafts never sends.</p>'+
+   '</div><div class="grwc-dialog-foot"><button type="button" data-close>Close</button>'+
+   '<button type="button" data-consent>Record opt-in</button>'+
+   '<button type="button" data-template>Confirm template</button></div>';
+  document.body.append(dlg);dlg.onclose=()=>dlg.remove();
+  dlg.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>dlg.close());
+  dlg.querySelector('[data-consent]').onclick=()=>{dlg.close();recordOptIn(campaign)};
+  dlg.querySelector('[data-template]').onclick=()=>{dlg.close();confirmTemplate(campaign)};
+  dlg.showModal();
+ }
  async function reviewCampaign(campaign){
   if(!app.admin)return alert('Company Admin permission required to send campaigns.','warning');
   const args={connection_id:campaign.connection_id,campaign_id:campaign.id};
   try{
    const status=await secureSend('check_campaign',args);
-   if(!status.ready)return alert('Cannot send yet: '+status.blockers.join('; ')+'. Eligible opted-in: '+status.eligible+' / '+status.selected+'.','warning');
+   if(!status.ready){showReadinessGuide(campaign,status);return}
    if(!status.remaining)return alert('No unsubmitted opted-in contacts remaining.','info');
    const batch=Math.min(status.remaining,3);
    if(!window.confirm('Submit the approved marketing message to '+batch+' opted-in recipients? Provider charges may apply. '+(status.remaining-batch)+' remain for a separate confirmed batch.'))return;

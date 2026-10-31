@@ -39,4 +39,7 @@ pass('Storage file-size limit',migration.includes('5242880'));
 pass('Months retained as unit',migration.includes("interval_unit text not null default 'days'"));
 pass('No provider webhooks activated',!migration.includes('create trigger')&&!migration.includes('gr_wa_messages'));
 pass('Script included',html.includes('greenrich-whatsapp-crm-workflows.js'));
+pass('Readiness guidance not a fake send',ui.includes('function showReadinessGuide')&&ui.includes('No message sent.'));
+pass('Per-campaign opt-in action',ui.includes('data-consent-campaign')&&ui.includes('recordOptIn(campaign=null)'));
+pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('tpl.innerHTML=options(templateOptions'));
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');
