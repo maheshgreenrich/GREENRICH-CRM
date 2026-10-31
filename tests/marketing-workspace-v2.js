@@ -48,6 +48,9 @@ pass('One-time Settings consent is accessible',ui.includes('data-settings-optin'
 pass('One-time Settings template confirmation is accessible',ui.includes('data-settings-confirm-template')&&ui.includes('function settingsTemplateApproval(company,container)')&&ui.includes("secureSend('confirm_template'"));
 pass('Marketing remains one button',ui.includes('data-send-campaign')&&!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template'));
 
-pass('Template catalog labels reported Meta approval distinctly',ui.includes('Meta APPROVED reported · content not synced'));
+pass('JSON import status separate from Meta approval',ui.includes('JSON imported · approval not yet verified')&&ui.includes('JSON imported · not verified'));
+pass('JSON file imports supported',ui.includes('name="json_file"')&&ui.includes('await file.text()'));
+pass('Template mismatch blocked',ui.includes('Correct the name to match the approved provider template'));
+pass('Confirmation dialog preloads JSON',ui.includes('const jsonOf=t=>')&&ui.includes("note('Full approved template JSON','approved_json',jsonOf(list[0]))"));
 pass('Settings can verify with Meta',ui.includes('data-verify-meta-template')&&ui.includes('function verifyMetaTemplate(')&&ui.includes("secureSend('sync_meta_template'"));
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');

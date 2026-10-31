@@ -1,0 +1,23 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('greenrich-whatsapp-crm-workflows.js','utf8');
+const sql=fs.readFileSync('supabase/migrations/20261031210000_protect_whatsapp_template_identity_on_import.sql','utf8');
+const anchor=' window.GreenRichWhatsAppWorkflows={configure,mountMarketing,mountSettings,welcomeOptions,saveLeadWelcome,openCustomerRule,openCustomerHistory};';
+assert.equal(src.split(anchor).length,2);
+const instrumented=src.replace(anchor,' window.__waErrorTest={setDB:db=>{app={db};},secureSend};'+anchor);
+const win={};vm.runInNewContext(instrumented,{window:win,console},{timeout:2000});
+(async()=>{
+ const ctx={json:async()=>({ok:false,error:'Automatic Meta verification is not connected. Set the WABA ID and Meta management token in Supabase Secrets.'})};
+ win.__waErrorTest.setDB({functions:{invoke:async()=>({error:{message:'Edge Function returned a non-2xx status code',context:ctx}})}});
+ await assert.rejects(win.__waErrorTest.secureSend('sync_meta_template',{template_id:'test'}),/Automatic Meta verification is not connected/);
+ win.__waErrorTest.setDB({functions:{invoke:async()=>({data:{ok:true,verified:true}})}});
+ const res=await win.__waErrorTest.secureSend('sync_meta_template',{});
+ assert.equal(res.verified,true);
+ assert.ok(src.includes('name="json_file"')&&src.includes('await file.text()'),'JSON file upload supported');
+ assert.ok(src.includes('prior.name!==t.name'),'Name mismatch detected');
+ assert.ok(src.includes('already verified. Do not overwrite'),'Verified templates protected');
+ assert.ok(sql.includes('v_existing_name<>v_name'),'DB prevents identity mismatch');
+ assert.ok(sql.includes("v_existing_source in ('verified_provider','admin_confirmed')"),'DB protects approved content');
+ assert.ok(src.includes("note('Full approved template JSON','approved_json',jsonOf(list[0]))"),'Prefilled review');
+ console.log('PASS: Error payload, JSON import and server-side template identity safeguards.');
+})().catch(e=>{console.error(e);process.exitCode=1});
