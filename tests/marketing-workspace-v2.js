@@ -43,5 +43,9 @@ pass('Readiness guidance not a fake send',ui.includes('function showReadinessGui
 pass('Saved campaigns can send remaining eligible recipients',ui.includes('data-review-campaign')&&ui.includes('Send remaining')&&ui.includes("secureSend('send_campaign'"));
 pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('tpl.innerHTML=options(templateOptions'));
 pass('No extra marketing approval questionnaire controls',!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template')&&!ui.includes('data-consent-campaign'));
-pass('No draft created before opt-in and template check',ui.indexOf('if(!eligible.length)')>=0&&ui.indexOf('if(!eligible.length)')<ui.indexOf("record=await save('gr_wa_campaigns'"));
+pass('No draft created until secure complete preflight',ui.indexOf("secureSend('preflight_marketing'")>=0&&ui.indexOf("secureSend('preflight_marketing'")<ui.indexOf("record=await save('gr_wa_campaigns'"));
+pass('One-time Settings consent is accessible',ui.includes('data-settings-optin')&&ui.includes('function settingsConsent(company,container)')&&ui.includes("secureSend('record_consent'"));
+pass('One-time Settings template confirmation is accessible',ui.includes('data-settings-confirm-template')&&ui.includes('function settingsTemplateApproval(company,container)')&&ui.includes("secureSend('confirm_template'"));
+pass('Marketing remains one button',ui.includes('data-send-campaign')&&!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template'));
+
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');

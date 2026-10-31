@@ -7,4 +7,9 @@ for(const item of ['gr_wa_admin','auth.getUser','SB_ENABLE_MARKETING_SEND','elig
  'input.confirm!==true','slice(0,3)','gr_wa_messages'])assert.ok(edge.includes(item),'Missing safeguard '+item);
 assert.ok(sql.includes('gr_wa_one_send_per_campaign_phone'));
 assert.ok(sql.includes('enable row level security'));
+assert.ok(edge.includes('if(action==="preflight_marketing")'),'Missing read-only marketing preflight');
+assert.ok(edge.includes('No selected recipients have documented WhatsApp marketing opt-in'),'Preflight cannot ignore consent');
+assert.ok(edge.includes('Live sending is disabled in Supabase Secrets'),'Preflight cannot ignore activation');
+assert.ok(edge.includes('Full approved MARKETING template is not confirmed in Settings'),'Preflight cannot accept unverified template');
+assert.ok(edge.includes('return res(200,{ok:true,ready:!blockers.length'),'Preflight must provide all blockers');
 console.log('PASS: Secure SocialBerries send adapter has role, opt-in, approval, idempotency, live gate and bounded send controls.');
