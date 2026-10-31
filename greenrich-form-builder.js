@@ -97,7 +97,7 @@ window.GreenRichFormBuilder=(()=>{
      throw Error('Unknown conditional operator');
     if(String(rule.value||'').length>250)throw Error('Condition value too long');
    }
-   if(['select','checkbox','radio'].includes(f.type)&&!native){
+   if(['select','checkbox','radio'].includes(f.type)&&(!native||f.options?.length)){
     if(!Array.isArray(f.options)||f.options.length<1||f.options.length>30||f.options.some(o=>typeof o!=='string'||!o.trim()||o.length>100))throw Error('Choice questions need 1–30 options, up to 100 characters each.');
    }
   }
@@ -125,6 +125,11 @@ window.GreenRichFormBuilder=(()=>{
   if(f.type==='heading'){
    const header=document.createElement('h4');header.textContent=f.label;header.className='grfb-section-heading';
    header.dataset.grfbField=f.id;return header;
+  }
+  if(f.type==='button'){
+   const button=document.createElement('button');button.type='button';button.textContent=f.label;
+   button.className='grfb-design-button';button.dataset.grfbField=f.id;
+   button.title='Visual button. App actions require their own workflow integration.';return button;
   }
   const label=document.createElement('label');label.dataset.grfbField=f.id;
   label.className='grfb-custom '+(f.layout==='wide'?'wide':'');
@@ -271,7 +276,7 @@ window.GreenRichFormBuilder=(()=>{
   const fields=schema(company,key).filter(onlyCustom),out={};
   if(!fields.length)return out;
   for(const f of fields){
-   if(f.type==='heading')continue;
+   if(f.type==='heading'||f.type==='button')continue;
    const wrap=form.querySelector('[data-grfb-field="'+f.id+'"]');
    if(!wrap||wrap.hidden)continue;
    const inputs=[...wrap.querySelectorAll('[name]')].filter(el=>el.name===f.id&&!el.disabled);
@@ -355,11 +360,11 @@ window.GreenRichFormBuilder=(()=>{
      (!f.system?'<button type="button" data-op="delete" data-index="'+index+'" title="Delete custom field">Delete</button>':'')+'</div></div>'+
      '<div class="grfb-rowfields">'+
      '<label>Question label '+input('label',f.label)+'</label>'+
-     '<label>Field type <select data-edit="type" '+(f.system?'disabled':'')+'>'+optionsList(TYPES).replace('value="'+esc(f.type)+'"','value="'+esc(f.type)+'" selected')+'</select></label>'+
+     '<label>Field type <select data-edit="type">'+optionsList(TYPES).replace('value="'+esc(f.type)+'"','value="'+esc(f.type)+'" selected')+'</select></label>'+
      '<label>Width <select data-edit="layout">'+optionsList(['half','wide']).replace('value="'+esc(f.layout||'half')+'"','value="'+esc(f.layout||'half')+'" selected')+'</select></label>'+
      '<label>Placeholder '+input('placeholder',f.placeholder||'')+'</label>'+
-     '<label class="grfb-switch"><input type="checkbox" data-edit="visible" '+(f.visible!==false?'checked':'')+(f.protected?' disabled':'')+'> Show this field</label>'+
-     '<label class="grfb-switch"><input type="checkbox" data-edit="required" '+(f.required?'checked':'')+(f.protected?' disabled':'')+'> Required</label>'+
+     '<label class="grfb-switch"><input type="checkbox" data-edit="visible" '+(f.visible!==false?'checked':'')+'> Show this field</label>'+
+     '<label class="grfb-switch"><input type="checkbox" data-edit="required" '+(f.required?'checked':'')+'> Required</label>'+
      (!f.system&&['select','radio','checkbox'].includes(f.type)?
       '<label class="grfb-full">Dropdown / choice options (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
      (f.protected?'<p class="grfb-full grfb-core">Required by the GreenRich workflow. Cannot be hidden or conditional.</p>':
