@@ -86,7 +86,7 @@ const multi=form.defaults('lead_create');multi.push({
 });
 assert.ok(form.validate('lead_create',multi));
 multi[multi.length-1].conditions.rules.push({field:'custom_multi_rule',operator:'equals',value:'Yes'});
-assert.throws(()=>form.validate('lead_create',multi),/invalid or identical/);
+assert.throws(()=>form.validate('lead_create',multi),/missing or identical/);
 const customCfg=form.defaults('customer');
 customCfg[0].visible=false; // intentionally malicious override; should protect at runtime
 customCfg.push({...custom});
