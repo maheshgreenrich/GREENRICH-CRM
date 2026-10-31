@@ -17,7 +17,7 @@ assert.ok(shell.includes("'stock','marketing','operations'"),'Missing dedicated 
 assert.ok(!shell.includes("marketing:'tasks'"),'Marketing must not redirect to Follow-ups');
 assert.ok(shell.includes("else if(page==='marketing')"),'Marketing needs its own route');
 assert.ok(shell.includes("permission:action=>can('marketing',action)"),'Respect existing employee role permissions');
-assert.ok(shell.includes("crmPermissions:{customers:can('customers','view'),leads:can('leads','view')}"),'Import only permitted CRM data');
+assert.ok(shell.includes("canLeads:can('leads','view'),canCustomers:can('customers','view')"),'New CRM-led Marketing may load only permitted leads and customers');
 assert.ok(marketing.includes('ctx.companies.flatMap')===false,'Provider slots must be scoped to selected assigned companies');
 assert.ok(marketing.includes('flatMap(c=>[1,2]'),'Support exactly two connection slots per company');
 for(const term of ['overview','campaigns','contacts','templates','inbox','automations','reports','providers'])
