@@ -9,7 +9,7 @@ const css=fs.readFileSync('greenrich-crm-inline.css','utf8');
 const app=fs.readFileSync('greenrich-one.js','utf8');
 for(const [name,src] of [['crm',crm],['tags',tags],['settings',settings],['app',app]])new vm.Script(src,{filename:name});
 for(const field of ['date','internal_order_id','company_id','channel_id','product_id','qty','shipping_charge','notes'])assert.ok(crm.includes("'"+field+"'"),'Missing sales field '+field);
-for(const phrase of ['Platform order ID (optional)','Internal Sales Order ID (automatic)','Company','New Customer','Select Existing','Search existing customer by name, mobile number or email','Duplicate customer: email or mobile number','Insufficient stock for','Second mobile number','tag_ids','Available stock:','data-stock-update','autoProductPricing','round(calc.total+row.shipping_charge+shippingTax)','nextOrderId(copy,targetId)'])assert.ok(crm.includes(phrase),'Sales function missing: '+phrase);
+for(const phrase of ['Platform order ID (optional)','Internal Sales Order ID (automatic)','Company','New Customer','Find Lead / Customer','Search lead or customer by name, mobile number or email','Duplicate customer: email or mobile number','Insufficient stock for','Second mobile number','tag_ids','Available stock:','data-stock-update','autoProductPricing','round(calc.total+row.shipping_charge+shippingTax)','nextOrderId(copy,targetId)'])assert.ok(crm.includes(phrase),'Sales function missing: '+phrase);
 assert.ok(crm.includes('row.tax_rate=Number(product.tax)'),'Product tax must be automatic');
 assert.ok(crm.includes('product.stock-=row.qty'),'Stock must decrease after sale');
 assert.ok(crm.includes('saveCompanyData(targetId,copy)'),'Sale must save to selected company');
