@@ -16,7 +16,7 @@ window.GreenRichFormBuilder=(()=>{
    fixed('note','Conversation details / reason','textarea',true,true),fixed('heat','Lead priority','select'),
    fixed('due','Next follow-up date & time','datetime-local',true,true),fixed('order_search','Find Sales Order','text'),fixed('order','Confirmed Sales Order','select',true,true)];
   const customer=[fixed('name','Customer full name','text',true,true),fixed('mobile','Primary mobile','tel',true,true),fixed('mobile2','Second mobile','tel'),
-   fixed('email','Email address','email',true,true),fixed('tag_ids','Customer tags','checkbox'),fixed('company','Company name'),fixed('type','Customer type','select'),
+   fixed('email','Email address','email'),fixed('tag_ids','Customer tags','checkbox'),fixed('company','Company name'),fixed('type','Customer type','select'),
    fixed('address1','Address line 1','textarea',true,true),fixed('address2','Address line 2'),fixed('city','City'),fixed('state','State'),fixed('pincode','PIN code'),
    fixed('country','Country'),fixed('gstin','GSTIN'),fixed('source','Customer source'),fixed('owner','Account owner'),fixed('notes','Customer notes','textarea')];
   const sale=[fixed('date','Order date','date',true,true),fixed('internal_order_id','Sales Order number','text',true,true),
@@ -161,7 +161,7 @@ window.GreenRichFormBuilder=(()=>{
  }
  function decorate(form,company,key,values={}){
   if(!form||!db)return;
-  const fields=schema(company,key),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields')||form:form;
+  const fields=schema(company,key),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields,.gr-contact-fields')||form:form;
   keyForForm.set(form,key);
   if(!target)return;
   // Keep existing native application handlers. Only add layout & custom field nodes.
@@ -180,7 +180,15 @@ window.GreenRichFormBuilder=(()=>{
    wrap.classList.toggle('grfb-full',f.layout==='wide');
    if(key==='customer'||key==='sales_order')wrap.classList.toggle('wide',f.layout==='wide');
    const title=wrap.querySelector(':scope > span');
-   if(f.system&&title&&f.label)title.textContent=f.label+(f.required?' *':'');
+   if(f.system&&f.label){
+    const labelText=f.label+(f.required?' *':'');
+    if(title)title.textContent=labelText;
+    else if(wrap.tagName==='LABEL'){
+     const firstText=[...wrap.childNodes].find(n=>n.nodeType===3);
+     if(firstText)firstText.textContent=labelText;
+     else wrap.insertBefore(document.createTextNode(labelText),wrap.firstChild);
+    }
+   }
    if(f.system&&!f.protected){
     const inputs=[...wrap.querySelectorAll('input,select,textarea')].filter(el=>el.name===f.id);
     for(const input of inputs)if(f.placeholder&&'placeholder'in input)input.placeholder=f.placeholder;
