@@ -369,7 +369,7 @@
    }
   };
  }
- function openMessageHistory(connectionId){
+ function openMessageHistory(connectionId,initialPhone=''){
   const provider=rows.connections.find(x=>x.id===connectionId&&x.provider.toLowerCase()==='socialberries');
   if(!provider)return alert('SocialBerries connection not found.','warning');
   const d=document.createElement('dialog');d.className='grwc-dialog';
@@ -384,6 +384,7 @@
   d.onclose=()=>d.remove();
   d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
   const results=d.querySelector('#grwc-history-results'),form=d.querySelector('#grwc-history-form');
+  if(initialPhone)form.elements.phone.value=initialPhone;
   const prev=d.querySelector('[data-previous]'),next=d.querySelector('[data-next]');
   let page=1,lastNumber='',loading=false;
   async function loadHistory(targetPage){
@@ -424,6 +425,22 @@
   prev.onclick=()=>{if(!prev.disabled)void loadHistory(page-1)};
   next.onclick=()=>{if(!next.disabled)void loadHistory(page+1)};
   d.showModal();
+ }
+ async function openCustomerHistory({customer,companyId}={}){
+  if(!app?.admin)return alert('Company administrator access required for provider chat history.','warning');
+  if(!customer?.mobile&&!customer?.mobile2)return alert('Customer WhatsApp number is missing.','warning');
+  if(!app?.db)return alert('Sign in to GreenRich ONE first.','warning');
+  const links=rows.connections?.filter(x=>x.company_id===companyId&&x.provider.toLowerCase()==='socialberries')||[];
+  let connection=links[0];
+  if(!connection){
+   if(!companyId||!app.companies.includes(companyId))
+    return alert('Choose the customer company before viewing WhatsApp messages.','warning');
+   const r=await app.db.from('gr_wa_connections').select('id,company_id,provider,display_name')
+     .eq('company_id',companyId).eq('provider','socialberries').limit(1).maybeSingle();
+   if(r.error||!r.data)return alert('No configured SocialBerries provider for this company.','warning');
+   connection=r.data;rows.connections=[...(rows.connections||[]),connection];
+  }
+  openMessageHistory(connection.id,customer.mobile||customer.mobile2);
  }
  async function checkProvider(id,action){
    const provider=rows.connections.find(x=>x.id===id);
@@ -668,5 +685,5 @@
   try{await fetchAll();settingsDraw(element)}catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
  }
  const configure=ctx=>{app=ctx};
- window.GreenRichWhatsAppWorkflows={configure,mountMarketing,mountSettings,welcomeOptions,saveLeadWelcome,openCustomerRule};
+ window.GreenRichWhatsAppWorkflows={configure,mountMarketing,mountSettings,welcomeOptions,saveLeadWelcome,openCustomerRule,openCustomerHistory};
 })();
