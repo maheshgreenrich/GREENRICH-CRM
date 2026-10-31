@@ -28,7 +28,7 @@ assert.ok(wa.includes("tag==='all'||x.tags.includes(tag)"),'Audience must filter
 assert.ok(wa.includes("owner==='all'||x.owner===owner"),'Audience must filter salesperson');
 assert.ok(wa.includes("status:'draft'"),'Campaign execution stays draft without provider auth');
 assert.ok(wa.includes("No SocialBerries API credentials"),'Do not falsely claim connected APIs');
-assert.ok(wa.includes("Sync templates from SocialBerries (requires API)"),'Surface disabled sync action instead of fake templates');
+assert.ok(wa.includes("Auto-sync Templates (provider endpoint needed)"),'Surface disabled sync action instead of fake templates');
 assert.ok(wa.includes('gr_wa_inbound_rules'),'Inbound mapping must have database storage');
 assert.ok(wa.includes('interval_days'),'Support custom recurrent service intervals');
 assert.ok(schema.includes('enable row level security'),'Protect new user data');
