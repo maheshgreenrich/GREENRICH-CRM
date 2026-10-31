@@ -125,6 +125,28 @@ Deno.serve(async request=>{
     return response(request,200,{ok:true,configured:true,count:Number(data.count)||0,page,batches});
    }catch{return response(request,200,{ok:false,configured:true,message:"Could not retrieve provider campaigns"})}
   }
+  if(action==="batch_detail"){
+   const id=String(body.batch_id||"").trim();
+   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+    return response(request,400,{ok:false,error:"Valid SocialBerries campaign batch ID required"});
+   try{
+    const out=await providerRead(cfg,"whatsapp/messages/bulk_batches/"+id+"/",{});
+    if(!out.ok)return response(request,200,{ok:false,message:"Provider batch detail returned HTTP "+out.status});
+    const d=out.data||{},raw=d.message_statistics||{};
+    const toCount=(x:unknown)=>{const value=Number(x);return Number.isFinite(value)&&value>=0?Math.floor(value):null};
+    return response(request,200,{ok:true,
+      id:String(d.id||id),name:String(d.name||"").slice(0,160),status:String(d.status||"unknown").slice(0,40),
+      total_clients_count:toCount(d.total_clients_count),
+      statistics:{
+        total_messages:toCount(raw.total_messages),pending:toCount(raw.pending),
+        sent:toCount(raw.sent),delivered:toCount(raw.delivered),
+        read:toCount(raw.read),failed:toCount(raw.failed)
+      },
+      responded:null,not_responded:null,
+      note:"Read indicates provider WhatsApp read status. Reply information is not provided by this batch statistics API."
+    });
+   }catch{return response(request,200,{ok:false,message:"Could not read provider campaign statistics"})}
+  }
   if(action==="sync_leads"){
    // Read provider's documented GET Leads endpoint, stage only the whitelisted
    // fields, and require explicit Admin approval to create GreenRich CRM leads.
@@ -209,6 +231,6 @@ Deno.serve(async request=>{
    }catch{return response(request,200,{ok:false,configured:true,
      message:"Could not retrieve message history. Check provider response format and API settings."})}
   }
-  return response(request,400,{ok:false,error:"Only Test Connection, Batch List, Message History and read-only provider-lead staging sync are enabled"});
+  return response(request,400,{ok:false,error:"Only read-only tests, batch summaries/details, message history and provider-lead staging are enabled"});
  }catch{return response(request,400,{ok:false,error:"Invalid request or integration configuration"})}
 });
