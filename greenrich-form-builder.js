@@ -216,6 +216,55 @@ window.GreenRichFormBuilder=(()=>{
    if(!changed)break;
   }
  }
+ // Preserve native field names/IDs so existing CRM and ERP saves still
+ // receive their normal values. Composite pickers and script-bound controls
+ // are not replaced with incompatible widgets.
+ function applyNativeDisplay(form,wrap,field){
+  const nodes=[...wrap.querySelectorAll('input,select,textarea')].filter(e=>e.name===field.id);
+  if(nodes.length!==1||field.id==='customer_picker'||field.id==='tag_ids')return;
+  const original=nodes[0];
+  if(['button','heading'].includes(field.type))return; // application actions cannot be fabricated
+  const simple=['text','email','tel','number','date','datetime-local','time','url'];
+  if(original.tagName==='INPUT'&&simple.includes(field.type)){
+   if(original.type!==field.type)try{original.type=field.type}catch{}
+   if(field.placeholder)original.placeholder=field.placeholder;
+   return;
+  }
+  if(original.tagName==='SELECT'&&field.type==='select'){
+   if(field.options?.length&&form.id==='gr-ops-form'){
+    const selected=original.value;
+    original.replaceChildren(...field.options.map(v=>new Option(v,v)));
+    if(field.options.includes(selected))original.value=selected;
+   }
+   return;
+  }
+  // ERP Operations forms use delegated handlers, so switching native controls
+  // here is safe; CRM-specific composite controls keep their original bindings.
+  if(form.id!=='gr-ops-form')return;
+  const prev=original.value||'',identity={id:original.id,name:original.name};
+  let next;
+  if(field.type==='textarea'){
+   next=document.createElement('textarea');next.rows=3;next.value=prev;
+  }else if(field.type==='select'&&field.options?.length){
+   next=document.createElement('select');next.append(new Option('Choose',''));
+   for(const v of field.options)next.append(new Option(v,v));next.value=field.options.includes(prev)?prev:'';
+  }else if(['radio','checkbox'].includes(field.type)&&field.options?.length){
+   next=document.createElement('span');next.className='grfb-native-choices';
+   field.options.forEach((val,i)=>{
+    const item=document.createElement('span');item.className='grfb-option';
+    const el=document.createElement('input');el.type=field.type;el.name=identity.name;
+    if(i===0&&identity.id)el.id=identity.id;
+    el.value=val;el.checked=prev===val;
+    const name=document.createElement('span');name.textContent=val;
+    item.append(el,name);next.append(item);
+   });
+  }else if(simple.includes(field.type)){
+   next=document.createElement('input');next.type=field.type;next.value=prev;
+  }
+  if(!next)return;
+  if(next.tagName!=='SPAN'){next.name=identity.name;if(identity.id)next.id=identity.id;}
+  original.replaceWith(next);
+ }
  function decorate(form,company,key,values={}){
   if(!form||!db)return;
   const fields=schema(company,key),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields,.gr-contact-fields')||form:form;
@@ -244,7 +293,8 @@ window.GreenRichFormBuilder=(()=>{
      else wrap.insertBefore(document.createTextNode(labelText),wrap.firstChild);
     }
    }
-   if(f.system&&!f.protected){
+   if(f.system)applyNativeDisplay(form,wrap,f);
+   if(f.system){
     const inputs=[...wrap.querySelectorAll('input,select,textarea')].filter(el=>el.name===f.id);
     for(const input of inputs)if(f.placeholder&&'placeholder'in input)input.placeholder=f.placeholder;
    }
