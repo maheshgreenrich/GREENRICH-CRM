@@ -89,15 +89,16 @@
  }
  // CRM customers can be shared across both companies, including older unassigned records.
  // Provider determines sender company; leads stay company-scoped.
- const campaignTargets=companyId=>audience().filter(x=>selected.has(x.id)&&
-  (x.type==='Customer'||x.company_id===companyId)&&digits(x.mobile).length===10);
+ // Campaign selection must be independent of the visible audience filters.
+ const campaignTargets=companyId=>targets().filter(x=>selected.has(x.id)&&
+  (x.type==='Customer'||x.company_id===companyId)&&/^[6-9][0-9]{9}$/.test(digits(x.mobile)));
+ const selectedStatus=()=>{const loaded=targets().filter(x=>selected.has(x.id));return {total:loaded.length,missing:selected.size-loaded.length};};
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
  '<div class="grwc-notice">Select customers, the WhatsApp provider, an approved marketing template and an optional image. Click <b>Send Campaign</b>. The server checks marketing permission and sending readiness automatically.</div>'+
  '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
-  const list=audience(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
-  const chosen=[...selected].filter(x=>ids.has(x));selected=new Set(chosen);
+  const list=audience(),tags=rows.tags,chosen=selectedStatus();
   return '<section class="grwc-panel">'+headers('CRM audience selection','Filter Leads and Customers from GreenRich ONE; no contact upload required to build an audience.')+
    '<div class="grwc-filters">'+
    sel('Company','grwc-company',app.companies.map(c=>[c,name(c)]),scope,'Both companies')+
@@ -110,11 +111,11 @@
    '<label>From date<input id="grwc-date-from" type="date" value="'+esc(startDate)+'"></label>'+
    '<label>To date<input id="grwc-date-to" type="date" value="'+esc(endDate)+'"></label>'+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
-   '<div class="grwc-audience-summary"><b>'+list.length+'</b> loaded matching records · <b>'+chosen.length+'</b> selected · Marketing audience draft only. Sending requires provider verification and consent.</div>'+
+   '<div class="grwc-audience-summary"><b>'+list.length+'</b> matching records · <b data-grwc-selected-count>'+chosen.total+'</b> selected across filters'+(chosen.missing?' · '+chosen.missing+' no longer in loaded CRM':'')+'. Your selections remain checked when filters change.</div>'+
    '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">The Company filter above is optional. Leave Both companies to select old customers without a company assignment. The chosen WhatsApp provider automatically identifies the sender company. Customers may be included regardless of previous company association, while leads must belong to the sender company. Only the first 250 of '+list.length+' loaded matches are displayed. Sending still requires recorded marketing opt-in and a verified provider connection.</p></section>'+
+   '<p class="grwc-muted">Company is an optional filter. Previously unassigned customers can be selected. Showing the first 250 of '+list.length+' matching contacts. Selections are kept across filters; use Clear selection to start over. Valid numbers, sender-company leads and marketing permission are checked before sending.</p></section>'+
    '<section class="grwc-panel">'+headers('Send WhatsApp campaign','Choose an approved marketing template and optional image.')+
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
@@ -796,8 +797,8 @@
     return;
    }
    if(e.target.closest('[data-clear-all-matching]')){selected.clear();marketingDraw();return}
-   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);return}
-   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});return}
+   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
+   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
   };
   element.onchange=e=>{
    const form=e.target.closest?.('#grwc-audience-form');
@@ -815,7 +816,7 @@
    if(!map[e.target.id])return;
    const v=e.target.value;
    switch(e.target.id){
-    case 'grwc-company':scope=v;selected.clear();break;
+    case 'grwc-company':scope=v;break;
     case 'grwc-kind':kind=v;break;
     case 'grwc-source':source=v;break;
     case 'grwc-tag':tag=v;break;
@@ -860,8 +861,14 @@
    const template=rows.templates.find(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId&&t.category==='marketing');
    if(!template)return alert('Choose an approved marketing template.','warning');
    const matches=campaignTargets(companyId);
-   if(!matches.length)return alert('Choose a customer with a valid WhatsApp number or a lead belonging to the selected provider. Customers do not need a company assignment.','warning');
-   const excluded=audience().filter(x=>selected.has(x.id)).length-matches.length;
+   if(!selected.size)return alert('No customers selected. Tick at least one checkbox in the audience above.','warning');
+   if(!matches.length){
+    const chosen=targets().filter(x=>selected.has(x.id));
+    const invalid=chosen.filter(x=>!/^[6-9][0-9]{9}$/.test(digits(x.mobile))).length;
+    const otherLeads=chosen.filter(x=>x.type==='Lead'&&x.company_id!==companyId).length;
+    return alert('None of the '+selected.size+' selected contacts can be sent by this provider. '+invalid+' invalid mobile number(s), '+otherLeads+' lead(s) from a different company.','warning');
+   }
+   const excluded=selected.size-matches.length;
    const file=f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
    const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
