@@ -1,0 +1,30 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const edge=fs.readFileSync('supabase/functions/greenrich-whatsapp-send/index.ts','utf8');
+const ui=fs.readFileSync('greenrich-whatsapp-crm-workflows.js','utf8');
+const mig=fs.readFileSync('supabase/migrations/20261031163500_validate_socialberries_sender_phone_format.sql','utf8');
+assert.ok(edge.includes('u.searchParams.set("phone_number",recipient.phone)'),
+ 'Send to selected CRM recipient using documented SocialBerries query parameter');
+assert.ok(!edge.includes('"to":recipient.phone'),'Never use Meta-style to field');
+assert.ok(edge.includes('db.storage.from("gr-wa-campaign-images").createSignedUrl('),
+ 'Real campaign images must generate signed HTTPS storage links');
+assert.ok(!edge.includes('YOUR-PUBLIC-IMAGE-LINK'),'Sanitized example image URL must not be used in live send');
+assert.ok(ui.includes('Registered WhatsApp business sender (+91 followed by 10 digits)'));
+assert.ok(ui.includes('Do not add extra digits.'));
+assert.ok(mig.includes('gr_wa_socialberries_sender_phone_format'));
+assert.ok(mig.includes("sender_phone ~ '^\\+91[6-9][0-9]{9}$'"));
+const start=edge.indexOf('  const item=doc?.data||{},status=');
+const end=edge.indexOf('\n }catch(e){',start);
+assert.ok(start>0&&end>start,'Provider JSON parsing block must be present');
+const parse=new Function('doc','code','errorText','val',edge.slice(start,end));
+const val=x=>String(x);
+const accepted=parse({message_id:'wamid.test.1',status:'pending'},'', '',val);
+assert.equal(accepted.id,'wamid.test.1','Top-level pending message_id without error=false is accepted');
+const nested=parse({data:{message_id:'wamid.test.2',status:'pending'}},'', '',val);
+assert.equal(nested.id,'wamid.test.2','Nested pending message_id without error=false is accepted');
+const rejected=parse({error:true,data:{message_id:'wamid.test.bad'}},'', '',val);
+assert.equal(rejected.code,'PROVIDER_REJECTED','Explicit errors must not be accepted');
+const uncertain=parse({status:'pending'},'', '',val);
+assert.equal(uncertain.code,'NO_PROVIDER_MESSAGE_ID','No provider ID is not a confirmed acceptance');
+assert.equal(uncertain.uncertain,true,'No provider ID has uncertain status');
+console.log('PASS: SocialBerries sender validation, real campaign URL, recipient routing and pending response parsing.');
