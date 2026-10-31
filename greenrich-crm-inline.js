@@ -696,6 +696,16 @@ function openEditor(k,id=''){
   if(!existing)switchCompany();else{const p=editorData().products.find(x=>x.id===existing.product_id);$('#gr-stock-preview').textContent=p?'Available stock: '+Number(p.stock||0)+' units':'';pricePreview()}
  }
  if(k==='customers'){$('#f-company_id')?.remove();} // Customer records belong to the currently active company.
+ const formKey=k==='sales'?'sales_order':k==='customers'?'customer':'';
+ if(formKey&&window.GreenRichFormBuilder){
+  const co=k==='customers'?activeCompany:$('#f-company_id')?.value||activeCompany;
+  $('#editor-form').dataset.formCompany=co;
+  window.GreenRichFormBuilder.decorate($('#editor-form'),co,formKey);
+  if(id)void window.GreenRichFormBuilder.recentAnswers(co,formKey,id).then(values=>{
+   if($('#editor')?.open&&editing===k&&editId===id)
+    window.GreenRichFormBuilder.decorate($('#editor-form'),co,formKey,values);
+  }).catch(()=>{});
+ }
  $('#editor').showModal();
 }
 function createOrderForLead(lead){
@@ -715,9 +725,12 @@ function createOrderForLead(lead){
 async function saveEditor(event){
  event.preventDefault();
  const form=$('#editor-form'),inputs=new FormData(form),row={};
- inputs.forEach((value,key)=>{if(key!=='tag_ids')row[key]=String(value).trim()});
+ inputs.forEach((value,key)=>{if(key!=='tag_ids'&&!key.startsWith('custom_'))row[key]=String(value).trim()});
  const targetId=editing==='customers'?activeCompany:(row.company_id||(editId?ownerOf(editing,editId):companyScope==='all'?'':activeCompany));
  if(!permittedCompanies.includes(targetId))return toast('Select a company you are assigned to');
+ const fbKey=editing==='sales'?'sales_order':editing==='customers'?'customer':'';
+ let fbExtra={};
+ if(fbKey)try{fbExtra=window.GreenRichFormBuilder?.collect?.(form,targetId,fbKey)||{}}catch(error){return toast(error.message,'error')}
  if(editId&&editing!=='customers'&&targetId!==ownerOf(editing,editId))return toast('To edit an existing record, keep its current company.');
  const copy=JSON.parse(JSON.stringify(loadCompanyData(targetId)));ensureCRMData(copy);
  let old=editId?copy[editing].find(r=>r.id===editId):null;
