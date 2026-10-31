@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#123e35"><meta name="robots" content="noindex,nofollow">
+<title>GreenRich Field Tracker | Standalone Pilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="./field-tracker.css?v=pilot-1">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script defer src="./greenrich-public-config.js"></script>
+<script defer src="./field-tracker.js?v=pilot-1"></script>
+</head><body>
+<div class="ft-shell">
+ <header class="ft-top"><div class="ft-brand"><div class="ft-logo">G</div><div>
+ <b>GreenRich Field Tracker</b><small>Separate trial workspace · does not change ERP attendance</small></div></div>
+ <div class="ft-topright"><span id="ft-user">Checking login…</span><a class="ft-back" href="./secure.html">Back to GreenRich ONE</a></div></header>
+ <div class="ft-shellinner">
+  <aside class="ft-aside">
+   <div class="ft-aside-h"><small>FIELD OPERATIONS</small><strong>Tracking Pilot</strong><p>GPS check-in, visits, photo proof & repeat services</p></div>
+   <nav id="ft-nav" aria-label="Pilot pages">
+    <button type="button" data-tab="shift" class="active">◎ My Shift</button>
+    <button type="button" data-tab="visits">▦ My Visits</button>
+    <button type="button" data-tab="new">＋ Schedule Visit</button>
+    <button type="button" data-tab="history">◷ Visit History</button>
+    <button type="button" data-tab="monitor" id="ft-monitor-link" hidden>⌖ Live Staff & GPS</button>
+    <button type="button" data-tab="team" id="ft-team-link" hidden>♙ Supervisor Access</button>
+   </nav>
+   <div class="ft-aside-foot">Tracking is only active after a staff member explicitly checks in and keeps this page open. No hidden background GPS tracking.</div>
+  </aside>
+  <main class="ft-main">
+   <div class="ft-heading"><div><small id="ft-subtitle">FIELD TRACKING PILOT</small><h1 id="ft-title">My Shift</h1></div>
+   <div class="ft-headside"><label class="ft-company-label">Company <select id="ft-company" aria-label="Choose company"></select></label>
+    <button type="button" id="ft-refresh" class="ft-btn ft-btn-ghost">↻ Refresh</button></div></div>
+   <div id="ft-notice" class="ft-notice" role="status" hidden></div>
+   <div id="ft-content"><section class="ft-panel">Checking secure access…</section></div>
+  </main>
+ </div>
+ <footer class="ft-footer">GreenRich ONE Field Tracker · Pilot version 1 · Locations and photos are restricted to authorized users. No GPS is collected before check-in.</footer>
+</div>
+</body></html>
