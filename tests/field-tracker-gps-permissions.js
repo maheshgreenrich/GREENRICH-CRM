@@ -30,8 +30,8 @@ vm.runInNewContext(
  await context.helpers.testGPS();
  assert.equal(requestCount,1,'One explicit location request');
  assert.equal(context.helpers.getGPS().level,'error');
- assert.match(context.helpers.getGPS().message,/Windows Location services may be OFF/);
- assert.match(panel.textContent,/Privacy & security/);
+ assert.match(context.helpers.getGPS().message,/Browser location permission is BLOCKED/);
+ assert.match(panel.textContent,/Site settings/);
  assert.match(panel.textContent,/Browser permission: Blocked/);
  geolocation.getCurrentPosition=(ok)=>{requestCount++;ok({coords:{latitude:11.05,longitude:76.96,accuracy:30}})};
  context.navigator.permissions.query=async()=>({state:'granted'});
