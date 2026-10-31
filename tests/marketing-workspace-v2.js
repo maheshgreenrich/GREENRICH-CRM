@@ -39,7 +39,7 @@ pass('Storage file-size limit',migration.includes('5242880'));
 pass('Months retained as unit',migration.includes("interval_unit text not null default 'days'"));
 pass('No provider webhooks activated',!migration.includes('create trigger')&&!migration.includes('gr_wa_messages'));
 pass('Script included',html.includes('greenrich-whatsapp-crm-workflows.js'));
-pass('Readiness guidance not a fake send',ui.includes('function showReadinessGuide')&&ui.includes('No message sent.'));
+pass('Secure preflight reports blockers without sending',ui.includes("secureSend('preflight_marketing'")&&ui.includes('Nothing sent.')&&!ui.includes('function showReadinessGuide'));
 pass('Saved campaigns can send remaining eligible recipients',ui.includes('data-review-campaign')&&ui.includes('Send remaining')&&ui.includes("secureSend('send_campaign'"));
 pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('tpl.innerHTML=options(templateOptions'));
 pass('No extra marketing approval questionnaire controls',!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template')&&!ui.includes('data-consent-campaign'));
