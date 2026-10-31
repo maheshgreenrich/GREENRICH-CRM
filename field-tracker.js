@@ -12,9 +12,13 @@
  let db,user,profile,company='',tab='shift',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],openSession=null;
  let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null;
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
+ let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
+ const isNetworkError=err=>/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(String(err?.message||err||''));
+ const readableNetworkError=err=>isNetworkError(err)?
+ 'GreenRich cannot reach Supabase (Failed to fetch). This is a network/API issue, not proof of a GPS or login failure. Check internet, browser extensions, VPN, firewall or try another browser.':(err?.message||String(err));
  const isWindows=()=>/Windows/i.test(navigator.userAgent||'');
  function locationError(err){
-  if(err?.code===1)return Error((isWindows()?'Windows Location services may be OFF, or this browser site is blocked. Open Windows Settings > Privacy & security > Location and turn on Location services. Then allow Location for this website in the browser.':'Location access was blocked. Enable device Location and allow this website to use it.')+' After updating permissions, return here and click Test GPS Access.');
+  if(err?.code===1)return Error((isWindows()?'Location access denied. Windows Location services can be ON while this website is BLOCKED. Click the icon beside the address bar → Site settings → Location → Allow.':'Location permission denied. Allow this website to access location in the browser and turn on device Location.')+' Reopen the page and click Test GPS Access again.');
   if(err?.code===3)return Error('Location request timed out. Turn on device location, try near a window or outdoors, or use a GPS-enabled phone.');
   return Error('Location could not be determined. Check system Location services, browser site permission, network and GPS availability. Desktop PCs may not have a GPS sensor.');
  }
@@ -31,7 +35,7 @@
  }
 
  const notify=(msg,err=false)=>{const n=$('#ft-notice');n.hidden=false;n.className='ft-notice'+(err?' error':'');n.textContent=msg;n.scrollIntoView({block:'nearest',behavior:'smooth'});};
- const run=async(fn)=>{try{return await fn()}catch(err){notify(err?.message||String(err),true);return null}};
+ const run=async(fn)=>{try{return await fn()}catch(err){notify(readableNetworkError(err),true);return null}};
  async function rpc(name,args){const r=await db.rpc(name,args);if(r.error)throw Error(r.error.message);return r.data}
  async function q(table,cols='*',configure=x=>x){const result=await configure(db.from(table).select(cols));if(result.error)throw Error(result.error.message);return result.data||[]}
  function hasGPS(){
@@ -52,10 +56,31 @@
    }else{
     gpsState={level:'success',message:'Location access WORKS. Browser permission: '+perm+'. Current accuracy: ±'+Math.round(p.p_accuracy)+' metres. This was a test only; no check-in or GPS history was saved.'};
    }
-  }catch(err){const perm=await browserGPSPermission();gpsState={level:'error',message:err.message+' Browser permission: '+perm+'.'};}
+  }catch(err){
+   const perm=await browserGPSPermission();
+   const help=perm==='Blocked'?'Browser location permission is BLOCKED for this site. Windows location can be ON. Click the icon beside the website address → Site settings → Location → Allow (or reset permissions). Reopen browser and test again.':err.message;
+   gpsState={level:'error',message:help+' Browser permission: '+perm+'.'};
+  }
   displayGPSFeedback();
  }
 
+ function displayNetworkFeedback(){
+  const n=$('#ft-network-feedback');if(!n)return;
+  n.textContent=networkState.message;
+  n.className='ft-gps-feedback'+(networkState.level==='error'?' error':networkState.level==='success'?' success':'');
+ }
+ async function testBackend(){
+  networkState={level:'info',message:'Checking CRM login and connection. No GPS or attendance record will be saved.'};
+  displayNetworkFeedback();
+  try{
+   const result=await db.auth.getUser();
+   if(result.error||!result.data.user)throw Error('Login session expired. Sign in again through GreenRich ONE.');
+   const allowed=await rpc('gr_field_member',{p_company:company});
+   if(allowed!==true)throw Error('Logged in, but this employee is not assigned to the selected company.');
+   networkState={level:'success',message:'CRM connection WORKS. Logged in as '+profile.full_name+'. No GPS or attendance saved.'};
+  }catch(err){networkState={level:'error',message:readableNetworkError(err)};}
+  displayNetworkFeedback();
+ }
  function activeHere(){return openSession&&openSession.company_id===company}
  function stopTracking(){if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}}
  function startTracking(){
@@ -152,6 +177,11 @@
     '<div class="ft-gps-guide"><b>Windows computer:</b> Settings → Privacy & security → Location → Turn on Location services. Then click the site controls icon beside the browser address → Site settings → Location → Allow. Refresh and test again.'+
     '<p><b>Android phone:</b> Turn on device Location, then allow location permission for your browser and this site. A phone normally gives better GPS accuracy than a desktop PC.</p>'+
     '<p><b>System location OFF?</b> The browser cannot switch it on. Use the System settings button in the Windows popup.</p></div>')+
+   box('CRM Login & Connection Diagnostics',
+    '<p>“Failed to fetch” is a separate network/API error, not proof of GPS failure. Test the connection without recording anything.</p>'+
+    '<div class="ft-row">'+btn('Test CRM Connection (No Check In)','testbackend','','ft-btn-soft')+
+    '<a href="./secure.html" class="ft-btn ft-btn-ghost">Open GreenRich Login</a></div>'+
+    '<p id="ft-network-feedback" class="ft-gps-feedback'+(networkState.level==='error'?' error':networkState.level==='success'?' success':'')+'">'+e(networkState.message)+'</p>')+
    box('Location sharing & privacy',
     '<p class="ft-note">GPS is only collected after Check In, during an active shift, when this page is open and visible. Phone lock, browser suspension, no network or GPS permission denial may stop updates. You can stop location sharing by checking out. The admin can review locations collected during authorized shifts.</p>'+
     '<p><b>Important:</b> Pilot attendance stays separate from official GreenRich ONE attendance and payroll until approved.</p>')+
@@ -269,6 +299,7 @@
  }
  async function actionHandler(action,id){
   if(action==='testgps'){await testGPS();return}
+  if(action==='testbackend'){await testBackend();return}
   if(action==='checkin'){
    if(openSession)throw Error('Already checked in. Check out before starting a new shift.');
    const p=await locate();const s=await rpc('gr_field_clock_in',{p_company:company,...p});
