@@ -34,6 +34,7 @@ jobs:
           node tests/socialberries-api-connection.js
           node tests/socialberries-lead-sync.js
           node tests/socialberries-diwali-template-link.js
+          node tests/marketing-workspace-v2.js
           node tests/whatsapp-provider-slot-edit.js
           test -s greenrich-whatsapp-marketing.css
           node tests/whatsapp-marketing.js
