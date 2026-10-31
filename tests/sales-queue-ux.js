@@ -18,7 +18,7 @@ assert.ok(contacts.includes('pointerdown')&&pipeline.includes('pointerdown'));
 assert.ok(contacts.includes('gr-contact-company')&&contacts.includes('gr-contact-stage'));
 assert.ok(pipeline.includes('contactIcons(l)')&&pipeline.includes("ico('stage','Move stage'"));
 assert.ok(!pipeline.includes("button('Link customer','customer'"));
-assert.ok(pipeline.includes('gr_pipeline_advance')&&pipeline.includes("if(first&&(!products.length||!tags.length))"));
+assert.ok(pipeline.includes('gr_pipeline_advance')&&pipeline.includes("const allowed=stages.filter(stage=>stage!==l.stage)"));
 assert.ok(pipeline.includes('datetime-local')&&pipeline.includes('lead_heat'));
 assert.ok(pipeline.includes('setInterval(checkReminders,60000)'),'In-app reminders checked while app is open');
 assert.ok(pipeline.includes("f.heat")&&pipeline.includes('Follow-ups today')&&pipeline.includes('Overdue follow-ups'));
@@ -31,4 +31,4 @@ assert.ok(sql.includes('gr_pipeline_source_answers')&&sql.includes("gr_lead_can(
 assert.ok(sql.includes("cardinality(coalesce(p_products,'{}'))=0")&&sql.includes("cardinality(coalesce(p_tags,'{}'))=0"));
 assert.ok(sql.includes("in ('Issued','Confirmed','Approved','Completed','Dispatched')"));
 assert.ok(sql.includes('revoke all on function public.gr_pipeline_move('),'Legacy path must not bypass mandatory rules');
-console.log('PASS Sales UX: Common RLS, mandatory first stage, issued SO, time/heat, full lead profile, filters, Excel/Sheet, icon actions');
+console.log('PASS Sales UX: Common RLS, flexible lead stages, issued SO, time/heat, full lead profile, filters, Excel/Sheet, icon actions');
