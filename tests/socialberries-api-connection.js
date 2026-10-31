@@ -10,7 +10,7 @@ assert.ok(crm.includes('data-test-provider'), 'Admin settings must offer read-on
 assert.ok(crm.includes("app.db.functions.invoke('greenrich-socialberries'"),'Browser must call secure Supabase Edge Function');
 assert.ok(crm.includes('data-batches-provider'),'Expose provider batch status read-only');
 assert.ok(crm.includes('data-messages-provider'),'Admin settings must offer WhatsApp message-history lookup');
-assert.ok(crm.includes("function openMessageHistory(connectionId)"),'History lookup must stay inside scoped Settings');
+assert.ok(crm.includes("function openMessageHistory(connectionId,initialPhone='')"),'History lookup must stay inside scoped Settings');
 assert.ok(crm.includes("action:'messages'"),'History UI calls read-only gateway action');
 assert.ok(crm.includes("esc(m.text||'—')"),'Message text must be escaped to avoid XSS');
 assert.ok(crm.includes('data-previous')&&crm.includes('data-next'),'Pagination for message history is required');
