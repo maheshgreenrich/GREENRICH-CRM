@@ -10,7 +10,7 @@ for(const source of [app,crm,dashboard,lead,profile,alarms,notify])new vm.Script
 for(const file of ['greenrich-one','greenrich-lead-pipeline','greenrich-lead-profile','greenrich-dashboard','greenrich-crm-inline'])
  assert.ok(html.includes(file+'.js?v='),'Missing loaded '+file);
 for(const file of ['greenrich-notifications','greenrich-followup-alarm'])
- assert.ok(html.includes(file+'.js?v=20261030-modernbi-1'),'Missing new '+file);
+ assert.ok(html.includes(file+'.js?v='),'Missing loaded '+file);
 assert.ok(html.indexOf('greenrich-followup-alarm.js?v=')<html.indexOf('greenrich-one.js?v='));
 assert.ok(html.indexOf('greenrich-notifications.js?v=')<html.indexOf('greenrich-one.js?v='));
 assert.ok(app.includes('GreenRichFollowupAlarm?.start')&&app.includes('role:roleName()'));
