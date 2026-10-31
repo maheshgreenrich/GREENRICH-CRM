@@ -41,7 +41,7 @@
    optional('gr_dispatch_orders','id,company_id,source_sale_id,order_id,order_date,customer_id,customer_name,customer_mobile,product_name,sku,status,dispatched_at,delivered_at,customer_email'),
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
    optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
-   optional('gr_wa_messages','id,company_id,campaign_id,delivery_status,phone')
+   optional('gr_wa_messages','id,company_id,campaign_id,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,created_at')
   ]);
   rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages};
  }
@@ -138,7 +138,12 @@
    (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Attempts</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
    relevant.map(x=>{
     const attempts=messages.filter(m=>m.campaign_id===x.id);
-    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td><button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button></td></tr>';
+    const failures=attempts.filter(m=>m.delivery_status==='failed');
+    const last=failures.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+    const reason=last?.provider_error_message||last?.provider_error_code||'The provider rejection was not captured for this older attempt';
+    const state=attempts.length&&failures.length===attempts.length?'Not accepted · '+failures.length+' failed':x.status==='draft'?'Draft · not sent':x.status;
+    const allAttempted=attempts.length>0&&attempts.length>=Number(x.audience?.selected_count||0);
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(state)+(last?'<div class="grwc-muted">Reason: '+esc(reason)+'</div>':'')+'</td><td>'+(allAttempted?'<small>Already attempted · do not automatically retry</small>':'<button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button>')+'</td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
    '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
    (app.admin?'<button type="button" data-provider-report>View SocialBerries native bulk statistics</button>':'')+
@@ -799,7 +804,13 @@
    }
    if(!status.remaining)return alert('No remaining eligible customers for this campaign.','info');
    const result=await secureSend('send_campaign',{...args,confirm:true});
-   alert('SocialBerries accepted '+result.accepted+' / '+result.attempted+' messages; '+result.remaining+' eligible customers remain. Acceptance is not delivery.','success');
+   const failed=(result.results||[]).filter(x=>x.result!=='accepted_by_provider');
+   if(result.accepted===0){
+    const reasons=[...new Set(failed.map(x=>(x.code?x.code+': ':'')+(x.reason||x.result)))];
+    alert('No WhatsApp message was accepted. '+reasons.join(' | ')+'. See Campaign reports. Do not retry automatically.','error');
+   }else if(failed.length){
+    alert('SocialBerries accepted '+result.accepted+' of '+result.attempted+' attempts. '+failed.length+' failed or are uncertain. Delivery is not confirmed.','warning');
+   }else alert('SocialBerries accepted '+result.accepted+' of '+result.attempted+' messages. Acceptance is not delivery.','success');
    await fetchAll();marketingDraw();
   }catch(e){alert(e.message,'error')}
  }
