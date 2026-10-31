@@ -754,7 +754,15 @@ async function saveEditor(event){
   const calc=getCalc(row.qty,row.unit_price,row.tax_rate,row.inclusive);
   if(fresh){
    try{const created=await window.GreenRichSharedCustomers.saveCustomer(fresh);row.customer_id=created.id;copy.customers.push(created)}
-   catch(error){return toast('Unable to create shared customer: '+error.message)}
+   catch(error){
+    const shared=await window.GreenRichSharedCustomers.refresh().catch(()=>null);
+    const email=String(fresh.email||'').trim().toLowerCase(),phone=cleanPhone(fresh.mobile),phone2=cleanPhone(fresh.mobile2);
+    const existingCustomer=shared?.customers?.find(c=>[cleanPhone(c.mobile),cleanPhone(c.mobile2)].some(n=>n.length===10&&(n===phone||n===phone2))||
+     (email&&String(c.email||'').trim().toLowerCase()===email));
+    if(!existingCustomer)return toast('Unable to create or find shared customer: '+error.message,'error');
+    row.customer_id=existingCustomer.id;
+    if(!copy.customers.some(c=>c.id===existingCustomer.id))copy.customers.push(existingCustomer);
+   }
   }
   const customer=copy.customers.find(c=>c.id===row.customer_id);
   if(!customer)return toast('Shared customer not found. Refresh and try again.');
@@ -800,15 +808,26 @@ async function saveEditor(event){
  if(editing==='sales'&&!editId&&row.lead_id){
   try{
    await window.GreenRichCRMCloud.whenSynced(targetId);
-   const originalLead=copy.leads.find(l=>(l.id||l.lead_id)===row.lead_id);
-   if(originalLead?.stage==='Won'){
-    toast('Repeat purchase saved for an existing converted customer. The original Won stage is unchanged.','success');return;
-   }
-   if(!['Issued','Confirmed','Approved','Completed','Dispatched'].includes(row.status)){
-    toast('Sales Order saved. Change the order to Completed before converting this lead to Won.','info');return;
-   }
    const client=pipelineConfig.client;
    if(!client)throw Error('CRM database connection unavailable');
+   const current=await client.from('gr_lead_pipeline').select('stage,customer_id')
+    .eq('company_id',targetId).eq('lead_id',row.lead_id).single();
+   if(current.error||!current.data)throw Error('Original lead not available: '+(current.error?.message||'not found'));
+   if(current.data.customer_id&&current.data.customer_id!==row.customer_id)
+    throw Error('Lead is linked to another customer. Order saved, but customer link requires Admin review.');
+   if(current.data.stage==='Won'){
+    toast('Repeat purchase saved for a converted customer. Won stage unchanged.','success');return;
+   }
+   if(!current.data.customer_id){
+    const linked=await client.rpc('gr_pipeline_link_customer',{
+     p_company:targetId,p_lead:row.lead_id,p_customer:row.customer_id,
+     p_note:'Customer linked during Sales Order '+row.internal_order_id
+    });
+    if(linked.error)throw Error('Lead/customer link failed: '+linked.error.message);
+   }
+   if(!['Issued','Confirmed','Approved','Completed','Dispatched'].includes(row.status)){
+    toast('Lead converted to a shared customer and linked to the Pending Sales Order. Mark Completed only when confirmed to move the lead to Won.','success');return;
+   }
    const result=await client.rpc('gr_pipeline_win_with_order',{
     p_company:targetId,p_lead:row.lead_id,p_order:row.id,
     p_note:'Confirmed Sales Order '+row.internal_order_id+' created from lead'
