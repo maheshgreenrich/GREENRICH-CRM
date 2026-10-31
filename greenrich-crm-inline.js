@@ -69,7 +69,11 @@ function productName(s){return s.product_name||nameOf('products',s.product_id)}
 function customerName(s){return s.customer_name||nameOf('customers',s.customer_id)}
 function el(tag,props={}){let e=document.createElement(tag);Object.entries(props).forEach(([k,v])=>k==='text'?e.textContent=v:e.setAttribute(k,v));return e}
 const titles={dashboard:['Overview','Your sales, customers and growth in one place.','+ Add Sale','sales'],sales:['Sales Orders','Track sales orders across every channel and calculate GST.','+ Add Sale','sales'],customers:['Customers','Maintain complete customer contact and address records.','+ Add Customer','customers'],leads:['Leads & CRM','Assigned leads · New → Contacted → Qualified → Quotation → Won / Lost','+ Add Lead','leads'],tasks:['Follow-ups','Manage daily reminders and customer follow-ups.','+ Add Follow-up','tasks'],products:['Product Master','Set a default price and GST for every product.','+ Add Product','products'],channels:['Sales Channels','Add marketplaces, distributors and new sales sources.','+ Add Channel','channels'],dispatch:['Dispatch','Approved orders, packing and courier tracking.','Dispatch queue','sales'],reports:['Import & Export','Import Excel, export reports and back up your records.','+ Add Sale','sales']};
-function navigate(p){if(!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('#page-heading').textContent=titles[p][0];$('#page-subtitle').textContent=titles[p][1];$('#primary-action').textContent=titles[p][2];$('#primary-action').hidden=p==='reports'||p==='dispatch'||p==='customers'||p==='leads'||(adminMode&&p==='dashboard');render();root?.scrollIntoView({block:'start'})}
+function navigate(p){if(!root?.isConnected||!allowedTabs.includes(p))return;page=p;all('.page').forEach(x=>x.classList.toggle('active',x.id===p));all('#navigation button[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===p));const heading=$('#page-heading'),subtitle=$('#page-subtitle'),action=$('#primary-action');
+ if(heading)heading.textContent=titles[p][0];
+ if(subtitle)subtitle.textContent=titles[p][1];
+ if(action){action.textContent=titles[p][2];action.hidden=p==='reports'||p==='dispatch'||p==='customers'||p==='leads'||(adminMode&&p==='dashboard')}
+ render();root?.scrollIntoView({block:'start'})}
 function fillSelect(sel,rows,emptyLabel='None'){let old=sel.value;sel.replaceChildren();sel.append(el('option',{value:'',text:emptyLabel}));rows.forEach(r=>sel.append(el('option',{value:r.id,text:r.name||r.title})));if([...sel.options].some(o=>o.value===old))sel.value=old}
 
 function channelFilters(){
@@ -427,15 +431,20 @@ const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invo
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
 
 function customerProfileBack(){
+ if(!root?.isConnected)return;
  currentCustomerId='';currentSourceSaleId='';
- $('#gr-customer-profile').hidden=true;$('#gr-customer-directory').hidden=false;
- $('#primary-action').hidden=true;
- $('#page-heading').textContent='Customers';$('#page-subtitle').textContent=titles.customers[1];
+ const area=$('#gr-customer-profile'),directory=$('#gr-customer-directory');
+ if(area)area.hidden=true;
+ if(directory)directory.hidden=false;
+ const primary=$('#primary-action');if(primary)primary.hidden=true;
+ const heading=$('#page-heading'),subtitle=$('#page-subtitle');
+ if(heading)heading.textContent='Customers';
+ if(subtitle)subtitle.textContent=titles.customers[1];
  const title=document.querySelector('#app #title');if(title)title.textContent='Customers';
  root?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderCustomerProfile(){
- if(!currentCustomerId&&!currentSourceSaleId)return;
+ if(!root?.isConnected||(!currentCustomerId&&!currentSourceSaleId))return;
  if(!window.GreenRichCustomerProfile)return toast('Customer 360 profile is unavailable. Refresh this page.');
  const customer=data.customers.find(c=>c.id===currentCustomerId)||null;
  const source=scopeRows('sales').find(s=>s.id===currentSourceSaleId)||null;
@@ -443,9 +452,10 @@ function renderCustomerProfile(){
  const area=$('#gr-customer-profile'),list=$('#gr-customer-directory');
  if(!area||!list)return;
  list.hidden=true;area.hidden=false;
- $('#primary-action').hidden=true;
- $('#page-heading').textContent='Customer profile';
- $('#page-subtitle').textContent='Contact information, order history, invoices and customer activity';
+ const primary=$('#primary-action');if(primary)primary.hidden=true;
+ const heading=$('#page-heading'),subtitle=$('#page-subtitle');
+ if(heading)heading.textContent='Customer profile';
+ if(subtitle)subtitle.textContent='Contact information, order history, invoices and customer activity';
  const title=document.querySelector('#app #title');if(title)title.textContent='Customer profile';
  window.GreenRichCustomerProfile.render(area,{
   customer,sourceSale:source,sales:scopeRows('sales'),leads:scopeRows('leads'),tasks:scopeRows('tasks'),
@@ -471,6 +481,7 @@ function openCustomerProfile(customerId='',saleId=''){
 }
 
 function renderTables(){
+ if(!root?.isConnected||!$('#customers-search')||!$('#customers-table')||!$('#tasks-search')||!$('#tasks-table')||!$('#products-search')||!$('#products-table')||!$('#channels-table'))return;
  window.GreenRichSalesOps?.renderSales();
  let q=$('#customers-search').value.toLowerCase();
  $('#customers-table').innerHTML=data.customers.filter(c=>[c.name,c.mobile,c.mobile2,c.email,c.city,c.company].some(v=>String(v||'').toLowerCase().includes(q))).map(c=>'<tr><td><button type="button" class="gr-customer-name-link" data-customer-profile="'+esc(c.id)+'">'+esc(c.name)+'</button><small>'+esc(c.gstin||'')+'</small></td><td>'+esc(c.mobile)+'<small>'+esc(c.mobile2||'')+' · '+esc(c.email)+'</small></td><td>'+esc(c.city)+'<small>'+esc(c.state)+'</small></td><td>'+esc(c.company)+'</td><td>'+esc(c.type)+'</td><td>'+(c.tag_ids||[]).map(id=>'<span class="gr-customer-tag">'+esc(data.tags.find(t=>t.id===id)?.name||'')+'</span>').join('')+'</td><td>'+new Set(scopeRows('sales').filter(s=>s.customer_id===c.id).map(s=>s.internal_order_id||s._companyId+'|'+s.id)).size+'</td><td>'+act('customers',c.id)+'</td></tr>').join('')||empty(8);
@@ -482,6 +493,7 @@ function renderTables(){
  $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
 }
 function render(){
+ if(!root?.isConnected)return;
  if(page==='dashboard')renderDashboard();
  else if(page==='dispatch')window.GreenRichSalesOps?.renderDispatch();
  else {
@@ -912,7 +924,7 @@ window.GreenRichCRM={
   all('#navigation button[data-page]').forEach(button=>button.hidden=!allowedTabs.includes(button.dataset.page));
   data=ensureCRMData(JSON.parse(localStorage.getItem(storageKey())||'null')||initial());
   if(!['sales','products','channels','customers','leads','tasks'].every(k=>Array.isArray(data[k])))throw Error('Local CRM data needs restoration from a valid backup');
-  $('#dashboard-export-actions').hidden=!allowDashboardExport;
+  const dashboardExports=$('#dashboard-export-actions');if(dashboardExports)dashboardExports.hidden=!allowDashboardExport;
   $('#today-label').textContent=new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric'}).format(new Date());
   bind();
   if(!window.GreenRichContacts)throw Error('Contact manager module missing. Refresh the page.');
