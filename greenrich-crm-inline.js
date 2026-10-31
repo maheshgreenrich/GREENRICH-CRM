@@ -672,19 +672,18 @@ function openEditor(k,id=''){
  $('#editor').showModal();
 }
 function createOrderForLead(lead){
- if(!lead?.customer_id)return toast('Link a shared customer to this lead first.');
- if(!permittedCompanies.includes(lead.company_id))return toast('Company access denied.');
+ if(!lead?.lead_id&&!lead?.id)return toast('Lead details unavailable. Reopen this lead and try again.','error');
+ if(!permittedCompanies.includes(lead.company_id))return toast('Company access denied.','error');
+ if(!allowedTabs.includes('sales'))return toast('Sales Order creation is not enabled for your role.','error');
  navigate('sales');window.GreenRichShell?.setPageWithoutRemount?.('orders');
  openEditor('sales');
- const co=$('#f-company_id');if(co){co.value=lead.company_id;co.dispatchEvent(new Event('change'))}
- const customer=$('#f-customer_id');if(customer){customer.value=lead.customer_id;
-  const person=editorData().customers.find(c=>c.id===lead.customer_id);
-  $('#gr-customer-selected').textContent=person?'Selected: '+person.name:'Choose this customer in the picker';
- }
+ const company=$('#f-company_id');if(company){company.value=lead.company_id;company.dispatchEvent(new Event('change'))}
+ const picker=$('.gr-customer-picker');
+ if(!picker?.selectLeadForOrder)return toast('Sales Order form did not load correctly. Refresh the CRM.','error');
+ picker.selectLeadForOrder({...lead,id:lead.lead_id||lead.id});
  if(lead.product_id&&$('#f-product_id')){$('#f-product_id').value=lead.product_id;$('#f-product_id').dispatchEvent(new Event('change'))}
- if($('#f-notes'))$('#f-notes').value='Linked quotation / lead: '+lead.title+' ('+lead.lead_id+')';
- const link=document.createElement('input');link.type='hidden';link.name='lead_id';link.value=lead.lead_id;$('#editor-form').append(link);
- toast('Complete the Sales Order fields and save. Then return to the lead and mark Won using the saved order.');
+ if($('#f-notes'))$('#f-notes').value='Sales Order from lead: '+(lead.contact||lead.title||'Enquiry')+' ('+(lead.lead_id||lead.id)+')';
+ toast('Lead details filled. Verify the customer, product, stock and order information before saving.','info');
 }
 async function saveEditor(event){
  event.preventDefault();
@@ -758,7 +757,29 @@ async function saveEditor(event){
  if(!saveCompanyData(targetId,copy))return;
  $('#editor').close();render();
  if(editing==='sales'&&targetId===activeCompany&&allowedTabs.includes('sales'))navigate('sales');
- toast((editing==='sales'?'Sales order '+row.internal_order_id+' saved. Draft invoice '+row.invoice_number+' created.':'Saved successfully')+(targetId!==activeCompany?' Switch to '+companyLabel(targetId)+' to view it.':''));
+ toast((editing==='sales'?'Sales order '+row.internal_order_id+' saved. Draft invoice '+row.invoice_number+' created.':'Saved successfully')+(targetId!==activeCompany?' Switch to '+companyLabel(targetId)+' to view it.':''),'success');
+ if(editing==='sales'&&!editId&&row.lead_id){
+  try{
+   await window.GreenRichCRMCloud.whenSynced(targetId);
+   if(!['Issued','Confirmed','Approved','Completed','Dispatched'].includes(row.status)){
+    toast('Sales Order saved. Change the order to Completed before converting this lead to Won.','info');return;
+   }
+   const client=pipelineConfig.client;
+   if(!client)throw Error('CRM database connection unavailable');
+   const result=await client.rpc('gr_pipeline_win_with_order',{
+    p_company:targetId,p_lead:row.lead_id,p_order:row.id,
+    p_note:'Confirmed Sales Order '+row.internal_order_id+' created from lead'
+   });
+   if(result.error)throw result.error;
+   toast('Sale completed! Lead converted to Won and linked to customer '+row.customer_name+'.','success');
+   if(allowedTabs.includes('leads')){
+    navigate('leads');window.GreenRichShell?.setPageWithoutRemount?.('leads');
+    await window.GreenRichLeadPipeline?.refreshRoot?.($('#gr-lead-pipeline-root'));
+   }
+  }catch(error){
+   toast('Sales Order saved, but lead is not yet Won: '+error.message+'. Open the lead and select this order.','warning');
+  }
+ }
 }
 
 async function openSaleInvoice(id,ownerOverride=''){
