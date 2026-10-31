@@ -21,7 +21,8 @@ assert.ok(crm.includes('selectLeadForOrder=lead=>'),'Prefill Sales Order from se
 assert.ok(crm.includes("setCustomerMode('new')")&&crm.includes('new_mobile:lead.mobile'),'Create customer from an unlinked lead');
 assert.ok(crm.includes('GreenRichCRMCloud.whenSynced(targetId)'),'Await persisted order before conversion');
 assert.ok(crm.includes("gr_pipeline_win_with_order"),'Convert after confirmed Sales Order is saved');
-assert.ok(crm.includes("originalLead?.stage==='Won'"),'Repeat orders must not reconvert completed leads');
+assert.ok(crm.includes("current.data.stage==='Won'"),'Repeat orders must not reconvert completed leads');
+assert.ok(crm.includes("gr_pipeline_link_customer"),'Pending order must link a real shared customer');
 assert.ok(cloud.includes('async function whenSynced(company)'), 'Cloud must expose a synchronized save barrier');
 assert.ok(ops.includes("!q('#dispatch-metrics')")&&ops.includes("!q('#orders-table-head')"),'Avoid null element toast errors');
 assert.ok(sql.includes("if v.stage='Won' then raise exception"),'Completed won records cannot change stage');
