@@ -666,6 +666,11 @@ function openEditor(k,id=''){
    $('#f-internal_order_id').value=existing?.internal_order_id||peekOrderId(db,$('#f-company_id').value);
    refreshCustomerTags();
    drawCustomerMatches();autoProductPricing();
+   const targetCompany=$('#f-company_id')?.value||activeCompany;
+   if(window.GreenRichFormBuilder){
+    $('#editor-form').dataset.formCompany=targetCompany;
+    window.GreenRichFormBuilder.decorate($('#editor-form'),targetCompany,'sales_order');
+   }
   };
   const autoProductPricing=()=>{
    const db=editorData(),p=db.products.find(x=>x.id===$('#f-product_id').value);
