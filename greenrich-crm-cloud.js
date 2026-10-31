@@ -189,5 +189,6 @@
   }
   return commit(id,before,after);
  }
- window.GreenRichCRMCloud={start,stop,commit,externalSave,refresh,local,diff};
+ async function whenSynced(company){const p=queue.get(company);if(p)await p;const error=errors.get(company);if(error)throw Error(error)}
+  window.GreenRichCRMCloud={start,stop,commit,whenSynced,externalSave,refresh,local,diff};
 })();
