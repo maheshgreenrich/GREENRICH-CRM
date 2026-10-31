@@ -230,15 +230,60 @@
    companyFieldWith(c)+field('Customer','customer_id',options(customerOpts,'Choose customer'),true)+
    field('WhatsApp provider','connection_id',options(rows.connections.filter(x=>x.company_id===c).map(x=>[x.id,x.display_name]),'Choose provider'),true)+
    field('Existing provider template','template_id',options(templateOptions(c),'Choose template'),true)+
-   field('Repeat frequency','interval_days',options([[7,'Weekly (7 days)'],[15,'Every 15 days'],[30,'Monthly (30 days)'],[60,'Every 60 days'],[90,'Every 90 days']], 'Choose interval'),true)+
+   input('Repeat every (number)','interval_value','7','number')+
+   field('Interval unit','interval_unit',options([['days','Days'],['weeks','Weeks'],['months','Calendar months']],'Select unit'),true)+
+   field('Message purpose','service_reason',options([['service','Service reminder'],['delivery','Delivery update'],['reminder','Follow-up reminder'],['offer','Offer'],['cross_sell','Related product promotion']],'Select purpose'),true)+
    input('First follow-up date','next_due',new Date().toISOString().slice(0,10),'date')+note('Service notes','notes');
   dialog('Recurring WhatsApp service follow-up',f,async fd=>{
-   const x=Object.fromEntries(fd),days=Number(x.interval_days);
-   if(!x.customer_id||!x.connection_id||!x.template_id||days<1)throw Error('Choose customer, provider, template and interval.');
+   const x=Object.fromEntries(fd),count=Number(x.interval_value),unit=x.interval_unit;
+   if(!x.customer_id||!x.connection_id||!x.template_id||!Number.isInteger(count)||count<1||count>365||!['days','weeks','months'].includes(unit))throw Error('Choose customer, provider, template and a valid 1–365 interval.');
    const t=rows.templates.find(t=>t.id===x.template_id),link=rows.connections.find(p=>p.id===x.connection_id);
    if(!t||!link||t.company_id!==x.company_id||link.company_id!==x.company_id||t.connection_id!==link.id)throw Error('Provider/template must belong to chosen company.');
-   x.interval_days=days;x.status='draft';
+   x.interval_days=Math.min(365,count*(unit==='weeks'?7:unit==='months'?30:1));x.interval_value=count;x.interval_unit=unit;x.status='draft';
    await save('gr_wa_recurring_rules',x);
+  });
+ }
+ function bulkServiceDialog(){
+  const members=serviceTargets().filter(x=>serviceSelected.has(x.id)&&x.type==='Customer'&&x.company_id);
+  if(!members.length)return alert('Select linked customer records in one company first.','warning');
+  const c=serviceCompany;
+  if(c==='all'||members.some(x=>x.company_id!==c))
+   return alert('Choose a single company before scheduling after-sales follow-ups.','warning');
+  if(members.length>250)return alert('Please filter to 250 or fewer customers per batch to prevent accidental bulk scheduling.','warning');
+  const links=rows.connections.filter(x=>x.company_id===c);
+  if(!links.length)return alert('Configure WhatsApp provider for this company first.','warning');
+  const form='<div class="grwc-notice grwc-span"><b>'+members.length+' selected customers.</b> These are draft service rules. No messages will be sent until approved integration and consent checks are enabled.</div>'+
+   '<div class="grwc-feature grwc-span"><b>Company:</b> '+esc(name(c))+'</div>'+
+   field('WhatsApp tool','connection_id',options(links.map(x=>[x.id,x.display_name]),'Choose provider'),true)+
+   field('Existing template','template_id',options(templateOptions(c),'Choose template'),true)+
+   field('Purpose','service_reason',options([['delivery','Delivery notification'],['reminder','Reminder'],['offer','Offer'],['cross_sell','Related product promotion'],['service','General service follow-up']],'Select purpose'),true)+
+   input('Repeat every','interval_value','1','number')+
+   field('Interval unit','interval_unit',options([['days','Days'],['weeks','Weeks'],['months','Calendar months']],'Choose time unit'),true)+
+   input('First follow-up date','next_due',new Date().toISOString().slice(0,10),'date')+
+   note('Notes / instructions','notes');
+  dialog('After-sales repeat service · '+members.length+' customers',form,async fd=>{
+   if(!can('create'))throw Error('Marketing create permission required');
+   const conn=String(fd.get('connection_id')||''),template=String(fd.get('template_id')||'');
+   const unit=String(fd.get('interval_unit')||''),num=Number(fd.get('interval_value'));
+   if(!Number.isInteger(num)||num<1||num>365||!['days','weeks','months'].includes(unit))throw Error('Enter 1–365 days, weeks or months');
+   const t=rows.templates.find(t=>t.id===template&&t.company_id===c&&t.connection_id===conn);
+   if(!t)throw Error('Select a matching SocialBerries provider/template');
+   const interval=Math.min(365,num*(unit==='weeks'?7:unit==='months'?30:1));
+   const existing=new Set(rows.recurring.filter(r=>r.company_id===c&&r.connection_id===conn&&r.template_id===template)
+     .map(r=>r.customer_id));
+   const list=members.filter(m=>!existing.has(m.customer_id));
+   if(!list.length)throw Error('All selected customers already have this provider/template rule');
+   const data=list.map(m=>({
+    company_id:c,customer_id:m.customer_id,connection_id:conn,template_id:template,
+    interval_days:interval,interval_value:num,interval_unit:unit,
+    service_reason:String(fd.get('service_reason')||'service'),
+    next_due:String(fd.get('next_due')||new Date().toISOString().slice(0,10)),
+    notes:String(fd.get('notes')||'').slice(0,2000),status:'draft'
+   }));
+   const r=await app.db.from('gr_wa_recurring_rules').insert(data);
+   if(r.error)throw Error(r.error.message);
+   alert(data.length+' after-sales draft rules saved; '+(members.length-data.length)+' duplicate rules skipped. No messages sent.','success');
+   serviceSelected.clear();
   });
  }
  const companyFieldWith=(id)=>'<label>Company<select name="company_id">'+app.companies.map(c=>'<option value="'+c+'" '+(c===id?'selected':'')+'>'+name(c)+'</option>').join('')+'</select></label>';
