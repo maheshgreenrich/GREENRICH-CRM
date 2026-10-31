@@ -40,7 +40,7 @@ pass('Months retained as unit',migration.includes("interval_unit text not null d
 pass('No provider webhooks activated',!migration.includes('create trigger')&&!migration.includes('gr_wa_messages'));
 pass('Script included',html.includes('greenrich-whatsapp-crm-workflows.js'));
 pass('Readiness guidance not a fake send',ui.includes('function showReadinessGuide')&&ui.includes('No message sent.'));
-pass('Per-campaign opt-in action',ui.includes('data-consent-campaign')&&ui.includes('recordOptIn(campaign=null)'));
+pass('Saved campaigns can send remaining eligible recipients',ui.includes('data-review-campaign')&&ui.includes('Send remaining')&&ui.includes("secureSend('send_campaign'"));
 pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('tpl.innerHTML=options(templateOptions'));
 pass('No extra marketing approval questionnaire controls',!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template')&&!ui.includes('data-consent-campaign'));
 pass('No draft created before opt-in and template check',ui.indexOf('if(!eligible.length)')>=0&&ui.indexOf('if(!eligible.length)')<ui.indexOf("record=await save('gr_wa_campaigns'"));
