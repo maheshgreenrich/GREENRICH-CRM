@@ -107,10 +107,17 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]):Promise<S
   if(!response.ok)return {id:null,code:"HTTP_"+response.status+(code?"_"+code:""),
    reason:errorText||"SocialBerries rejected the template request (HTTP "+response.status+").",
    uncertain:response.status>=500};
-  const item=doc?.data||{},status=String(item.status||"").toLowerCase();
-  if(doc?.error!==false||["failed","rejected","error"].includes(status))
+  const item=doc?.data||{},status=String(item?.status||doc?.status||"").toLowerCase();
+  // SocialBerries response examples may include an id/message_id with "pending"
+  // and omit the optional boolean error=false. Do not mislabel these as rejection.
+  const explicitError=doc?.error===true||
+   (typeof doc?.error==="string"&&doc.error.trim().toLowerCase()!=="false"&&doc.error.trim()!=="")||
+   (doc?.error!==null&&typeof doc?.error==="object")||
+   doc?.success===false||["failed","rejected","error"].includes(status);
+  if(explicitError)
    return {id:null,code:code||"PROVIDER_REJECTED",reason:errorText||"SocialBerries reported an unsuccessful template send.",uncertain:false};
-  const providerId=item.message_id||item.id||item.data?.messages?.[0]?.id;
+  const providerId=item?.message_id||item?.id||item?.data?.messages?.[0]?.id||
+   doc?.message_id||doc?.id;
   if(!providerId)return {id:null,code:"NO_PROVIDER_MESSAGE_ID",reason:"SocialBerries returned HTTP success without a verifiable message ID; delivery is unknown.",uncertain:true};
   return {id:val(providerId,250),code:"",reason:"",uncertain:false};
  }catch(e){
