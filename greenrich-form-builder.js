@@ -223,7 +223,7 @@ window.GreenRichFormBuilder=(()=>{
   const nodes=[...wrap.querySelectorAll('input,select,textarea')].filter(e=>e.name===field.id);
   if(nodes.length!==1||field.id==='customer_picker'||field.id==='tag_ids')return;
   const original=nodes[0];
-  if(['button','heading'].includes(field.type))return; // application actions cannot be fabricated
+  if(form.id==='gr-ops-form'&&['button','heading'].includes(field.type))return; // ERP application actions remain server-defined
   const simple=['text','email','tel','number','date','datetime-local','time','url'];
   if(original.tagName==='INPUT'&&simple.includes(field.type)){
    if(original.type!==field.type)try{original.type=field.type}catch{}
