@@ -42,6 +42,7 @@ jobs:
           node tests/whatsapp-guarded-sending.js
           node tests/customer-edit-lead-inline-marketing-filters.js
           node tests/whatsapp-provider-slot-edit.js
+          node tests/whatsapp-registered-sender-and-provider-pending.js
           test -s greenrich-whatsapp-marketing.css
           node tests/whatsapp-marketing.js
           node --check greenrich-sidebar.js
