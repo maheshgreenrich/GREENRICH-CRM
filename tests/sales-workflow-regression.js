@@ -11,9 +11,9 @@ for(const [name,src] of [['crm',crm],['tags',tags],['settings',settings],['app',
 for(const field of ['date','internal_order_id','company_id','channel_id','product_id','qty','shipping_charge','notes'])assert.ok(crm.includes("'"+field+"'"),'Missing sales field '+field);
 for(const phrase of ['Platform order ID (optional)','Internal Sales Order ID (automatic)','Company','New Customer','Find Lead / Customer','Search lead or customer by name, mobile number or email','Duplicate customer: email or mobile number','Insufficient stock for','Second mobile number','tag_ids','Available stock:','data-stock-update','autoProductPricing','round(calc.total+row.shipping_charge+shippingTax)','nextOrderId(copy,targetId)'])assert.ok(crm.includes(phrase),'Sales function missing: '+phrase);
 assert.ok(crm.includes('row.tax_rate=Number(product.tax)'),'Product tax must be automatic');
-assert.ok(crm.includes('product.stock-=row.qty'),'Stock must decrease after sale');
+assert.ok(crm.includes('adjustStockForSale(copy,old,{product_id:row.product_id,qty:row.qty,status})'),'Sales status transition must update stock once');
 assert.ok(crm.includes('saveCompanyData(targetId,copy)'),'Sale must save to selected company');
-assert.ok(crm.includes('if(consumesStock(row))'),'Only active sales consume stock');
+assert.ok(crm.includes('if(previous)previous.stock=Number(previous.stock)+restore')&&crm.includes('if(current)current.stock=Number(current.stock)-Number(next.qty)'),'Only active sales reserve stock and cancellation restores it');
 assert.ok(crm.includes('cleanPhone'),'Normalize phone numbers for duplicate detection');
 assert.ok(crm.includes('if(!saveCompanyData(targetId,copy))return'),'Save failures must abort.');
 assert.ok(settings.includes("['tags','Customer Tags']"),'Customer Tags must be in Settings');
