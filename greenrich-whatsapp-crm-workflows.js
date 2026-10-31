@@ -161,7 +161,7 @@
     const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
     return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
       '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
-      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button>':'')+
+      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
       '</div>';
    }).join('')+'</div>'+
    '<div class="grwc-steps"><b>Connection instructions — SocialBerries</b><ol>'+
@@ -182,14 +182,15 @@
    '<section class="grwc-panel">'+headers('4 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('5 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
-   '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity test</b><p>Available using GET /api/v1/users/. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
+   '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity & history</b><p>Read-only GET users, campaign batches and phone-specific WhatsApp messages. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
   container.querySelectorAll('[data-sheet-template]').forEach(x=>{const sh=sheetRows.find(r=>r.id===x.dataset.sheetTemplate);x.value=sh?.welcome_template_id||''});
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
    const edit=e.target.closest('[data-edit-provider]'),add=e.target.closest('[data-new-inbound]'),sheet=e.target.closest('[data-save-sheet]');
-   const check=e.target.closest('[data-test-provider]'),batches=e.target.closest('[data-batches-provider]');
+   const check=e.target.closest('[data-test-provider]'),batches=e.target.closest('[data-batches-provider]'),messages=e.target.closest('[data-messages-provider]');
    if(check)return await checkProvider(check.dataset.testProvider,'test');
    if(batches)return await checkProvider(batches.dataset.batchesProvider,'batches');
+   if(messages)return openMessageHistory(messages.dataset.messagesProvider);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
@@ -198,6 +199,62 @@
     try{const r=await app.db.rpc('gr_wa_set_sheet_welcome',{p_sheet:id,p_template:value});if(r.error)throw r.error;alert('Sheet welcome preference saved. Blank = no template.','success');await fetchAll();settingsDraw(container)}catch(err){alert(err.message,'error')}
    }
   };
+ }
+ function openMessageHistory(connectionId){
+  const provider=rows.connections.find(x=>x.id===connectionId&&x.provider.toLowerCase()==='socialberries');
+  if(!provider)return alert('SocialBerries connection not found.','warning');
+  const d=document.createElement('dialog');d.className='grwc-dialog';
+  d.innerHTML='<div class="grwc-dialog-head"><h3>SocialBerries Message History</h3><button type="button" data-close>×</button></div>'+
+   '<form class="grwc-dialog-fields" id="grwc-history-form">'+
+   '<p class="grwc-notice grwc-span">Read-only provider lookup for a specific WhatsApp number. Available to company administrators. Messages are not saved into CRM. API credentials must be configured in Supabase Secrets.</p>'+
+   '<label class="grwc-span">Customer / Lead WhatsApp mobile<input name="phone" type="tel" inputmode="tel" required autocomplete="off" placeholder="+91 98765 43210"></label>'+
+   '<button type="submit" class="grwc-primary">Find messages</button></form>'+
+   '<div class="grwc-dialog-fields" id="grwc-history-results" aria-live="polite"></div>'+
+   '<div class="grwc-dialog-foot"><button type="button" data-previous disabled>Previous</button><button type="button" data-next disabled>Next</button><button type="button" data-close>Close</button></div>';
+  document.body.append(d);
+  d.onclose=()=>d.remove();
+  d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
+  const results=d.querySelector('#grwc-history-results'),form=d.querySelector('#grwc-history-form');
+  const prev=d.querySelector('[data-previous]'),next=d.querySelector('[data-next]');
+  let page=1,lastNumber='',loading=false;
+  async function loadHistory(targetPage){
+   if(loading)return;
+   const raw=String(form.elements.phone.value||'').trim();
+   const digits=raw.replace(/[\s()+-]/g,'');
+   const normalized=/^[6-9]\d{9}$/.test(digits)?'91'+digits:digits;
+   if(!/^91[6-9]\d{9}$/.test(normalized)){
+    results.innerHTML='<p class="grwc-muted">Enter a valid 10-digit Indian mobile number (or +91XXXXXXXXXX).</p>';
+    return;
+   }
+   loading=true;results.innerHTML='<p class="grwc-muted">Checking SocialBerries messages…</p>';
+   prev.disabled=true;next.disabled=true;
+   try{
+    const res=await app.db.functions.invoke('greenrich-socialberries',{
+     body:{connection_id:connectionId,action:'messages',phone_number:normalized,page:targetPage}
+    });
+    if(res.error)throw Error(res.error.message||'Could not access secure provider API');
+    const data=res.data||{};
+    if(!data.ok){
+     const missing=Array.isArray(data.missing)?' Missing server secrets: '+data.missing.join(', '):'';
+     throw Error((data.message||data.error||'Message lookup failed')+missing);
+    }
+    page=targetPage;lastNumber=normalized;
+    const list=Array.isArray(data.messages)?data.messages:[];
+    results.innerHTML='<p class="grwc-muted grwc-span">Showing page '+esc(page)+' of message history for '+esc(lastNumber)+'. Only the latest 15 items per page are requested.</p>'+
+     (!data.shape_known?'<p class="grwc-notice grwc-span">SocialBerries returned a different message list format. The provider response schema was not included in the supplied API docs. Nothing is displayed until it can be mapped safely.</p>':
+      list.length?'<div class="grwc-tablewrap grwc-span"><table><thead><tr><th>Date</th><th>Direction</th><th>Type</th><th>Status</th><th>Text</th></tr></thead><tbody>'+
+      list.map(m=>'<tr><td>'+esc(m.event_at)+'</td><td>'+esc(m.direction)+'</td><td>'+esc(m.type)+'</td><td>'+esc(m.status)+'</td><td>'+esc(m.text||'—')+'</td></tr>').join('')+'</tbody></table></div>':
+      '<p class="grwc-muted grwc-span">No messages in this page for this number.</p>');
+    prev.disabled=page<=1;
+    next.disabled=!data.shape_known||list.length<15||(data.count!==null&&page*15>=data.count);
+   }catch(err){
+    results.innerHTML='<p class="grwc-notice grwc-span">Could not load message history: '+esc(err.message)+'</p>';
+   }finally{loading=false}
+  }
+  form.onsubmit=e=>{e.preventDefault();void loadHistory(1)};
+  prev.onclick=()=>{if(!prev.disabled)void loadHistory(page-1)};
+  next.onclick=()=>{if(!next.disabled)void loadHistory(page+1)};
+  d.showModal();
  }
  async function checkProvider(id,action){
    const provider=rows.connections.find(x=>x.id===id);
