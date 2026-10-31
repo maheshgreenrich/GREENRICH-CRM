@@ -126,6 +126,7 @@ window.GreenRichFormBuilder=(()=>{
   label.append(control);
   return label;
  };
+ const keyForForm=new WeakMap();
  function showConditions(form,fields){
   const visibleField=id=>{
    const wrap=form.querySelector('[data-grfb-field="'+id+'"]');
@@ -137,6 +138,11 @@ window.GreenRichFormBuilder=(()=>{
   for(const field of fields){
    const wrap=form.querySelector('[data-grfb-field="'+field.id+'"]');if(!wrap)continue;
    let show=field.visible!==false;
+   if(keyForForm.get(form)==='lead_stage'){
+    const stage=form.querySelector('[name=stage]')?.value||'';
+    if(field.id==='due'||field.id==='heat')show=show&&!['Won','Lost'].includes(stage);
+    if(field.id==='order'||field.id==='order_search')show=show&&stage==='Won';
+   }
    if(show&&field.when?.field){
     // Conditions may depend on built-in questions (e.g. Lead priority Hot).
     const src=form.querySelector('[name="'+field.when.field+'"]');
@@ -156,6 +162,7 @@ window.GreenRichFormBuilder=(()=>{
  function decorate(form,company,key,values={}){
   if(!form||!db)return;
   const fields=schema(company,key),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields')||form:form;
+  keyForForm.set(form,key);
   if(!target)return;
   // Keep existing native application handlers. Only add layout & custom field nodes.
   target.querySelectorAll('[data-grfb-field]').forEach(el=>{if(el.dataset.grfbCustom==='yes')el.remove();else el.removeAttribute('data-grfb-field')});
@@ -196,8 +203,8 @@ window.GreenRichFormBuilder=(()=>{
   };
   for(const [id,value] of Object.entries(values||{}))if(fields.some(f=>f.id===id&&!f.system))addValue(id,value);
   const apply=()=>showConditions(form,fields);
-  if(form._grfbHandler)form.removeEventListener('change',form._grfbHandler);
-  form._grfbHandler=apply;form.addEventListener('change',apply);
+  if(form._grfbHandler){form.removeEventListener('change',form._grfbHandler);form.removeEventListener('input',form._grfbHandler)}
+  form._grfbHandler=apply;form.addEventListener('change',apply);form.addEventListener('input',apply);
   apply();
   return {fields,refresh:apply};
  }
@@ -334,7 +341,7 @@ window.GreenRichFormBuilder=(()=>{
     try{
      validate(key,draft);
      const user=await db.auth.getUser();if(user.error||!user.data.user)throw Error('Sign in again to publish form settings.');
-     const row={company_id:company,form_key:key,fields:draft,updated_by:user.data.user.id,updated_at:new Date().toISOString()};
+     const row={company_id:company,form_key:key,fields:draft,updated_by:user.data.user.id};
      const {error}=await db.from('gr_form_schemas').upsert(row,{onConflict:'company_id,form_key'});
      if(error)throw Error(error.message);
      cache.set(token(company,key),cloning(draft));dirty=false;redraw();message('Form configuration published to '+company+'. Employees will see it when they open a new form.');
