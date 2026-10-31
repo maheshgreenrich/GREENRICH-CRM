@@ -90,11 +90,12 @@ assert.throws(()=>form.validate('lead_create',multi),/missing or identical/);
 const customCfg=form.defaults('customer');
 customCfg[0].visible=false; // intentionally malicious override; should protect at runtime
 customCfg.push({...custom});
-const fakeDb={from:()=>({select:()=>({order:async()=>({data:[],error:null}),in:async()=>({data:[{company_id:'grow-india',form_key:'customer',fields:customCfg,version:1}],error:null})})})};
+const fakeDb={from:table=>({select:()=>table==='gr_shared_form_schemas'?Promise.resolve({data:[{form_key:'customer',fields:customCfg,version:1}],error:null}):({order:async()=>({data:[],error:null})})})};
 (async()=>{
  await form.ready(fakeDb,['grow-india']);
  const actual=form.schema('grow-india','customer');
+ assert.equal(JSON.stringify(actual),JSON.stringify(form.schema('enviro-solutions','customer')),'Both companies use the same layout');
  assert.equal(actual.find(f=>f.id==='name').visible,false,'Admin changes to built-in fields should persist');
  assert.ok(actual.some(f=>f.id==='custom_service_type'),'Shared custom question must load');
- console.log('PASS Admin Form Builder: 16 forms, native visibility/type controls, company schemas, cloud cache, RLS and CRM/ERP wiring.');
+ console.log('PASS Admin Form Builder: 16 forms, native visibility/type controls, shared schemas, cloud cache, RLS and CRM/ERP wiring.');
 })().catch(err=>{console.error(err);process.exitCode=1});

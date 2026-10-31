@@ -1,5 +1,5 @@
 'use strict';
-/* GreenRich ONE Form Builder v1: shared per-company admin schemas.
+/* GreenRich ONE Form Builder: one shared admin schema per form for all companies.
    Native mandatory database fields and permission checks are never replaced.
    Custom answers are saved separately and are not silently discarded. */
 window.GreenRichFormBuilder=(()=>{
@@ -7,7 +7,7 @@ window.GreenRichFormBuilder=(()=>{
  const KEYS=['lead_create','lead_stage','customer','sales_order',...Object.keys(OPS).map(k=>'ops_'+k)];
  const TITLES={lead_create:'New Lead Capture',lead_stage:'Lead Stage Movement',customer:'Customer Add / Edit',sales_order:'Sales Order',
   ...Object.fromEntries(Object.entries(OPS).map(([key,val])=>['ops_'+key,'ERP · '+val.label]))};
- const TYPES=['text','textarea','number','email','tel','date','datetime-local','time','url','select','radio','checkbox','heading','button'];
+ const TYPES=['text','textarea','number','email','tel','date','datetime-local','time','url','select','radio','checkbox','multiselect','heading','button'];
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fixed=(id,label,type='text',required=false,protectedField=false)=>({id,label,type,required,visible:true,system:true,protected:protectedField,layout:'half',options:[],when:null,placeholder:''});
  const buildDefaults=()=>{
@@ -40,17 +40,18 @@ window.GreenRichFormBuilder=(()=>{
  };
  const DEFAULTS=buildDefaults();
  let db=null,companies=[],cache=new Map(),loading=null;
- const catalogs={customer_sources:[],customer_tags:[]};
- const SOURCES={custom:'Custom choices',customer_sources:'Settings · Customer sources',customer_tags:'Settings · Customer tags',customer_types:'Customer types'};
+ const catalogs={customer_sources:[],customer_tags:[],companies:[]};
+ const SOURCES={custom:'Custom choices',customer_sources:'Settings · Customer sources',customer_tags:'Settings · Customer tags',customer_types:'Customer types',companies:'Available Companies'};
  const resolved=f=>({...f,options:f.optionSource&&f.optionSource!=='custom'?(f.optionSource==='customer_types'?['Individual','Retailer','Distributor','Business']:catalogs[f.optionSource]||[]):f.options||[]});
  async function loadChoices(){
-  for(const [key,table] of [['customer_sources','gr_crm_sources'],['customer_tags','gr_crm_tags']]){
+  for(const [key,table] of [['customer_sources','gr_crm_sources'],['customer_tags','gr_crm_tags'],['companies','gr_companies']]){
    const {data,error}=await db.from(table).select('*').order('name');
    if(error)throw Error('Could not load Settings choices: '+error.message);
    catalogs[key]=(data||[]).filter(x=>x.active!==false).map(x=>x.name);
   }
  }
- const token=(company,key)=>company+'|'+key;
+ // Company remains an argument for caller compatibility; layout is shared.
+ const token=(company,key)=>key;
  const cloning=x=>JSON.parse(JSON.stringify(x));
  const defaults=key=>cloning(DEFAULTS[key]||[]);
  function schema(company,key){
@@ -75,9 +76,9 @@ window.GreenRichFormBuilder=(()=>{
   if(!db)throw Error('CRM login is required for Form Builder');
   if(loading&&!refresh)return loading;
   loading=(async()=>{
-   const q=db.from('gr_form_schemas').select('company_id,form_key,fields,version').in('company_id',companies);
+   const q=db.from('gr_shared_form_schemas').select('form_key,fields,version');
    const {data,error}=await q;if(error)throw Error('Form Builder settings could not load: '+error.message);
-   for(const row of data||[])if(KEYS.includes(row.form_key)&&Array.isArray(row.fields))cache.set(token(row.company_id,row.form_key),row.fields);
+   for(const row of data||[])if(KEYS.includes(row.form_key)&&Array.isArray(row.fields))cache.set(row.form_key,row.fields);
    await loadChoices();
    return true;
   })();
@@ -109,7 +110,7 @@ window.GreenRichFormBuilder=(()=>{
     if(String(rule.value||'').length>250)throw Error('Condition value too long');
    }
    if(f.optionSource&&!Object.hasOwn(SOURCES,f.optionSource))throw Error('Unknown Settings choice source');
-   if(['select','checkbox','radio'].includes(f.type)&&(!f.optionSource||f.optionSource==='custom')&&(!native||f.options?.length)){
+   if(['select','checkbox','radio','multiselect'].includes(f.type)&&(!f.optionSource||f.optionSource==='custom')&&(!native||f.options?.length)){
     if(!Array.isArray(f.options)||f.options.length<1||f.options.length>30||f.options.some(o=>typeof o!=='string'||!o.trim()||o.length>100))throw Error('Choice questions need 1–30 options, up to 100 characters each.');
    }
   }
@@ -143,22 +144,29 @@ window.GreenRichFormBuilder=(()=>{
    button.className='grfb-design-button';button.dataset.grfbField=f.id;
    button.title='Visual button. App actions require their own workflow integration.';return button;
   }
-  const label=document.createElement('label');label.dataset.grfbField=f.id;
+  const label=document.createElement(['checkbox','radio','multiselect'].includes(f.type)?'div':'label');label.dataset.grfbField=f.id;
   label.className='grfb-custom '+(f.layout==='wide'?'wide':'');
+  if(label.tagName==='DIV'){label.setAttribute('role','group');label.setAttribute('aria-label',f.label)}
   const text=document.createElement('span');text.textContent=f.label+(f.required?' *':'');label.append(text);
   let control;
   if(f.type==='textarea'){control=document.createElement('textarea');control.rows=3}
   else if(f.type==='select'){control=document.createElement('select');control.append(new Option('Choose an option',''));
    for(const val of f.options||[])control.append(new Option(val,val));
-  }else if(f.type==='radio'||f.type==='checkbox'){
+  }else if(['radio','checkbox','multiselect'].includes(f.type)){
    control=document.createElement('div');control.className='grfb-options';
    for(const val of f.options||[]){
     const option=document.createElement('label');option.className='grfb-option';
-    const input=document.createElement('input');input.type=f.type;input.name=f.id;input.value=val;
+    const input=document.createElement('input');input.type=f.type==='multiselect'?'checkbox':f.type;input.name=f.id;input.value=val;
     option.append(input,document.createTextNode(val));control.append(option);
    }
   }else{control=document.createElement('input');control.type=f.type;}
-  if(f.type!=='radio'&&f.type!=='checkbox'){
+  if(f.type==='multiselect'){
+   const details=document.createElement('details');details.className='grfb-multiselect';
+   const summary=document.createElement('summary');summary.textContent='Select options';
+   details.append(summary,control);control=details;
+   details.addEventListener('change',()=>{const n=details.querySelectorAll('input:checked').length;summary.textContent=n?n+' selected':'Select options'});
+  }
+  if(!['radio','checkbox','multiselect'].includes(f.type)){
    control.name=f.id;control.placeholder=f.placeholder||'';
    if(f.required)control.required=true;
   }
@@ -380,10 +388,11 @@ window.GreenRichFormBuilder=(()=>{
    const nodes=[...wrap.querySelectorAll('[name]')].filter(el=>el.name===id);
    for(const el of nodes){
     if(el.type==='checkbox'||el.type==='radio')el.checked=Array.isArray(value)?value.includes(el.value):String(value)===el.value;
-    else if(value!=null)el.value=value;
+    else if(value!=null){if(el.tagName==='SELECT'&&value&&![...el.options].some(o=>o.value===String(value)))el.append(new Option(String(value),String(value)));el.value=value;}
    }
   };
   for(const [id,value] of Object.entries(values||{}))if(fields.some(f=>f.id===id&&!f.system))addValue(id,value);
+  form.querySelectorAll('.grfb-multiselect').forEach(el=>el.dispatchEvent(new Event('change')));
   const apply=()=>showConditions(form,fields);
   if(form._grfbHandler){form.removeEventListener('change',form._grfbHandler);form.removeEventListener('input',form._grfbHandler)}
   form._grfbHandler=apply;form.addEventListener('change',apply);form.addEventListener('input',apply);
@@ -405,7 +414,7 @@ window.GreenRichFormBuilder=(()=>{
    if(!wrap||wrap.hidden)continue;
    const inputs=[...wrap.querySelectorAll('[name]')].filter(el=>el.name===f.id&&!el.disabled);
    let value;
-   if(f.type==='checkbox')value=inputs.filter(el=>el.checked).map(el=>el.value);
+   if(f.type==='checkbox'||f.type==='multiselect')value=inputs.filter(el=>el.checked).map(el=>el.value);
    else if(f.type==='radio')value=inputs.find(el=>el.checked)?.value||'';
    else value=inputs[0]?.value?.trim?.()||'';
    if(f.required&&(Array.isArray(value)?!value.length:!String(value).trim()))throw Error('Please answer required question: '+f.label);
@@ -425,8 +434,9 @@ window.GreenRichFormBuilder=(()=>{
  }
  async function recentAnswers(company,key,entityId){
   if(!db||!entityId)return {};
-  const q=await db.from('gr_form_answers').select('answers').eq('company_id',company).eq('form_key',key)
-   .eq('entity_id',String(entityId)).order('created_at',{ascending:false}).limit(1);
+  let query=db.from('gr_form_answers').select('answers').eq('form_key',key).eq('entity_id',String(entityId));
+  if(key!=='customer')query=query.eq('company_id',company);
+  const q=await query.order('created_at',{ascending:false}).limit(1);
   return q.error?{}:q.data?.[0]?.answers||{};
  }
  const input=(name,value='',type='text')=>'<input data-edit="'+name+'" type="'+type+'" value="'+esc(value)+'">';
@@ -438,8 +448,8 @@ window.GreenRichFormBuilder=(()=>{
    let company=companyIds[0],key=KEYS[0],draft=schema(company,key),dirty=false;
    const message=notify||(()=>{});
    root.innerHTML='<div class="grfb"><div class="panel"><h2>Admin Form Builder</h2>'+
-    '<p>Design CRM and ERP Operations questions yourself, including native field appearance and multiple conditional rules. Employee forms use the saved company-specific configuration.</p>'+
-    '<div class="grfb-top"><label>Company<select id="grfb-company">'+optionsList(companyIds)+'</select></label>'+
+    '<p>Design CRM and ERP Operations questions yourself, including native field appearance and multiple conditional rules. One saved configuration is used across all companies. Customer details are shared; choose the billing company when creating a transaction.</p>'+
+    '<div class="grfb-top">'+
     '<label>Form<select id="grfb-form">'+KEYS.map(k=>'<option value="'+k+'">'+esc(TITLES[k])+'</option>').join('')+'</select></label>'+
     '<button type="button" data-grfb="new">+ Add Question</button>'+
     '<button type="button" data-grfb="save" class="grfb-primary">Save & Publish</button></div>'+
@@ -449,10 +459,10 @@ window.GreenRichFormBuilder=(()=>{
     '<button type="button" data-grfb="reset">Reset unsaved edits</button></div></div>'+
     '<div class="panel grfb-history"><div class="grfb-heading"><h3>Saved custom question answers</h3>'+
     '<button type="button" data-grfb="answers">Refresh Answers</button></div>'+
-    '<p>Admin can review the last 50 answers recorded for this company and form. Answers are not part of the default customer/order columns.</p>'+
+    '<p>Admin can review the last 50 answers recorded for this form across companies. Answers are not part of the default customer/order columns.</p>'+
     '<div id="grfb-answers">Select Refresh Answers to review recorded responses.</div></div></div>';
    const $=q=>root.querySelector(q),els=$('#grfb-fields'),preview=$('#grfb-preview');
-   $('#grfb-company').value=company;$('#grfb-form').value=key;
+   $('#grfb-form').value=key;
    const mark=()=>{dirty=true;$('#grfb-unsaved').textContent='Unsaved changes';drawPreview()};
    const drawPreview=()=>{
     const previewForm=document.createElement('form');previewForm.className='grfb-preview-form';
@@ -460,7 +470,7 @@ window.GreenRichFormBuilder=(()=>{
      const f=resolved(raw);
      if(!f.visible)continue;
      const el=customTag({...f,system:false});
-     if(f.system&&['select','radio','checkbox'].includes(f.type)&&!f.options?.length){
+     if(f.system&&['select','radio','checkbox','multiselect'].includes(f.type)&&!f.options?.length){
       const values={stage:['New','Contacted','Qualified','Quotation','Won','Lost'],
        heat:['Hot','Warm','Cold'],type:['Individual','Retailer','Distributor','Business'],
        status:['Pending','Completed','Cancelled','Returned']}[f.id]||['System-provided choices'];
@@ -504,12 +514,12 @@ window.GreenRichFormBuilder=(()=>{
      (!f.system?'<button type="button" data-op="delete" data-index="'+index+'" title="Delete custom field">Delete</button>':'')+'</div></div>'+
      '<div class="grfb-rowfields">'+
      '<label>Question label '+input('label',f.label)+'</label>'+
-     '<label>Field type <select data-edit="type">'+optionsList(TYPES).replace('value="'+esc(f.type)+'"','value="'+esc(f.type)+'" selected')+'</select></label>'+
+     '<label>Field type <select data-edit="type">'+optionsList(TYPES).replace('>multiselect<','>Checkbox dropdown (multiple choices)<').replace('value="'+esc(f.type)+'"','value="'+esc(f.type)+'" selected')+'</select></label>'+
      '<label>Width <select data-edit="layout">'+optionsList(['half','wide']).replace('value="'+esc(f.layout||'half')+'"','value="'+esc(f.layout||'half')+'" selected')+'</select></label>'+
      '<label>Placeholder '+input('placeholder',f.placeholder||'')+'</label>'+
      '<label class="grfb-switch"><input type="checkbox" data-edit="visible" '+(f.visible!==false?'checked':'')+'> Show this field</label>'+
      '<label class="grfb-switch"><input type="checkbox" data-edit="required" '+(f.required?'checked':'')+'> Required</label>'+
-     (['select','radio','checkbox'].includes(f.type)?
+     (['select','radio','checkbox','multiselect'].includes(f.type)?
       '<label class="grfb-full">Options source<select data-edit="optionSource">'+Object.entries(SOURCES).map(([v,t])=>'<option value="'+v+'" '+((f.optionSource||'custom')===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label>'+
       ((!f.optionSource||f.optionSource==='custom')?'<label class="grfb-full">Choices (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'<p class="grfb-full">Choices are loaded from Settings when the form opens.</p>'):'')+
      (f.system?'<p class="grfb-full grfb-core">Native CRM/ERP field: Admin can edit design and visibility. Original data requirements, approvals, GST/stock calculations and server validations still apply.</p>':'')+
@@ -518,11 +528,11 @@ window.GreenRichFormBuilder=(()=>{
     drawPreview();
    };
    const switchTo=()=>{
-    if(dirty&&!confirm('Discard unsaved Form Builder edits?')){ $('#grfb-company').value=company;$('#grfb-form').value=key;return}
-    company=$('#grfb-company').value;key=$('#grfb-form').value;draft=schema(company,key);dirty=false;
+    if(dirty&&!confirm('Discard unsaved Form Builder edits?')){ $('#grfb-form').value=key;return}
+    key=$('#grfb-form').value;draft=schema(company,key);dirty=false;
     $('#grfb-answers').textContent='Select Refresh Answers to review recorded responses.';redraw();
    };
-   $('#grfb-company').addEventListener('change',switchTo);$('#grfb-form').addEventListener('change',switchTo);
+   $('#grfb-form').addEventListener('change',switchTo);
    els.addEventListener('input',event=>{
     const ruleInput=event.target.closest('[data-rule-part]');
     if(ruleInput){
@@ -539,7 +549,7 @@ window.GreenRichFormBuilder=(()=>{
     else if(id==='visible'||id==='required')field[id]=value
     else if(id==='options')field.options=value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     else if(id==='rules_match'){field.conditions=field.conditions||{match:'all',rules:[]};field.conditions.match=value}
-    else if(id==='type'){field.type=value;if(['select','radio','checkbox'].includes(value)&&!field.options?.length&&!field.system)field.options=['Option 1','Option 2'];}
+    else if(id==='type'){field.type=value;if(['select','radio','checkbox','multiselect'].includes(value)&&!field.options?.length&&!field.system)field.options=['Option 1','Option 2'];}
     mark();
    });
    els.addEventListener('change',event=>{
@@ -584,7 +594,7 @@ window.GreenRichFormBuilder=(()=>{
     out.textContent='Loading saved answers…';
     try{
      const {data,error}=await db.from('gr_form_answers').select('entity_id,answers,created_at')
-      .eq('company_id',company).eq('form_key',key).order('created_at',{ascending:false}).limit(50);
+      .in('company_id',companyIds).eq('form_key',key).order('created_at',{ascending:false}).limit(50);
      if(error)throw Error(error.message);
      const labels=new Map(schema(company,key).map(f=>[f.id,f.label]));
      out.innerHTML=(data||[]).length?(data||[]).map(row=>
@@ -600,10 +610,10 @@ window.GreenRichFormBuilder=(()=>{
     try{
      validate(key,draft);
      const user=await db.auth.getUser();if(user.error||!user.data.user)throw Error('Sign in again to publish form settings.');
-     const row={company_id:company,form_key:key,fields:draft,updated_by:user.data.user.id};
-     const {error}=await db.from('gr_form_schemas').upsert(row,{onConflict:'company_id,form_key'});
+     const row={form_key:key,fields:draft,updated_by:user.data.user.id,updated_at:new Date().toISOString()};
+     const {error}=await db.from('gr_shared_form_schemas').upsert(row,{onConflict:'form_key'});
      if(error)throw Error(error.message);
-     cache.set(token(company,key),cloning(draft));dirty=false;redraw();message('Form configuration published to '+company+'. Employees will see it when they open a new form.');
+     cache.set(token(company,key),cloning(draft));dirty=false;redraw();message('Shared form published for all companies. Employees will see it when they open a new form.');
     }catch(err){message('Form Builder could not save: '+err.message)}finally{button.disabled=false}
    };
    redraw();

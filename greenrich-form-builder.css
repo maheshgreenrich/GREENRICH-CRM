@@ -76,3 +76,9 @@
 
 /* Apply saved widths to actual CRM forms, including built-in fields. */
 [data-grfb-field].grfb-full{grid-column:1/-1}
+
+.grfb-multiselect{border:1px solid #cbdce6;border-radius:7px;background:#fff;color:#263d4b}
+.grfb-multiselect summary{padding:11px;cursor:pointer;font-size:12px;min-height:44px}
+.grfb-multiselect .grfb-options{display:grid;gap:8px;padding:8px 12px;max-height:240px;overflow:auto}
+.grfb-multiselect .grfb-option{min-height:36px}
+.grfb-preview-form>.grfb-custom{display:flex;flex-direction:column;gap:7px;font-size:11px}
