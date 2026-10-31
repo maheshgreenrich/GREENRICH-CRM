@@ -578,7 +578,7 @@ function openEditor(k,id=''){
   function formCustomerMode(mode){$('#editor-form').dataset.customerMode=mode}
 
   const setLeadReference=id=>{
-   const form=$('#editor-form');if(!form)return;
+   const form=$('#editor-fields');if(!form)return;
    let field=form.querySelector('input[name=lead_id]');
    if(!field){field=document.createElement('input');field.type='hidden';field.name='lead_id';form.append(field)}
    field.value=id||'';
