@@ -18,7 +18,7 @@ assert.ok(app.includes('canExport:roleName()'));
 assert.ok(notify.includes("error")&&notify.includes("warning")&&notify.includes("success"));
 assert.ok(lead.includes('gr_pipeline_win_with_order')&&lead.includes('data-full')===false);
 assert.ok(lead.includes('celebrateWon(l.contact')&&lead.includes('order_search'));
-assert.ok(lead.includes("d.querySelector('.gl-move-heat').hidden=won"));
+assert.ok(lead.includes("if(heatPanel)heatPanel.hidden=won"));
 assert.ok(profile.includes('grlp-hero')&&profile.includes('grlp-stats'));
 assert.ok(reminderSql.includes('gr_lead_can')&&reminderSql.includes('gr_lead_stage_history'));
 assert.ok(wonSql.includes('right(phone1,10)=right(phone2,10)')&&wonSql.includes('gr_pipeline_advance'));
