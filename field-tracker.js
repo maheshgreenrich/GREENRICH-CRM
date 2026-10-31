@@ -46,13 +46,40 @@
   p=>{const c=p.coords;if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||!Number.isFinite(c.accuracy))return reject(Error('GPS coordinates unavailable'));resolve({p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy});},
   err=>reject(locationError(err)),
   {enableHighAccuracy:true,timeout:20000,maximumAge:0}));}
+ // Keep server 3 km threshold: broad desktop/IP estimates must never be
+ // recorded as precise employee location.
+ const maxFieldAccuracyM=3000;
+ const accuracyLabel=m=>Number(m)>=1000?(Number(m)/1000).toFixed(1)+' km':Math.round(Number(m))+' m';
+ async function locateForField(purpose){
+  let best=await locate();
+  if(best.p_accuracy<=maxFieldAccuracyM)return best;
+  gpsState={level:'info',message:'Location found with accuracy ±'+accuracyLabel(best.p_accuracy)+
+   '. Requesting a more accurate fix for '+purpose+'. GPS proof requires accuracy within 3 km.'};
+  displayGPSFeedback();
+  try{
+   const second=await locate();
+   if(second.p_accuracy<best.p_accuracy)best=second;
+  }catch(err){
+   if(/permission denied|location access denied|location permission denied|blocked/i.test(String(err?.message||'')))throw err;
+  }
+  if(best.p_accuracy>maxFieldAccuracyM){
+   const message='Location detected, but accuracy is only ±'+accuracyLabel(best.p_accuracy)+
+    '. Field '+purpose+' requires accuracy within 3 km. A desktop PC may use an approximate Wi-Fi/IP location rather than GPS. '+
+    'Please use a GPS-enabled phone with precise location enabled and try outdoors. Nothing has been saved.';
+   gpsState={level:'error',message};displayGPSFeedback();
+   throw Error(message);
+  }
+  gpsState={level:'success',message:'GPS accuracy for '+purpose+': ±'+accuracyLabel(best.p_accuracy)+'.'};
+  displayGPSFeedback();
+  return best;
+ }
  async function testGPS(){
   gpsState={level:'info',message:'Checking device location. If prompted, allow location for this site. No shift or visit record will be saved.'};
   displayGPSFeedback();
   try{
    const p=await locate(),perm=await browserGPSPermission();
    if(p.p_accuracy>3000){
-    gpsState={level:'error',message:'Location was detected, but accuracy is ±'+Math.round(p.p_accuracy)+' metres. Field check-in requires accuracy within 3 km. Use a GPS-enabled phone outdoors. Browser permission: '+perm+'.'};
+    gpsState={level:'error',message:'Location permission works, but accuracy is only ±'+accuracyLabel(p.p_accuracy)+'. Field check-in requires accuracy within 3 km. On a desktop this may be a broad Wi-Fi/IP estimate, not GPS. Try a GPS-enabled phone with precise location enabled, preferably outdoors. Browser permission: '+perm+'. Test only; no record saved.'};
    }else{
     gpsState={level:'success',message:'Location access WORKS. Browser permission: '+perm+'. Current accuracy: ±'+Math.round(p.p_accuracy)+' metres. This was a test only; no check-in or GPS history was saved.'};
    }
@@ -170,7 +197,7 @@
      '<p>Check in to record your server time and GPS coordinates. Location history will update approximately once a minute while this page is visible.</p>'+
      btn('Check In With Current GPS','checkin','','ft-btn')))+
    box('GPS Permission & Setup',
-    '<p>First test your GPS here. Testing does not create a shift, service visit or location-history record.</p>'+
+    '<p>First test your GPS here. Testing does not create a shift, service visit or location-history record. A website can have Location permission but still return a position too approximate for field check-in.</p>'+
     '<div class="ft-row">'+btn('Test GPS Access (No Check In)','testgps','','ft-btn-soft')+
     '<a class="ft-btn ft-btn-ghost" href="https://support.microsoft.com/en-us/windows/privacy/windows-location-service-and-privacy" target="_blank" rel="noopener noreferrer">Windows Location Help</a></div>'+
     '<p id="ft-gps-feedback" class="ft-gps-feedback'+(gpsState.level==='error'?' error':gpsState.level==='success'?' success':'')+'">'+e(gpsState.message)+'</p>'+
@@ -302,14 +329,14 @@
   if(action==='testbackend'){await testBackend();return}
   if(action==='checkin'){
    if(openSession)throw Error('Already checked in. Check out before starting a new shift.');
-   const p=await locate();const s=await rpc('gr_field_clock_in',{p_company:company,...p});
+   const p=await locateForField('check-in');const s=await rpc('gr_field_clock_in',{p_company:company,...p});
    notify('Field check-in recorded using server time and GPS. Shift '+String(s).slice(0,8)+'.');await reload();startTracking();
   }else if(action==='checkout'){
    if(!openSession)throw Error('No active field shift');
-   const p=await locate();await rpc('gr_field_clock_out',{p_session:openSession.id,...p});stopTracking();
+   const p=await locateForField('check-out');await rpc('gr_field_clock_out',{p_session:openSession.id,...p});stopTracking();
    notify('Field check-out time and GPS saved. Tracking stopped.');await reload();
   }else if(action==='arrive'){
-   const p=await locate();await rpc('gr_field_arrive',{p_visit:id,...p});notify('Customer/site arrival time and GPS recorded. Upload photo proof before completing.');await reload();
+   const p=await locateForField('visit arrival');await rpc('gr_field_arrive',{p_visit:id,...p});notify('Customer/site arrival time and GPS recorded. Upload photo proof before completing.');await reload();
   }else if(action==='upload')await showUpload(id);
   else if(action==='complete')await showComplete(id);
   else if(action==='proof')await showProof(id);
@@ -327,7 +354,7 @@
     if(!(file instanceof File)||!file.size||file.size>5242880||!['image/jpeg','image/png','image/webp'].includes(file.type))
      throw Error('Select JPG, PNG or WebP under 5 MB');
     if(notes.length<5)throw Error('Photo notes are required');
-    const p=await locate(),ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+    const p=await locateForField('photo proof'),ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
     const path=v.company_id+'/'+v.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;
     const put=await db.storage.from('gr-field-visit-proofs').upload(path,file,{contentType:file.type,upsert:false});
     if(put.error)throw Error('Photo upload failed: '+put.error.message);
@@ -350,7 +377,7 @@
     const notes=String(fd.get('notes')||'').trim(),heat=sales?String(fd.get('heat')||''):null;
     if(notes.length<10)throw Error('Add at least 10 characters about this visit');
     if(sales&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
-    const p=await locate();const next=await rpc('gr_field_finish_visit',{p_visit:v.id,p_notes:notes,p_heat:heat,...p});
+    const p=await locateForField('visit completion');const next=await rpc('gr_field_finish_visit',{p_visit:v.id,p_notes:notes,p_heat:heat,...p});
     notify('Visit completed with location, time, report and evidence.'+(next?' Next recurring service job scheduled automatically.':''));
    });
  }
