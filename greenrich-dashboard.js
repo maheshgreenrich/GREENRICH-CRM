@@ -50,7 +50,7 @@
    customers:records.customers.filter(c=>customerIds.has(c.id)),from,to,restricted};
  }
  function draw(){
-  if(!host)return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
+  if(!isActive())return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
   const salesCount=new Set(f.sales.map(r=>r.company_id+'|'+(r.internal_order_id||r.id))).size;
   const linked=s=>dispatch.some(d=>d.company_id===s.company_id&&d.source_sale_id===s.id);
   const approved=f.sales.filter(s=>linked(s)||s.approval_status==='Approved').length;
