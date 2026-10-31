@@ -75,7 +75,16 @@ function components(template:any,person:Person,image:string){
  if(vars.length)result.push({type:"body",parameters:vars.map(x=>({type:"text",text:values[x]}))});
  return result;
 }
-async function send(cfg:any,recipient:Person,template:any,parts:any[]){
+type SendOutcome={id:string|null;code:string;reason:string;uncertain:boolean};
+function safeProviderReason(v:unknown){
+ // Only extract a short, non-secret description. Never store raw HTTP responses.
+ return String(v??"").replace(/https?:\/\/\S+/gi,"[URL]")
+  .replace(/\b(?:basic|bearer)\s+[a-z0-9+/=._-]+/gi,"[credential]")
+  .replace(/\b[0-9]{10,16}\b/g,"[number]")
+  .replace(/\b[a-z0-9+/=_-]{35,}\b/gi,"[redacted]")
+  .replace(/[<>{}\r\n]/g," ").replace(/\s+/g," ").trim().slice(0,180);
+}
+async function send(cfg:any,recipient:Person,template:any,parts:any[]):Promise<SendOutcome>{
  const u=new URL(cfg.base+"/api/"+cfg.version+"/whatsapp/messages/");u.searchParams.set("phone_number",recipient.phone);
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
  try{
@@ -83,12 +92,33 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]){
    headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),"Content-Type":"application/json","Accept":"application/json"},
    body:JSON.stringify({type:"template",template:template.name,language:template.language,template_id:template.provider_template_id,
     category:"MARKETING",preview_template:{id:template.provider_template_id,name:template.name,language:template.language,status:"APPROVED",category:"MARKETING",components:template.provider_preview.components},components:parts})});
-  if(!response.ok)return null;
-  const raw=await response.text();if(raw.length>120000)return null;
-  const doc=JSON.parse(raw),item=doc?.data||{};
-  if(doc?.error!==false||(!item.id&&!item.message_id)||["failed","rejected","error"].includes(String(item.status||"").toLowerCase()))return null;
-  return val(item.message_id||item.id,250);
- }catch{return null}finally{clearTimeout(timer)}
+  const raw=await response.text();
+  if(raw.length>120000)return {id:null,code:"RESPONSE_TOO_LARGE",reason:"SocialBerries returned an unexpectedly large response.",uncertain:true};
+  let doc:any=null;try{doc=JSON.parse(raw)}catch{
+   return {id:null,code:"INVALID_PROVIDER_RESPONSE",reason:"SocialBerries returned a non-JSON response (HTTP "+response.status+").",uncertain:response.ok};
+  }
+  const code=safeProviderReason(
+   typeof doc?.error_code==="string"?doc.error_code:
+   typeof doc?.code==="string"?doc.code:
+   typeof doc?.error?.code==="string"?doc.error.code:"");
+  const details=doc?.error?.message||doc?.detail||doc?.message||doc?.errors?.[0]?.message||
+   (typeof doc?.error==="string"?doc.error:"");
+  const errorText=safeProviderReason(details);
+  if(!response.ok)return {id:null,code:"HTTP_"+response.status+(code?"_"+code:""),
+   reason:errorText||"SocialBerries rejected the template request (HTTP "+response.status+").",
+   uncertain:response.status>=500};
+  const item=doc?.data||{},status=String(item.status||"").toLowerCase();
+  if(doc?.error!==false||["failed","rejected","error"].includes(status))
+   return {id:null,code:code||"PROVIDER_REJECTED",reason:errorText||"SocialBerries reported an unsuccessful template send.",uncertain:false};
+  const providerId=item.message_id||item.id||item.data?.messages?.[0]?.id;
+  if(!providerId)return {id:null,code:"NO_PROVIDER_MESSAGE_ID",reason:"SocialBerries returned HTTP success without a verifiable message ID; delivery is unknown.",uncertain:true};
+  return {id:val(providerId,250),code:"",reason:"",uncertain:false};
+ }catch(e){
+  const timedOut=ctl.signal.aborted;
+  return {id:null,code:timedOut?"PROVIDER_TIMEOUT":"PROVIDER_NETWORK_ERROR",
+   reason:timedOut?"SocialBerries did not respond within 12 seconds. Delivery is unconfirmed.":"The SocialBerries API connection failed during sending. Delivery is unconfirmed.",
+   uncertain:true};
+ }finally{clearTimeout(timer)}
 }
 Deno.serve(async request=>{
  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:hdr});
@@ -284,14 +314,21 @@ Deno.serve(async request=>{
     campaign_id:campaign.id,contact_id:group.states.get(person.phone)?.id||null,direction:"outbound",phone:person.phone,
     body:"Marketing template: "+t.name,delivery_status:"queued"}).select("id").single();
    if(claim.error){results.push({last4:person.phone.slice(-4),result:"duplicate_or_unavailable"});continue}
-   let providerId:string|null=null;
-   try{providerId=await send(config,person,t,components(t,person,image))}catch{}
-   await db.from("gr_wa_messages").update({provider_message_id:providerId,delivery_status:providerId?"queued":"failed"}).eq("id",claim.data.id);
-   results.push({last4:person.phone.slice(-4),result:providerId?"accepted_by_provider":"not_confirmed"});
+   let outcome:SendOutcome;
+   try{outcome=await send(config,person,t,components(t,person,image))}
+   catch{outcome={id:null,code:"TEMPLATE_PARAMETERS_INVALID",reason:"Template parameters did not match the approved BODY or IMAGE header.",uncertain:false}}
+   const updated=await db.from("gr_wa_messages").update({
+    provider_message_id:outcome.id,delivery_status:outcome.id?"queued":"failed",
+    provider_error_code:outcome.code||null,provider_error_message:outcome.reason||null
+   }).eq("id",claim.data.id);
+   if(updated.error)return res(500,{ok:false,error:"Provider request was attempted but the CRM could not save its outcome. Do not retry automatically."});
+   results.push({last4:person.phone.slice(-4),
+    result:outcome.id?"accepted_by_provider":outcome.uncertain?"unconfirmed":"rejected",
+    code:outcome.code||null,reason:outcome.reason||null});
   }
   const left=Math.max(0,group.remaining.length-chosen.length);
   if(results.length)await db.from("gr_wa_campaigns").update({status:left?"sending":"submitted"}).eq("id",campaign.id);
   return res(200,{ok:true,attempted:results.length,accepted:results.filter(x=>x.result==="accepted_by_provider").length,
-   remaining:left,results,message:"Acceptance is not delivery. Failed or uncertain attempts are not automatically retried."});
+   remaining:left,results,message:"Provider acceptance is not delivery. Unconfirmed attempts must be checked with SocialBerries before any resend."});
  }catch{return res(400,{ok:false,error:"Secure WhatsApp request could not be processed"})}
 });
