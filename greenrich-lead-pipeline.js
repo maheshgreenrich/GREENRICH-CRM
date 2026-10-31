@@ -50,6 +50,16 @@
  .gl-count{background:#e6edf7;border-radius:20px;padding:4px 10px;color:#355580}
  .gl-list{display:flex;flex-direction:column;gap:9px;max-height:65vh;overflow-y:auto}
  .gl-card{background:#fff;border:1px solid #d9e2ee;border-radius:10px;padding:12px;box-shadow:0 2px 4px #102a4a10}
+ /* Only the single due lead card pulses, not the entire stage or other cards. */
+ .gl-card.gl-followup-due{background:#fff2f0!important;border:2px solid #dc2626!important;
+  animation:gl-followup-pulse 2.4s ease-in-out infinite}
+ .gl-card.gl-followup-due .gl-name-link{color:#a61b1b!important}
+ .gl-due-alert{padding:9px;margin:9px 0;border-radius:8px;background:#b91c1c;color:#fff;font-size:11px;font-weight:800;line-height:1.5}
+ .gl-due-alert[hidden]{display:none!important}
+ .gl-card.gl-followup-due .gl-due-time{color:#ad1e1e}
+ @keyframes gl-followup-pulse{0%,100%{box-shadow:0 0 0 2px #dc262621,0 3px 10px #b91c1c18}
+  50%{box-shadow:0 0 0 6px #dc26263a,0 8px 20px #b91c1c30}}
+ @media(prefers-reduced-motion:reduce){.gl-card.gl-followup-due{animation:none}}
  .gl-card strong{display:block;font-size:13px;color:#152d4d;overflow-wrap:anywhere}
  .gl-card p{font-size:12px;color:#63758e;margin:8px 0}
  .gl-card-line{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin:7px 0}
@@ -184,6 +194,16 @@
  }
  const showMessage=(ctx,e)=>notify(ctx,e?.message||String(e));
  async function refresh(ctx){await query(ctx);draw(ctx)}
+ // Timer updates the alert without rebuilding the board or resetting filters.
+ function updateDueCards(ctx){
+  if(!ctx.root?.isConnected)return;
+  const now=Date.now();
+  ctx.root.querySelectorAll('.gl-card[data-followup-at]').forEach(card=>{
+   const at=Number(card.dataset.followupAt),due=at>0&&Number.isFinite(at)&&now>=at;
+   card.classList.toggle('gl-followup-due',due);
+   const message=card.querySelector('.gl-due-alert');if(message)message.hidden=!due;
+  });
+ }
  function draw(ctx){
   const root=ctx.root;if(!root?.isConnected||ctx.profileOpen)return;
   const rows=picked(ctx),wins=rows.filter(l=>l.stage==='Won'),quoted=rows.filter(l=>l.stage==='Quotation');
@@ -205,7 +225,10 @@
    '<div class="gl-main">'+stat.map(([a,b])=>'<div class="gl-stat"><span>'+escape(a)+'</span><strong>'+escape(b)+'</strong></div>').join('')+'</div>'+
    buildFilters(ctx)+
    '<div class="gl-board" aria-label="Lead stage board">'+stages.map(stage=>'<section class="gl-column" data-stage="'+escape(stage)+'"><h4>'+stage+' <span class="gl-count">'+rows.filter(x=>x.stage===stage).length+'</span></h4><div class="gl-list">'+
-    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+leadLink(l,l.contact||l.title)+
+    rows.filter(x=>x.stage===stage).map(l=>'<article class="gl-card" draggable="true" data-lead="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'" data-followup-at="'+
+     (l.next_followup_at&&l.stage!=='Won'&&l.stage!=='Lost'?escape(new Date(l.next_followup_at).getTime()):'')+'">'+
+     '<div class="gl-due-alert" hidden role="status">⏰ Follow-up due now · Call this lead</div>'+
+     leadLink(l,l.contact||l.title)+
      '<div class="gl-card-line"><span>Mobile</span><span>'+escape(l.mobile||'—')+'</span></div>'+
      '<div class="gl-card-line"><span>Email</span><span>'+escape(l.email||'—')+'</span></div>'+
      '<div class="gl-card-line"><span>Product enquiry</span><span>'+escape(labelProduct(ctx,l))+'</span></div>'+
@@ -215,7 +238,7 @@
      ''+
      '<div class="gl-card-line"><span>Source</span><span>'+escape(l.source||'—')+'</span></div>'+
      ''+
-     (l.next_followup_at&&l.stage!=='Won'?'<div class="gl-card-line"><span>Follow-up</span><b>'+escape(dates(l.next_followup_at))+'</b></div>':'')+
+     (l.next_followup_at&&l.stage!=='Won'&&l.stage!=='Lost'?'<div class="gl-card-line gl-due-time"><span>Follow-up</span><b>'+escape(dates(l.next_followup_at))+'</b></div>':'')+
      (l.stage==='Won'?'':'<div class="gl-card-line"><span>Priority</span><b>'+escape(l.lead_heat||'Warm')+'</b></div>')+
      '<div class="gl-card-actions gl-icon-row">'+contactIcons(l)+
      ico('quick','Quick view','quick',l)+ico('stage','Move stage','move',l)+ico('history','History','detail',l)+
@@ -233,6 +256,7 @@
   root.querySelectorAll('button[data-gl-action]').forEach(el=>el.onclick=()=>act(ctx,el));
   root.querySelectorAll('.gl-multi').forEach(d=>d.ontoggle=()=>{if(d.open)root.querySelectorAll('.gl-multi').forEach(o=>{if(o!==d)o.open=false})});
   root.querySelectorAll('.gl-card').forEach(card=>card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',JSON.stringify({id:card.dataset.lead,company:card.dataset.company}));e.dataTransfer.effectAllowed='move'}));
+  updateDueCards(ctx);
   root.querySelectorAll('.gl-column').forEach(col=>{
     col.ondragover=e=>{e.preventDefault();col.classList.add('over')};
     col.ondragleave=()=>col.classList.remove('over');
@@ -544,6 +568,7 @@
    due.forEach(l=>reminded.add(l.company_id+':'+l.lead_id));
    if(due.length)notify(state,due.length+' follow-up'+(due.length>1?'s are':' is')+' due. Open Leads & CRM to call.');
   };
+  const pulseTick=setInterval(()=>{if(!board.isConnected){clearInterval(pulseTick);return}updateDueCards(state)},10000);
   const tick=setInterval(checkReminders,60000);
   checkReminders();return state;
  }
