@@ -30,6 +30,7 @@ jobs:
           test -s field-tracker.js
           node --check field-tracker.js
           node tests/field-tracker-pilot.js
+          node tests/field-tracker-gps-permissions.js
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
