@@ -579,7 +579,7 @@ function openEditor(k,id=''){
   customerField.classList.add('wide','gr-existing-customer-select');
   customerField.style.display='none';
   const picker=el('div',{class:'gr-customer-picker wide'});
-  picker.innerHTML='<span class="gr-field-title">Customer or Lead <b>*</b></span><div class="gr-customer-switch"><button type="button" data-customer-mode="new">+ New Customer</button><button type="button" data-customer-mode="existing">Find Lead / Customer</button></div><div id="gr-existing-customer" hidden><label>Search lead or customer by name, mobile number or email<input id="gr-customer-search" type="search" autocomplete="off" placeholder="Type at least 2 characters to search"></label><div id="gr-customer-results" class="gr-customer-results"></div><div id="gr-customer-selected"></div></div><div id="gr-new-customer" hidden><div class="gr-new-customer-grid"><label>Customer full name *<input name="new_name" id="f-new_name" required></label><label>Email address *<input name="new_email" id="f-new_email" type="email" required></label><label>Primary mobile number *<input name="new_mobile" id="f-new_mobile" inputmode="tel" type="tel" required></label><label>Second mobile number (optional)<input name="new_mobile2" id="f-new_mobile2" inputmode="tel" type="tel"></label><label class="wide">Customer address *<textarea name="new_address1" id="f-new_address1" required></textarea></label><label>City<input name="new_city" id="f-new_city"></label><label>State (for GST invoice) *<input name="new_state" id="f-new_state" required placeholder="Tamil Nadu / Goa / ..."></label><label>PIN code<input name="new_pincode" id="f-new_pincode"></label><label>Customer GSTIN (optional)<input name="new_gstin" id="f-new_gstin"></label></div><div id="gr-new-customer-tags"></div></div>';
+  picker.innerHTML='<span class="gr-field-title">Customer or Lead <b>*</b></span><div class="gr-customer-switch"><button type="button" data-customer-mode="new">+ New Customer</button><button type="button" data-customer-mode="existing">Find Lead / Customer</button></div><div id="gr-existing-customer" hidden><label>Search lead or customer by name, mobile number or email<input id="gr-customer-search" type="search" autocomplete="off" placeholder="Type at least 2 characters to search"></label><div id="gr-customer-results" class="gr-customer-results"></div><div id="gr-customer-selected"></div></div><div id="gr-new-customer" hidden><div class="gr-new-customer-grid"><label>Customer full name *<input name="new_name" id="f-new_name" required></label><label>Email address *<input name="new_email" id="f-new_email" type="email" required></label><label>Primary mobile number *<input name="new_mobile" id="f-new_mobile" inputmode="tel" type="tel" required></label><label>Second mobile number (optional)<input name="new_mobile2" id="f-new_mobile2" inputmode="tel" type="tel"></label><label class="wide">Customer address *<textarea name="new_address1" id="f-new_address1" required></textarea></label><label>Address line 2<input name="new_address2" id="f-new_address2"></label><label>City<input name="new_city" id="f-new_city"></label><label>State (for GST invoice) *<input name="new_state" id="f-new_state" required placeholder="Tamil Nadu / Goa / ..."></label><label>PIN code<input name="new_pincode" id="f-new_pincode"></label><label>Customer GSTIN (optional)<input name="new_gstin" id="f-new_gstin"></label><label>Customer type<select name="new_type" id="f-new_type"><option>Individual</option><option>Retailer</option><option>Distributor</option><option>Business</option></select></label><label>Customer source<input name="new_source" id="f-new_source"></label><label class="wide">Lead discussion / customer history<textarea name="new_notes" id="f-new_notes"></textarea></label></div><div id="gr-new-customer-tags"></div></div>';
   fields.insertBefore(picker,customerField);
   const existingInvoice=existing||{};
   const invoiceExtra=el('details',{class:'gr-invoice-extra-fields wide'});
@@ -610,7 +610,7 @@ function openEditor(k,id=''){
   };
   const selectLeadForOrder=lead=>{
    if(!lead)return;
-   setLeadReference(lead.id||lead.lead_id);
+   setLeadReference(lead.lead_id||lead.id);
    const db=editorData(),phone=cleanPhone(lead.mobile),email=String(lead.email||'').trim().toLowerCase();
    const known=db.customers.find(c=>c.id===lead.customer_id||
       (phone.length===10&&[c.mobile,c.mobile2].some(p=>cleanPhone(p)===phone))||
@@ -622,10 +622,12 @@ function openEditor(k,id=''){
    }else{
     setCustomerMode('new');
     const fields={new_name:lead.name||lead.contact||lead.title||'',new_email:lead.email||'',new_mobile:lead.mobile||'',
-      new_mobile2:lead.mobile2||'',new_address1:lead.address1||lead.address||'',new_city:lead.city||'',
-      new_state:lead.state||'',new_pincode:lead.pincode||'',new_gstin:lead.gstin||''};
+      new_mobile2:lead.mobile2||'',new_address1:lead.address1||lead.address||'',
+      new_address2:lead.address2||'',new_city:lead.city||'',new_state:lead.state||'',
+      new_pincode:lead.pincode||'',new_gstin:lead.gstin||'',new_type:lead.type||'Individual',
+      new_source:lead.source||'',new_notes:lead.notes||lead.enquiry_details?.notes||''};
     Object.entries(fields).forEach(([id,v])=>{const field=$('#f-'+id);if(field)field.value=v});
-    const display=$('#gr-customer-selected');if(display)display.textContent='Selected lead: '+(lead.contact||lead.title||'')+'. Complete any missing customer details.';
+    const display=$('#gr-customer-selected');if(display)display.textContent='Selected lead: '+(lead.contact||lead.title||'')+'. All available lead details are prefilled below. Complete missing fields and save to convert this same lead into a shared customer.';
    }
   };
   picker.selectLeadForOrder=selectLeadForOrder;
@@ -728,9 +730,21 @@ async function saveEditor(event){
   if(!Number.isInteger(row.qty)||row.qty<1||!Number.isFinite(row.unit_price)||row.unit_price<0||!Number.isFinite(row.shipping_charge)||row.shipping_charge<0||!Number.isFinite(row.shipping_gst_rate)||row.shipping_gst_rate<0||row.shipping_gst_rate>100)return toast('Quantity, unit price, shipping charge and shipping GST rate must be valid');
   if(row.order_id&&copy.sales.some(s=>s.id!==editId&&s.order_id&&s.order_id.toLowerCase()===row.order_id.toLowerCase()&&s.channel_id===row.channel_id&&s.product_id===row.product_id))return toast('This platform order, product and channel are already recorded');
   const mode=form.dataset.customerMode||'existing';
-  const fresh=mode==='new'?{name:row.new_name||'',email:row.new_email||'',mobile:row.new_mobile||'',mobile2:row.new_mobile2||'',address1:row.new_address1||'',city:row.new_city||'',state:row.new_state||'',pincode:row.new_pincode||'',gstin:row.new_gstin||'',tag_ids:inputs.getAll('new_tag_ids'),company:companyLabel(targetId),type:'Individual',country:'India'}:null;
-  if(fresh){const problem=validateCustomer(copy,fresh,'');if(problem)return toast(problem)}
-  else if(!copy.customers.some(c=>c.id===row.customer_id))return toast('Find and select an existing customer, or choose New Customer');
+  let fresh=mode==='new'?{name:row.new_name||'',email:row.new_email||'',mobile:row.new_mobile||'',mobile2:row.new_mobile2||'',
+   address1:row.new_address1||'',address2:row.new_address2||'',city:row.new_city||'',state:row.new_state||'',
+   pincode:row.new_pincode||'',gstin:row.new_gstin||'',tag_ids:inputs.getAll('new_tag_ids'),
+   company:companyLabel(targetId),type:row.new_type||'Individual',source:row.new_source||'',
+   notes:row.new_notes||'',country:'India'}:null;
+  if(fresh){
+   // A lead may already be present in the shared customer directory. Reuse
+   // its customer ID by email/mobile rather than creating a duplicate.
+   const phone=cleanPhone(fresh.mobile),phone2=cleanPhone(fresh.mobile2),email=String(fresh.email||'').trim().toLowerCase();
+   const matched=copy.customers.find(c=>[cleanPhone(c.mobile),cleanPhone(c.mobile2)].some(n=>n.length===10&&(n===phone||n===phone2))||
+    (email&&String(c.email||'').trim().toLowerCase()===email));
+   if(matched){row.customer_id=matched.id;fresh=null;}
+   else{const issue=validateCustomer(copy,fresh,'');if(issue)return toast(issue)}
+  }
+  if(!fresh&&!copy.customers.some(c=>c.id===row.customer_id))return toast('Select the existing customer or complete missing lead details.');
   if(old&&old.invoice_status==='Issued')return toast('Issued invoice is locked. Do not edit this order; contact Accounts for credit-note adjustments.');
   if(old&&window.GreenRichSalesOps?.isApproved?.(targetId,old.id))return toast('Approved orders are locked; contact the dispatch team for delivery updates.');
   const status=row.status||old?.status||'Pending';
@@ -754,7 +768,7 @@ async function saveEditor(event){
     total:round(calc.total+row.shipping_charge+shippingTax),product_name:product.name,
     sku:product.sku,hsn:product.hsn||'',channel_name:channel.name,customer_name:customer.name,status
    });
-  ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_city','new_state','new_pincode','new_gstin','new_tag_ids'].forEach(k=>delete row[k]);
+  ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_address2','new_city','new_state','new_pincode','new_gstin','new_type','new_source','new_notes','new_tag_ids'].forEach(k=>delete row[k]);
   // Product stock was already reserved or released once above.
  }else if(editing==='products'){
   row.price=Number(row.price);row.tax=Number(row.tax);row.stock=Number(row.stock);
