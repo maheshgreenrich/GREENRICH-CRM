@@ -81,7 +81,7 @@ create policy gr_wa_recurring_insert on public.gr_wa_recurring_rules for insert 
  with check(
   (public.gr_wa_customer_edit(company_id,'edit') or public.gr_wa_allowed(company_id,'create'))
   and status='draft'
-  and exists(select 1 from public.gr_wa_templates t where t.id=template_id and t.company_id=company_id
+  and exists(select 1 from public.gr_wa_templates t where t.id=gr_wa_recurring_rules.template_id and t.company_id=gr_wa_recurring_rules.company_id
      and t.connection_id=gr_wa_recurring_rules.connection_id)
  );
 create policy gr_wa_recurring_update on public.gr_wa_recurring_rules for update to authenticated
