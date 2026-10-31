@@ -16,7 +16,7 @@
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
  const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot · API unverified':'Unverified');
- const templateOptions=(c,connectionId='')=>templates(c).filter(t=>!connectionId||t.connection_id===connectionId).map(t=>[t.id,tmpl(t)]);
+ const templateOptions=(c,connectionId='')=>templates(c).filter(t=>t.category==='marketing'&&(!connectionId||t.connection_id===connectionId)).map(t=>[t.id,t.name+' · '+t.language+(t.provider_approval==='approved'&&['verified_provider','admin_confirmed'].includes(t.provider_source)?' · Approved':' · Not verified')]);
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
  const scoped=(a)=>a.filter(x=>scope==='all'||x.company_id===scope);
@@ -232,8 +232,7 @@
   const previous=root.querySelector('#grwc-audience-form');
   const remembered=previous?{
    connection:previous.elements.connection_id?.value||'',
-   template:previous.elements.template_id?.value||'',
-   campaign:previous.elements.name?.value||''
+   template:previous.elements.template_id?.value||''
   }:null;
   root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='welcome'?welcomeView():current==='recurring'?recurringView():inboundView())+'</div>';
   const form=root.querySelector('#grwc-audience-form');
@@ -882,7 +881,8 @@
    const sender=campaignConnection(connectionId);
    if(!sender)return alert('Choose an authorized WhatsApp provider.','error');
    const companyId=sender.company_id;
-   if(!rows.templates.some(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId))return alert('Select an existing template for this provider.','error');
+   const template=rows.templates.find(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId&&t.category==='marketing');
+   if(!template)return alert('Choose an approved marketing template.','warning');
    const matches=campaignTargets(companyId);
    if(!matches.length)return alert('Choose a customer with a valid WhatsApp number or a lead belonging to the selected provider. Customers do not need a company assignment.','warning');
    const excluded=audience().filter(x=>selected.has(x.id)).length-matches.length;
@@ -896,9 +896,25 @@
    const consent=rows.consents||[];
    const eligible=matches.filter(x=>consent.some(w=>w.company_id===companyId&&
     sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
-   let record=null;
+   // Validate the ready-to-send prerequisites before creating a draft.
+   // This prevents unusable duplicate drafts when a customer presses Send.
+   if(!eligible.length)return alert('Cannot send: selected customers have no recorded WhatsApp marketing permission.','warning');
+   const verified=template.provider_approval==='approved'&&
+    ['verified_provider','admin_confirmed'].includes(template.provider_source)&&
+    template.provider_preview?.status==='APPROVED'&&Array.isArray(template.provider_preview?.components)&&!!template.body;
+   if(!verified)return alert('Cannot send: this marketing template is not verified in your SocialBerries connection. Complete setup in Settings.','warning');
+   const header=template.provider_preview.components.find(c=>String(c.type).toUpperCase()==='HEADER');
+   if(hasFile&&String(header?.format).toUpperCase()!=='IMAGE')
+    return alert('This template has no approved image header. Remove the image or choose an image template.','warning');
+   if(!hasFile&&String(header?.format).toUpperCase()==='IMAGE')
+    return alert('This approved template requires an image. Select an image file to send.','warning');
+   const signature=JSON.stringify([companyId,connectionId,templateId,matches.map(x=>x.id).sort(),
+    hasFile?[file.name,file.size,file.lastModified]:null]);
+   let record=lastPrepared?.signature===signature?lastPrepared.record:null;
+   sendBusy=true;
+   const clicked=e.target.querySelector('[data-send-campaign]');if(clicked){clicked.disabled=true;clicked.textContent='Sending…'}
    try{
-    record=await save('gr_wa_campaigns',{
+    if(!record)record=await save('gr_wa_campaigns',{
       company_id:companyId,connection_id:connectionId,template_id:templateId,
       name:(rows.templates.find(t=>t.id===templateId)?.name||'WhatsApp campaign')+' · '+new Date().toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}),
       audience:{crm_ids:matches.map(x=>x.id),selected_count:matches.length,
@@ -909,7 +925,7 @@
       status:'draft',
       notes:'Not sent. Template requires verified approved components. Media images are private draft assets, not a provider-sent template header. Actual messaging requires opt-in and verified sender.'
     });
-    if(hasFile){
+    if(hasFile&&lastPrepared?.signature!==signature){
      const path=companyId+'/'+record.id+'/marketing.'+allowed[file.type];
      const upload=await app.db.storage.from('gr-wa-campaign-images')
       .upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});
@@ -918,12 +934,13 @@
       .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
      if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
     }
-    await reviewCampaign({id:record.id,connection_id:connectionId});
+    lastPrepared={signature,record:{id:record.id,connection_id:connectionId}};
+    await reviewCampaign(lastPrepared.record);
     await fetchAll();marketingDraw();
    }catch(error){
-    alert(error.message+(record?' (draft ID '+record.id+')':''),'error');
+    alert(error.message,'error');
     await fetchAll().catch(()=>{});
-   }
+   }finally{sendBusy=false;const button=element.querySelector('[data-send-campaign]');if(button){button.disabled=false;button.textContent='Send Campaign'}}
   };
  }
  async function mountSettings(element,ctx){
