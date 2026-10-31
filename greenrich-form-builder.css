@@ -1,0 +1,50 @@
+/* GreenRich ONE · company-scoped Admin Form Builder */
+.grfb{font-family:Inter,system-ui,sans-serif;color:#1c3349;max-width:1540px;margin:auto}
+.grfb *{box-sizing:border-box}
+.grfb .panel{background:#fff;border:1px solid #dbe7ef;border-radius:14px;padding:20px;margin-bottom:14px;box-shadow:0 4px 17px #142f4e0a}
+.grfb h2{font-size:23px;margin:0 0 7px;letter-spacing:-.6px}
+.grfb h3{font-size:17px;margin:0 0 10px}
+.grfb p{font-size:12px;line-height:1.7;color:#687e8f}
+.grfb-top{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin:17px 0 10px}
+.grfb-top label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700;color:#5e7585;min-width:180px;flex:1}
+.grfb button{border:1px solid #cbdce6;color:#185879;background:white;border-radius:8px;font-size:12px;font-weight:700;padding:10px 13px;cursor:pointer;min-height:38px}
+.grfb button:hover{background:#eef7fc}
+.grfb button:disabled{opacity:.55;cursor:not-allowed}
+.grfb .grfb-primary{color:white;background:#11674e;border-color:#11674e}
+.grfb .grfb-primary:hover{background:#0e543f}
+.grfb input,.grfb select,.grfb textarea{width:100%;padding:9px 10px;background:white;color:#263d4b;border:1px solid #cbdce6;border-radius:7px;font-size:12px;min-height:37px;accent-color:#137854}
+.grfb input[type=checkbox],.grfb input[type=radio]{min-height:unset;width:16px;height:16px;margin:0}
+.grfb-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,.85fr);gap:15px}
+.grfb-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#grfb-unsaved{font-size:11px;font-weight:700;color:#ab7024}
+#grfb-fields{display:flex;flex-direction:column;gap:12px;margin-top:15px}
+.grfb-row{border:1px solid #dce7ef;border-radius:11px;padding:13px;background:#fafcfb}
+.grfb-row:focus-within{border-color:#a1c4b5}
+.grfb-rowhead{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.grfb-rowhead b{font-size:13px;flex:1;min-width:140px}
+.grfb-chip{border-radius:100px;padding:4px 8px;background:#e4f5ea;color:#27704e;font-size:10px;font-weight:800;white-space:nowrap}
+.grfb-chip.locked{background:#eaf0f9;color:#496785}
+.grfb-rowmoves{display:flex;gap:4px}
+.grfb-rowmoves button{padding:5px 9px;min-height:27px}
+.grfb-rowfields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.grfb-rowfields>label{font-size:11px;color:#587180;font-weight:600;display:flex;flex-direction:column;gap:5px;min-width:0}
+.grfb-rowfields .grfb-switch{flex-direction:row;gap:9px;align-items:center;font-size:12px}
+.grfb-rowfields .grfb-full{grid-column:1/-1}
+.grfb-rowfields .grfb-core{color:#9a6b32;background:#fff6e5;border-radius:7px;padding:8px;margin:0}
+.grfb-preview{position:sticky;top:15px;align-self:start;max-height:85vh;overflow:auto}
+.grfb-preview-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:15px}
+.grfb-preview-form>label{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:600;color:#4b6573}
+.grfb-preview-form>.wide,.grfb-preview-form>.grfb-full{grid-column:1/-1}
+.grfb-preview-form .grfb-options{display:grid;gap:7px}
+.grfb-option{display:flex!important;flex-direction:row!important;align-items:center;gap:7px}
+.grfb-section-heading{grid-column:1/-1;font-size:14px;margin:10px 0 2px}
+.grfb-hidden,[data-grfb-field][hidden]{display:none!important}
+.grfb-custom.grfb-full{grid-column:1/-1}
+.grfb-custom .grfb-options{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0}
+.grfb-custom .grfb-option{font-size:12px;display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px}
+.grfb-custom .grfb-option input{width:16px!important;height:16px!important;min-width:16px!important;min-height:16px!important}
+.grfb-custom h4{margin:0}
+#grCrmWorkspace .grfb-custom,#grCrmWorkspace .grfb-custom *{min-width:0}
+@media(max-width:1100px){.grfb-layout{grid-template-columns:1fr}.grfb-preview{position:static;max-height:unset}}
+@media(max-width:580px){.grfb-rowfields,.grfb-preview-form{grid-template-columns:1fr}.grfb-top{flex-direction:column;align-items:stretch}.grfb-top label{width:100%}}
+@media(prefers-reduced-motion:reduce){.grfb *{scroll-behavior:auto!important}}
