@@ -3,7 +3,7 @@
    No network calls to undocumented provider endpoints and no simulated sends. */
 (()=>{
  let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set();
- let startDate='',endDate='',product='all',leadStage='all',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1;
+ let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1;
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  const name=id=>companies[id]||id;
@@ -193,14 +193,26 @@
  }
  function inboundView(){
   const rules=scoped(rows.inbound);
-  return '<section class="grwc-panel">'+headers('Incoming WhatsApp & website leads','When a verified provider webhook receives an actual enquiry, CRM can create/update a lead with source, tags and assigned salesperson.')+
-   '<div class="grwc-grid"><div class="grwc-feature"><b>WhatsApp enquiry</b><p>Customer message → Verified webhook → Match existing mobile → New/updated lead → Assigned salesperson.</p></div>'+
-   '<div class="grwc-feature"><b>Website enquiry</b><p>Website form or meaningful registration enquiry → Verified source → CRM lead. OTP-only authentication events should not become marketing leads.</p></div></div>'+
-   '<div class="grwc-notice">The inbound webhook endpoint is not enabled. A secure receiver requires SocialBerries payload examples and webhook authentication/signature details. These rules cannot ingest messages yet.</div></section>'+
-   '<section class="grwc-panel">'+headers('Inbound lead assignment mapping','Admin selects provider + event type + CRM source + tags + default salesperson. Configure in Settings → WhatsApp.')+
-   (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Event</th><th>Provider</th><th>CRM source</th><th>Assigned employee</th><th>State</th></tr></thead><tbody>'+rules.map(r=>
-     '<tr><td>'+esc(r.event_type)+'</td><td>'+esc(connectionLabel(r.connection_id))+'</td><td>'+esc(r.source_name)+'</td><td>'+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common queue')+'</td><td>Draft</td></tr>').join('')+'</tbody></table></div>':empty('No incoming lead mapping configured.'))+
-   '<button type="button" data-open-settings>Open WhatsApp Settings</button></section>';
+  const matches=inboundNeedle?targets().filter(x=>
+   String(x.mobile||'').replace(/\D/g,'').includes(inboundNeedle.replace(/\D/g,''))||
+   x.name.toLowerCase().includes(inboundNeedle.toLowerCase())):[];
+  return '<section class="grwc-panel">'+headers('Incoming WhatsApp enquiries',
+   'Match a WhatsApp number to an existing CRM contact and open its provider chat history. New inbound events require an authenticated SocialBerries webhook.')+
+   '<div class="grwc-filters"><label>Search customer or lead by WhatsApp number / name<input id="grwc-inbound-lookup" type="search" placeholder="+91 mobile or customer name" value="'+esc(inboundNeedle)+'"></label></div>'+
+   (inboundNeedle?(matches.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Contact</th><th>Record</th><th>Company</th><th>Mobile</th><th>Messages</th></tr></thead><tbody>'+
+   matches.slice(0,30).map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.type)+'</td><td>'+esc(x.company_id?name(x.company_id):'Company not linked')+'</td><td>'+esc(x.mobile)+'</td><td>'+
+   (app.admin&&x.company_id?'<button type="button" data-inbound-history="'+esc(x.id)+'">View SocialBerries chat</button>':'Company assignment or Admin required')+
+   '</td></tr>').join('')+'</tbody></table></div>':empty('No existing CRM contact matches. A verified incoming-message event can create a new WhatsApp-source lead after duplicate checking.')):
+   empty('Search by mobile number to identify an existing lead or customer.'))+
+   '<div class="grwc-grid"><div class="grwc-feature"><b>Existing contact</b><p>Match mobile → customer / lead record → view provider chat. Customer 360 also has an on-demand read-only chat lookup.</p></div>'+
+   '<div class="grwc-feature"><b>New WhatsApp enquiry</b><p>Signed webhook → deduplicate mobile → create a WhatsApp-source lead → assign salesperson or common queue.</p></div></div>'+
+   '<div class="grwc-notice"><b>Automatic inbound lead creation is not active.</b> The supplied SocialBerries API documents message lookup by known number, but not the signed webhook payload for discovering new incoming senders. No incoming enquiry is silently lost or fabricated; configure verified events before switching it on.</div></section>'+
+   '<section class="grwc-panel">'+headers('Incoming lead assignment rules',
+    'Select company, source, tags and assigned salesperson under Settings → WhatsApp Integration. Common queue is allowed.')+
+   (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Company</th><th>Event</th><th>Source</th><th>Salesperson</th><th>State</th></tr></thead><tbody>'+
+    rules.map(r=>'<tr><td>'+esc(name(r.company_id))+'</td><td>'+esc(r.event_type)+'</td><td>'+esc(r.source_name)+'</td><td>'+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common sales queue')+'</td><td>Draft · webhook not connected</td></tr>').join('')+'</tbody></table></div>':
+    empty('No incoming WhatsApp assignment rules have been saved.'))+
+   '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>';
  }
  function marketingDraw(){
   if(!root?.isConnected)return;
