@@ -125,6 +125,44 @@ Deno.serve(async request=>{
     return response(request,200,{ok:true,configured:true,count:Number(data.count)||0,page,batches});
    }catch{return response(request,200,{ok:false,configured:true,message:"Could not retrieve provider campaigns"})}
   }
-  return response(request,400,{ok:false,error:"Only read-only Test Connection and Batch List operations are enabled"});
+  if(action==="messages"){
+   // Never permit a browser-supplied provider URL, arbitrary query or client ID.
+   // All mobile numbers in this GreenRich CRM integration use the Indian 91 prefix.
+   const raw=String(body.phone_number||"").trim();
+   const digits=raw.replace(/[\s()+-]/g,"");
+   const phone=/^[6-9]\d{9}$/.test(digits)?"91"+digits:digits;
+   if(!/^91[6-9]\d{9}$/.test(phone))
+    return response(request,400,{ok:false,error:"Enter a valid Indian WhatsApp mobile number"});
+   const pageNumber=Number(body.page);
+   const page=Number.isInteger(pageNumber)&&pageNumber>=1&&pageNumber<=100?String(pageNumber):"1";
+   try{
+    const out=await providerRead(cfg,"whatsapp/messages/",{phone_number:phone,page,limit:"15"});
+    if(!out.ok)return response(request,200,{ok:false,configured:true,code:"HTTP_"+out.status,
+      message:"SocialBerries message-history request returned HTTP "+out.status});
+    const data=out.data;
+    // The OpenAPI Get Messages 200 schema is empty. Accept list or paginated
+    // results only, whitelist fields, and never expose an unknown response body.
+    const list=Array.isArray(data)?data:(Array.isArray(data?.results)?data.results:[]);
+    const records=list.slice(0,15).filter(x=>x&&typeof x==="object").map(x=>{
+      const sender=String(x.sender??""),receiver=String(x.receiver??"");
+      const direction=sender.replace(/\D/g,"")===phone?"Incoming":
+        receiver.replace(/\D/g,"")===phone?"Outgoing":"Unknown";
+      return {
+       id:String(x.id??x.message_id??"").slice(0,120),
+       direction,
+       type:String(x.type??"unknown").slice(0,60),
+       status:String(x.status??"unknown").slice(0,60),
+       text:typeof x.message_text==="string"?x.message_text.slice(0,600):"",
+       event_at:String(x.created_on??x.created_at??"").slice(0,50)
+      };
+    });
+    const count=Number(data?.count);
+    return response(request,200,{ok:true,configured:true,page:Number(page),
+      messages:records,count:Number.isFinite(count)?count:null,
+      shape_known:Array.isArray(data)||Array.isArray(data?.results)});
+   }catch{return response(request,200,{ok:false,configured:true,
+     message:"Could not retrieve message history. Check provider response format and API settings."})}
+  }
+  return response(request,400,{ok:false,error:"Only read-only Test Connection, Batch List and Message History operations are enabled"});
  }catch{return response(request,400,{ok:false,error:"Invalid request or integration configuration"})}
 });
