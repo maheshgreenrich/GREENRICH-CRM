@@ -329,6 +329,7 @@
    '<div class="gl-move-heat">'+selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+'</div>'+dateInput+orderSelect+
    '<p class="gl-note">Choose any next stage. Won requires a matching confirmed Sales Order, which also converts this lead into a customer. Lost closes follow-ups; other active stages require a future follow-up.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
+   const custom=window.GreenRichFormBuilder?.collect?.(d.querySelector('form'),l.company_id,'lead_stage')||{};
    const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
    // Product and tag interests are optional; when chosen, the server verifies them.
    if(stage==='Won'&&!fd.get('order'))throw Error('Choose a matching issued or completed Sales Order.');
@@ -342,8 +343,13 @@
         p_due_at:due,p_heat:fd.get('heat')
       });
    if(error)throw error;
+   if(Object.keys(custom).length){
+    try{await window.GreenRichFormBuilder.saveAnswers(l.company_id,'lead_stage',l.lead_id,{__stage:stage,...custom})}
+    catch(e){notify(ctx,'Stage updated, but additional question answers were not saved: '+e.message)}
+   }
    if(stage==='Won'){notify(ctx,'Lead converted to customer and Sales Order linked successfully.');setTimeout(()=>celebrateWon(l.contact||l.title),180);}
   });
+  window.GreenRichFormBuilder?.decorate?.(d.querySelector('form'),l.company_id,'lead_stage');
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
   const controls=()=>{
@@ -483,14 +489,21 @@
       '<label><input type="checkbox" name="tags" value="'+escape(t.id)+'">'+escape(t.name)+'</label>').join('')+'</fieldset>'+
      fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
+     const custom=window.GreenRichFormBuilder?.collect?.(d.querySelector('form'),fd.get('company'),'lead_create')||{};
      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can create Common leads. Select yourself.');
      const {data:leadId,error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee')||null,
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
       p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
+      if(leadId&&Object.keys(custom).length){
+       try{await window.GreenRichFormBuilder.saveAnswers(fd.get('company'),'lead_create',leadId,custom)}
+       catch(e){notify(ctx,'Lead created, but custom question answers could not save: '+e.message)}
+      }
       if(leadId&&fd.get('welcome')){try{await window.GreenRichWhatsAppWorkflows.saveLeadWelcome(ctx.db,fd.get('company'),leadId,fd.get('welcome'))}
        catch(ex){window.GreenRichNotify?.(ex.message,'warning')}}
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
-    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=()=>{renderChoices();void changeWelcome(comp.value,d)};renderChoices();return;
+    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=()=>{renderChoices();void changeWelcome(comp.value,d);
+      window.GreenRichFormBuilder?.decorate?.(d.querySelector('form'),comp.value,'lead_create')};
+     renderChoices();window.GreenRichFormBuilder?.decorate?.(d.querySelector('form'),comp.value,'lead_create');return;
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
     '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes,welcome_template. Choose a default welcome template or supply the exact template name/ID per row. Blank means no message.</p>'+
@@ -566,6 +579,7 @@
   const state={...ctx,root:board,filters:{company:ctx.companyIds.length===1?ctx.companyIds[0]:'all',person:'all',from:'',to:'',product:[],source:[],tag:[],heat:[],search:''},
    leads:[],staff:[],orders:[],products:[],customers:[],canViewTeam:false};
   contexts.set(root,state);
+  try{await window.GreenRichFormBuilder?.ready?.(ctx.db,ctx.companyIds)}catch(e){notify(state,'Form Builder settings unavailable: '+e.message)}
   try{await refresh(state);state.loadedAt=Date.now()}catch(e){board.innerHTML='<p class="gl-note">Pipeline is unavailable: '+escape(e.message)+'. Verify the lead pipeline migration and access permissions.</p>'}
   const reminded=new Set();
   const checkReminders=()=>{
