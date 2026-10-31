@@ -21,7 +21,7 @@
  const companyMatch=r=>company==='all'||r.company_id===company;
  const providerMatch=r=>provider==='all'||r.connection_id===provider;
  const matching=(...v)=>!search||v.some(x=>String(x||'').toLowerCase().includes(search));
- const filtered=(name)=>store[name].filter(x=>companyMatch(x)&&providerMatch(x));
+ const filtered=(name)=>store[name].filter(x=>companyMatch(x)&&(name==='contacts'||providerMatch(x)));
  const companyName=id=>COMPANY[id]||id;
  const connectionName=id=>store.connections.find(c=>c.id===id)?.display_name||'Choose a provider';
  const templateName=id=>store.templates.find(t=>t.id===id)?.name||'Choose template';
