@@ -1,0 +1,99 @@
+/* GreenRich ONE | WhatsApp Marketing Workspace */
+#content .grwa{--t:#223752;--muted:#7c8eaa;--line:#e5ebf4;--wa:#159974;--bg:#f5f8ff;font:13px/1.5 Inter,ui-sans-serif,system-ui,sans-serif;max-width:1660px;margin:auto;color:var(--t);display:grid;gap:17px}
+#content .grwa *{box-sizing:border-box}#content .grwa button{cursor:pointer;width:auto!important;min-width:0!important;font:700 12px/1.3 Inter,system-ui,sans-serif!important;padding:9px 13px!important;border:1px solid #cfdcf0!important;border-radius:9px!important;color:#345b93!important;background:#f7faff!important;white-space:nowrap}
+#content .grwa button:hover{background:#eaf2ff!important;border-color:#b6cbed!important}#content .grwa button:focus-visible{outline:3px solid #7ca8ff;outline-offset:2px}
+#content .grwa button:disabled{cursor:not-allowed;opacity:.5}
+#content .grwa-top{display:flex;justify-content:space-between;align-items:center;gap:15px;background:linear-gradient(112deg,#ffffff,#f4fbfa 70%,#ecfff7);border:1px solid #dfede9;padding:23px 27px;border-radius:19px;box-shadow:0 9px 28px #2b486a08}
+#content .grwa-eyebrow{display:block;font-size:10px;letter-spacing:.12em;font-weight:800;color:#15916c}
+#content .grwa-top h2{font-size:25px!important;letter-spacing:-.04em!important;color:#193b42!important;font-weight:800!important;margin:4px 0 3px!important}
+#content .grwa-top p{font-size:12px;color:#78918f;margin:0}#content .grwa-top-actions{display:flex;gap:10px;align-items:center}
+#content .grwa-pill{display:inline-flex;align-items:center;gap:5px;border-radius:30px;padding:5px 9px;font-size:10px;font-weight:800;color:#63748d;background:#edf1f6;text-transform:capitalize;white-space:nowrap}
+#content .grwa-pill[data-tone=green]{color:#13865b;background:#e1f7ec}
+#content .grwa-pill[data-tone=amber]{color:#9b681c;background:#fff3dc}
+#content .grwa-pill[data-tone=red]{color:#bf4059;background:#ffebf0}
+#content .grwa-pill[data-tone=blue]{color:#426fc7;background:#e9f1ff}
+#content .grwa-notice{border:1px solid #eadcba;border-left:4px solid #edb95e;border-radius:11px;background:#fffaf0;padding:12px 15px;color:#7e673c;font-size:12px}
+#content .grwa-filters{display:grid;grid-template-columns:1.2fr 1.2fr 1.55fr 1fr;gap:12px;background:white;border:1px solid var(--line);border-radius:14px;padding:17px 18px;box-shadow:0 5px 21px #22406b08}
+#content .grwa label{display:grid;gap:6px;min-width:0;color:#536b8b;font-size:11px;font-weight:700}
+#content .grwa input,#content .grwa select,#content .grwa textarea{background:#fbfdff;border:1px solid #d8e4f2;border-radius:9px;min-width:0;width:100%;padding:10px 12px;font:500 12px Inter,system-ui,sans-serif!important;color:#294565;min-height:40px;outline-offset:2px}
+#content .grwa-filters select,#content .grwa-filters input{height:40px!important}
+#content .grwa-tabs{display:flex;flex-wrap:wrap;gap:8px;padding:7px;border:1px solid var(--line);background:#fff;border-radius:14px}
+#content .grwa-tabs button{border:0!important;background:transparent!important;font-weight:700!important;color:#697f9d!important;display:flex;align-items:center;gap:7px}
+#content .grwa-tabs button span{font-size:15px}#content .grwa-tabs button.active,#content .grwa-tabs button[aria-current=page]{background:#dcf6ed!important;color:#127858!important}
+#content .grwa-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+#content .grwa-kpi{display:grid;gap:7px;align-content:start;min-height:128px;padding:20px 21px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 5px 18px #22406b0a;position:relative;overflow:hidden}
+#content .grwa-kpi:after{position:absolute;content:'';width:105px;height:105px;border-radius:50%;background:var(--wash);right:-25px;top:-28px}
+#content .grwa-kpi[data-color=green]{--accent:#16a17e;--wash:#e0f8ec}
+#content .grwa-kpi[data-color=purple]{--accent:#8869e2;--wash:#f2edff}
+#content .grwa-kpi[data-color=blue]{--accent:#4a81db;--wash:#eaf2ff}
+#content .grwa-kpi[data-color=amber]{--accent:#d79e48;--wash:#fff2dd}
+#content .grwa-kpi[data-color=rose]{--accent:#de6383;--wash:#ffedf2}
+#content .grwa-kpi span{font-size:11px;font-weight:700;color:#72839f;z-index:1}
+#content .grwa-kpi strong{font-size:29px;color:var(--accent);z-index:1;line-height:1.1;font-weight:800;font-variant-numeric:tabular-nums}
+#content .grwa-kpi small{font-size:10px;color:#8a9bb0;z-index:1}
+#content .grwa-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+#content .grwa-card{background:#fff;border:1px solid var(--line);border-radius:17px;box-shadow:0 7px 23px #29436609;padding:20px 20px 22px;min-width:0}
+#content .grwa-card-title{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:16px}
+#content .grwa-card-title>div{min-width:0}#content .grwa-card-title h3{color:#2a4266!important;font-size:16px!important;font-weight:800!important;line-height:1.3!important;margin:0 0 5px!important}
+#content .grwa-card-title p{font-size:11px;color:#8a9cb3;margin:0;line-height:1.5}
+#content .grwa-card-title>div:last-child:not(:first-child){display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+#content .grwa-provider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:11px}
+#content .grwa-provider-tile{border:1px solid #e1e9f4;border-radius:12px;padding:15px 13px;background:#f9fcff;display:grid;grid-template-columns:38px minmax(0,1fr);align-items:start;gap:10px}
+#content .grwa-provider-tile .grwa-provider-symbol{background:#ddf7ec;color:#15956f;border-radius:11px;display:grid;place-items:center;font-size:21px;width:38px;height:38px}
+#content .grwa-provider-tile small{display:block;font-size:10px;color:#8a9ab1}
+#content .grwa-provider-tile strong{display:block;font-size:13px;font-weight:800;color:#274668;margin:3px 0;overflow-wrap:anywhere}
+#content .grwa-provider-tile p{font-size:10.5px;color:#879ab1;margin:0 0 7px;overflow-wrap:anywhere}
+#content .grwa-provider-tile button{grid-column:1/-1;justify-self:start}
+#content .grwa-metrics{display:flex;gap:11px;flex-wrap:wrap}
+#content .grwa-metrics>div{flex:1;min-width:90px;padding:17px 12px;display:grid;gap:5px;border:1px solid #e8eef7;border-radius:13px;background:#fafcff}
+#content .grwa-metrics span{text-transform:capitalize;font-size:10px;color:#8b9ab0}
+#content .grwa-metrics strong{font-size:24px;color:#284c7b;font-weight:800}
+#content .grwa-metrics i{width:42px;height:6px;border-radius:20px}
+#content .grwa-chart-title{margin:22px 0 10px;font-size:11px;font-weight:800;color:#526b8c}
+#content .grwa-consent{display:flex;gap:24px;align-items:center;justify-content:center;flex-wrap:wrap}
+#content .grwa-donut{width:146px;height:146px;border-radius:50%;display:grid;place-items:center;flex:0 0 146px}
+#content .grwa-donut>div{width:94px;height:94px;border-radius:50%;background:white;display:grid;align-content:center;justify-items:center}
+#content .grwa-donut strong{font-size:25px;font-weight:800;color:#274361}#content .grwa-donut small{font-size:10px;color:#889cb2}
+#content .grwa-consent>div:last-child{min-width:140px;flex:1}
+#content .grwa-consent p{display:flex;gap:9px;align-items:center;margin:7px 0;font-size:11px;color:#69809d}
+#content .grwa-consent p i{width:10px;height:10px;border-radius:4px}
+#content .grwa-consent p b{margin-left:auto;font-size:12px;color:#2c4569}
+#content .grwa-empty{text-align:center;padding:30px 16px;background:#f9fbff;border:1px dashed #dbe5f3;border-radius:13px;color:#8b9cb0}
+#content .grwa-empty span{display:block;font-size:26px;color:#9ac7ba}
+#content .grwa-empty h4{font-size:13px!important;color:#5d738f;margin:4px 0!important}
+#content .grwa-empty p{font-size:11px;max-width:350px;margin:0 auto}
+#content .grwa-tablewrap{width:100%;overflow:auto;border:1px solid #ecf0f6;border-radius:11px}
+#content .grwa table{width:100%;border-collapse:collapse;min-width:640px}
+#content .grwa th{text-align:left;padding:11px;background:#f8faff;color:#7d8faa;font-size:10px;font-weight:800;white-space:nowrap}
+#content .grwa td{padding:11px 10px;border-top:1px solid #eef2f7;white-space:nowrap;font-size:11px;color:#546a8b;vertical-align:middle}
+#content .grwa td strong{display:block;font-size:11.5px;color:#2f4e79}
+#content .grwa td small{display:block;color:#91a0b4;font-size:10px;white-space:normal;max-width:210px}
+#content .grwa-clip{display:block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#content .grwa-help{background:#f6faff;padding:10px 13px;border-radius:9px;border:1px solid #e0e9f6;font-size:11px;color:#59789d}
+#content .grwa-setup{margin-top:15px;padding:18px;background:#f8fcfb;border:1px solid #e1f0eb;border-radius:12px}
+#content .grwa-setup h4{font-size:13px;color:#1c8268;margin:0 0 8px}
+#content .grwa-setup p,#content .grwa-setup li{font-size:11.5px;color:#67817d;line-height:1.65}
+#content .grwa-setup ol{padding-left:21px}
+#content .grwa-footer{padding:8px 3px 24px;color:#93a3b4;font-size:10.5px}
+#content .grwa-error,#content .grwa-loading{border:1px solid #efdcba;border-radius:12px;background:#fffaf1;color:#805c24;padding:16px}
+/* Dialog is deliberately appended to body for reliable showModal inside the CRM. */
+body .grwa-dialog{border:1px solid #d7e3ef;padding:0!important;border-radius:16px;width:min(680px,95vw);max-height:90vh;overflow:auto;box-shadow:0 25px 95px #0b2e5070;background:white;color:#294764}
+body .grwa-dialog::backdrop{background:#142b4a88}
+body .grwa-dialog form{margin:0}
+body .grwa-dialog-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e7eff6;padding:19px 22px}
+body .grwa-dialog-head h3{font-size:18px!important;margin:0!important;color:#244667}
+body .grwa-dialog-head button{border:0;background:#edf4fc;color:#456b8c;border-radius:8px;font-size:19px;cursor:pointer;width:32px;height:32px}
+body .grwa-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;padding:22px}
+body .grwa-form label{display:grid;align-content:start;gap:6px;font-size:11.5px;font-weight:700;color:#576d8b}
+body .grwa-form input:not([type=checkbox]),body .grwa-form select,body .grwa-form textarea{border:1px solid #d6e3f0;background:#fcfdff;padding:10px 11px;border-radius:9px;box-sizing:border-box;width:100%;font:500 12px Inter,system-ui,sans-serif;min-height:39px;color:#2d486b}
+body .grwa-form .wide{grid-column:1/-1}
+body .grwa-form .grwa-hint{font-size:11px;color:#677f9c;background:#f0f7ff;padding:12px 13px;border-radius:10px;border:1px solid #deebfc}
+body .grwa-form .grwa-audience-preview{background:#eaf8ef;color:#247455;border:1px solid #cdebd8;padding:11px 13px;font-size:12px;font-weight:800;border-radius:9px}
+body .grwa-form input[type=checkbox]{width:16px;vertical-align:middle}
+body .grwa-dialog-foot{display:flex;justify-content:flex-end;gap:10px;padding:15px 22px;border-top:1px solid #ebeff7}
+body .grwa-dialog-foot button,body .grwa-form button{width:auto!important;border:1px solid #dce5f0;background:#fff;border-radius:9px;color:#385d89;padding:10px 14px;cursor:pointer;font:700 12px Inter,system-ui,sans-serif!important}
+body .grwa-dialog-foot .grwa-primary{background:#198b69!important;color:white!important;border-color:#198b69!important}
+body .grwa-dialog-foot button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:1200px){#content .grwa-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#content .grwa-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){#content .grwa-grid{grid-template-columns:1fr}#content .grwa-top{padding:20px}#content .grwa-card{padding:17px}}
+@media(max-width:540px){#content .grwa{gap:12px}#content .grwa-top{align-items:start;flex-direction:column;padding:17px}#content .grwa-top h2{font-size:22px!important}#content .grwa-filters{grid-template-columns:1fr;padding:13px}#content .grwa-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin}#content .grwa-tabs button{flex:0 0 auto}#content .grwa-kpi{padding:14px;min-height:112px}#content .grwa-kpi strong{font-size:23px}#content .grwa-card-title{flex-direction:column;gap:9px}body .grwa-form{grid-template-columns:1fr;padding:15px}body .grwa-form .wide{grid-column:auto}body .grwa-dialog-head{padding:13px 16px}body .grwa-dialog-foot{padding:13px 15px}}

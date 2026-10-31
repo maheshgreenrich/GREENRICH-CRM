@@ -1,9 +1,9 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','operations','purchase','accounts','settings'];
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','marketing','operations','purchase','accounts','settings'];
 const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
-const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',marketing:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
+const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
  sales:can('sales')||can('orders'),
@@ -61,7 +61,7 @@ const menuIcons={
  leads:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 17a3 3 0 0 1 6 0M15 9h4M15 13h4"/>',
  customers:'<path d="M3 21V5l9-3 9 3v16M3 9h18M8 21v-5h8v5"/>',
  sales:'<path d="M3 7h18M6 3v4M18 3v4M5 11h14v10H5zM9 15h6"/>',
- marketing:'<path d="m3 11 18-7-7 18-3-9-8-2Zm8 2 10-9"/>',
+ marketing:'<path d="M12 3C6.8 3 2.5 6.9 2.5 11.7c0 1.8.6 3.5 1.6 4.9L3 21l4.8-1.3c1.3.7 2.8 1 4.2 1 5.3 0 9.5-3.8 9.5-8.8S17.2 3 12 3Z"/><path d="M8 8.8c.5 3 3.1 5.6 6.2 6.4l1.8-1.4-2.2-1.2-1.2 1-2.3-2.1.8-1.3-1.5-2Z"/>',
  orders:'<path d="M4 7h16l-1 13H5L4 7ZM8 7a4 4 0 0 1 8 0"/>',
  stock:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/>',
  operations:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7zM11 7h2M7 11v2M17 11v2"/>',
@@ -84,7 +84,7 @@ function configureCompanySelector(){
    manager.choose(select.value,user.id);
    if(label)label.textContent=manager.name(user.id);
    document.title='GreenRich ONE · '+manager.name(user.id);
-   if(crmMap[page])void render();
+   if(crmMap[page]||page==='marketing')void render();
    // Attendance is a completed module: changing company never re-renders it.
   }catch(error){toast(error.message);select.value=manager.selected(user.id)}
  };
@@ -174,6 +174,13 @@ async function render(){
   else if(page==='settings'){crmCache=null;await settings(c)}
   else if(page==='operations')await operations(c)
   else if(page==='accounts')await window.GreenRichAccounts.mount(c,{db,companyId:window.GreenRichCompanies.selected(user.id)})
+   else if(page==='marketing'){
+    if(!window.GreenRichWhatsAppMarketing)throw Error('WhatsApp Marketing module is not loaded. Refresh GreenRich ONE.');
+    await window.GreenRichWhatsAppMarketing.mount(c,{db,companies:window.GreenRichCompanies.allowed(),
+      selectedCompany:window.GreenRichCompanies.selected(user.id),userId:user.id,admin:roleName()==='Admin',
+      permission:action=>can('marketing',action),
+      crmPermissions:{customers:can('customers','view'),leads:can('leads','view')},notify:toast});
+   }
   else if(crmMap[page])await crmWorkspace(c,crmMap[page]);
   else await placeholder(c)
  }catch(e){c.innerHTML='<div class="notice">'+esc(e.message)+'</div>'}
