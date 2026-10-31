@@ -30,12 +30,12 @@ async function audience(db:any,campaign:any,company:string){
  const cids=ids.filter((x:string)=>x.startsWith("C:")&&validId(x.slice(2))).map((x:string)=>x.slice(2));
  const lids=ids.filter((x:string)=>x.startsWith("L:"+company+":")).map((x:string)=>x.slice(company.length+3));
  const [c,l]=await Promise.all([
-  cids.length?db.from("gr_crm_customers").select("id,name,mobile,email").in("id",cids):Promise.resolve({data:[],error:null}),
+  cids.length?db.from("gr_crm_customers").select("id,name,mobile,mobile2,email").in("id",cids):Promise.resolve({data:[],error:null}),
   lids.length?db.from("gr_lead_pipeline").select("lead_id,contact,title,mobile,email").eq("company_id",company).in("lead_id",lids):Promise.resolve({data:[],error:null})
  ]);
  if(c.error||l.error)throw Error("CRM recipient verification failed");
  const found=new Map<string,Person>();
- for(const x of c.data||[]){const phone=norm(x.mobile);if(phone)found.set("C:"+x.id,{key:"C:"+x.id,name:val(x.name),email:val(x.email),phone})}
+ for(const x of c.data||[]){const phone=norm(x.mobile)||norm(x.mobile2);if(phone)found.set("C:"+x.id,{key:"C:"+x.id,name:val(x.name),email:val(x.email),phone})}
  for(const x of l.data||[]){const phone=norm(x.mobile);if(phone)found.set("L:"+company+":"+x.lead_id,{key:"L:"+company+":"+x.lead_id,name:val(x.contact||x.title),email:val(x.email),phone})}
  const people:Person[]=[],seen=new Set<string>();
  for(const id of ids){const x=found.get(id);if(x&&!seen.has(x.phone)){people.push(x);seen.add(x.phone)}}
@@ -134,7 +134,7 @@ Deno.serve(async request=>{
    catch(e){return res(422,{ok:false,error:e instanceof Error?e.message:"Could not validate audience"})}
    if(!checked.eligible.length)
     blockers.push("No selected recipients have documented WhatsApp marketing opt-in for this sender company");
-   if(checked.no_phone)blockers.push(checked.no_phone+" selected contacts are invalid, duplicates or leads from another sender company");
+   // Invalid, duplicate and other-company contacts are skipped; eligible contacts may still send.
    const withImage=input.has_image===true;
    if(t?.provider_preview?.components){
     const header=t.provider_preview.components.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
@@ -154,11 +154,11 @@ Deno.serve(async request=>{
    if(input.attested!==true||source.length<12||evidence.length<10)return res(400,{ok:false,error:"Confirm explicit opt-in and provide its source and evidence"});
    let row:any=null;
    if(key.startsWith("C:")&&validId(key.slice(2))){
-    const q=await db.from("gr_crm_customers").select("id,name,mobile").eq("id",key.slice(2)).maybeSingle();row=q.data;
+    const q=await db.from("gr_crm_customers").select("id,name,mobile,mobile2").eq("id",key.slice(2)).maybeSingle();row=q.data;
    }else if(key.startsWith("L:"+company+":")){
     const q=await db.from("gr_lead_pipeline").select("lead_id,contact,mobile").eq("company_id",company).eq("lead_id",key.slice(company.length+3)).maybeSingle();row=q.data;
    }
-   const number=norm(row?.mobile);
+   const number=norm(row?.mobile)||norm(row?.mobile2);
    if(!number)return res(400,{ok:false,error:"CRM contact or valid mobile not found"});
    const prev=await db.from("gr_wa_contacts").select("consent_status,opt_out_at").eq("company_id",company).eq("mobile",number).maybeSingle();
    if(prev.error)return res(400,{ok:false,error:"Could not read existing consent"});

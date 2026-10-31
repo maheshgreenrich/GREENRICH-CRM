@@ -61,7 +61,7 @@
   return found.length===1?found[0]:'';
  };
  const customerTarget=c=>({id:'C:'+c.id,type:'Customer',name:c.name||'Unnamed customer',
-  mobile:c.mobile||'',email:c.email||'',source:c.source||'',tags:c.tag_ids||[],
+  mobile:/^[6-9][0-9]{9}$/.test(digits(c.mobile))?c.mobile:(/^[6-9][0-9]{9}$/.test(digits(c.mobile2))?c.mobile2:(c.mobile||c.mobile2||'')),email:c.email||'',source:c.source||'',tags:c.tag_ids||[],
   company_id:customerCompany(c),owner:c.owner||'',customer_id:c.id,lead_id:null,
   stage:'',product_id:'',created_at:c.created_at||'',products:ordersFor(c).map(o=>o.product_name),
   orders:ordersFor(c)});
@@ -558,7 +558,7 @@
  function settingsConsent(company,container){
   const connections=rows.connections.filter(x=>x.company_id===company&&x.provider==='socialberries');
   const contacts=[
-   ...rows.customers.map(x=>({id:'C:'+x.id,label:(x.name||'Customer')+' · '+(x.mobile||'No phone')})),
+   ...rows.customers.map(x=>({id:'C:'+x.id,label:(x.name||'Customer')+' · '+(customerTarget(x).mobile||'No phone')})),
    ...rows.leads.filter(x=>x.company_id===company).map(x=>({id:'L:'+company+':'+x.lead_id,label:(x.contact||x.title||'Lead')+' · '+(x.mobile||'No phone')}))
   ];
   if(!connections.length)return alert('Add a SocialBerries provider in this company first.','warning');
