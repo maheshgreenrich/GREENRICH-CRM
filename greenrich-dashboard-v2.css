@@ -177,3 +177,12 @@
  #content .gr2-panel{break-inside:avoid;box-shadow:none}
  #content .gr2-heading{background:#fff}
 }
+
+/* Source and product enquiries are paired, but remain individually readable. */
+#content .gr2-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+#content .gr2-split>div{min-width:0}
+#content .gr2-split>div+div{border-left:1px solid #edf1f8;padding-left:20px}
+#content .gr2-split h4{font-size:12px!important;color:#445e81!important;line-height:1.4;margin:0 0 14px!important;font-weight:750!important}
+#content .gr2-leader>div>strong small{display:block;text-align:right;font-weight:650;color:#268b72;font-size:10px}
+#content .gr2-leader>div>strong{line-height:1.35}
+@media(max-width:680px){#content .gr2-split{grid-template-columns:1fr;gap:15px}#content .gr2-split>div+div{padding:15px 0 0;border-left:0;border-top:1px solid #edf1f8}}
