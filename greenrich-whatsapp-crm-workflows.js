@@ -151,7 +151,9 @@
  const companyFieldWith=(id)=>'<label>Company<select name="company_id">'+app.companies.map(c=>'<option value="'+c+'" '+(c===id?'selected':'')+'>'+name(c)+'</option>').join('')+'</select></label>';
  function settingsDraw(container){
   if(!container?.isConnected)return;
-  let c=scope==='all'?app.companies[0]:scope;
+  // Settings owns its own company selector. "Both Companies" in the workspace
+  // is not a valid provider record: always work with one explicitly shown company.
+  let c=scope==='all'?(app.companies.includes('grow-india')?'grow-india':app.companies[0]):scope;
   const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c);
   container.innerHTML='<div class="grwc">'+
    '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
@@ -352,17 +354,43 @@
      });
  }
  function editProvider(c,slot,container){
+  // A provider slot belongs permanently to one company. The former form
+  // exposed company_id as an editable dropdown, allowing an Enviro row to be
+  // reassigned to Grow India's already-occupied slot (Postgres 23505).
+  if(!app.admin||!app.companies.includes(c)||![1,2].includes(slot))
+   return alert('You do not have permission to edit this company/provider slot.','error');
   const old=rows.connections.find(p=>p.company_id===c&&p.slot===slot);
-  dialog('Configure WhatsApp Tool '+slot,companyFieldWith(c)+
+  dialog('Configure WhatsApp Tool '+slot,
+   '<div class="grwc-feature grwc-span"><b>Company (fixed for Tool '+slot+')</b><p>'+esc(name(c))+'</p>'+
+   '<p>To edit another company, close this form and change the Company selector in WhatsApp Settings.</p></div>'+
    input('Provider name','display_name',old?.display_name||(slot===1?'SocialBerries':''))+
    input('Provider identifier','provider',old?.provider||(slot===1?'socialberries':''))+
    input('WhatsApp number','sender_phone',old?.sender_phone||'')+
    note('API documentation link / integration notes (no API keys)','notes',old?.notes||''),
-  async fd=>{
-   const x=Object.fromEntries(fd);x.slot=slot;x.enabled=false;x.setup_state='not_configured';
-   const r=old?await app.db.from('gr_wa_connections').update(x).eq('id',old.id):await app.db.from('gr_wa_connections').insert(x);
-   if(r.error)throw Error(r.error.message);
-  });
+   async fd=>{
+    const x={
+     company_id:c,slot,
+     display_name:String(fd.get('display_name')||'').trim(),
+     provider:String(fd.get('provider')||'').trim().toLowerCase(),
+     sender_phone:String(fd.get('sender_phone')||'').trim(),
+     notes:String(fd.get('notes')||'').trim(),
+     enabled:false,setup_state:'not_configured'
+    };
+    if(!x.display_name||!x.provider)throw Error('Provider name and identifier are required');
+    // ON CONFLICT updates the same (company_id,slot) row without changing
+    // its UUID or any dependent template/campaign references. No second row.
+    const r=await app.db.from('gr_wa_connections').upsert(x,{
+     onConflict:'company_id,slot',ignoreDuplicates:false
+    }).select('id,company_id,slot').single();
+    if(r.error){
+     if(r.error.code==='23505')throw Error('This company already has a Tool '+slot+'. Refresh Settings and edit its existing record.');
+     throw Error(r.error.message);
+    }
+    if(r.data?.company_id!==c||Number(r.data?.slot)!==slot)
+     throw Error('Provider company/slot verification failed. Reload Settings.');
+    await fetchAll();
+    if(container?.isConnected){scope=c;settingsDraw(container)}
+   });
  }
  function inboundDialog(c,container){
   const cons=rows.connections.filter(p=>p.company_id===c);
@@ -432,7 +460,9 @@
   };
  }
  async function mountSettings(element,ctx){
-  app=ctx;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:ctx.companies[0];
+  app=ctx;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)
+   ?ctx.selectedCompany
+   :(ctx.companies.includes('grow-india')?'grow-india':ctx.companies[0]);
   element.innerHTML='<p>Loading WhatsApp integration settings…</p>';
   try{await fetchAll();settingsDraw(element)}catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
  }
