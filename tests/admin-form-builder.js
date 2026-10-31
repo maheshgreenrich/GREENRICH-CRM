@@ -23,8 +23,8 @@ const custom={id:'custom_service_type',label:'Service type',type:'select',system
 title.push(custom);assert.ok(form.validate('customer',title));
 const duplicate=form.defaults('customer');duplicate.push({...duplicate[0]});
 assert.throws(()=>form.validate('customer',duplicate),/unique field key/);
-const cyc=form.defaults('lead_create');cyc.push({...custom,id:'custom_a',when:{field:'custom_b',operator:'equals',equals:'Yes'}},
- {...custom,id:'custom_b',when:{field:'custom_a',operator:'equals',equals:'Yes'}});
+const cyc=form.defaults('lead_create');cyc.push({...custom,id:'custom_loopa',when:{field:'custom_loopb',operator:'equals',equals:'Yes'}},
+ {...custom,id:'custom_loopb',when:{field:'custom_loopa',operator:'equals',equals:'Yes'}});
 assert.throws(()=>form.validate('lead_create',cyc),/loops/);
 const rls=[
  "gr_form_schemas enable row level security",
