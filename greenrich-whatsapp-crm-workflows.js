@@ -713,7 +713,8 @@
    '<p>To edit another company, close this form and change the Company selector in WhatsApp Settings.</p></div>'+
    input('Provider name','display_name',old?.display_name||(slot===1?'SocialBerries':''))+
    input('Provider identifier','provider',old?.provider||(slot===1?'socialberries':''))+
-   input('WhatsApp number','sender_phone',old?.sender_phone||'')+
+   input('Registered WhatsApp business sender (+91 followed by 10 digits)','sender_phone',old?.sender_phone||'')+
+   '<p class="grwc-muted grwc-span">Use the number registered to this company in SocialBerries. Campaign recipients are selected separately from CRM contacts.</p>'+
    note('API documentation link / integration notes (no API keys)','notes',old?.notes||''),
    async fd=>{
     const x={
@@ -725,6 +726,14 @@
      enabled:false,setup_state:'not_configured'
     };
     if(!x.display_name||!x.provider)throw Error('Provider name and identifier are required');
+    if(x.provider==='socialberries'){
+     const raw=x.sender_phone.replace(/[\s()\-]/g,'');
+     const digits=raw.replace(/^\+/,'');
+     const normalized=/^[6-9]\d{9}$/.test(digits)?'91'+digits:digits;
+     if(!/^91[6-9]\d{9}$/.test(normalized))
+      throw Error('Enter the exact registered 10-digit Indian WhatsApp business sender with +91. Do not add extra digits.');
+     x.sender_phone='+'+normalized;
+    }
     // ON CONFLICT updates the same (company_id,slot) row without changing
     // its UUID or any dependent template/campaign references. No second row.
     const r=await app.db.from('gr_wa_connections').upsert(x,{
