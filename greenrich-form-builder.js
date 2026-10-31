@@ -223,7 +223,7 @@ window.GreenRichFormBuilder=(()=>{
   const nodes=[...wrap.querySelectorAll('input,select,textarea')].filter(e=>e.name===field.id);
   if(nodes.length!==1||field.id==='customer_picker'||field.id==='tag_ids')return;
   const original=nodes[0];
-  if(form.id==='gr-ops-form'&&['button','heading'].includes(field.type))return; // ERP application actions remain server-defined
+  // Buttons/headings are visual-only until attached to an approved workflow.
   const simple=['text','email','tel','number','date','datetime-local','time','url'];
   if(original.tagName==='INPUT'&&simple.includes(field.type)){
    if(original.type!==field.type)try{original.type=field.type}catch{}
@@ -240,7 +240,7 @@ window.GreenRichFormBuilder=(()=>{
   }
   // ERP Operations forms use delegated handlers, so switching native controls
   // here is safe; CRM-specific composite controls keep their original bindings.
-  if(form.id!=='gr-ops-form'){
+  if(form.id!=='gr-ops-form'||['button','heading'].includes(field.type)){
    // CRM scripts can hold direct references to their inputs. Keep the native
    // control and use a display proxy instead of replacing its identity.
    wrap.querySelectorAll('[data-grfb-proxy]').forEach(n=>n.remove());
@@ -250,7 +250,7 @@ window.GreenRichFormBuilder=(()=>{
    let proxy;
    if(field.type==='heading'||field.type==='button'){
     proxy=document.createElement(field.type==='button'?'button':'h4');
-    if(field.type==='button')proxy.type='button';
+    if(field.type==='button'){proxy.type='button';proxy.disabled=true;proxy.title='Display-only: connect a workflow before using a custom action button.'}
     proxy.textContent=field.label;
    }else if(field.type==='textarea'){proxy=document.createElement('textarea');proxy.value=current}
    else if(field.type==='select'&&possible.length){
@@ -412,12 +412,12 @@ window.GreenRichFormBuilder=(()=>{
    let company=companyIds[0],key=KEYS[0],draft=schema(company,key),dirty=false;
    const message=notify||(()=>{});
    root.innerHTML='<div class="grfb"><div class="panel"><h2>Admin Form Builder</h2>'+
-    '<p>Design lead capture, lead stage updates, customer and Sales Order questions yourself. Employee forms use the saved company-specific configuration.</p>'+
+    '<p>Design CRM and ERP Operations questions yourself, including native field appearance and multiple conditional rules. Employee forms use the saved company-specific configuration.</p>'+
     '<div class="grfb-top"><label>Company<select id="grfb-company">'+optionsList(companyIds)+'</select></label>'+
     '<label>Form<select id="grfb-form">'+KEYS.map(k=>'<option value="'+k+'">'+esc(TITLES[k])+'</option>').join('')+'</select></label>'+
     '<button type="button" data-grfb="new">+ Add Question</button>'+
     '<button type="button" data-grfb="save" class="grfb-primary">Save & Publish</button></div>'+
-    '<p class="grfb-instruction">Reorder using ↑ ↓ or drag-and-drop. Edit question labels, visibility, required status, layout and rules. System-required questions are locked to protect live sales and CRM data. New questions are saved in the secure custom answers history.</p></div>'+
+    '<p class="grfb-instruction">Reorder using ↑ ↓ or drag-and-drop. Edit question labels, visibility, required status, layout and rules. Fields are design-editable by Admin. Core ERP/CRM data rules (stock, identity, required sales data, approvals) still apply at save time. New questions are saved in the secure custom answers history.</p></div>'+
     '<div class="grfb-layout"><div class="grfb-editor panel"><div class="grfb-heading"><h3>Configure questions</h3><span id="grfb-unsaved"></span></div><div id="grfb-fields"></div></div>'+
     '<div class="grfb-preview panel"><h3>Live form preview</h3><p>Preview shows the visual layout and conditions; actual CRM records are unchanged until Save & Publish.</p><div id="grfb-preview"></div>'+
     '<button type="button" data-grfb="reset">Reset unsaved edits</button></div></div>'+
