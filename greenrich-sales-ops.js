@@ -136,7 +136,7 @@
   }
  };
  function renderSales(){
-  if(!root||!q('#sales-table'))return;
+  if(!root?.isConnected||!q('#sales-table')||!q('#orders-table-head')||!q('#sales-count')||!q('#orders-filter-summary'))return;
   updateChoices();
   const sales=filteredSales(),stats=report(sales),cols=getSelectedColumns();
   q('#orders-table-head').innerHTML='<tr>'+cols.map(key=>'<th scope="col">'+esc(dataColumns.find(c=>c[0]===key)?.[1]||key)+'</th>').join('')+'</tr>';
@@ -154,7 +154,7 @@
  }
  const delayedRefresh=async()=>{if(loading)return loading;loading=refreshDispatch();try{return await loading}finally{loading=null}};
  function renderDispatch(){
-  if(!q('#dispatch-table'))return;
+  if(!root?.isConnected||!q('#dispatch-table')||!q('#dispatch-metrics')||!q('#dispatch-count'))return;
   const term=text(q('#dispatch-search')?.value).toLowerCase(),status=q('#dispatch-status-filter')?.value||'all',company=q('#dispatch-company-filter')?.value||'all';
   const list=dispatchRows.filter(r=>allowed.includes(r.company_id)&&(status==='all'||r.status===status)&&(company==='all'||r.company_id===company)&&
    (!term||[r.order_id,r.platform_order_id,r.company_id,r.customer_name,r.customer_mobile,r.customer_email,r.product_name,r.sku,r.courier_name,r.tracking_number,r.invoice_number].some(x=>String(x??'').toLowerCase().includes(term))));
