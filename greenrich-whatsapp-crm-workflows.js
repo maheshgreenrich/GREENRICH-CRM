@@ -93,7 +93,7 @@
   (x.type==='Customer'||x.company_id===companyId)&&digits(x.mobile).length===10);
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
- '<div class="grwc-notice">Provider authentication and automatic template-list sync have not been verified. Existing templates can be linked by ID for campaign drafts; message content must come from SocialBerries. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
+ '<div class="grwc-notice">Sending requires real customer marketing opt-in, a complete approved MARKETING template, and administrator activation of the SocialBerries gateway. Saving a draft does not send a message. Use Review / Send to see the outstanding steps.</div>'+
  '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
@@ -138,7 +138,7 @@
    (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Attempts</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
    relevant.map(x=>{
     const attempts=messages.filter(m=>m.campaign_id===x.id);
-    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td><button type="button" data-review-campaign="'+esc(x.id)+'">Review / Send</button></td></tr>';
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td><button type="button" data-review-campaign="'+esc(x.id)+'">Review / Send</button> <button type="button" data-consent-campaign="'+esc(x.id)+'">Record opt-in</button></td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
    '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
    (app.admin?'<button type="button" data-provider-report>View SocialBerries native bulk statistics</button>':'')+
@@ -230,7 +230,25 @@
  }
  function marketingDraw(){
   if(!root?.isConnected)return;
+  const previous=root.querySelector('#grwc-audience-form');
+  const remembered=previous?{
+   connection:previous.elements.connection_id?.value||'',
+   template:previous.elements.template_id?.value||'',
+   campaign:previous.elements.name?.value||''
+  }:null;
   root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='welcome'?welcomeView():current==='recurring'?recurringView():inboundView())+'</div>';
+  const form=root.querySelector('#grwc-audience-form');
+  if(form&&remembered){
+   const prov=form.elements.connection_id;
+   if(Array.from(prov.options).some(o=>o.value===remembered.connection)){
+    prov.value=remembered.connection;
+    const company=campaignConnection(remembered.connection)?.company_id||'';
+    const tpl=form.elements.template_id;
+    tpl.innerHTML=options(templateOptions(company,remembered.connection),'Choose a template for this provider');
+    if(Array.from(tpl.options).some(o=>o.value===remembered.template))tpl.value=remembered.template;
+   }
+   form.elements.name.value=remembered.campaign;
+  }
  }
  const input=(label,key,value='',type='text')=>'<label>'+esc(label)+'<input name="'+esc(key)+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const note=(label,key,v='')=>'<label class="grwc-span">'+esc(label)+'<textarea name="'+esc(key)+'" rows="3">'+esc(v)+'</textarea></label>';
@@ -671,26 +689,30 @@
    await fetchAll();marketingDraw();
   }catch(e){alert(e.message,'error')}
  }
- function recordOptIn(){
-  const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
-  const companyId=campaignConnection(connectionId)?.company_id,people=companyId?campaignTargets(companyId):[];
-  if(!companyId)return alert('Select a WhatsApp provider first.','warning');
-  if(people.length!==1)return alert('Select exactly one customer or matching-company lead first.','warning');
-  const person=people[0];
-  const fields='<p class="grwc-muted grwc-span">Record explicit marketing permission already given by '+esc(person.name)+'. A CRM phone number is not permission to send marketing.</p>'+
-   '<label class="grwc-span">Opt-in source<input name="source" required minlength="12" placeholder="e.g. Website WhatsApp marketing checkbox"></label>'+
-   '<label class="grwc-span">Evidence<textarea name="evidence" rows="3" required minlength="10" placeholder="Date, form or other evidence of explicit consent"></textarea></label>'+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirm this contact explicitly opted in to WhatsApp marketing</label>'+
-   '<label class="grwc-span"><input type="checkbox" name="new"> New opt-in was obtained after a previous opt-out (if applicable)</label>';
-  dialog('Record WhatsApp marketing consent',fields,async f=>{
-   await secureSend('record_consent',{connection_id:connectionId,contact_key:person.id,
+ function recordOptIn(campaign=null){
+  const form=root?.querySelector('#grwc-audience-form');
+  const connectionId=campaign?.connection_id||form?.elements.connection_id?.value||'';
+  const companyId=campaignConnection(connectionId)?.company_id;
+  if(!companyId)return alert('Choose WhatsApp provider first.','warning');
+  const keys=new Set(campaign?.audience?.crm_ids||[...selected]);
+  const recipients=targets().filter(x=>keys.has(x.id)&&
+   (x.type==='Customer'||x.company_id===companyId)&&digits(x.mobile).length===10);
+  if(!recipients.length)return alert('No saved CRM contacts with valid phone numbers were found in the currently loaded list.','warning');
+  const fields='<p class="grwc-muted grwc-span">Only record explicit marketing permission the customer has already given. An existing CRM phone number does not prove permission. Sender: '+esc(name(companyId))+'.</p>'+
+   field('Customer / Lead','contact_key',options(recipients.map(x=>[x.id,x.name+' · '+x.mobile]),'Choose one contact'),true)+
+   '<label class="grwc-span">Permission source<input name="source" required minlength="12" placeholder="e.g. WhatsApp marketing checkbox on website"></label>'+
+   '<label class="grwc-span">Evidence<textarea name="evidence" rows="3" required minlength="10" placeholder="When and how customer agreed"></textarea></label>'+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirm this person explicitly opted in to WhatsApp marketing</label>'+
+   '<label class="grwc-span"><input type="checkbox" name="new"> Fresh opt-in after an earlier opt-out (only if applicable)</label>';
+  dialog('Record WhatsApp marketing opt-in',fields,async f=>{
+   await secureSend('record_consent',{connection_id:connectionId,contact_key:String(f.get('contact_key')||''),
     consent_source:String(f.get('source')||''),evidence_note:String(f.get('evidence')||''),
     attested:f.has('attested'),new_opt_in:f.has('new')});
-  },'Record opt-in','Marketing permission evidence recorded');
+  },'Record opt-in','Customer marketing permission recorded');
  }
- function confirmTemplate(){
-  const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
-  const templateId=form?.elements.template_id.value||'',t=rows.templates.find(x=>x.id===templateId&&x.connection_id===connectionId);
+ function confirmTemplate(campaign=null){
+  const form=root?.querySelector('#grwc-audience-form'),connectionId=campaign?.connection_id||form?.elements.connection_id?.value||'';
+  const templateId=campaign?.template_id||form?.elements.template_id?.value||'',t=rows.templates.find(x=>x.id===templateId&&x.connection_id===connectionId);
   if(!t)return alert('Select a marketing template first.','warning');
   const fields='<p class="grwc-muted grwc-span">Verify this template in your actual SocialBerries account and paste its complete APPROVED MARKETING JSON with BODY text and any IMAGE header. This records an administrator attestation, not an API verification.</p>'+
    '<p class="grwc-muted grwc-span">Template: '+esc(t.name)+' · Provider ID: '+esc(t.provider_template_id||'—')+'</p>'+
@@ -714,6 +736,7 @@
    if(e.target.closest('[data-confirm-template]')){await confirmTemplate();return}
    if(e.target.closest('[data-save-and-review]')){const form=element.querySelector('#grwc-audience-form');if(form){form.dataset.reviewAfter='1';form.requestSubmit()}return}
    const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
+   const optin=e.target.closest('[data-consent-campaign]');if(optin){const row=rows.campaigns.find(c=>c.id===optin.dataset.consentCampaign);if(row)recordOptIn(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-refresh-crm]')){try{await fetchAll();marketingDraw();alert('Latest GreenRich template references and CRM data loaded. SocialBerries automatic template API is not connected.','success')}catch(error){alert(error.message,'error')}return}
