@@ -102,11 +102,15 @@ window.GreenRichFormBuilder=(()=>{
    }
   }
   for(const sys of system.values())if(!ids.has(sys.id))throw Error('Built-in question '+sys.label+' cannot be removed.');
-  // No cycles among conditional questions.
-  for(const item of fields){const seen=new Set();let current=item;while(current?.when?.field){
-   if(seen.has(current.id))throw Error('Conditional questions cannot contain loops.');
-   seen.add(current.id);current=fields.find(f=>f.id===current.when.field);
-  }}
+  // No conditional dependency cycles, including ALL/ANY rule branches.
+  const deps=item=>(Array.isArray(item.conditions?.rules)&&item.conditions.rules.length?
+   item.conditions.rules.map(r=>r.field):item.when?.field?[item.when.field]:[]).filter(Boolean);
+  const visit=(id,seen=new Set())=>{
+   if(seen.has(id))throw Error('Conditional questions cannot contain loops.');
+   const next=new Set(seen);next.add(id);
+   for(const source of deps(fields.find(f=>f.id===id)||{}))visit(source,next);
+  };
+  for(const item of fields)visit(item.id);
   return fields;
  }
  const nativeWrap=(form,id)=>{
@@ -145,36 +149,66 @@ window.GreenRichFormBuilder=(()=>{
   return label;
  };
  const keyForForm=new WeakMap();
+ // WordPress-style multi-rule conditional engine, deliberately no eval/JS.
+ const OPERATORS=['equals','not_equals','contains','not_contains','filled','empty','greater','less','greater_equal','less_equal','in_list'];
+ function matchesRule(value,rule){
+  const original=String(value??'').trim(),compare=String(rule.value??'').trim(),v=original.toLowerCase(),t=compare.toLowerCase();
+  if(rule.operator==='filled')return !!original;
+  if(rule.operator==='empty')return !original;
+  if(rule.operator==='equals')return v===t;
+  if(rule.operator==='not_equals')return v!==t;
+  if(rule.operator==='contains')return v.includes(t);
+  if(rule.operator==='not_contains')return !v.includes(t);
+  if(rule.operator==='in_list')return compare.split(',').map(x=>x.trim().toLowerCase()).includes(v);
+  const x=Number(original),y=Number(compare);
+  if(!original||!compare||!Number.isFinite(x)||!Number.isFinite(y))return false;
+  return rule.operator==='greater'?x>y:rule.operator==='less'?x<y:
+   rule.operator==='greater_equal'?x>=y:rule.operator==='less_equal'?x<=y:false;
+ }
+ const rulesFor=f=>Array.isArray(f.conditions?.rules)&&f.conditions.rules.length?f.conditions.rules:
+  f.when?.field?[{field:f.when.field,operator:f.when.operator||'equals',value:f.when.equals||''}]:[];
+ function matchesCondition(field,read){
+  const rules=rulesFor(field);if(!rules.length)return true;
+  const results=rules.map(rule=>{
+   const current=read(rule.field);if(current===null)return false;
+   if(Array.isArray(current)){
+    if(rule.operator==='filled')return current.length>0;
+    if(rule.operator==='empty')return current.length===0;
+    return current.some(v=>matchesRule(v,rule));
+   }
+   return matchesRule(current,rule);
+  });
+  return field.conditions?.match==='any'?results.some(Boolean):results.every(Boolean);
+ }
  function showConditions(form,fields){
-  const visibleField=id=>{
+  const read=id=>{
    const wrap=form.querySelector('[data-grfb-field="'+id+'"]');
-   if(!wrap||wrap.hidden)return '';
-   const nodes=[...wrap.querySelectorAll('[name]')].filter(e=>e.name===id&&!e.disabled);
-   if(nodes.some(e=>e.type==='checkbox'||e.type==='radio'))return nodes.filter(e=>e.checked).map(e=>e.value).join(',');
-   return nodes[0]?.value||'';
+   if(wrap?.hidden)return null;
+   const nodes=[...((wrap||form).querySelectorAll('[name]'))].filter(x=>x.name===id);
+   if(!nodes.length)return '';
+   if(nodes.some(x=>x.type==='checkbox'||x.type==='radio'))return nodes.filter(x=>x.checked).map(x=>x.value);
+   return nodes[0].value||'';
   };
-  for(const field of fields){
-   const wrap=form.querySelector('[data-grfb-field="'+field.id+'"]');if(!wrap)continue;
-   let show=field.visible!==false;
-   if(keyForForm.get(form)==='lead_stage'){
-    const stage=form.querySelector('[name=stage]')?.value||'';
-    if(field.id==='due'||field.id==='heat')show=show&&!['Won','Lost'].includes(stage);
-    if(field.id==='order'||field.id==='order_search')show=show&&stage==='Won';
+  for(let pass=0;pass<=fields.length;pass++){
+   let changed=false;
+   for(const field of fields){
+    const wrap=form.querySelector('[data-grfb-field="'+field.id+'"]');if(!wrap)continue;
+    let show=field.visible!==false;
+    if(keyForForm.get(form)==='lead_stage'){
+     const stage=form.querySelector('[name=stage]')?.value||'';
+     if(field.id==='due'||field.id==='heat')show=show&&!['Won','Lost'].includes(stage);
+     if(field.id==='order'||field.id==='order_search')show=show&&stage==='Won';
+    }
+    show=show&&matchesCondition(field,read);
+    if(wrap.hidden!==!show){changed=true;wrap.hidden=!show}
+    wrap.classList.toggle('grfb-hidden',!show);
+    for(const input of wrap.querySelectorAll('input,select,textarea')){
+     if(input.name!==field.id||input.dataset.grfbReadOnly==='1')continue;
+     input.disabled=!show;
+     if(!['radio','checkbox'].includes(input.type))input.required=show&&field.required!==false;
+    }
    }
-   if(show&&field.when?.field){
-    // Conditions may depend on built-in questions (e.g. Lead priority Hot).
-    const src=form.querySelector('[name="'+field.when.field+'"]');
-    const current=visibleField(field.when.field)||(src?.value||'');
-    show=field.when.operator==='not_equals'?current!==field.when.equals:current===field.when.equals;
-   }
-   wrap.hidden=!show;wrap.classList.toggle('grfb-hidden',!show);
-   for(const control of wrap.querySelectorAll('input,select,textarea')){
-    if(control.name!==field.id||control.dataset.grfbReadOnly==='1')continue;
-    control.disabled=!show;
-    if(field.type==='radio'||field.type==='checkbox'){continue}
-    // Never lower built-in backend requirements.
-    if(!field.protected)control.required=show&&!!field.required;
-   }
+   if(!changed)break;
   }
  }
  function decorate(form,company,key,values={}){
