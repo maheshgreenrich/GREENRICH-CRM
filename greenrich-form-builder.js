@@ -398,18 +398,28 @@ window.GreenRichFormBuilder=(()=>{
    };
    $('#grfb-company').addEventListener('change',switchTo);$('#grfb-form').addEventListener('change',switchTo);
    els.addEventListener('input',event=>{
+    const ruleInput=event.target.closest('[data-rule-part]');
+    if(ruleInput){
+     const row=ruleInput.closest('[data-index]'),field=row&&draft[Number(row.dataset.index)];
+     const index=Number(ruleInput.dataset.ruleIndex),part=ruleInput.dataset.rulePart;
+     if(!field?.conditions?.rules?.[index])return;
+     field.conditions.rules[index][part]=ruleInput.value;
+     field.when=null;mark();return;
+    }
     const row=event.target.closest('[data-index]'),field=row&&draft[Number(row.dataset.index)];if(!field)return;
     const id=event.target.dataset.edit;if(!id)return;
     const value=event.target.type==='checkbox'?event.target.checked:event.target.value;
     if(id==='label'||id==='placeholder'||id==='layout')field[id]=value;
-    else if(id==='visible'||id==='required'){if(!field.protected)field[id]=value}
+    else if(id==='visible'||id==='required')field[id]=value
     else if(id==='options')field.options=value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-    else if(id==='when_field'){field.when=value?{field:value,equals:field.when?.equals||'',operator:field.when?.operator||'equals'}:null}
-    else if(id==='when_equals'||id==='when_operator'){field.when=field.when||null;if(field.when)field.when[id==='when_equals'?'equals':'operator']=value}
-    else if(id==='type'&&!field.system){field.type=value;if(['select','radio','checkbox'].includes(value)&&!field.options?.length)field.options=['Option 1','Option 2'];}
+    else if(id==='rules_match'){field.conditions=field.conditions||{match:'all',rules:[]};field.conditions.match=value}
+    else if(id==='type'){field.type=value;if(['select','radio','checkbox'].includes(value)&&!field.options?.length&&!field.system)field.options=['Option 1','Option 2'];}
     mark();
    });
-   els.addEventListener('change',event=>{if(event.target.dataset.edit==='type')redraw()});
+   els.addEventListener('change',event=>{
+    if(event.target.dataset.rulePart==='operator')redraw();
+    else if(event.target.dataset.edit==='type')redraw();
+   });
    const reorder=(from,to)=>{
     if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=draft.length||to>=draft.length||from===to)return;
     const [moved]=draft.splice(from,1);draft.splice(to,0,moved);mark();redraw();
@@ -419,6 +429,20 @@ window.GreenRichFormBuilder=(()=>{
     const i=Number(b.dataset.index),op=b.dataset.op;
     if(op==='up')reorder(i,i-1);if(op==='down')reorder(i,i+1);
     if(op==='delete'&&!draft[i].system){draft.splice(i,1);mark();redraw()}
+    if(op==='add-rule'){
+     const f=draft[i];if(!f)return;
+     f.conditions=f.conditions||{match:'all',rules:[]};
+     if(!f.conditions.rules.length&&f.when?.field){
+      f.conditions.rules.push({field:f.when.field,operator:f.when.operator||'equals',value:f.when.equals||''});f.when=null;
+     }
+     if(f.conditions.rules.length>=10){message('Maximum 10 conditions per question');return}
+     f.conditions.rules.push({field:'',operator:'equals',value:''});mark();redraw();
+    }
+    if(op==='remove-rule'){
+     const f=draft[i],n=Number(b.dataset.ruleIndex);if(!f)return;
+     if(!f.conditions?.rules?.length&&f.when?.field){f.conditions={match:'all',rules:rulesFor(f)};f.when=null}
+     if(f.conditions?.rules?.[n]){f.conditions.rules.splice(n,1);mark();redraw()}
+    }
    });
    let dragging=-1;els.addEventListener('dragstart',e=>{const item=e.target.closest('[data-index]');dragging=item?Number(item.dataset.index):-1});
    els.addEventListener('dragover',e=>{if(e.target.closest('[data-index]'))e.preventDefault()});
