@@ -871,7 +871,7 @@
       .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
      if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
     }
-    if(reviewAfter)await reviewCampaign(record);
+    if(reviewAfter)await reviewCampaign({id:record.id,connection_id:connectionId});
     else alert('Campaign draft saved for '+matches.length+' selected CRM contacts. '+eligible.length+' have recorded marketing consent. No messages sent. Use Review / Send after verification.','success');
     await fetchAll();marketingDraw();
    }catch(error){
