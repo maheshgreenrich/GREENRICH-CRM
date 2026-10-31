@@ -363,6 +363,7 @@ async function settings(c){
   openUsers:host=>users(host),
   openRoles:host=>permissionPage(host),
    openTags:host=>window.GreenRichCustomerTags.mount(host,{db,notify:toast}),
+  openFormBuilder:host=>window.GreenRichFormBuilder.mount(host,{client:db,companyIds:window.GreenRichCompanies.allowed(),notify:toast}),
   openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
