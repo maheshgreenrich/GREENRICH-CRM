@@ -240,7 +240,51 @@ window.GreenRichFormBuilder=(()=>{
   }
   // ERP Operations forms use delegated handlers, so switching native controls
   // here is safe; CRM-specific composite controls keep their original bindings.
-  if(form.id!=='gr-ops-form')return;
+  if(form.id!=='gr-ops-form'){
+   // CRM scripts can hold direct references to their inputs. Keep the native
+   // control and use a display proxy instead of replacing its identity.
+   wrap.querySelectorAll('[data-grfb-proxy]').forEach(n=>n.remove());
+   original.style.display='';
+   const current=original.value||'',possible=field.options?.length?field.options:
+    original.tagName==='SELECT'?[...original.options].filter(o=>o.value).map(o=>o.value):[];
+   let proxy;
+   if(field.type==='heading'||field.type==='button'){
+    proxy=document.createElement(field.type==='button'?'button':'h4');
+    if(field.type==='button')proxy.type='button';
+    proxy.textContent=field.label;
+   }else if(field.type==='textarea'){proxy=document.createElement('textarea');proxy.value=current}
+   else if(field.type==='select'&&possible.length){
+    proxy=document.createElement('select');proxy.append(new Option('Choose',''));
+    possible.forEach(v=>proxy.append(new Option(v,v)));proxy.value=current;
+   }else if(['radio','checkbox'].includes(field.type)&&possible.length){
+    proxy=document.createElement('span');proxy.className='grfb-native-choices';
+    possible.forEach(v=>{
+     const item=document.createElement('span');item.className='grfb-option';
+     const toggle=document.createElement('input');toggle.type=field.type;toggle.value=v;
+     toggle.checked=v===current;item.append(toggle,document.createTextNode(v));proxy.append(item);
+    });
+   }else if(simple.includes(field.type)){
+    proxy=document.createElement('input');proxy.type=field.type;proxy.value=current;
+   }
+   if(!proxy)return;
+   proxy.dataset.grfbProxy='1';
+   const update=()=>{
+    const value=['radio','checkbox'].includes(field.type)?
+     [...proxy.querySelectorAll('input:checked')].map(n=>n.value).join(','):
+     ('value'in proxy?proxy.value:'');
+    if(original.value!==value){
+     original.value=value;original.dispatchEvent(new Event('input',{bubbles:true}));
+     original.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+   };
+   proxy.addEventListener('input',update);proxy.addEventListener('change',update);
+   original.style.display='none';wrap.append(proxy);
+   Promise.resolve().then(()=>{if(!proxy.isConnected)return;
+    if('value'in proxy)proxy.value=original.value;
+    else proxy.querySelectorAll('input').forEach(el=>el.checked=original.value===el.value);
+   });
+   return;
+  }
   const prev=original.value||'',identity={id:original.id,name:original.name};
   let next;
   if(field.type==='textarea'){
@@ -276,6 +320,10 @@ window.GreenRichFormBuilder=(()=>{
   for(const f of fields){
    let wrap=f.system?nativeWrap(form,f.id):customTag(f);
    if(!wrap)continue;
+   if(f.system){
+    wrap.querySelectorAll('[data-grfb-proxy]').forEach(el=>el.remove());
+    [...wrap.querySelectorAll('[name]')].filter(n=>n.name===f.id).forEach(n=>{n.style.display=''});
+   }
    if(!f.system){wrap.dataset.grfbCustom='yes';}
    // Composite controls retain their CRM layout container, but their
    // visibility and conditions must still respond to Admin settings.
