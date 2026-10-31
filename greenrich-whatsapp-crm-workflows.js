@@ -335,10 +335,10 @@
   // Settings owns its own company selector. "Both Companies" in the workspace
   // is not a valid provider record: always work with one explicitly shown company.
   let c=scope==='all'?(app.companies.includes('grow-india')?'grow-india':app.companies[0]):scope;
-  const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c);
+  const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c),opted=rows.consents.filter(w=>w.company_id===c&&w.consent_status==='opted_in'&&w.consent_source&&w.consent_at&&!w.opt_out_at).length,approved=templ.filter(t=>t.category==='marketing'&&t.provider_approval==='approved'&&['verified_provider','admin_confirmed'].includes(t.provider_source)).length;
   container.innerHTML='<div class="grwc">'+
    '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
-   '<div class="grwc-notice"><b>Documented API found:</b> SocialBerries supports HTTP Basic authorization and read-only users/batch endpoints, template messages and bulk campaigns. Connection test uses a read-only call. Provider host and credentials are still required in secure Supabase Secrets; sending and inbound webhooks remain disabled. Never enter passwords or API keys in this page.</div>'+
+   '<div class="grwc-notice"><b>WhatsApp Marketing setup:</b> '+opted+' recorded opt-in(s) · '+approved+' confirmed MARKETING template(s) for '+esc(name(c))+'. Complete these one-time setup steps below. Marketing stays a simple Send Campaign page. API credentials stay in Supabase Secrets.</div>'+
    sel('Company','grwc-settings-company',app.companies.map(c=>[c,name(c)]),c,null)+
    '<section class="grwc-panel">'+headers('1 · Your WhatsApp providers','GreenRich uses SocialBerries for existing templates and delivery. The second provider is optional.')+
    '<div class="grwc-grid">'+[1,2].map(slot=>{
@@ -362,6 +362,10 @@
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
    (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Screenshot: APPROVED · API unverified':'Not API-verified · '+(t.body?'Preview recorded':'Metadata only'))+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
+    '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
+    '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-settings-confirm-template>Confirm existing approved template</button></div></div>'+
+    '<p class="grwc-muted">CRM contacts and Meta leads are not automatically opted in. Record genuine permission once for the correct sending company; future campaigns reuse it.</p></section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
    '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
@@ -390,6 +394,8 @@
    const sync=e.target.closest('[data-sync-provider-leads]'),importLead=e.target.closest('[data-import-provider-lead]');
    if(sync)return await syncProviderLeads(sync.dataset.syncProviderLeads,container);
    if(importLead)return importStagedLead(importLead.dataset.importProviderLead,container);
+   if(e.target.closest('[data-settings-optin]'))return settingsConsent(c,container);
+   if(e.target.closest('[data-settings-confirm-template]'))return settingsTemplateApproval(c,container);
    if(e.target.closest('[data-import-template-metadata]'))return importTemplateMetadata(c,container);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
@@ -548,6 +554,48 @@
     else alert('No new lead created: '+String(outcome.status||'Unknown result')+'. Existing CRM record kept unchanged.','info');
     await fetchAll();settingsDraw(container);
    });
+ }
+ function settingsConsent(company,container){
+  const connections=rows.connections.filter(x=>x.company_id===company&&x.provider==='socialberries');
+  const contacts=[
+   ...rows.customers.map(x=>({id:'C:'+x.id,label:(x.name||'Customer')+' · '+(x.mobile||'No phone')})),
+   ...rows.leads.filter(x=>x.company_id===company).map(x=>({id:'L:'+company+':'+x.lead_id,label:(x.contact||x.title||'Lead')+' · '+(x.mobile||'No phone')}))
+  ];
+  if(!connections.length)return alert('Add a SocialBerries provider in this company first.','warning');
+  if(!contacts.length)return alert('No customer or lead is available in this CRM.','warning');
+  dialog('Record existing WhatsApp marketing permission',
+   '<p class="grwc-muted grwc-span">Only record explicit permission the person has already given. Being in CRM or filling an enquiry form does not itself prove WhatsApp marketing permission.</p>'+
+   field('SocialBerries provider','connection_id',options(connections.map(x=>[x.id,x.display_name]),'Choose provider'),true)+
+   field('Customer / Lead','contact_key',options(contacts.map(x=>[x.id,x.label]),'Choose contact'),true)+
+   input('Source of permission','consent_source','')+
+   note('When / how they agreed','evidence_note','')+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> The customer explicitly agreed to WhatsApp marketing</label>'+
+   '<label class="grwc-span"><input type="checkbox" name="new_opt_in"> They gave fresh permission after opting out (only if true)</label>',
+   async f=>{
+    await secureSend('record_consent',{connection_id:String(f.get('connection_id')||''),
+     contact_key:String(f.get('contact_key')||''),consent_source:String(f.get('consent_source')||''),
+     evidence_note:String(f.get('evidence_note')||''),attested:f.has('attested'),
+     new_opt_in:f.has('new_opt_in')});
+    await fetchAll();settingsDraw(container);
+   },'Save permission','Marketing permission recorded for this sending company.');
+ }
+ function settingsTemplateApproval(company,container){
+  const list=rows.templates.filter(x=>x.company_id===company&&x.category==='marketing');
+  if(!list.length)return alert('Import your existing approved marketing template under Templates first.','warning');
+  dialog('Confirm provider-approved MARKETING template',
+   '<p class="grwc-muted grwc-span">Copy complete APPROVED template JSON including ID, language, category, BODY and any IMAGE HEADER from the actual SocialBerries/Meta account. This records administrator confirmation, not an API check.</p>'+
+   field('Existing marketing template','template_id',options(list.map(x=>[x.id,x.name+' · '+x.provider_template_id]),'Choose template'),true)+
+   note('Full approved template JSON','approved_json','')+
+   note('Approval evidence: who verified, where, when','confirmation_note','')+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirmed this template is approved in SocialBerries</label>',
+   async f=>{
+    const id=String(f.get('template_id')||''),t=list.find(x=>x.id===id);
+    if(!t)throw Error('Choose an existing marketing template');
+    await secureSend('confirm_template',{connection_id:t.connection_id,template_id:id,
+     approved_json:String(f.get('approved_json')||''),confirmation_note:String(f.get('confirmation_note')||''),
+     attested:f.has('attested')});
+    await fetchAll();settingsDraw(container);
+   },'Confirm template','Approved marketing-template details confirmed. No message sent.');
  }
  function importTemplateMetadata(company,container){
   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
@@ -881,11 +929,11 @@
     sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
    // Validate the ready-to-send prerequisites before creating a draft.
    // This prevents unusable duplicate drafts when a customer presses Send.
-   if(!eligible.length)return alert('Cannot send: selected customers have no recorded WhatsApp marketing permission.','warning');
+   if(!eligible.length)return alert('Cannot send: '+matches.length+' selected recipient(s), but 0 have recorded marketing permission for '+name(companyId)+'. Record genuine permission once in Settings → WhatsApp Integration. Nothing was sent.','warning');
    const verified=template.provider_approval==='approved'&&
     ['verified_provider','admin_confirmed'].includes(template.provider_source)&&
     template.provider_preview?.status==='APPROVED'&&Array.isArray(template.provider_preview?.components)&&!!template.body;
-   if(!verified)return alert('Cannot send: this marketing template is not verified in your SocialBerries connection. Complete setup in Settings.','warning');
+   if(!verified)return alert('Cannot send: this template is only a reference, not confirmed full approved MARKETING content. Complete it once in Settings → WhatsApp Integration. Nothing was sent.','warning');
    const header=template.provider_preview.components.find(c=>String(c.type).toUpperCase()==='HEADER');
    if(hasFile&&String(header?.format).toUpperCase()!=='IMAGE')
     return alert('This template has no approved image header. Remove the image or choose an image template.','warning');
