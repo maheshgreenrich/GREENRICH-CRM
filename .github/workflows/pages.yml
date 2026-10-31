@@ -67,6 +67,7 @@ jobs:
           node --check greenrich-shared-customers.js
           node tests/shared-customers-and-tags.js
           node tests/sales-workflow-regression.js
+          node tests/lead-due-pulse-convert-stock-release.js
           node tests/sales-overview-dashboard.js
           node tests/channel-dashboard-drilldown.js
           node tests/employee-company-access.js
