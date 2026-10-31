@@ -20,7 +20,7 @@
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
  const scoped=(a)=>a.filter(x=>scope==='all'||x.company_id===scope);
- const companyField=(selected='')=>'<label>Company<select name="company_id" required>'+app.companies.map(c=>'<option value="'+c+'" '+(c===selected?'selected':'')+'>'+esc(name(c))+'</option>').join('')+'</select></label>';
+ const campaignConnection=id=>rows.connections.find(c=>c.id===id&&app.companies.includes(c.company_id));
  async function fetchAll(){
   if(!app?.db)return;
   const db=app.db,cs=app.companies,read=async(table,cols='*',filter='company_id')=>{
@@ -86,12 +86,16 @@
    (!needle||[x.name,x.mobile,x.email,x.source,x.type,x.stage].some(v=>String(v||'').toLowerCase().includes(needle)))
   );
  }
+ // CRM customers can be shared across both companies, including older unassigned records.
+ // Provider determines sender company; leads stay company-scoped.
+ const campaignTargets=companyId=>audience().filter(x=>selected.has(x.id)&&
+  (x.type==='Customer'||x.company_id===companyId)&&digits(x.mobile).length===10);
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
  '<div class="grwc-notice">Provider authentication and automatic template-list sync have not been verified. Existing templates can be linked by ID for campaign drafts; message content must come from SocialBerries. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
  '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
-  const list=audience(),co=cd(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
+  const list=audience(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
   const chosen=[...selected].filter(x=>ids.has(x));selected=new Set(chosen);
   return '<section class="grwc-panel">'+headers('CRM audience selection','Filter Leads and Customers from GreenRich ONE; no contact upload required to build an audience.')+
    '<div class="grwc-filters">'+
@@ -109,14 +113,14 @@
    '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">The top Company dropdown is only an audience filter. You may leave it on Both companies. The campaign Company below determines the sending company and only selected contacts linked to that company are included in its draft. Records without a verified company association are skipped. Showing the first 250 of '+list.length+' loaded matches; more CRM rows may exist. Marketing consent is not inferred from a CRM record.</p></section>'+
+   '<p class="grwc-muted">The Company filter above is optional. Leave Both companies to select old customers without a company assignment. The chosen WhatsApp provider automatically identifies the sender company. Customers may be included regardless of previous company association, while leads must belong to the sender company. Only the first 250 of '+list.length+' loaded matches are displayed. Sending still requires recorded marketing opt-in and a verified provider connection.</p></section>'+
    '<section class="grwc-panel">'+headers('Choose existing SocialBerries template','Templates come from the provider catalog when the API connection is verified. Unverified CRM references cannot send messages.')+
-   '<form id="grwc-audience-form" class="grwc-form">'+companyField(co)+
-   '<label>WhatsApp tool<select name="connection_id" required>'+options(rows.connections.filter(x=>x.company_id===co).map(x=>[x.id,x.display_name]),'Select provider')+'</select></label>'+
+   '<form id="grwc-audience-form" class="grwc-form">'+
+   '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
    '<label>Existing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+ 
    '<label>Optional campaign image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
-   '<p class="grwc-muted grwc-span">The Company selected here is the campaign owner; it does not need to match the audience filter above. Only selected, company-matched contacts can be saved for this campaign. Other-company and unlinked contacts are excluded automatically. Saving a draft does NOT send messages.</p>'+
+   '<p class="grwc-muted grwc-span">Select customers, WhatsApp provider and existing template, plus an optional image. Customer company assignments are not needed. The provider determines the sender company. Other-company leads and invalid mobile numbers are excluded. This saves a draft, not a sent message; real sending requires verified provider access and recipient opt-in.</p>'+
    '<button type="submit" class="grwc-primary">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" disabled title="Sending requires confirmed provider API, approved template components and marketing opt-in">Send WhatsApp marketing (not enabled)</button><button type="button" data-refresh-crm>Refresh template references</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
  }
  function campaignReports(){
@@ -683,13 +687,14 @@
    }
    if(e.target.closest('[data-check-send-readiness]')){
     const form=element.querySelector('#grwc-audience-form');
-    const c=form?.elements.company_id.value,connection=form?.elements.connection_id.value,
-      tid=form?.elements.template_id.value;
+    const connection=form?.elements.connection_id.value,tid=form?.elements.template_id.value;
+    const sender=campaignConnection(connection),c=sender?.company_id||'';
     const t=rows.templates.find(x=>x.id===tid&&x.connection_id===connection&&x.company_id===c);
-    const checked=audience().filter(x=>selected.has(x.id));
+    const checked=campaignTargets(c),ignored=audience().filter(x=>selected.has(x.id)).length-checked.length;
     const why=[];
-    if(!c||!app.companies.includes(c))why.push('choose an authorized campaign company');
-    if(!checked.length)why.push('select at least one customer or lead');
+    if(!sender)why.push('choose an authorized WhatsApp provider');
+    if(!checked.length)why.push('select a customer or matching-company lead with a valid phone');
+    if(ignored)why.push(ignored+' records have invalid mobiles or are leads from another company');
     if(!t)why.push('choose SocialBerries and an existing template');
     if(!t?.body||!t?.provider_preview?.components)why.push('sync the approved template content/components from SocialBerries');
     if(t?.provider_approval!=='approved')why.push('verify the template approval through the provider API');
@@ -713,16 +718,10 @@
   };
   element.onchange=e=>{
    const form=e.target.closest?.('#grwc-audience-form');
-   if(form&&(e.target.name==='company_id'||e.target.name==='connection_id')){
-    const c=form.querySelector('[name=company_id]')?.value||'';
-    const prov=form.querySelector('[name=connection_id]');
+   if(form&&e.target.name==='connection_id'){
+    const connectionId=e.target.value,c=campaignConnection(connectionId)?.company_id||'';
     const tpl=form.querySelector('[name=template_id]');
-    if(e.target.name==='company_id'){
-     prov.innerHTML=options(rows.connections.filter(x=>x.company_id===c).map(x=>[x.id,x.display_name]),'Select provider');
-     tpl.innerHTML=options([], 'Choose provider first');
-    }else{
-     tpl.innerHTML=options(templateOptions(c,prov.value),'Choose a template for this provider');
-    }
+    if(tpl)tpl.innerHTML=options(templateOptions(c,connectionId),'Choose a template for this provider');
     return;
    }
    const map={'grwc-company':'scope','grwc-kind':'kind','grwc-source':'source','grwc-tag':'tag','grwc-owner':'owner',
@@ -769,12 +768,14 @@
   element.onsubmit=async e=>{
    if(e.target.id!=='grwc-audience-form')return;e.preventDefault();
    if(!can('create'))return alert('Marketing create permission required','error');
-   const f=new FormData(e.target),companyId=f.get('company_id'),connectionId=f.get('connection_id'),templateId=f.get('template_id');
-   if(!rows.connections.some(c=>c.id===connectionId&&c.company_id===companyId)||!rows.templates.some(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId))return alert('Select a matching provider/template.','error');
-   if(!app.companies.includes(companyId))return alert('Select an authorized campaign company.','error');
-   const audienceIds=[...selected],matches=audience().filter(x=>audienceIds.includes(x.id)&&x.company_id===companyId);
-   if(!matches.length)return alert('No selected contacts belong to the campaign company. Select matching contacts or change the campaign company; the top filter can remain Both companies.','warning');
-   const excluded=audienceIds.length-matches.length;
+   const f=new FormData(e.target),connectionId=String(f.get('connection_id')||''),templateId=String(f.get('template_id')||'');
+   const sender=campaignConnection(connectionId);
+   if(!sender)return alert('Choose an authorized WhatsApp provider.','error');
+   const companyId=sender.company_id;
+   if(!rows.templates.some(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId))return alert('Select an existing template for this provider.','error');
+   const matches=campaignTargets(companyId);
+   if(!matches.length)return alert('Choose a customer with a valid WhatsApp number or a lead belonging to the selected provider. Customers do not need a company assignment.','warning');
+   const excluded=audience().filter(x=>selected.has(x.id)).length-matches.length;
    const file=f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
    const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
@@ -791,7 +792,10 @@
       company_id:companyId,connection_id:connectionId,template_id:templateId,
       name:String(f.get('name')||'').trim(),
       audience:{crm_ids:matches.map(x=>x.id),selected_count:matches.length,
-       crm_consent_checked_count:eligible.length,selection:'manual',source:'greenrich_crm'},
+       selected_customers:matches.filter(x=>x.type==='Customer').length,
+       selected_leads:matches.filter(x=>x.type==='Lead').length,
+       crm_consent_checked_count:eligible.length,selection:'manual',source:'greenrich_crm',
+       company_rule:'shared_customers_provider_sender_leads_company_scoped'},
       status:'draft',
       notes:'Not sent. Template requires verified approved components. Media images are private draft assets, not a provider-sent template header. Actual messaging requires opt-in and verified sender.'
     });
@@ -804,7 +808,7 @@
       .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
      if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
     }
-    alert('Campaign draft saved for '+matches.length+' company-matched CRM records'+(excluded?' ('+excluded+' selected from other/unlinked companies excluded)':'')+'. '+eligible.length+
+    alert('Campaign draft saved for '+matches.length+' selected CRM contacts'+(excluded?' ('+excluded+' invalid-phone contacts or other-company leads excluded)':'')+'. '+eligible.length+
       ' have recorded marketing consent. No message sent.','success');
     await fetchAll();marketingDraw();
    }catch(error){

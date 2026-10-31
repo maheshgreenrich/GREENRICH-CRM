@@ -13,12 +13,12 @@ const checks=[
  ['manual ID linking protected by admin',migration.includes("public.gr_wa_admin(v_company)")],
  ['metadata importer never allows sending',!migration.includes('gr_wa_messages')],
  ['template catalog ID visible',script.includes("esc(t.provider_template_id||'—')")],
- ['template name selectable for campaign draft',script.includes("templateOptions(c,prov.value)")],
+ ['template name selectable for campaign draft',script.includes("templateOptions(c,connectionId)")],
  ['template filtered to selected provider',script.includes("t.connection_id===connectionId")],
  ['select all matching loaded contacts',script.includes("data-select-all-matching")&&script.includes("selected=new Set(members.map(x=>x.id))")],
- ['campaign company scopes all-company audience',script.includes("if(!app.companies.includes(companyId))")&&script.includes('x.company_id===companyId')&&script.includes("selected=new Set(members.map(x=>x.id))")],
+ ['provider-selected sender includes shared customers',script.includes('const companyId=sender.company_id;')&&script.includes("x.type==='Customer'||x.company_id===companyId")&&script.includes("selected=new Set(members.map(x=>x.id))")],
  ['draft only',script.includes("status:'draft'")&&script.includes('Nothing is sent automatically')],
  ['does not create a messaging API caller',!script.includes("action:'send'")]
 ];
 for(const [name,passed] of checks)assert.ok(passed,'Failed: '+name);
-console.log('PASS: diwali_offer linked as Grow India metadata-only reference; select-for-draft and all-loaded audience are provider/company-scoped; no messages sent');
+console.log('PASS: Diwali reference draft uses provider-selected company and shared customers; no messages sent');

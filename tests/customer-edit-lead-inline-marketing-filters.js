@@ -25,8 +25,11 @@ check('Lead profile leaves sidebar visible',!leads.includes('gr-lead-full-screen
 check('Lead profile back restores board',leads.includes("ctx.profileOpen=false;")&&leads.includes('draw(ctx)'));
 check('Marketing can select all from Both Companies filter',!marketing.includes("if(scope==='all')return alert('Choose one company above before selecting all"));
 check('Marketing does not enforce top company for draft',!marketing.includes("if(companyId!==scope)")&&!marketing.includes("if(scope==='all')return alert('Choose one company in the audience filter"));
-check('Campaign company is still required and authorized',marketing.includes("if(!app.companies.includes(companyId))"));
-check('Company-scoped recipients only',marketing.includes("x.company_id===companyId")&&marketing.includes("matches.map(x=>x.id)"));
-check('No silent cross-company sending',marketing.includes("selected from other/unlinked companies excluded"));
+check('Sender company is derived from authorized provider',marketing.includes('const campaignConnection=id=>')&&marketing.includes('const companyId=sender.company_id;'));
+check('No required campaign company input',!marketing.includes('companyField(co)')&&!marketing.includes('name="company_id" required'));
+check('Old shared customers are selectable without a company',marketing.includes("x.type==='Customer'||x.company_id===companyId"));
+check('Lead records remain provider-company restricted',marketing.includes("x.type==='Customer'||x.company_id===companyId"));
+check('Selected CRM IDs saved',marketing.includes('crm_ids:matches.map(x=>x.id)'));
+check('Marketing consent still checked',marketing.includes("w.consent_status==='opted_in'"));
 check('Marketing remains non-sending draft',marketing.includes("status:'draft'")&&!marketing.includes("action:'send'"));
-console.log('PASS: Customer 360 edit portal/close, navigation null checks, inline lead profile with sidebar, and Marketing company-independent filters with scoped campaign drafts.');
+console.log('PASS: Customer editor and inline lead profile; WhatsApp provider-selected drafts include shared CRM customers.');
