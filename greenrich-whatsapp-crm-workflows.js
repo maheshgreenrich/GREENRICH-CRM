@@ -154,25 +154,43 @@
   const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c);
   container.innerHTML='<div class="grwc">'+
    '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
-   '<div class="grwc-notice"><b>Important:</b> SocialBerries API endpoints and webhook signatures have not been supplied. Connection fields below save settings only; there is no live send/template sync until verified. Never enter an API key or webhook secret in this page.</div>'+
+   '<div class="grwc-notice"><b>Documented API found:</b> SocialBerries supports HTTP Basic authorization and read-only users/batch endpoints, template messages and bulk campaigns. Connection test uses a read-only call. Provider host and credentials are still required in secure Supabase Secrets; sending and inbound webhooks remain disabled. Never enter passwords or API keys in this page.</div>'+
    sel('Company','grwc-settings-company',app.companies.map(c=>[c,name(c)]),c,null)+
    '<section class="grwc-panel">'+headers('1 · Your WhatsApp providers','GreenRich uses SocialBerries for existing templates and delivery. The second provider is optional.')+
-   '<div class="grwc-grid">'+[1,2].map(slot=>{const p=providers.find(p=>p.slot===slot);return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(p?.display_name||(slot===1?'SocialBerries':'Second provider'))+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Connection: Not configured · API access not verified</p><button type="button" data-edit-provider="'+slot+'">Edit provider details</button></div>'}).join('')+'</div>'+
-   '<div class="grwc-steps"><b>Connection instructions</b><ol><li>Sign in to <a href="https://whatsapp.socialberries.in/home" target="_blank" rel="noopener">SocialBerries</a> and ask support for the template-list API, template-send API, authorization type and signed webhook payloads.</li><li>Ask them to enable API access for your existing WhatsApp number and approved templates; share the API documentation link (not credentials).</li><li>Save the provider name/number here. A secure Supabase Edge Function adapter must be configured with its credentials in server-side Secrets.</li><li>Register the verified inbound callback URL with SocialBerries after the webhook receiver is implemented and tested.</li><li>Only after successful authentication, webhook validation, approved-template lookup and opt-in checks should the integration be enabled.</li></ol></div></section>'+
+   '<div class="grwc-grid">'+[1,2].map(slot=>{
+    const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
+    return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
+      '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
+      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button>':'')+
+      '</div>';
+   }).join('')+'</div>'+
+   '<div class="grwc-steps"><b>Connection instructions — SocialBerries</b><ol>'+
+   '<li>SocialBerries → Developers → Add New Key → Name <b>GreenRich ONE CRM</b>. Choose an expiry and save the credential securely. For Allowed IPs, do not guess a Supabase IP; ask SocialBerries whether blank is permitted or a static egress IP is required.</li>'+
+   '<li>The API specification says <code>Authorization: Basic base64(username:password)</code>. Confirm with SocialBerries whether Developer API keys replace this password or use a separate authentication method.</li>'+
+   '<li>Supabase → Edge Functions → Secrets: enter server-side <b>BASE_URL</b>, <b>BASIC_USERNAME</b>, <b>BASIC_PASSWORD</b> for this company/provider. Use an HTTPS API host, not the documentation URL. Set API_VERSION (default v1). Never enter credentials in CRM or GitHub.</li>'+
+   '<li>Environment variable prefix for tool 1: <code>'+esc(c==='grow-india'?'SB_GROW_INDIA_SLOT1':'SB_ENVIRO_SOLUTIONS_SLOT1')+'</code> (tool 2 uses SLOT2). Example: <code>..._BASE_URL</code>.</li>'+
+   '<li>Press <b>Test Connection</b> after configuration. It calls only <code>GET /api/v1/users/?page=1</code>. No WhatsApp message is sent.</li>'+
+   '<li>Existing templates: import their preview JSON below until SocialBerries supplies its missing Get Templates endpoint. Message sending and inbound WhatsApp webhooks stay disabled until authentication, opt-in and webhook verification are implemented.</li>'+
+   '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
-   '<p class="grwc-muted">Template catalog currently has '+templ.length+' CRM reference/draft record(s), '+templ.filter(x=>x.provider_approval==='approved').length+' marked approved. These are not proof of an active SocialBerries connection.</p>'+
-   '<button type="button" disabled title="Needs provider template-list API">Sync templates from SocialBerries (requires API)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Name</th><th>Provider</th><th>Language</th><th>Verification</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'Approved record':'Not synced')+'</td></tr>').join('')+'</tbody></table></div>':empty('No provider templates are synced. Provider API documentation is required.'))+'</section>'+
+   '<p class="grwc-muted">Template catalog has '+templ.length+' CRM draft/reference record(s). Existing SocialBerries template ID, language and category can be imported without recreating the message. A manually imported JSON is <b>unverified</b> until a provider lookup confirms it.</p>'+
+   '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
+   '<button type="button" data-import-provider-template>Import Existing Template JSON (reference only)</button>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Name</th><th>Provider</th><th>Language</th><th>Verification</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'Approved record':'Not synced')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
    '<section class="grwc-panel">'+headers('3 · WhatsApp and website enquiry → CRM Lead','Choose source, tags and salesperson for each inbound enquiry type. OTP-only login events must not create marketing leads.', '<button type="button" data-new-inbound>+ Mapping</button>')+
    (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common')+'</p><small>Awaiting verified webhook</small></div>').join(''):empty('No inbound assignment mappings.'))+'</section>'+
    '<section class="grwc-panel">'+headers('4 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('5 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
-   '<div class="grwc-grid"><div class="grwc-feature"><b>Template sync</b><p>Waiting for provider API details.</p></div><div class="grwc-feature"><b>Message sending</b><p>Disabled — no unauthorized marketing messages.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>Disabled — authentication and payload verification required.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
+   '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity test</b><p>Available using GET /api/v1/users/. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
   container.querySelectorAll('[data-sheet-template]').forEach(x=>{const sh=sheetRows.find(r=>r.id===x.dataset.sheetTemplate);x.value=sh?.welcome_template_id||''});
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
    const edit=e.target.closest('[data-edit-provider]'),add=e.target.closest('[data-new-inbound]'),sheet=e.target.closest('[data-save-sheet]');
+   const check=e.target.closest('[data-test-provider]'),batches=e.target.closest('[data-batches-provider]');
+   if(check)return await checkProvider(check.dataset.testProvider,'test');
+   if(batches)return await checkProvider(batches.dataset.batchesProvider,'batches');
+   if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
    if(sheet){
@@ -180,6 +198,43 @@
     try{const r=await app.db.rpc('gr_wa_set_sheet_welcome',{p_sheet:id,p_template:value});if(r.error)throw r.error;alert('Sheet welcome preference saved. Blank = no template.','success');await fetchAll();settingsDraw(container)}catch(err){alert(err.message,'error')}
    }
   };
+ }
+ async function checkProvider(id,action){
+   const provider=rows.connections.find(x=>x.id===id);
+   if(!provider)return alert('Save provider details first.','warning');
+   try{
+    const result=await app.db.functions.invoke('greenrich-socialberries',{body:{connection_id:id,action}});
+    if(result.error)throw Error(result.error.message||'Could not contact secure gateway');
+    const data=result.data||{};
+    if(!data.ok){
+      const missing=Array.isArray(data.missing)?' Missing: '+data.missing.join(', '):'';
+      alert((data.message||data.error||'Provider check failed')+missing,'warning');return;
+    }
+    if(action==='test')return alert('Read-only SocialBerries API connected. Authentication successful. User count: '+(data.users_count??'not returned')+'. Sending is still disabled.','success');
+    const lines=(data.batches||[]).map(b=>[b.name,b.status,b.total_clients_count,b.completed_clients_count].join(' · '));
+    dialog('SocialBerries Campaign Status (read-only)',
+     '<p class="grwc-muted grwc-span">'+esc(data.count||0)+' total provider batches. Showing page '+esc(data.page||1)+'.</p>'+
+     '<pre class="grwc-span" style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(lines.join('\n')||'No batches returned')+'</pre>',
+     async()=>{});
+    alert('Provider batch status received.','success');
+   }catch(err){alert('Connection test failed: '+err.message,'error')}
+ }
+ function importProviderTemplate(company,container){
+   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
+   if(!choices.length)return alert('First save a SocialBerries provider for this company in Tool 1 or Tool 2.','warning');
+   dialog('Import existing SocialBerries template reference',
+     field('SocialBerries tool','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose SocialBerries connection'),true)+
+     '<div class="grwc-notice grwc-span">Copy the complete approved template JSON preview from SocialBerries, with id, name, language, category and components (including BODY text). This does not create a template in SocialBerries or send a message. Credentials do not belong here.</div>'+
+     note('Paste template preview JSON','preview_json'),
+     async fd=>{
+       const connectionId=fd.get('connection_id');
+       if(!choices.some(x=>x.id===connectionId))throw Error('Choose a matching company provider');
+       let preview;try{preview=JSON.parse(String(fd.get('preview_json')||''))}catch{throw Error('Valid JSON is required')}
+       if(preview?.preview_template?.components)preview=preview.preview_template;
+       const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:preview});
+       if(out.error)throw Error(out.error.message);
+       await fetchAll();settingsDraw(container);
+     });
  }
  function editProvider(c,slot,container){
   const old=rows.connections.find(p=>p.company_id===c&&p.slot===slot);
