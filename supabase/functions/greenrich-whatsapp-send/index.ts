@@ -82,7 +82,7 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]){
   const response=await fetch(u,{method:"POST",redirect:"error",signal:ctl.signal,
    headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),"Content-Type":"application/json","Accept":"application/json"},
    body:JSON.stringify({type:"template",template:template.name,language:template.language,template_id:template.provider_template_id,
-    category:"MARKETING",preview_template:{id:template.provider_template_id,name:template.name,language:template.language,category:"MARKETING"},components:parts})});
+    category:"MARKETING",preview_template:{id:template.provider_template_id,name:template.name,language:template.language,status:"APPROVED",category:"MARKETING",components:template.provider_preview.components},components:parts})});
   if(!response.ok)return null;
   const raw=await response.text();if(raw.length>120000)return null;
   const doc=JSON.parse(raw),item=doc?.data||{};
@@ -171,6 +171,59 @@ Deno.serve(async request=>{
    const saved=await db.from("gr_wa_contacts").upsert(record,{onConflict:"company_id,mobile"});
    if(saved.error)return res(400,{ok:false,error:"Could not save consent evidence"});
    return res(200,{ok:true,message:"Consent evidence recorded for selected sender company"});
+  }
+  // Verify an existing template against Meta Graph API with an admin-only server
+  // credential. This reads the actual WABA template, not a screenshot claim.
+  if(action==="sync_meta_template"){
+   const id=val(input.template_id,40);
+   if(!validId(id))return res(400,{ok:false,error:"Choose a saved marketing template"});
+   const row=await db.from("gr_wa_templates").select("*").eq("id",id)
+    .eq("company_id",company).eq("connection_id",connectionId).maybeSingle();
+   const template=row.data;
+   if(row.error||!template||template.category!=="marketing")
+    return res(404,{ok:false,error:"Marketing template unavailable"});
+   const prefix=prefixes[company+":"+r.data.slot];
+   const waba=env(prefix+"_META_WABA_ID"),token=env(prefix+"_META_ACCESS_TOKEN");
+   const version=env(prefix+"_META_GRAPH_VERSION")||"v23.0";
+   if(!/^[0-9]{5,25}$/.test(waba)||!token||!/^v[0-9]{1,2}\.[0-9]{1,2}$/.test(version))
+    return res(422,{ok:false,error:"Automatic Meta verification is not connected. Set the WABA ID and Meta management token in Supabase Secrets, or use Confirm existing approved template with full JSON."});
+   const u=new URL("https://graph.facebook.com/"+version+"/"+waba+"/message_templates");
+   u.searchParams.set("fields","id,name,language,status,category,components");
+   u.searchParams.set("name",template.name);
+   u.searchParams.set("limit","100");
+   let response:Response;
+   try{
+    response=await fetch(u,{method:"GET",redirect:"error",signal:AbortSignal.timeout(12000),
+     headers:{"Authorization":"Bearer "+token,"Accept":"application/json"}});
+   }catch{return res(502,{ok:false,error:"Meta template verification could not connect securely"})}
+   if(!response.ok)return res(422,{ok:false,error:
+    response.status===401||response.status===403?"Meta denied template access. Check the WABA ID and token permissions.":"Meta template lookup failed (HTTP "+response.status+")."});
+   const raw=await response.text();
+   if(raw.length>300000)return res(502,{ok:false,error:"Meta returned too many template details"});
+   let data:any;
+   try{data=JSON.parse(raw)}catch{return res(502,{ok:false,error:"Unexpected Meta template response"})}
+   const items=Array.isArray(data?.data)?data.data:[];
+   const t=items.find((x:any)=>String(x?.id)===String(template.provider_template_id)&&
+    x?.name===template.name&&x?.language===template.language);
+   if(!t)return res(422,{ok:false,error:"Meta did not return this exact template ID, name and language from the selected WABA."});
+   if(t.status!=="APPROVED"||String(t.category).toUpperCase()!=="MARKETING")
+    return res(422,{ok:false,error:"Meta reports template status "+val(t.status,40)+
+     " and category "+val(t.category,40)+". An approved MARKETING template is required."});
+   const body=Array.isArray(t.components)?t.components.find((x:any)=>String(x.type).toUpperCase()==="BODY"):null;
+   if(typeof body?.text!=="string"||!body.text.trim()||body.text.length>4000)
+    return res(422,{ok:false,error:"Meta returned no valid approved template BODY."});
+   const preview={id:String(t.id),name:t.name,language:t.language,category:"MARKETING",
+    status:"APPROVED",components:t.components};
+   const logged=await db.from("gr_wa_template_confirmations").insert({
+    company_id:company,template_id:id,confirmed_by:session.data.user.id,
+    confirmation_note:"Verified approved MARKETING template from Meta Graph API WABA "+waba,
+    provider_template_id:String(t.id)});
+   if(logged.error)return res(400,{ok:false,error:"Could not audit Meta verification"});
+   const saved=await db.from("gr_wa_templates").update({provider_approval:"approved",
+    provider_source:"verified_provider",body:body.text,provider_preview:preview})
+    .eq("id",id).eq("company_id",company).eq("connection_id",connectionId);
+   if(saved.error)return res(400,{ok:false,error:"Could not save verified Meta template"});
+   return res(200,{ok:true,verified:true,template_name:t.name,message:"Meta-approved template verified with full message content."});
   }
   if(action==="confirm_template"){
    const id=val(input.template_id,40),note=val(input.confirmation_note,500);
