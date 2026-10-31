@@ -87,9 +87,9 @@
   );
  }
  const header=()=>
- '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Campaign Handoff</h2><p>Your CRM is the audience source. SocialBerries remains the template and campaign delivery platform.</p></div><span class="grwc-chip">Provider API pending</span></div>'+
+ '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
  '<div class="grwc-notice">Provider authentication and automatic template-list sync have not been verified. Existing templates can be linked by ID for campaign drafts; message content must come from SocialBerries. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
- '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['welcome','Lead Welcome'],['recurring','Repeat Service'],['sync','Incoming Leads']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
+ '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),co=cd(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
   const chosen=[...selected].filter(x=>ids.has(x));selected=new Set(chosen);
@@ -100,19 +100,38 @@
    sel('Source','grwc-source',byType(),source,'All sources')+
    sel('Customer/Lead tag','grwc-tag',tags.map(t=>[t.id,t.name]),tag,'All tags')+
    sel('Salesperson','grwc-owner',rows.profiles.map(p=>[p.id,p.full_name]),owner,'All salespeople')+
+   sel('Product','grwc-product',productChoices(),product,'All products')+
+   sel('Lead stage','grwc-stage',stageChoices(),leadStage,'All lead stages')+
+   '<label>From date<input id="grwc-date-from" type="date" value="'+esc(startDate)+'"></label>'+
+   '<label>To date<input id="grwc-date-to" type="date" value="'+esc(endDate)+'"></label>'+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
    '<div class="grwc-audience-summary"><b>'+list.length+'</b> loaded matching records · <b>'+chosen.length+'</b> selected · Marketing audience draft only. Sending requires provider verification and consent.</div>'+
    '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Showing first 250 of '+list.length+' currently loaded matching contacts. The Select all action includes all '+list.length+' loaded matches, not just the first 250; additional CRM rows beyond this data load are not included. Choose one company before selecting everyone. No marketing consent is inferred from a CRM record.</p></section>'+
+   '<p class="grwc-muted">Customers without a reliable company match in existing dispatch/consent records are excluded from company-specific sends until assigned. Showing first 250 of '+list.length+' currently loaded matching contacts. The Select all action includes all '+list.length+' loaded matches, not just the first 250; additional CRM rows beyond this data load are not included. Choose one company before selecting everyone. No marketing consent is inferred from a CRM record.</p></section>'+
    '<section class="grwc-panel">'+headers('Choose existing SocialBerries template','Templates come from the provider catalog when the API connection is verified. Unverified CRM references cannot send messages.')+
    '<form id="grwc-audience-form" class="grwc-form">'+companyField(co)+
    '<label>WhatsApp tool<select name="connection_id" required>'+options(rows.connections.filter(x=>x.company_id===co).map(x=>[x.id,x.display_name]),'Select provider')+'</select></label>'+
    '<label>Existing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
-   '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+
+   '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+ 
+   '<label>Optional campaign image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
    '<p class="grwc-muted grwc-span">Select a company and opt-in eligible contacts, then choose the existing SocialBerries template. The selected template may be metadata-only until the full approved template is retrieved. Save creates a draft; it does NOT send messages.</p>'+
-   '<button type="submit">Save audience & template draft</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>';
+   '<button type="submit">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
+ }
+ function campaignReports(){
+  const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
+  const completed=relevant.filter(x=>!!x.provider_batch_id);
+  return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
+   'Local campaign drafts and provider batch references. Read/opened statuses require verified provider statistics; replied/not replied require incoming-message events.')+
+   '<div class="grwc-grid grwc-kpis">'+
+   [['CRM drafts',relevant.length],['Provider batches linked',completed.length],['Read / opened','—'],['Responded','—'],['Not responded','—']].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
+   (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Created</th><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Status</th><th>Image</th></tr></thead><tbody>'+
+    relevant.map(x=>'<tr><td>'+esc(date(x.created_at))+'</td><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td>'+esc(x.attachment_path?'Attached':'—')+'</td></tr>').join('')+
+    '</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
+   '<div class="grwc-notice">WhatsApp “opened” is represented by provider READ status, not a guaranteed human view. Reply and non-reply statistics are unavailable until incoming-message event sync is verified. No percentages are invented.</div>'+
+   (app.admin?'<button type="button" data-provider-report>View SocialBerries batch statistics (read-only)</button>':'')+
+   '</section>';
  }
  function welcomeView(){
   const rules=scoped(rows.welcomes),co=cd();
