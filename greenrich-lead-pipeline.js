@@ -415,7 +415,14 @@
    const companies=ctx.companyIds,defaultCompany=ctx.filters.company!=='all'?ctx.filters.company:companies[0];
    const staff=ctx.staff.filter(p=>p.company_id===defaultCompany);
    const assignee=selectFld('Assign to sales employee','assignee',[['','Common — all Sales users'],...staff.map(p=>[p.id,p.full_name])],false);
-   const common=selectFld('Company *','company',companies.map(c=>[c,companyText(ctx,c)]))+assignee;
+   const initialTemplates=await window.GreenRichWhatsAppWorkflows?.welcomeOptions?.(ctx.db,defaultCompany).catch(()=>[])||[];
+   const welcomeSelect=list=>selectFld('Welcome WhatsApp template (optional)','welcome',[['','None — no message'],...list.map(t=>[t.id,t.name])],false);
+   const common=selectFld('Company *','company',companies.map(c=>[c,companyText(ctx,c)]))+assignee+welcomeSelect(initialTemplates);
+   const changeWelcome=async(c,dialog)=>{
+    const f=dialog.querySelector('[name=welcome]');if(!f)return;
+    const catalog=await window.GreenRichWhatsAppWorkflows?.welcomeOptions?.(ctx.db,c).catch(()=>[])||[];
+    f.innerHTML=choices([['','None — no message'],...catalog.map(t=>[t.id,t.name])],'');
+   };
    if(action==='new'){
     const products=ctx.products.filter(p=>p.company_id===defaultCompany);
     const fields=common+fld('Lead title *','title','text','',true)+fld('Contact name','contact')+fld('Mobile (+91)','mobile','tel')+
@@ -428,14 +435,16 @@
      fld('Initial enquiry notes','note');
     const d=dialog(ctx,'Create and assign lead',fields,async fd=>{
      if(!fd.get('assignee')&&!ctx.admin)throw Error('Only Admin can create Common leads. Select yourself.');
-     const {error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee')||null,
+     const {data:leadId,error}=await ctx.db.rpc('gr_pipeline_create',{p_company:fd.get('company'),p_title:fd.get('title'),p_contact:fd.get('contact'),p_assignee:fd.get('assignee')||null,
       p_source:fd.get('source'),p_product:fd.get('product')||null,p_customer:fd.get('customer')||null,p_value:fd.get('value')||0,p_mobile:fd.get('mobile'),
       p_email:fd.get('email'),p_tags:fd.getAll('tags'),p_note:fd.get('note')});if(error)throw error;
+      if(leadId&&fd.get('welcome')){try{await window.GreenRichWhatsAppWorkflows.saveLeadWelcome(ctx.db,fd.get('company'),leadId,fd.get('welcome'))}
+       catch(ex){window.GreenRichNotify?.(ex.message,'warning')}}
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]'),prod=d.querySelector('[name=product]');
-    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=renderChoices;renderChoices();return;
+    comp.value=defaultCompany;const renderChoices=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;prod.innerHTML=choices([['','None'],...ctx.products.filter(p=>p.company_id===comp.value).map(p=>[p.record_id,p.payload?.name||p.record_id])],'')};comp.onchange=()=>{renderChoices();void changeWelcome(comp.value,d)};renderChoices();return;
    }
    const d=dialog(ctx,'Import leads (CSV)',common+
-    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes. Admin may choose Common, otherwise select your Sales account. All imported records start in New.</p>'+
+    '<p class="gl-note">CSV columns: title,contact,mobile,email,source,product_id,value,tags,notes,welcome_template. Choose a default welcome template or supply the exact template name/ID per row. Blank means no message.</p>'+
     '<label>Choose Excel or CSV file<input type="file" name="file" accept=".csv,.xlsx,.xls,text/csv" required></label>',async fd=>{
       const file=fd.get('file');if(!file?.size)throw Error('Choose an Excel or CSV file');
       if(file.size>3000000)throw Error('Import file must be below 3 MB');
@@ -448,7 +457,8 @@
         title:p.title||p.products||p.enquiry_details||p.name||'Excel enquiry',
         contact:p.name||p.contact||'',mobile:p.mobile||'',email:p.email||'',
         source:p.source||'',product_id:p.product_id||'',value:p.value||'0',
-        tags:p.tags||'',notes:[p.notes,p.enquiry_details,p.company,p.address1,p.city].filter(Boolean).join(' | ')
+        tags:p.tags||'',welcome_template:p.welcome_template||p.welcome_template_id||'',
+         notes:[p.notes,p.enquiry_details,p.company,p.address1,p.city].filter(Boolean).join(' | ')
        }));
       }else{
        const raw=await file.text(),lines=parseCSV(raw),headers=(lines.shift()||[]).map(x=>x.toLowerCase().trim());
@@ -457,22 +467,33 @@
       }
       if(items.length>500)throw Error('Import a maximum of 500 leads');
       let success=0,errors=[];
+      const catalog=await window.GreenRichWhatsAppWorkflows?.welcomeOptions?.(ctx.db,fd.get('company')).catch(()=>[])||[];
       for(const lead of items){
        const approved=ctx.approvedSources.find(src=>matchesApproved(src.name,lead.source))?.name||'';
        const product=ctx.products.some(p=>p.company_id===fd.get('company')&&p.record_id===lead.product_id)?lead.product_id:null;
        const ids=String(lead.tags||'').split(/[;,]/).map(t=>t.trim()).filter(Boolean).map(t=>
          ctx.approvedTags.find(tag=>tag.id===t||tag.name.toLowerCase()===t.toLowerCase())?.id).filter(Boolean);
-       const {error}=await ctx.db.rpc('gr_pipeline_create',{
+       const {data:leadId,error}=await ctx.db.rpc('gr_pipeline_create',{
         p_company:fd.get('company'),p_title:lead.title||'Imported lead',p_contact:lead.contact||'',
         p_assignee:fd.get('assignee')||null,p_source:approved,p_product:product,
         p_value:Number(lead.value)||0,p_mobile:lead.mobile||'',p_email:lead.email||'',
         p_tags:ids,p_note:lead.notes||'Imported using CRM spreadsheet importer'
        });
-       if(error){errors.push(error.message);if(errors.length>=15)break}else success++;
+       if(error){errors.push(error.message);if(errors.length>=15)break}
+       else{
+        success++;
+        const ref=String(lead.welcome_template||'').trim();
+        const chosen=catalog.find(t=>t.id===ref||t.name.split(' · ')[0].toLowerCase()===ref.toLowerCase());
+        const templateId=chosen?.id||fd.get('welcome');
+        if(templateId&&leadId){
+         try{await window.GreenRichWhatsAppWorkflows.saveLeadWelcome(ctx.db,fd.get('company'),leadId,templateId)}
+         catch(ex){errors.push('Welcome preference: '+ex.message)}
+        }
+       }
       }
       notify(ctx,'Imported '+success+' enquiries'+(errors.length?'; '+errors.length+' rejected. First: '+errors[0]:''));
     });const comp=d.querySelector('[name=company]'),sel=d.querySelector('[name=assignee]');comp.value=defaultCompany;
-    comp.onchange=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId};comp.onchange();return;
+    comp.onchange=()=>{sel.innerHTML=choices([['','Common — all Sales users'],...ctx.staff.filter(p=>p.company_id===comp.value).map(p=>[p.id,p.full_name])],'');if(!ctx.admin)sel.value=ctx.userId;void changeWelcome(comp.value,d)};comp.onchange();return;
   }
  }
  function parseCSV(raw){const rows=[];let row=[],field='',quoted=false;for(let i=0;i<raw.length;i++){const c=raw[i];

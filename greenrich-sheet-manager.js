@@ -25,7 +25,8 @@ window.GreenRichSheetManager=(function(){
    ctx.db.from('gr_sheet_connections').select('*').in('company_id',cs).order('created_at',{ascending:false}),
    ctx.db.from('gr_sheet_import_rows').select('*').in('company_id',cs).order('created_at',{ascending:false}).limit(700),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(500),
-   ctx.db.from('gr_crm_sources').select('name').eq('active',true).order('name')
+   ctx.db.from('gr_crm_sources').select('name').eq('active',true).order('name'),
+   ctx.db.from('gr_wa_templates').select('id,company_id,name,language,provider_approval').in('company_id',cs).order('name')
   ]);
   r.forEach(x=>{if(x.error)throw x.error});
   let staff=ctx.staff||[];
@@ -33,7 +34,7 @@ window.GreenRichSheetManager=(function(){
    const q=await ctx.db.rpc('gr_pipeline_staff',{p_company:company_id});
    if(q.error)throw q.error;return (q.data||[]).map(x=>({...x,company_id}));
   }));staff=p.flat()}
-  return {sources:r[0].data||[],imports:r[1].data||[],products:r[2].data||[],approvedSources:r[3].data||[],staff};
+  return {sources:r[0].data||[],imports:r[1].data||[],products:r[2].data||[],approvedSources:r[3].data||[],templates:r[4].error?[]:r[4].data||[],staff};
  }
  function mount(root,ctx){
   const st={root,ctx,tab:'sources',data:null};
@@ -122,6 +123,9 @@ window.GreenRichSheetManager=(function(){
    select('Lead source','source',st.data.approvedSources.map(x=>[x.name,x.name]).concat(s&&!st.data.approvedSources.some(x=>x.name===s.source_name)?[[s.source_name,s.source_name+' (legacy source)']]:[]),s?.source_name||'Meta')+
    input('Brand','brand',s?.brand||'')+input('Product interest','product_interest',s?.product_interest||'')+
    select('Assign to employee','assignee',peopleOpts(company),s?.assigned_to)+
+    select('Welcome WhatsApp template (optional)','welcome_template',
+     [['','None — no template'],...st.data.templates.filter(t=>t.company_id===company).map(t=>[t.id,t.name+' · '+(t.provider_approval==='approved'?'Approved':'Not synced')])],
+     s?.welcome_template_id||'')+
    select('CRM product (optional)','product',productOpts(company),s?.product_id||'')+
    input('Header row','header',s?.header_row||1,'number')+
    input('First data row','first',s?.first_data_row||2,'number')+
@@ -140,12 +144,15 @@ window.GreenRichSheetManager=(function(){
     p_header_row:Number(f.get('header')),p_first_row:Number(f.get('first')),
     p_import_mode:f.get('mode'),p_enabled:f.get('enabled')==='true'};
    const r=await ctx.db.rpc('gr_sheet_admin_upsert',{...p,p_assignee:p.p_assignee||null});if(r.error)throw r.error;
+     const set=await ctx.db.rpc('gr_wa_set_sheet_welcome',{p_sheet:r.data,p_template:f.get('welcome_template')||null});
+     if(set.error)throw Error('Google Sheet saved, but welcome template mapping failed: '+set.error.message);
   });
   const form=d.querySelector('form');
   form.elements.template.onchange=e=>{const p=preset[e.target.value];if(p)F.forEach(([key])=>form.elements['map_'+key].value=p[key]||'')};
   form.elements.company.onchange=e=>{
    form.elements.assignee.innerHTML=option(peopleOpts(e.target.value));
    form.elements.product.innerHTML=option(productOpts(e.target.value));
+    form.elements.welcome_template.innerHTML=option([['','None — no template'],...st.data.templates.filter(t=>t.company_id===e.target.value).map(t=>[t.id,t.name+' · '+t.provider_approval])]);
   };
  }
  function original(st,id){
