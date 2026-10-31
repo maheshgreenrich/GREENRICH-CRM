@@ -68,6 +68,9 @@ jobs:
           node --check greenrich-sources.js
           node tests/unified-contacts-management.js
           node --check greenrich-dashboard.js
+          node --check greenrich-dashboard-v2.js
+          test -s greenrich-dashboard-v2.css
+          node tests/modern-business-intelligence.js
           node --check greenrich-actions.js
           node tests/executive-dashboard-and-dispatch.js
           node --check greenrich-notifications.js
