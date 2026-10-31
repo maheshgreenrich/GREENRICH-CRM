@@ -235,12 +235,12 @@
  const input=(label,key,value='',type='text')=>'<label>'+esc(label)+'<input name="'+esc(key)+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const note=(label,key,v='')=>'<label class="grwc-span">'+esc(label)+'<textarea name="'+esc(key)+'" rows="3">'+esc(v)+'</textarea></label>';
  const field=(label,key,opts,required=false)=>'<label>'+esc(label)+'<select name="'+esc(key)+'" '+(required?'required':'')+'>'+opts+'</select></label>';
- function dialog(title,body,submit){
-  const d=document.createElement('dialog');d.className='grwc-dialog';d.innerHTML='<form><div class="grwc-dialog-head"><h3>'+esc(title)+'</h3><button type="button" data-dismiss>×</button></div><div class="grwc-dialog-fields">'+body+'</div><div class="grwc-dialog-foot"><button type="button" data-dismiss>Cancel</button><button type="submit" class="grwc-primary">Save draft</button></div></form>';
+ function dialog(title,body,submit,buttonLabel='Save draft',successText='Saved successfully'){
+  const d=document.createElement('dialog');d.className='grwc-dialog';d.innerHTML='<form><div class="grwc-dialog-head"><h3>'+esc(title)+'</h3><button type="button" data-dismiss>×</button></div><div class="grwc-dialog-fields">'+body+'</div><div class="grwc-dialog-foot"><button type="button" data-dismiss>Cancel</button><button type="submit" class="grwc-primary">'+esc(buttonLabel)+'</button></div></form>';
   document.body.append(d);d.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=()=>d.close());
   d.onclose=()=>d.remove();
   d.querySelector('form').onsubmit=async e=>{e.preventDefault();let b=d.querySelector('[type=submit]');b.disabled=true;
-    try{await submit(new FormData(e.currentTarget));d.close();alert('Saved successfully','success');await fetchAll();if(root?.isConnected)marketingDraw()}
+    try{await submit(new FormData(e.currentTarget));d.close();alert(successText,'success');await fetchAll();if(root?.isConnected)marketingDraw()}
     catch(error){alert('Not saved: '+error.message,'error')}finally{b.disabled=false}};
   d.showModal();return d;
  }
@@ -671,37 +671,36 @@
    await fetchAll();marketingDraw();
   }catch(e){alert(e.message,'error')}
  }
- async function recordOptIn(){
+ function recordOptIn(){
   const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
   const companyId=campaignConnection(connectionId)?.company_id,people=companyId?campaignTargets(companyId):[];
   if(!companyId)return alert('Select a WhatsApp provider first.','warning');
   if(people.length!==1)return alert('Select exactly one customer or matching-company lead first.','warning');
   const person=people[0];
-  if(!window.confirm('Record confirmed WhatsApp MARKETING consent from '+person.name+'? Do not proceed unless they actually opted in.'))return;
-  const source=window.prompt('Where and how did the customer opt in? (minimum 12 characters)');
-  if(!source)return;
-  const evidence=window.prompt('Evidence of opt-in: date, form, customer request, or other verified details (minimum 10 characters)');
-  if(!evidence)return;
-  try{
-   const done=await secureSend('record_consent',{connection_id:connectionId,contact_key:person.id,
-    consent_source:source,evidence_note:evidence,attested:true});
-   alert(done.message,'success');await fetchAll();marketingDraw();
-  }catch(error){alert(error.message,'error')}
+  const fields='<p class="grwc-muted grwc-span">Record explicit marketing permission already given by '+esc(person.name)+'. A CRM phone number is not permission to send marketing.</p>'+
+   '<label class="grwc-span">Opt-in source<input name="source" required minlength="12" placeholder="e.g. Website WhatsApp marketing checkbox"></label>'+
+   '<label class="grwc-span">Evidence<textarea name="evidence" rows="3" required minlength="10" placeholder="Date, form or other evidence of explicit consent"></textarea></label>'+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirm this contact explicitly opted in to WhatsApp marketing</label>'+
+   '<label class="grwc-span"><input type="checkbox" name="new"> New opt-in was obtained after a previous opt-out (if applicable)</label>';
+  dialog('Record WhatsApp marketing consent',fields,async f=>{
+   await secureSend('record_consent',{connection_id:connectionId,contact_key:person.id,
+    consent_source:String(f.get('source')||''),evidence_note:String(f.get('evidence')||''),
+    attested:f.has('attested'),new_opt_in:f.has('new')});
+  },'Record opt-in','Marketing permission evidence recorded');
  }
- async function confirmTemplate(){
+ function confirmTemplate(){
   const form=root?.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id.value||'';
   const templateId=form?.elements.template_id.value||'',t=rows.templates.find(x=>x.id===templateId&&x.connection_id===connectionId);
-  if(!t)return alert('Select your existing marketing template first.','warning');
-  if(!window.confirm('Confirm the actual approved MARKETING template in your SocialBerries account? This is a manual administrator attestation, not API verification.'))return;
-  const json=window.prompt('Paste COMPLETE approved SocialBerries MARKETING template JSON for '+t.name+' (ID '+t.provider_template_id+'), including BODY and optional IMAGE header');
-  if(!json)return;
-  const note=window.prompt('Record evidence: who checked the approved template, where and when?');
-  if(!note)return;
-  try{
-   const done=await secureSend('confirm_template',{connection_id:connectionId,template_id:templateId,
-    approved_json:json,confirmation_note:note,attested:true});
-   alert(done.message,'success');await fetchAll();marketingDraw();
-  }catch(error){alert(error.message,'error')}
+  if(!t)return alert('Select a marketing template first.','warning');
+  const fields='<p class="grwc-muted grwc-span">Verify this template in your actual SocialBerries account and paste its complete APPROVED MARKETING JSON with BODY text and any IMAGE header. This records an administrator attestation, not an API verification.</p>'+
+   '<p class="grwc-muted grwc-span">Template: '+esc(t.name)+' · Provider ID: '+esc(t.provider_template_id||'—')+'</p>'+
+   '<label class="grwc-span">Approved template JSON<textarea name="json" rows="7" required></textarea></label>'+
+   '<label class="grwc-span">Approval evidence<textarea name="note" rows="2" minlength="10" required placeholder="Who checked this template, where and when?"></textarea></label>'+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I checked the template is approved in the actual provider account</label>';
+  dialog('Confirm approved marketing template',fields,async f=>{
+   await secureSend('confirm_template',{connection_id:connectionId,template_id:templateId,
+    approved_json:String(f.get('json')||''),confirmation_note:String(f.get('note')||''),attested:f.has('attested')});
+  },'Confirm template','Template approval evidence recorded');
  }
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
