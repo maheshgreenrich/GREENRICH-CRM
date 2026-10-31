@@ -568,14 +568,28 @@
    '<p class="grwc-muted grwc-span">Only record explicit permission the person has already given. Being in CRM or filling an enquiry form does not itself prove WhatsApp marketing permission.</p>'+
    field('SocialBerries provider','connection_id',options(connections.map(x=>[x.id,x.display_name]),'Choose provider'),true)+
    field('Customer / Lead','contact_key',options(contacts.map(x=>[x.id,x.label]),'Choose contact'),true)+
-   input('Source of permission','consent_source','')+
-   note('When / how they agreed','evidence_note','')+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> The customer explicitly agreed to WhatsApp marketing</label>'+
-   '<label class="grwc-span"><input type="checkbox" name="new_opt_in"> They gave fresh permission after opting out (only if true)</label>',
+   field('Where did the customer give permission?','consent_source',options([
+    ['WhatsApp conversation','WhatsApp conversation'],
+    ['Website opt-in checkbox','Website opt-in checkbox'],
+    ['Email confirmation','Email confirmation'],
+    ['Signed consent form','Signed consent form'],
+    ['Customer service phone call','Phone call (documented agreement)'],
+    ['In-person consent form','In-person consent form'],
+    ['Other documented opt-in','Other documented opt-in']
+   ],'Select the actual permission source'),true)+
+   '<label class="grwc-span">When and how did the customer agree? <small>(required, at least 10 characters)</small>'+
+   '<textarea name="evidence_note" rows="3" required minlength="10" maxlength="500" placeholder="Describe the actual date and what the customer agreed to. Do not invent permission."></textarea></label>'+
+   '<p class="grwc-muted grwc-span">Only record permission the person actually gave to receive WhatsApp marketing from this company. CRM membership alone is not consent.</p>'+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirm this person explicitly agreed to receive WhatsApp marketing</label>'+
+   '<label class="grwc-span"><input type="checkbox" name="new_opt_in"> Only if applicable: the customer opted out before and gave new permission afterwards</label>',
    async f=>{
+    const source=String(f.get('consent_source')||'').trim(),evidence=String(f.get('evidence_note')||'').trim();
+    if(!f.has('attested'))throw Error('Confirm only genuine WhatsApp marketing permission that was actually given.');
+    if(source.length<12)throw Error('Choose the actual permission source from the dropdown.');
+    if(evidence.length<10)throw Error('Describe the real date and how the customer agreed (at least 10 characters). A value such as 1 is not evidence.');
     await secureSend('record_consent',{connection_id:String(f.get('connection_id')||''),
-     contact_key:String(f.get('contact_key')||''),consent_source:String(f.get('consent_source')||''),
-     evidence_note:String(f.get('evidence_note')||''),attested:f.has('attested'),
+     contact_key:String(f.get('contact_key')||''),consent_source:source,
+     evidence_note:evidence,attested:true,
      new_opt_in:f.has('new_opt_in')});
     await fetchAll();settingsDraw(container);
    },'Save permission','Marketing permission recorded for this sending company.');
