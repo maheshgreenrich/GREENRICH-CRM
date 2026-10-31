@@ -1,0 +1,31 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const read=x=>fs.readFileSync(x,'utf8');
+const ui=read('greenrich-whatsapp-crm-workflows.js'),
+ api=read('supabase/functions/greenrich-socialberries/index.ts'),
+ sql=read('supabase/migrations/20261031170000_socialberries_lead_staging.sql');
+new vm.Script(ui,{filename:'greenrich-whatsapp-crm-workflows.js'});
+assert.ok(ui.includes("read('gr_wa_provider_leads')"),'Admin must load staged SocialBerries leads with company scope');
+assert.ok(ui.includes("app.admin?read('gr_wa_provider_leads')"),'Non-admin must not retrieve staging list');
+assert.ok(ui.includes("data-sync-provider-leads"),'Settings must show Lead Sync action');
+assert.ok(ui.includes("action:'sync_leads'"),'UI must call secure gateway sync action');
+assert.ok(ui.includes("data-import-provider-lead"),'Manual import actions required, no silent lead creation');
+assert.ok(ui.includes("app.db.rpc('gr_wa_import_provider_lead'"),'Import uses secure Admin-only RPC');
+assert.ok(ui.includes("data-import-provider-template"),'Existing template reference import visible');
+assert.ok(ui.includes("const list=Array.isArray(preview)?preview:[preview]"),'Support multiple provider template JSON objects');
+assert.ok(ui.includes("if(!list.length||list.length>50)"),'Bound template import');
+assert.ok(api.includes('if(action==="sync_leads")'),'Server API must implement staged sync');
+assert.ok(api.includes('providerRead(cfg,"leads/"'),'Use the supplied documented read-only GET Leads API');
+assert.ok(api.includes('client.rpc("gr_wa_admin"'),'Only authorized Admin can initiate provider fetches');
+assert.ok(api.includes('SUPABASE_SERVICE_ROLE_KEY'),'Server-side service account needed for staging');
+assert.ok(api.includes('gr_wa_provider_leads'),'Provider responses persist in dedicated staging, not CRM lead pipeline');
+assert.ok(api.includes('ignoreDuplicates:false'),'Updates must stay idempotent by provider ID');
+assert.ok(!api.includes('action==="send"'),'Live outbound sending must remain disabled');
+assert.ok(sql.includes("enable row level security"),'Stage table requires RLS');
+assert.ok(sql.includes("gr_wa_admin(company_id)"),'Company-Admin-only visibility required');
+assert.ok(sql.includes("public.gr_wa_import_provider_lead"),'Only explicit reviewed import can create a CRM lead');
+assert.ok(sql.includes("public.gr_pipeline_create("),'Preserve CRM pipeline validations');
+assert.ok(sql.includes("existing_customer"),'Prevent duplicating customer as new lead');
+assert.ok(sql.includes("existing_lead"),'Prevent duplicate leads');
+assert.ok(sql.includes("on conflict(company_id,slot) do nothing"),'Do not overwrite existing company provider settings');
+console.log('PASS: Admin-scoped provider sync staging, consent-safe no-send path, manual duplicate-reviewed CRM import and existing template reference batch import');
