@@ -3,9 +3,11 @@
    Native mandatory database fields and permission checks are never replaced.
    Custom answers are saved separately and are not silently discarded. */
 window.GreenRichFormBuilder=(()=>{
- const KEYS=['lead_create','lead_stage','customer','sales_order'];
- const TITLES={lead_create:'New Lead Capture',lead_stage:'Lead Stage Movement',customer:'Customer Add / Edit',sales_order:'Sales Order'};
- const TYPES=['text','textarea','number','email','tel','date','datetime-local','select','radio','checkbox','heading'];
+ const OPS=window.GreenRichOperations?.TYPES||{};
+ const KEYS=['lead_create','lead_stage','customer','sales_order',...Object.keys(OPS).map(k=>'ops_'+k)];
+ const TITLES={lead_create:'New Lead Capture',lead_stage:'Lead Stage Movement',customer:'Customer Add / Edit',sales_order:'Sales Order',
+  ...Object.fromEntries(Object.entries(OPS).map(([key,val])=>['ops_'+key,'ERP · '+val.label]))};
+ const TYPES=['text','textarea','number','email','tel','date','datetime-local','time','url','select','radio','checkbox','heading','button'];
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fixed=(id,label,type='text',required=false,protectedField=false)=>({id,label,type,required,visible:true,system:true,protected:protectedField,layout:'half',options:[],when:null,placeholder:''});
  const buildDefaults=()=>{
@@ -27,7 +29,14 @@ window.GreenRichFormBuilder=(()=>{
    fixed('dispatched_through','Courier / dispatch'),fixed('delivery_note','Delivery note'),fixed('invoice_reference','Invoice reference'),
    fixed('terms_of_delivery','Terms of delivery'),fixed('status','Sales Order status','select',true,true),fixed('notes','Order notes','textarea')];
   for(const group of [lead,stage,customer,sale])for(const f of group){if(['note','notes','address1'].includes(f.id))f.layout='wide';}
-  return {lead_create:lead,lead_stage:stage,customer, sales_order:sale};
+  const operations=Object.fromEntries(Object.entries(OPS).map(([k,v])=>['ops_'+k,[
+   fixed('company_id','Company','select',true,true),...v.fields.map(([id,label,raw,required])=>{
+    const f=fixed(id,label,raw.startsWith('select:')?'select':raw,Boolean(required),Boolean(required));
+    if(raw.startsWith('select:'))f.options=raw.slice(7).split(',');
+    if(raw==='textarea')f.layout='wide';return f;
+   })
+  ]]));
+  return {lead_create:lead,lead_stage:stage,customer,sales_order:sale,...operations};
  };
  const DEFAULTS=buildDefaults();
  let db=null,companies=[],cache=new Map(),loading=null;
@@ -43,9 +52,9 @@ window.GreenRichFormBuilder=(()=>{
   const fields=override.filter(x=>x&&typeof x.id==='string'&&(system.has(x.id)||/^custom_[a-z0-9_]{4,50}$/.test(x.id))).map(x=>{
    const base=system.get(x.id);
    if(!base)return {...x,system:false,protected:false};
-   return {...base,...x,id:base.id,system:true,type:base.type,
-    required:base.protected?true:!!x.required,visible:base.protected?true:x.visible!==false,
-    when:base.protected?null:x.when||null};
+   return {...base,...x,id:base.id,system:true,
+    required:x.required!==false,visible:x.visible!==false,
+    when:x.when||null};
   });
   for(const base of DEFAULTS[key])if(!fields.some(x=>x.id===base.id))fields.push(cloning(base));
   return fields;
@@ -75,10 +84,19 @@ window.GreenRichFormBuilder=(()=>{
    const native=system.get(f.id);
    if(!native&&!/^custom_[a-z0-9_]{4,50}$/.test(f.id))throw Error('Invalid custom field identifier');
    if(String(f.label||'').trim().length<2||String(f.label).length>110)throw Error('Question labels must be 2–110 characters');
-   if(!TYPES.includes(f.type)||native&&native.type!==f.type)throw Error('Changing a built-in field type is not supported. Add a custom question instead.');
-   if(native?.protected&&(f.required!==true||f.visible!==true||f.when))throw Error('System-required field '+native.label+' cannot be hidden, conditional or optional.');
+   if(!TYPES.includes(f.type))throw Error('Unknown field type '+f.type);
+   // Admin controls layout; backend CRM/ERP validations still protect transactions.
    if(f.when?.field&&(f.when.field===f.id||!fields.some(other=>other.id===f.when.field)))throw Error('Conditional field references an invalid or identical question');
    if(String(f.when?.equals||'').length>100)throw Error('Condition value too long');
+   const rules=f.conditions?.rules||[];
+   if(!Array.isArray(rules)||rules.length>10)throw Error('Maximum 10 rules per question');
+   if(rules.length&& !['all','any'].includes(f.conditions?.match))throw Error('Choose ALL or ANY for multi-rule conditions');
+   for(const rule of rules){
+    if(!fields.some(other=>other.id===rule.field&&other.id!==f.id))throw Error('Rule references missing or identical field');
+    if(!['equals','not_equals','contains','not_contains','filled','empty','greater','less','greater_equal','less_equal','in_list'].includes(rule.operator))
+     throw Error('Unknown conditional operator');
+    if(String(rule.value||'').length>250)throw Error('Condition value too long');
+   }
    if(['select','checkbox','radio'].includes(f.type)&&!native){
     if(!Array.isArray(f.options)||f.options.length<1||f.options.length>30||f.options.some(o=>typeof o!=='string'||!o.trim()||o.length>100))throw Error('Choice questions need 1–30 options, up to 100 characters each.');
    }
