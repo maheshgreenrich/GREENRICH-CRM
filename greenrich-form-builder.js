@@ -351,6 +351,25 @@ window.GreenRichFormBuilder=(()=>{
     previewForm.addEventListener('change',update);previewForm.addEventListener('input',update);
     try{update()}catch{/* preview cannot modify employee data */}
    };
+   const ruleMarkup=(field,idx)=>{
+    const rules=rulesFor(field);
+    const opLabels=[['equals','Equals'],['not_equals','Does not equal'],['contains','Contains'],['not_contains','Does not contain'],
+     ['filled','Has a value'],['empty','Is empty'],['greater','Greater than'],['less','Less than'],['greater_equal','At least'],
+     ['less_equal','At most'],['in_list','One of comma-separated values']];
+    return '<div class="grfb-condition grfb-full"><div class="grfb-condition-head"><strong>IF / THEN Conditional Logic</strong>'+
+      '<label>Show when <select data-edit="rules_match"><option value="all" '+(field.conditions?.match!=='any'?'selected':'')+'>ALL rules match (AND)</option>'+
+      '<option value="any" '+(field.conditions?.match==='any'?'selected':'')+'>ANY rule matches (OR)</option></select></label></div>'+
+      (rules.length?rules.map((r,i)=>'<div class="grfb-rule"><span>IF</span>'+
+       '<select data-rule-index="'+i+'" data-rule-part="field"><option value="">Choose another question</option>'+
+       draft.filter(q=>q.id!==field.id&&q.type!=='heading'&&q.type!=='button').map(q=>
+        '<option value="'+esc(q.id)+'" '+(r.field===q.id?'selected':'')+'>'+esc(q.label)+'</option>').join('')+'</select>'+
+       '<select data-rule-index="'+i+'" data-rule-part="operator">'+opLabels.map(([v,t])=>
+        '<option value="'+v+'" '+(r.operator===v?'selected':'')+'>'+t+'</option>').join('')+'</select>'+
+       '<input type="text" data-rule-index="'+i+'" data-rule-part="value" value="'+esc(r.value||'')+'" placeholder="Expected value" '+(['filled','empty'].includes(r.operator)?'disabled':'')+'>'+
+       '<button type="button" data-op="remove-rule" data-index="'+idx+'" data-rule-index="'+i+'" title="Remove this condition">×</button></div>').join(''):
+       '<p>Always visible until you add a rule.</p>')+
+       '<button type="button" data-op="add-rule" data-index="'+idx+'">+ Add condition</button></div>';
+   };
    const redraw=()=>{
     $('#grfb-unsaved').textContent=dirty?'Unsaved changes':'Saved configuration';
     els.innerHTML=draft.map((f,index)=>'<article class="grfb-row" draggable="true" data-index="'+index+'">'+
@@ -365,13 +384,10 @@ window.GreenRichFormBuilder=(()=>{
      '<label>Placeholder '+input('placeholder',f.placeholder||'')+'</label>'+
      '<label class="grfb-switch"><input type="checkbox" data-edit="visible" '+(f.visible!==false?'checked':'')+'> Show this field</label>'+
      '<label class="grfb-switch"><input type="checkbox" data-edit="required" '+(f.required?'checked':'')+'> Required</label>'+
-     (!f.system&&['select','radio','checkbox'].includes(f.type)?
-      '<label class="grfb-full">Dropdown / choice options (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
-     (f.protected?'<p class="grfb-full grfb-core">Required by the GreenRich workflow. Cannot be hidden or conditional.</p>':
-      '<label>Show only when <select data-edit="when_field"><option value="">Always visible</option>'+
-      draft.filter(x=>x.id!==f.id&&x.type!=='heading').map(x=>'<option value="'+esc(x.id)+'" '+(f.when?.field===x.id?'selected':'')+'>'+esc(x.label)+'</option>').join('')+'</select></label>'+
-      '<label>Condition <select data-edit="when_operator"><option value="equals" '+(f.when?.operator!=='not_equals'?'selected':'')+'>Equals</option><option value="not_equals" '+(f.when?.operator==='not_equals'?'selected':'')+'>Does not equal</option></select></label>'+
-      '<label>Value to match '+input('when_equals',f.when?.equals||'')+'</label>')+
+     (['select','radio','checkbox'].includes(f.type)?
+      '<label class="grfb-full">Choices (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
+     (f.system?'<p class="grfb-full grfb-core">Native CRM/ERP field: Admin can edit design and visibility. Original data requirements, approvals, GST/stock calculations and server validations still apply.</p>':'')+
+     ruleMarkup(f,index)+
      '</div></article>').join('');
     drawPreview();
    };
