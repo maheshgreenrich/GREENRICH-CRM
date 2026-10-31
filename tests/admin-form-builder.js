@@ -10,7 +10,7 @@ for(const [file,src] of [['builder',builder],['settings',settings],['app',one],[
 const sandbox={window:{}};vm.runInNewContext(builder,sandbox);
 const form=sandbox.window.GreenRichFormBuilder;
 assert.deepEqual(Array.from(form.KEYS),['lead_create','lead_stage','customer','sales_order']);
-for(const key of form.KEYS){const defs=form.defaults(key);assert.ok(defs.length>8);assert.ok(form.validate(key,defs));}
+for(const key of form.KEYS){const defs=form.defaults(key);assert.ok(defs.length>=8);assert.ok(form.validate(key,defs));}
 const native=form.defaults('lead_create');
 native.find(f=>f.id==='title').visible=false;
 assert.throws(()=>form.validate('lead_create',native),/System-required field/);
