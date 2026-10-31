@@ -171,11 +171,9 @@ window.GreenRichFormBuilder=(()=>{
    let wrap=f.system?nativeWrap(form,f.id):customTag(f);
    if(!wrap)continue;
    if(!f.system){wrap.dataset.grfbCustom='yes';}
-   // Never pull elements out of nested customer selection or first-interests widgets.
-   if(f.system&&wrap.parentElement!==target){
-    if(f.id==='products'||f.id==='tags'||wrap.closest('.gr-customer-picker')||wrap.closest('.gr-invoice-extra-fields'))continue;
-    if(wrap.parentElement!==target)continue;
-   }
+   // Composite controls retain their CRM layout container, but their
+   // visibility and conditions must still respond to Admin settings.
+   if(f.system&&wrap.parentElement!==target&&!target.contains(wrap))continue;
    wrap.dataset.grfbField=f.id;
    wrap.classList.toggle('grfb-full',f.layout==='wide');
    if(key==='customer'||key==='sales_order')wrap.classList.toggle('wide',f.layout==='wide');
@@ -198,6 +196,7 @@ window.GreenRichFormBuilder=(()=>{
   const anchor=target.querySelector('.actions,.modal-actions');
   for(const field of fields){
    const wrap=wrapFor.get(field.id);if(!wrap)continue;
+   if(wrap.parentElement!==target)continue; // Never disassemble a composite CRM widget.
    if(anchor?.parentElement===target)target.insertBefore(wrap,anchor);
    else target.append(wrap);
   }
@@ -276,12 +275,20 @@ window.GreenRichFormBuilder=(()=>{
      if(!f.visible)continue;
      const el=customTag({...f,system:false});
      if(f.system&&['select','radio','checkbox'].includes(f.type)&&!f.options?.length){
-      el.querySelector('select')?.append(new Option('System-provided choices','sample'));
+      const values={stage:['New','Contacted','Qualified','Quotation','Won','Lost'],
+       heat:['Hot','Warm','Cold'],type:['Individual','Retailer','Distributor','Business'],
+       status:['Pending','Completed','Cancelled','Returned']}[f.id]||['System-provided choices'];
+      const select=el.querySelector('select');
+      if(select)values.forEach(value=>select.append(new Option(value,value)));
+      else if(f.type==='checkbox')el.append(document.createTextNode('Choices loaded from GreenRich CRM'));
      }
      el.dataset.grfbField=f.id;previewForm.append(el);
     }
     preview.replaceChildren(previewForm);
-    try{showConditions(previewForm,draft)}catch{/* preview cannot modify employee data */}
+    keyForForm.set(previewForm,key);
+    const update=()=>showConditions(previewForm,draft);
+    previewForm.addEventListener('change',update);previewForm.addEventListener('input',update);
+    try{update()}catch{/* preview cannot modify employee data */}
    };
    const redraw=()=>{
     $('#grfb-unsaved').textContent=dirty?'Unsaved changes':'Saved configuration';
