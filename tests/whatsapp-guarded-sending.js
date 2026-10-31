@@ -12,4 +12,7 @@ assert.ok(edge.includes('No selected recipients have documented WhatsApp marketi
 assert.ok(edge.includes('Live sending is disabled in Supabase Secrets'),'Preflight cannot ignore activation');
 assert.ok(edge.includes('Full approved MARKETING template is not confirmed in Settings'),'Preflight cannot accept unverified template');
 assert.ok(edge.includes('return res(200,{ok:true,ready:!blockers.length'),'Preflight must provide all blockers');
+assert.ok(edge.includes('norm(x.mobile)||norm(x.mobile2)'),'Send gateway must use valid secondary customer mobile');
+assert.ok(edge.includes('norm(row?.mobile)||norm(row?.mobile2)'),'Consent gateway must support secondary customer mobile');
+assert.ok(!edge.includes('if(checked.no_phone)blockers.push'),'Skipped invalid contacts must not block eligible senders');
 console.log('PASS: Secure SocialBerries send adapter has role, opt-in, approval, idempotency, live gate and bounded send controls.');
