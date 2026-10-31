@@ -62,3 +62,22 @@ The bulk endpoint supports multipart file upload, which is relevant to GreenRich
 - Get Messages: GET with one of phone_number/client/lead and required page and limit. No complete response schema was supplied. Display only whitelisted message metadata from a recognized list; never assume undocumented JSON fields are present.
 - WhatsApp message policies/24-hour service windows, opt-in and template approval must be respected. A successful HTTP 200 does not establish message delivery: track provider message status separately.
 - GreenRich ONE message-history gateway remains Admin/company scoped and read-only; a future send flow requires server-side role/consent checks, per-recipient idempotency, opt-out, safe retry and a documented session eligibility check.
+
+## CRM sync workflow added after Supabase secrets setup
+
+SocialBerries's documented API includes **GET Leads**, but the response shape and its request body requirements are inconsistent in the supplied example. GreenRich does not assume additional undocumented fields or any Get Templates endpoint.
+
+- The Supabase migration seeds **GreenRich Grow India, Tool 1, SocialBerries** metadata if absent. This is not an authentication success; sending remains disabled.
+- Settings → WhatsApp Integration → **Sync SocialBerries Leads** retrieves up to 20 pages (bounded), using HTTP Basic secrets in the server-side Edge Function, and stages a whitelist of name, phone, email, source, provider status and provider IDs. Each page is fetched read-only via GET /api/v1/leads/?page=N.
+- Staged provider leads are **not inserted directly into CRM**. Admin reviews them, chooses a salesperson, and confirms import. The secure SQL RPC checks for existing company leads and customer mobile matches before calling the existing CRM pipeline function.
+- No provider record will appear until the real connection authenticates and Get Leads returns a supported paginated response. If GET Leads rejects page-only GET because the supplied API schema requires client fields in a GET request body, request a provider-supported query-based format instead of guessing.
+- Existing template catalogue: no Get Templates endpoint is in the supplied docs. CRM accepts a **JSON object or array of up to 50 complete preview objects** and uses an Admin-only RPC to store them as "not_verified" reference entries. This is not auto-sync and it cannot send messages.
+- Get Users is a user/staff API; it must **not** be treated as a customer-contact sync endpoint. Bulk batches and message history are read-only.
+- Outbound sending, bulk campaign trigger, and webhook-based lead creation remain disabled until the provider is authenticated, templates verified, consent checks and callback signature procedures are implemented.
+
+### Safe verification order
+
+1. Secret names saved in Supabase does not mean credentials verified. In Settings click **Test Connection**. A success report proves only the read-only Basic Auth test.
+2. Next click **Sync SocialBerries Leads** to stage a page-limited snapshot. Inspect the data.
+3. Use **Review & import** for individual leads after checking source, mobile and assigned employee. Existing CRM records remain unchanged on detected duplicates.
+4. For templates ask SocialBerries for its template-list API; while waiting, import one or several existing template preview JSON objects as unverified references.
