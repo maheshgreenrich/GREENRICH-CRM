@@ -125,6 +125,52 @@ Deno.serve(async request=>{
     return response(request,200,{ok:true,configured:true,count:Number(data.count)||0,page,batches});
    }catch{return response(request,200,{ok:false,configured:true,message:"Could not retrieve provider campaigns"})}
   }
+  if(action==="sync_leads"){
+   // Read provider's documented GET Leads endpoint, stage only the whitelisted
+   // fields, and require explicit Admin approval to create GreenRich CRM leads.
+   const page=Math.trunc(Number(body.page)||1);
+   if(page<1||page>100)return response(request,400,{ok:false,error:"Page must be 1–100"});
+   const serviceKey=env("SUPABASE_SERVICE_ROLE_KEY");
+   if(!serviceKey)return response(request,503,{ok:false,error:"Server sync capability unavailable; service role key not configured"});
+   try{
+    const result=await providerRead(cfg,"leads/",{page:String(page)});
+    if(!result.ok)return response(request,200,{ok:false,configured:true,
+     message:"SocialBerries Get Leads returned HTTP "+result.status+
+      ". Confirm whether its GET endpoint requires the documented client filters."});
+    const data=result.data;
+    const leads=Array.isArray(data?.results)?data.results:(Array.isArray(data)?data:[]);
+    if(!Array.isArray(data?.results)&&!Array.isArray(data))
+     return response(request,200,{ok:false,configured:true,
+      message:"SocialBerries returned an unrecognized lead-list format; no records were imported."});
+    const clean=(v:unknown,max:number)=>typeof v==="string"?v.trim().slice(0,max):"";
+    const items=leads.slice(0,100).filter((x:unknown)=>x&&typeof x==="object").flatMap((x:Record<string,unknown>)=>{
+     const c=(x.client&&typeof x.client==="object")?x.client as Record<string,unknown>:{};
+     const id=clean(x.id,150),mobile=clean(c.mobile??x.mobile,25);
+     if(!id)return [];
+     let displayName=[clean(c.first_name??x.first_name,90),clean(c.last_name??x.last_name,90)].filter(Boolean).join(" ");
+     if(!displayName)displayName=clean(c.name??x.name,180);
+     const state=(x.status&&typeof x.status==="object"?"":clean(x.status,90));
+     const source=clean(x.source??c.source,150);
+     return [{
+      company_id:connection.company_id,connection_id:connection.id,
+      provider_lead_id:id,provider_client_id:clean(c.id,150),
+      name:displayName,mobile,email:clean(c.email??x.email,200),
+      source,provider_status:state,received_at:new Date().toISOString()
+     }];
+    });
+    if(items.length){
+     const adminDb=createClient(url,serviceKey,{auth:{autoRefreshToken:false,persistSession:false}});
+     const saved=await adminDb.from("gr_wa_provider_leads").upsert(items,
+      {onConflict:"company_id,connection_id,provider_lead_id",ignoreDuplicates:false});
+     if(saved.error)throw Error("Could not stage provider leads");
+    }
+    return response(request,200,{ok:true,configured:true,page,
+     synced:items.length,skipped:Math.max(0,leads.slice(0,100).length-items.length),
+     provider_count:Number.isFinite(Number(data?.count))?Number(data.count):null,
+     has_more:Boolean(data?.next)});
+   }catch{return response(request,200,{ok:false,configured:true,
+    message:"Could not sync leads. Check SocialBerries API response and credentials."})}
+  }
   if(action==="messages"){
    // Never permit a browser-supplied provider URL, arbitrary query or client ID.
    // All mobile numbers in this GreenRich CRM integration use the Indian 91 prefix.
@@ -163,6 +209,6 @@ Deno.serve(async request=>{
    }catch{return response(request,200,{ok:false,configured:true,
      message:"Could not retrieve message history. Check provider response format and API settings."})}
   }
-  return response(request,400,{ok:false,error:"Only read-only Test Connection, Batch List and Message History operations are enabled"});
+  return response(request,400,{ok:false,error:"Only Test Connection, Batch List, Message History and read-only provider-lead staging sync are enabled"});
  }catch{return response(request,400,{ok:false,error:"Invalid request or integration configuration"})}
 });
