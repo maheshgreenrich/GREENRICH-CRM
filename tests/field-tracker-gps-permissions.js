@@ -9,6 +9,8 @@ assert.ok(source.includes("Test GPS Access (No Check In)"),
 assert.ok(source.includes("Windows computer:")&&source.includes("Location services"),
  'Windows system and website permission troubleshooting must be displayed');
 assert.ok(source.includes("gr_field_clock_in"),'Real check-in must remain available');
+assert.ok(source.includes("locateForField('check-in')"),'Coarse GPS must be rejected before a server check-in call');
+assert.ok(source.includes("const maxFieldAccuracyM=3000"),'Do not weaken the 3 km accuracy threshold');
 const start=source.indexOf(' const isWindows=()=>');
 const end=source.indexOf(' function stopTracking(){',start);
 assert.ok(start>0&&end>start,'Extract GPS helpers');
@@ -23,7 +25,7 @@ const context={
 };
 vm.runInNewContext(
  "let gpsState={level:'info',message:'Not tested'};\n"+source.slice(start,end)+
- "\nthis.helpers={locationError,locate,testGPS,getGPS:()=>gpsState};",context);
+ "\nthis.helpers={locationError,locate,locateForField,testGPS,getGPS:()=>gpsState};",context);
 (async()=>{
  let requestCount=0;
  geolocation.getCurrentPosition=(ok,error)=>{requestCount++;error({code:1})};
@@ -44,5 +46,17 @@ vm.runInNewContext(
  assert.equal(context.helpers.getGPS().level,'error');
  assert.match(panel.textContent,/accuracy is/);
  assert.equal(requestCount,3);
- console.log('PASS: explicit GPS test handles system permission denial, good GPS and low accuracy; no database writes.');
+ let fix=0;
+ geolocation.getCurrentPosition=(ok)=>{fix++;ok({coords:{latitude:11.05,longitude:76.96,accuracy:fix===1?5200:250}})};
+ const good=await context.helpers.locateForField('check-in');
+ assert.equal(good.p_accuracy,250,'A second, more precise GPS sample may be used');
+ assert.equal(fix,2);
+ fix=0;
+ geolocation.getCurrentPosition=(ok)=>{fix++;ok({coords:{latitude:11.05,longitude:76.96,accuracy:fix===1?6000:4800}})};
+ await assert.rejects(context.helpers.locateForField('check-in'),/4.8 km/);
+ assert.equal(fix,2,'Only one retry for coarse GPS');
+ assert.match(context.helpers.getGPS().message,/Nothing has been saved/);
+ assert.ok(source.includes("locateForField('check-out')")&&source.includes("locateForField('visit completion')"),
+ 'Photo and shift recording must use the same accuracy validation');
+ console.log('PASS: browser permission, GPS accuracy retry, coarse location rejection, no check-in or database writes.');
 })().catch(err=>{console.error(err);process.exitCode=1;});
