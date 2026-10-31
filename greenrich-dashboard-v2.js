@@ -130,15 +130,22 @@
   const stageCounts=stages.map(x=>[x,f.leads.filter(l=>l.stage===x).length]);
   const bySource=group(f.leads,l=>l.source);
   const perStaff=group(f.leads,l=>staff.find(p=>p.id===l.assigned_to)?.full_name||'Unassigned');
-  const owned=staff.map(p=>({name:p.full_name||'Employee',all:f.leads.filter(l=>l.assigned_to===p.id).length,won:f.leads.filter(l=>l.assigned_to===p.id&&l.stage==='Won').length})).filter(x=>x.all).sort((a,b)=>b.won-a.won||b.all-a.all).slice(0,8);
+  const owned=staff.map(p=>{
+   const mine=f.leads.filter(l=>l.assigned_to===p.id),orders=new Set(mine.filter(l=>l.stage==='Won'&&l.won_order_id).map(l=>l.company_id+'|'+l.won_order_id));
+   return {name:p.full_name||'Employee',all:mine.length,won:mine.filter(l=>l.stage==='Won').length,
+    orderValue:sum(sale.filter(x=>orders.has(x.company_id+'|'+x.id)),'total')};
+  }).filter(x=>x.all).sort((a,b)=>b.orderValue-a.orderValue||b.won-a.won||b.all-a.all).slice(0,8);
   const content={
    day_sales:()=>panel('day_sales','Sales date · income by day or month',trend(sale,f.from,f.to)),
    channel_sales:()=>panel('channel_sales','Revenue distribution by recorded order channel',donut(group(sale,s=>s.channel_name||s.channel,s=>s.total))),
    sales:()=>panel('sales','Filtered sales orders and amount',label('Revenue',money(sum(sale,'total')))+label('Order count',fmt(orderCount))+label('Units sold',fmt(sum(sale,s=>s.qty||s.quantity)))+label('Average order',orderCount?money(sum(sale,'total')/orderCount):'₹0')+listBars([['GST',sum(sale,s=>s.tax_amount||s.tax_total)],['Taxable value',sum(sale,s=>s.taxable||s.subtotal)]],C,money,2)),
    company_sales:()=>panel('company_sales','Both GreenRich companies · order values',columns(group(sale,s=>company(s.company_id),s=>s.total),money)),
-   leads:()=>panel('leads','Lead creation date · recorded marketing source',listBars(bySource,C,fmt,9), 'Lead sources from accessible CRM records'),
+   leads:()=>panel('leads','Lead creation date · recorded marketing source',
+     '<div class="gr2-split"><div><h4>Enquiries by source</h4>'+listBars(bySource,C,fmt,9)+'</div><div><h4>Product enquiries</h4>'+
+     listBars(group(f.leads,l=>records.products.find(p=>p.id===l.product_id&&p.company_id===l.company_id)?.name||l.product_interest||l.product_id||'Unspecified'),C,fmt,7)+'</div></div>',
+     'Sources and product interests from accessible lead records'),
    conversion:()=>panel('conversion','Stages and customer conversions',donut(stageCounts)+label('Conversion rate',pct(won.length,f.leads.length))+label('Won leads',fmt(won.length))),
-   salespeople:()=>panel('salespeople','Won leads versus assigned enquiries',owned.length?'<div class="gr2-leader">'+owned.map((p,i)=>'<div><span class="gr2-place">'+(i+1)+'</span><span class="gr2-person">'+e(p.name)+'</span><div class="gr2-leader-track"><i style="width:'+Math.round(100*p.won/Math.max(1,p.all))+'%"></i></div><strong>'+fmt(p.won)+' / '+fmt(p.all)+'</strong></div>').join('')+'</div>':note('No assigned leads in this period')),
+   salespeople:()=>panel('salespeople','Won leads versus assigned enquiries',owned.length?'<div class="gr2-leader">'+owned.map((p,i)=>'<div><span class="gr2-place">'+(i+1)+'</span><span class="gr2-person">'+e(p.name)+'</span><div class="gr2-leader-track"><i style="width:'+Math.round(100*p.won/Math.max(1,p.all))+'%"></i></div><strong>'+fmt(p.won)+' / '+fmt(p.all)+'<small>'+money(p.orderValue)+'</small></strong></div>').join('')+'</div>':note('No assigned leads in this period')),
    telecaller:()=>{const calls=f.leads.filter(l=>/telecall|telephone|phone call/i.test(l.source||'')||/telecall/i.test(staff.find(p=>p.id===l.assigned_to)?.role||''));return panel('telecaller','Source or owner identified as telecalling',label('Telecalling leads',fmt(calls.length))+label('Won',fmt(calls.filter(l=>l.stage==='Won').length))+label('Conversion',pct(calls.filter(l=>l.stage==='Won').length,calls.length))+label('Calls today','Not tracked')+listBars(group(calls,l=>staff.find(p=>p.id===l.assigned_to)?.full_name||'Unassigned'),C,fmt,6),'Calls today remain Not tracked until a call-log or dialer integration is connected.')},
    attendance:()=>panel('attendance','Recorded attendance in the selected date range',donut(group(f.attendance,a=>a.status||'Unknown'))+label('Entries',fmt(f.attendance.length))+(errors.attendance?note('Attendance is unavailable for this account: '+errors.attendance):''),'Attendance is employee-based, not attributed to a company.'),
    customers:()=>panel('customers','Shared customer directory · linked-company scope',label('Customers',fmt(f.customers.length))+label('New in period',fmt(f.customers.filter(c=>inRange(c.created_at,f.from,f.to)).length))+listBars(group(f.customers,c=>c.type||'Unspecified'),C,fmt,6)),
@@ -280,7 +287,7 @@
    '<label>From date<input id="gr2-from" type="date"></label><label>To date<input id="gr2-to" type="date"></label></div></details>'+
    '<div class="gr2-buttons"><span id="gr2-active">Loading widgets</span><button id="gr2-reset" type="button">Reset filters</button><button id="gr2-refresh" type="button">↻ Refresh</button>'+
    (cfg.canExport?'<button class="gr2-excel" id="gr2-excel" type="button">↓ Export Excel</button><button class="gr2-pdf" id="gr2-pdf" type="button">↓ Export PDF</button>':'')+'</div></div>'+
-   '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Data refreshes automatically and when CRM changes are received.</div></div>';
+   '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Salesperson sales value uses Won leads linked to order IDs. Data refreshes automatically and when CRM changes are received.</div></div>';
   if(cfg.companyIds?.length===1){query('#gr2-company').value=cfg.companyIds[0];query('#gr2-company').disabled=true}
   else if((cfg.companyIds||[]).includes(cfg.selectedCompany))query('#gr2-company').value=cfg.selectedCompany;
   host.addEventListener('change',event=>{
