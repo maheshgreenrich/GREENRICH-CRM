@@ -354,7 +354,7 @@
   if(action==='order'){
    
    if(typeof window.GreenRichCRM?.createOrderForLead!=='function')throw Error('Sales Order editor is unavailable. Refresh the CRM.');
-   window.GreenRichCRM.createOrderForLead(l);return;
+   window.GreenRichCRM.createOrderForLead({...ctx.leadPayloads?.get(l.company_id+':'+l.lead_id),...l});return;
   }
   if(action==='detail'){
     const {data,error}=await ctx.db.from('gr_lead_stage_history').select('*').eq('company_id',l.company_id).eq('lead_id',l.lead_id).order('created_at',{ascending:false}).limit(200);
@@ -543,5 +543,7 @@
   }
   if(root.isConnected){root.querySelectorAll('.gl-customer-timeline').forEach(e=>e.remove());root.append(holder)}
  }
- window.GreenRichLeadPipeline={mount,mountFollowups,renderCustomerTimeline};
+ window.GreenRichLeadPipeline={mount,mountFollowups,renderCustomerTimeline,
+   refreshRoot:async element=>{const ctx=contexts.get(element);if(ctx){await refresh(ctx);return true}return false},
+   celebrateWon};
 })();
