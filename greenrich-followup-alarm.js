@@ -1,8 +1,9 @@
 'use strict';
-/* Assigned salesperson's blocking follow-up alarm. Fires at the next known due time
+/* Assigned salesperson's non-blocking follow-up reminder. Fires at the next known due time
    while the app is running, and rechecks when a background tab becomes visible. */
 window.GreenRichFollowupAlarm=(()=>{
  let interval=null,deadline=null,modal=null,session=null,working=false,lastError='';
+ const alreadyNotified=new Set();
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fields='lead_id,company_id,contact,title,mobile,stage,next_followup_at,assigned_to,notes';
  const base=()=>session.db.from('gr_lead_pipeline').select(fields)
@@ -21,7 +22,17 @@ window.GreenRichFollowupAlarm=(()=>{
    const due=await base().lte('next_followup_at',new Date().toISOString())
     .order('next_followup_at',{ascending:true}).limit(1);
    if(due.error)throw Error(due.error.message);
-   if(due.data?.length){plan(null);open(due.data[0]);lastError='';return}
+   if(due.data?.length){
+    // Lead card carries the prominent red pulse. Never block the workspace
+    // with a modal; use a single non-blocking notice per scheduled due time.
+    const l=due.data[0],key=l.company_id+':'+l.lead_id+':'+l.next_followup_at;
+    if(!alreadyNotified.has(key)){
+     alreadyNotified.add(key);
+     if(alreadyNotified.size>500)alreadyNotified.clear();
+     window.GreenRichNotify?.('⏰ Follow-up due: '+(l.contact||l.title||'Lead')+'. Open Leads & CRM and call now.','warning');
+    }
+    plan(null);lastError='';return;
+   }
    const upcoming=await base().gt('next_followup_at',new Date().toISOString())
     .order('next_followup_at',{ascending:true}).limit(1);
    if(upcoming.error)throw Error(upcoming.error.message);
