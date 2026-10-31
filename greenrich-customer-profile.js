@@ -126,7 +126,7 @@
    '<div class="gr360-page">'+
     '<div class="gr360-breadcrumb">'+linkButton('← All customers','back')+'<span>Customer directory / '+esc(name)+'</span></div>'+
     '<div class="gr360-hero"><div class="gr360-hero-main"><div class="gr360-avatar" aria-hidden="true">'+esc(initials||'GR')+'</div><div class="gr360-identity"><span class="gr360-eyebrow">GREENRICH · CUSTOMER 360</span><h2>'+esc(name)+'</h2><p>'+esc(c.company||c.type||'Customer profile')+'</p><div class="gr360-tags">'+model.knownTags.map(t=>'<span>'+esc(t)+'</span>').join('')+(model.orderIds.length>1?'<span class="repeat">Repeat customer</span>':'')+'</div></div></div>'+
-    '<div class="gr360-hero-actions">'+linkButton('WhatsApp','whatsapp',!primaryPhone,'main')+linkButton('Email customer','email',!text(c.email))+linkButton('Share details','share',!primaryPhone)+linkButton('Edit customer','edit',!text(c.id))+linkButton('WhatsApp service follow-up','service-whatsapp',!text(c.id))+'</div></div>'+
+    '<div class="gr360-hero-actions">'+linkButton('WhatsApp','whatsapp',!primaryPhone,'main')+linkButton('Email customer','email',!text(c.email))+linkButton('Share details','share',!primaryPhone)+linkButton('Edit customer','edit',!text(c.id))+linkButton('WhatsApp service follow-up','service-whatsapp',!text(c.id))+linkButton('SocialBerries chat history','socialberries-history',!primaryPhone)+'</div></div>'+
     '<div class="gr360-stats">'+[
      ['Lifetime revenue',rupees(model.total),'Excludes cancelled / returned'],
      ['Orders placed',count(model.orderIds.length),'Across assigned companies'],
@@ -182,6 +182,16 @@
    const [kind,...parts]=button.dataset.gr360.split(':'),ref=parts.join(':');
    if(kind==='back'){actions.onBack?.();return}
    if(kind==='edit'){actions.onEdit?.(c.id);return}
+   if(kind==='socialberries-history'){
+    if(!window.GreenRichWhatsAppWorkflows?.openCustomerHistory)return window.alert('WhatsApp CRM module did not load. Refresh GreenRich ONE.');
+    const companies=[...new Set([
+     ...(model.purchases||[]).map(x=>x._companyId||x.company_id),
+     ...(model.deliveries||[]).map(x=>x.company_id)
+    ].filter(Boolean))];
+    if(companies.length!==1)return window.alert('Choose or link this customer to exactly one company before requesting provider messages.');
+    void window.GreenRichWhatsAppWorkflows.openCustomerHistory({customer:c,companyId:companies[0]});
+    return;
+   }
    if(kind==='service-whatsapp'){
     if(!window.GreenRichWhatsAppWorkflows?.openCustomerRule)return window.alert('WhatsApp service settings did not load. Refresh CRM.');
     void window.GreenRichWhatsAppWorkflows.openCustomerRule({customer:c});return;

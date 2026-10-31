@@ -61,3 +61,21 @@ body .grwc-dialog-foot .grwc-primary{background:#168b65!important;color:white!im
 
 #content .grwc-selection-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 15px}
 #content .grwc-selection-toolbar button{width:auto!important}
+
+/* Marketing v2: compact, responsive after-sales filters and readable KPIs */
+#content .grwc-filters{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:14px}
+#content .grwc-kpis{grid-template-columns:repeat(5,minmax(0,1fr));margin:8px 0 18px}
+#content .grwc-kpis .grwc-feature{padding:14px;background:#f7faff;border-color:#deebf8}
+#content .grwc-kpis .grwc-feature:nth-child(2){background:#f2fcf6;border-color:#d9f2e4}
+#content .grwc-kpis .grwc-feature:nth-child(3){background:#fff9ed;border-color:#f5e5c6}
+#content .grwc-kpis .grwc-feature:nth-child(4){background:#f8f4ff;border-color:#ebe1fa}
+#content .grwc-kpis .grwc-feature:nth-child(5){background:#fff6f6;border-color:#f3dfdf}
+#content .grwc-kpis .grwc-feature h3{font-size:21px!important;margin:8px 0 0!important;color:#233e60}
+#content .grwc-form button.grwc-primary,#content .grwc-selection-toolbar button.grwc-primary{background:#168b65!important;border-color:#168b65!important;color:#fff!important}
+#content .grwc input[type=file]{padding:6px 8px!important;line-height:1.6!important}
+#content .grwc input[type=file]::file-selector-button{border:1px solid #d7e5f3;border-radius:7px;padding:4px 9px;background:#edf6ff;color:#23568b;font-weight:700;margin-right:9px}
+#content .grwc-tablewrap td{vertical-align:middle;overflow-wrap:anywhere}
+#content .grwc-feature h3{font-weight:850}
+@media(max-width:1150px){#content .grwc-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){#content .grwc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){#content .grwc-kpis{grid-template-columns:1fr};#content .grwc-filters{grid-template-columns:1fr}}
