@@ -24,7 +24,7 @@
  .gl-lead-detail-inline{position:relative;display:block;width:100%;max-width:100%;min-width:0;min-height:72vh;overflow:visible;background:#f4f7fc;padding:clamp(12px,2vw,24px);border:1px solid #dee8f5;border-radius:16px}
  .gl-lead-detail-inline .grlp{max-width:100%;margin:0 auto}
  .gl-lead-detail-inline .grlp-full{width:100%;max-width:100%}
- .gr-lead-full-screen .grlp{max-width:1400px;margin:0 auto}
+ .gl-lead-detail-inline .grlp{max-width:100%;margin:0 auto}
  .gl-won-search{display:grid;gap:7px;margin:9px 0}
  .gl-won-search input{width:100%;border:1px solid #cbd8e9;border-radius:8px;padding:10px}
  .gr-won-celebrate{position:fixed;inset:0;z-index:9999;pointer-events:none;display:grid;place-items:center;background:#0b245047;animation:grwonfade 3.4s forwards}
