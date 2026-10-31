@@ -16,6 +16,8 @@ assert.equal(form.KEYS.length,16,'All 12 live ERP Operations forms must be confi
 assert.ok(form.KEYS.includes('ops_purchase_order')&&form.KEYS.includes('ops_bom')&&form.KEYS.includes('ops_service'));
 for(const key of form.KEYS){const defs=form.defaults(key);assert.ok(defs.length>=8);assert.ok(form.validate(key,defs));}
 const native=form.defaults('lead_create');
+native.find(f=>f.id==='title').type='textarea';
+assert.ok(form.validate('lead_create',native),'Admin can change a built-in field control type');
 native.find(f=>f.id==='title').visible=false;
 assert.ok(form.validate('lead_create',native),'Admin can choose visibility; backend still validates data contracts');
 const stage=form.defaults('lead_stage');
@@ -62,6 +64,8 @@ assert.ok(ops.includes("window.GreenRichFormBuilder?.decorate?.(form,co,'ops_'+k
 assert.ok(ops.includes("GreenRichFormBuilder.saveAnswers(company,'ops_'+k,payload.id,extra)"),'ERP must store custom answers');
 assert.ok(builder.includes("data-op=\"add-rule\"")&&builder.includes("data-edit=\"rules_match\""),'AND/OR UI controls');
 assert.ok(builder.includes("applyNativeDisplay(form,wrap,f)"),'Admin field type changes must reach native forms');
+assert.ok(builder.includes("proxy.dataset.grfbProxy='1'"),'CRM should preserve its original data control when changing the visual field type');
+assert.ok(builder.includes('matchesCondition(field,read)'),'Employee forms must use the ALL/ANY condition evaluator');
 const equals={operator:'equals',value:'Yes'};
 assert.equal(form.matchesRule('Yes',equals),true);
 assert.equal(form.matchesRule('No',equals),false);
