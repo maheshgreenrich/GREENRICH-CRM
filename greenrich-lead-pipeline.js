@@ -314,11 +314,18 @@
   });
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
-  const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
-   due.closest('label').hidden=won||stage.value==='Lost';due.required=!won&&stage.value!=='Lost';order.closest('label').hidden=!won;order.required=won;
-   d.querySelector('.gl-move-heat').hidden=won;
-   d.querySelector('.gl-won-search').hidden=!won;
-  };stage.onchange=controls;controls();
+  const controls=()=>{
+   if(!d.isConnected||!stage)return;
+   const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
+   const dueLabel=due?.closest('label'),orderLabel=order?.closest('label');
+   if(dueLabel)dueLabel.hidden=won||stage.value==='Lost';
+   if(due)due.required=!won&&stage.value!=='Lost';
+   if(orderLabel)orderLabel.hidden=!won;
+   if(order)order.required=won;
+   const heatPanel=d.querySelector('.gl-move-heat'),searchPanel=d.querySelector('.gl-won-search');
+   if(heatPanel)heatPanel.hidden=won;
+   if(searchPanel)searchPanel.hidden=!won;
+  };if(stage){stage.onchange=controls;controls()}
   const search=d.querySelector('[name=order_search]');
   const orderPicker=d.querySelector('[name=order]');
   const allOrderOptions=[...orderPicker.options].map(option=>option.cloneNode(true));
