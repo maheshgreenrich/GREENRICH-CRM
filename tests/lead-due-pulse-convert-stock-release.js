@@ -2,6 +2,9 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const crm=fs.readFileSync('greenrich-crm-inline.js','utf8');
 const leads=fs.readFileSync('greenrich-lead-pipeline.js','utf8');
+const alarm=fs.readFileSync('greenrich-followup-alarm.js','utf8');
+assert.ok(!alarm.includes('open(due.data[0])'),'Due reminders must not open a blocking modal');
+assert.ok(alarm.includes('alreadyNotified.add(key)'),'No repeating reminder toast for the same due time');
 new vm.Script(crm);new vm.Script(leads);
 // Run the exact shipping production stock transition function, not a duplicate copy.
 const begin=crm.indexOf('const consumesStock=s=>');
