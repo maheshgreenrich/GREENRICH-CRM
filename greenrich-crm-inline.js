@@ -724,7 +724,11 @@ async function saveEditor(event){
  if(editId&&!old)return toast('Record could not be found in the selected company');
  if(editing==='sales'){
   const product=copy.products.find(p=>p.id===row.product_id),channel=copy.channels.find(c=>c.id===row.channel_id);
-  if(!row.date||!product||!channel||product.active===false||channel.active===false)return toast('Enter date, active sales channel and product');
+  // A previously recorded order must remain cancellable even if its
+  // product or sales channel has since been made inactive.
+  const allowRelease=Boolean(old)&&['Cancelled','Returned'].includes(row.status);
+  if(!row.date||!product||!channel||((product.active===false||channel.active===false)&&!allowRelease))
+   return toast('Enter a date, valid sales channel and product (inactive items are allowed only when cancelling an existing order)');
   row.qty=Number(row.qty);row.unit_price=Number(row.unit_price);row.shipping_charge=Number(row.shipping_charge||0);row.shipping_gst_rate=Number(row.shipping_gst_rate||0);
   row.tax_rate=Number(product.tax);row.inclusive=Boolean(product.inclusive);
   if(!Number.isInteger(row.qty)||row.qty<1||!Number.isFinite(row.unit_price)||row.unit_price<0||!Number.isFinite(row.shipping_charge)||row.shipping_charge<0||!Number.isFinite(row.shipping_gst_rate)||row.shipping_gst_rate<0||row.shipping_gst_rate>100)return toast('Quantity, unit price, shipping charge and shipping GST rate must be valid');
