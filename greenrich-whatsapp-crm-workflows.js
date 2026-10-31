@@ -117,7 +117,7 @@
    '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+ 
    '<label>Optional campaign image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
    '<p class="grwc-muted grwc-span">Select a company and opt-in eligible contacts, then choose the existing SocialBerries template. The selected template may be metadata-only until the full approved template is retrieved. Save creates a draft; it does NOT send messages.</p>'+
-   '<button type="submit">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
+   '<button type="submit" class="grwc-primary">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" disabled title="Sending requires confirmed provider API, approved template components and marketing opt-in">Send WhatsApp marketing (not enabled)</button><button type="button" data-refresh-crm>Refresh template references</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
@@ -136,6 +136,8 @@
  function welcomeView(){
   const rules=scoped(rows.welcomes),co=cd();
   return '<section class="grwc-panel">'+headers('Optional Welcome Template for New Leads','Choose a template while creating a lead, importing Excel/CSV, or mapping a Google Sheet. Blank means no welcome message.')+
+   '<div class="grwc-notice">If no welcome template is selected, no message preference is saved. Template choices are read from GreenRich provider references and can be refreshed; automatic SocialBerries Get Templates sync still needs the provider endpoint.</div>'+
+   '<button type="button" data-refresh-crm>Refresh available template references</button>'+
    '<div class="grwc-grid"><div class="grwc-feature"><b>1 · Manual Lead</b><p>Leads & CRM → New Lead → Assign salesperson → Welcome template (optional).</p></div>'+
    '<div class="grwc-feature"><b>2 · Excel / CSV</b><p>Leads & CRM → Import → Default welcome template or optional per-row template ID/name.</p></div>'+
    '<div class="grwc-feature"><b>3 · Google Sheet</b><p>Settings → Google Sheet Leads → Select salesperson and default welcome template for each Sheet.</p></div></div></section>'+
@@ -647,6 +649,7 @@
   element.onclick=async e=>{
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
+   if(e.target.closest('[data-refresh-crm]')){try{await fetchAll();marketingDraw();alert('Latest GreenRich template references and CRM data loaded. SocialBerries automatic template API is not connected.','success')}catch(error){alert(error.message,'error')}return}
    if(e.target.closest('[data-create-service]')){serviceDialog();return}
    if(e.target.closest('[data-service-all]')){
     if(serviceCompany==='all')return alert('Choose one company before selecting all after-sales customers.','warning');
