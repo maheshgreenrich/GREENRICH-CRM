@@ -166,7 +166,7 @@
      '<td>'+e(x.completion_notes||x.notes||'—')+(x.lead_heat?'<br><b>Lead: '+e(x.lead_heat)+'</b>':'')+'</td>'+
      '<td>'+btn('Photos ('+photos.filter(p=>p.visit_id===x.id).length+')','proof',x.id,'ft-btn-sm ft-btn-ghost')+'</td></tr>').join('')+
      '</tbody></table></div>':'<div class="ft-empty">No visit history available.</div>')+
-  (isSupervisor?box('Recent Field Shift Logs',shiftTable(sessions.slice(0,70))):box('My Field Shift Logs',shiftTable(sessions.filter(x=>x.user_id===user.id).slice(0,50))));
+  (isSupervisor?box('Recent Field Shift Logs',shiftTable(sessions.slice(0,70))):box('My Field Shift Logs',shiftTable(sessions.filter(x=>x.user_id===user.id).slice(0,50)))));
  }
  function drawMonitor(){
   const active=sessions.filter(x=>!x.checkout_at);
