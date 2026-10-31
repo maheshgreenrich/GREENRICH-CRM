@@ -84,6 +84,7 @@ jobs:
           node tests/lead-360-regression.js
           node tests/sales-queue-ux.js
           node tests/flexible-stages-sales-order.js
+          node tests/admin-form-builder.js
           node --check greenrich-meta-sync.js
           node --check greenrich-sheet-manager.js
           node --check meta-sync-setup.js
