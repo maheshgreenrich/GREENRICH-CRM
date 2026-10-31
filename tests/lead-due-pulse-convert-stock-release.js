@@ -34,6 +34,7 @@ assert.ok(crm.includes("new_notes:lead.notes"),'Lead conversation/notes carried 
 assert.ok(crm.includes("gr_pipeline_link_customer"),'Link new customer to lead even on pending SO');
 assert.ok(crm.includes("current.data.stage==='Won'"),'Do not modify Won leads on repeat purchase');
 assert.ok(crm.includes('const existingCustomer=shared?.customers?.find'),'Duplicate customer race is reconciled');
+assert.ok(crm.includes('const allowRelease=Boolean(old)'),'Inactive products should not prevent cancelling an existing order');
 assert.ok(leads.includes("const pulseTick=setInterval("),'Board refreshes due state while open');
 assert.ok(leads.includes('updateDueCards(ctx)'),'Highlight updated on board render');
 assert.ok(leads.includes('prefers-reduced-motion:reduce'),'Respect reduced-motion preference');
@@ -43,7 +44,12 @@ const now=Date.now();
 const card=at=>({dataset:{followupAt:String(at)},classList:{classes:new Set(),toggle(name,on){on?this.classes.add(name):this.classes.delete(name)}},message:{hidden:true},querySelector(){return this.message}});
 const due=card(now-1000),future=card(now+3600000),empty=card(0);
 const scope={root:{isConnected:true,querySelectorAll(){return [due,future,empty]}}};
-vm.runInNewContext(leads.slice(dueStart,dueEnd)+';updateDueCards(ctx)',{ctx:scope,Date});
+const timers=[];
+vm.runInNewContext(leads.slice(dueStart,dueEnd)+';updateDueCards(ctx)',{
+ ctx:scope,Date,setTimeout:(cb,delay)=>{timers.push(delay);return timers.length},clearTimeout:()=>{}
+});
+assert.equal(timers.length,1,'Next future follow-up must have a specific deadline timer');
+assert.ok(timers[0]>0&&timers[0]<=3600050,'Deadline timer should target next follow-up, not a broad polling interval');
 assert.ok(due.classList.classes.has('gl-followup-due')&&!due.message.hidden,'Only overdue lead pulses');
 assert.ok(!future.classList.classes.has('gl-followup-due')&&future.message.hidden,'Future lead stays normal');
 assert.ok(!empty.classList.classes.has('gl-followup-due')&&empty.message.hidden,'Unscheduled lead stays normal');
