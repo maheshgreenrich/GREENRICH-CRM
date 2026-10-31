@@ -181,7 +181,7 @@ async function render(){
 async function dashboard(c){
  if(!window.GreenRichExecutiveDashboard)throw Error('Dashboard not loaded. Refresh GreenRich ONE.');
  await window.GreenRichExecutiveDashboard.mount(c,{db,userId:user.id,
- companyIds:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),notify:toast,admin:roleName()==='Admin',role:roleName(),canExport:roleName()==='Admin'||can('dashboard','export')});
+ companyIds:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),notify:toast,admin:roleName()==='Admin',role:roleName(),canExport:roleName()==='Admin'||can('dashboard','export'),canModule:module=>can(module)});
 }
 async function attendance(c){
  if(!window.GreenRichAttendance)throw Error('Attendance module script has not loaded. Refresh GreenRich ONE.');
