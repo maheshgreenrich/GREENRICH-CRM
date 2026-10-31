@@ -17,7 +17,7 @@ const checks=[
  ['template filtered to selected provider',script.includes("t.connection_id===connectionId")],
  ['select all matching loaded contacts',script.includes("data-select-all-matching")&&script.includes("selected=new Set(members.map(x=>x.id))")],
  ['provider-selected sender includes shared customers',script.includes('const companyId=sender.company_id;')&&script.includes("x.type==='Customer'||x.company_id===companyId")&&script.includes("selected=new Set(members.map(x=>x.id))")],
- ['draft saved without automatic sends',script.includes("status:'draft'")&&script.includes('Saving a draft does not send a message.')],
+ ['one-click sending checks real readiness',script.includes("status:'draft'")&&script.includes("secureSend('check_campaign'")&&script.includes("data-send-campaign")],
  ['does not create a messaging API caller',!script.includes("action:'send'")]
 ];
 for(const [name,passed] of checks)assert.ok(passed,'Failed: '+name);
