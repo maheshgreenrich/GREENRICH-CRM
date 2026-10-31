@@ -91,18 +91,26 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]):Promise<S
   const response=await fetch(u,{method:"POST",redirect:"error",signal:ctl.signal,
    headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),"Content-Type":"application/json","Accept":"application/json"},
    body:JSON.stringify({type:"template",template:template.name,language:template.language,template_id:template.provider_template_id,
-    category:"MARKETING",preview_template:{id:template.provider_template_id,name:template.name,language:template.language,status:"APPROVED",category:"MARKETING",components:template.provider_preview.components},components:parts})});
+    category:"MARKETING",preview_template:{id:template.provider_template_id,language:template.language,name:template.name,
+     status:"APPROVED",category:"MARKETING"},components:parts})});
   const raw=await response.text();
   if(raw.length>120000)return {id:null,code:"RESPONSE_TOO_LARGE",reason:"SocialBerries returned an unexpectedly large response.",uncertain:true};
   let doc:any=null;try{doc=JSON.parse(raw)}catch{
    return {id:null,code:"INVALID_PROVIDER_RESPONSE",reason:"SocialBerries returned a non-JSON response (HTTP "+response.status+").",uncertain:response.ok};
   }
-  const code=safeProviderReason(
-   typeof doc?.error_code==="string"?doc.error_code:
-   typeof doc?.code==="string"?doc.code:
-   typeof doc?.error?.code==="string"?doc.error.code:"");
-  const details=doc?.error?.message||doc?.detail||doc?.message||doc?.errors?.[0]?.message||
-   (typeof doc?.error==="string"?doc.error:"");
+  // Preserve the provider's useful nested rejection details without logging raw JSON,
+  // credentials, image URLs or recipient phone numbers.
+  const providerIssue=doc?.error && typeof doc.error==="object"?doc.error:
+   Array.isArray(doc?.errors)?doc.errors[0]:
+   doc?.data?.error && typeof doc.data.error==="object"?doc.data.error:
+   Array.isArray(doc?.data?.errors)?doc.data.errors[0]:
+   doc?.data?.result?.error && typeof doc.data.result.error==="object"?doc.data.result.error:null;
+  const issue=providerIssue && typeof providerIssue==="object"?providerIssue:{};
+  const code=safeProviderReason(doc?.error_code||doc?.code||issue?.code||
+   doc?.data?.error_code||doc?.data?.code||doc?.data?.status_code||"");
+  const details=issue?.message||issue?.description||issue?.detail||issue?.error_user_msg||
+   doc?.data?.error_description||doc?.data?.error_message||doc?.data?.message||
+   doc?.detail||doc?.message||(typeof doc?.error==="string"?doc.error:"");
   const errorText=safeProviderReason(details);
   if(!response.ok)return {id:null,code:"HTTP_"+response.status+(code?"_"+code:""),
    reason:errorText||"SocialBerries rejected the template request (HTTP "+response.status+").",
