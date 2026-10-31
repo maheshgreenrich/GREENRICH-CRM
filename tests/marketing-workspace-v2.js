@@ -20,7 +20,7 @@ pass('Image limit',ui.includes('5*1024*1024'));
 pass('Image path company scoped',ui.includes("companyId+'/'+record.id+'/marketing.'"));
 pass('Campaign always draft',ui.includes("status:'draft'"));
 pass('No fake send',!ui.includes("action:'send'")&&!api.includes('action==="send"'));
-pass('Visible warning for disabled send',ui.includes('Send WhatsApp marketing (not enabled)'));
+pass('Guarded send controls present',ui.includes('data-save-and-review')&&ui.includes('data-review-campaign')&&ui.includes("secureSend('send_campaign'"));
 pass('Consent preflight',ui.includes("w.consent_status==='opted_in'")&&ui.includes('w.opt_out_at'));
 pass('Read-only provider batch detail API',api.includes('if(action==="batch_detail")')&&api.includes('message_statistics'));
 pass('Read/failed reported only when provider returns',api.includes('read:toCount(raw.read)')&&api.includes('failed:toCount(raw.failed)'));

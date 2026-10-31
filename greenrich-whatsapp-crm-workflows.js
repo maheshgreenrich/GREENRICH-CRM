@@ -29,7 +29,7 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
@@ -40,9 +40,10 @@
    app.admin?read('gr_wa_provider_leads'):Promise.resolve([]),
    optional('gr_dispatch_orders','id,company_id,source_sale_id,order_id,order_date,customer_id,customer_name,customer_mobile,product_name,sku,status,dispatched_at,delivered_at,customer_email'),
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
-   optional('gr_pilot_products','id,company_id,crm_product_id,name,sku')
+   optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
+   optional('gr_wa_messages','id,company_id,campaign_id,delivery_status,phone')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -125,16 +126,22 @@
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
-  const completed=relevant.filter(x=>!!x.provider_batch_id);
+  const messages=rows.messages||[],completed=relevant.filter(x=>!!x.provider_batch_id);
+  const tracked=messages.filter(m=>relevant.some(c=>c.id===m.campaign_id));
   return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
-   'Local campaign drafts and provider batch references. Read/opened statuses require verified provider statistics; replied/not replied require incoming-message events.')+
+   'Provider acceptance is not WhatsApp delivery. Actual deliveries depend on reported provider events.')+
    '<div class="grwc-grid grwc-kpis">'+
-   [['Loaded CRM drafts',relevant.length],['Provider batches linked',completed.length],['Read / opened','—'],['Responded','—'],['Not responded','—']].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
-   (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Created</th><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Status</th><th>Image</th></tr></thead><tbody>'+
-    relevant.map(x=>'<tr><td>'+esc(date(x.created_at))+'</td><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td>'+esc(x.attachment_path?'Attached':'—')+'</td></tr>').join('')+
-    '</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
-   '<div class="grwc-notice">WhatsApp “opened” is represented by provider READ status, not a guaranteed human view. Reply and non-reply statistics are unavailable until incoming-message event sync is verified. No percentages are invented.</div>'+
-   (app.admin?'<button type="button" data-provider-report>View SocialBerries batch statistics (read-only)</button>':'')+
+   [['Campaigns',relevant.length],['Local attempts',tracked.length],
+    ['Awaiting provider delivery',tracked.filter(x=>x.delivery_status==='queued').length],
+    ['Failed / uncertain',tracked.filter(x=>x.delivery_status==='failed').length],
+    ['Provider batches linked',completed.length]].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
+   (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Attempts</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
+   relevant.map(x=>{
+    const attempts=messages.filter(m=>m.campaign_id===x.id);
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td><button type="button" data-review-campaign="'+esc(x.id)+'">Review / Send</button></td></tr>';
+   }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
+   '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
+   (app.admin?'<button type="button" data-provider-report>View SocialBerries native bulk statistics</button>':'')+
    '</section>';
  }
  function welcomeView(){
