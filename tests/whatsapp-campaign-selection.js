@@ -26,23 +26,23 @@ t.seed({
  customers:[
   {id:c1.slice(2),name:'Alpha',mobile:'919876543210',created_at:'2026-10-31',tag_ids:[]},
   {id:c2.slice(2),name:'Beta',mobile:'9655735712',created_at:'2026-10-31',tag_ids:[]},
-  {id:bad.slice(2),name:'Bad Mobile',mobile:'123',created_at:'2026-10-31',tag_ids:[]}
+  {id:bad.slice(2),name:'Backup Phone Customer',mobile:'123',mobile2:'919876543211',created_at:'2026-10-31',tag_ids:[]}
  ],
  leads:[{lead_id:l1.split(':').slice(2).join(':'),company_id:'enviro-solutions',contact:'Other',mobile:'9876543210',tag_ids:[]}],
  campaigns:[],connections:[],templates:[],messages:[],tags:[],profiles:[],consents:[],dispatches:[],products:[]
 });
 t.check([c1,c2,bad,l1]);
-assert.equal(t.sendable('grow-india').length,2,'Only two valid shared customers for Grow India');
-assert.equal(t.sendable('enviro-solutions').length,3,'Enviro keeps valid shared customers and its lead');
+assert.equal(t.sendable('grow-india').length,3,'Customer with valid second mobile is eligible for Grow India');
+assert.equal(t.sendable('enviro-solutions').length,4,'Enviro keeps three shared customers and its lead');
 t.search('Alpha');
 t.render();
 assert.equal(t.visible().length,1,'Search filters displayed audience');
 assert.equal(t.selected().length,4,'Search redraw must not silently discard selections');
-assert.equal(t.sendable('grow-india').length,2,'Hidden selections remain sendable');
+assert.equal(t.sendable('grow-india').length,3,'Hidden selections and second mobile fallback remain sendable');
 t.setScope('grow-india');t.render();
 assert.equal(t.selected().length,4,'Company filter redraw must keep selections');
-assert.equal(t.sendable('grow-india').length,2,'Unassigned shared customers may use chosen sender');
+assert.equal(t.sendable('grow-india').length,3,'Unassigned shared customers may use chosen sender');
 assert.ok(src.includes("case 'grwc-company':scope=v;break;"),'Company dropdown must not clear selection');
 assert.ok(src.includes('data-grwc-selected-count'),'Selection count available');
 assert.ok(src.indexOf('if(!selected.size)')<src.indexOf("record=await save('gr_wa_campaigns'"),'Empty selection checked before draft creation');
-console.log('PASS: Filter redraw retains selected contacts; sender-scoped leads, shared customers, mobile validation and empty-selection preflight work.');
+console.log('PASS: Filter redraw retains selected contacts; sender-scoped leads, shared customers, second mobile fallback and empty-selection preflight work.');
