@@ -354,7 +354,7 @@
    '<li>Supabase → Edge Functions → Secrets: enter server-side <b>BASE_URL</b>, <b>BASIC_USERNAME</b>, <b>BASIC_PASSWORD</b> for this company/provider. Use an HTTPS API host, not the documentation URL. Set API_VERSION (default v1). Never enter credentials in CRM or GitHub.</li>'+
    '<li>Environment variable prefix for tool 1: <code>'+esc(c==='grow-india'?'SB_GROW_INDIA_SLOT1':'SB_ENVIRO_SOLUTIONS_SLOT1')+'</code> (tool 2 uses SLOT2). Example: <code>..._BASE_URL</code>.</li>'+
    '<li>Press <b>Test Connection</b> after configuration. It calls only <code>GET /api/v1/users/?page=1</code>. No WhatsApp message is sent.</li>'+
-   '<li>Existing templates: import their preview JSON below until SocialBerries supplies its missing Get Templates endpoint. Message sending and inbound WhatsApp webhooks stay disabled until authentication, opt-in and webhook verification are implemented.</li>'+
+   '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
    '<p class="grwc-muted">Template catalog has '+templ.length+' CRM draft/reference record(s). An existing template can be linked by its exact provider ID, name, category and language, without recreating the message. Screenshot/manual references remain <b>not API-verified</b>; actual message content is not guessed.</p>'+
@@ -490,7 +490,7 @@
       const missing=Array.isArray(data.missing)?' Missing: '+data.missing.join(', '):'';
       alert((data.message||data.error||'Provider check failed')+missing,'warning');return;
     }
-    if(action==='test')return alert('Read-only SocialBerries API connected. Authentication successful. User count: '+(data.users_count??'not returned')+'. Sending is still disabled.','success');
+    if(action==='test')return alert('SocialBerries read-only API authentication succeeded. User count: '+(data.users_count??'not returned')+'. Marketing sending additionally requires a confirmed approved template, customer opt-ins and server activation.','success');
     const d=document.createElement('dialog');d.className='grwc-dialog';
     d.innerHTML='<div class="grwc-dialog-head"><h3>SocialBerries campaign reports</h3><button type="button" data-close>×</button></div>'+
       '<div class="grwc-dialog-fields"><p class="grwc-muted grwc-span">'+esc(data.count||0)+' provider batches · Page '+esc(data.page||1)+'. Provider batches are not automatically linked to GreenRich CRM campaign drafts.</p>'+
@@ -722,25 +722,6 @@
   if(!r.data?.ok)throw Error(r.data?.error||r.data?.blockers?.join('; ')||'WhatsApp request failed');
   return r.data;
  }
- function showReadinessGuide(campaign,status){
-  const dlg=document.createElement('dialog');dlg.className='grwc-dialog';
-  const selected=Number(status.selected)||0,eligible=Number(status.eligible)||0;
-  const blockers=(status.blockers||[]).map(x=>'<li>'+esc(x)+'</li>').join('');
-  dlg.innerHTML='<div class="grwc-dialog-head"><h3>Campaign sending checklist</h3><button type="button" data-close>×</button></div>'+
-   '<div class="grwc-dialog-fields">'+
-   '<p class="grwc-notice grwc-span"><b>'+esc(campaign.name||'Saved campaign')+'</b> — '+eligible+' / '+selected+
-   ' selected contacts have recorded marketing opt-in for this sender. <b>No message sent.</b></p>'+
-   '<div class="grwc-span"><b>Requirements to complete:</b><ol>'+blockers+'</ol></div>'+
-   '<p class="grwc-muted grwc-span">Only record real customer permission, and paste a complete approved MARKETING template from your SocialBerries account. After provider testing, an admin must enable SB_ENABLE_MARKETING_SEND=true in Supabase Secrets. Saving or reviewing drafts never sends.</p>'+
-   '</div><div class="grwc-dialog-foot"><button type="button" data-close>Close</button>'+
-   '<button type="button" data-consent>Record opt-in</button>'+
-   '<button type="button" data-template>Confirm template</button></div>';
-  document.body.append(dlg);dlg.onclose=()=>dlg.remove();
-  dlg.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>dlg.close());
-  dlg.querySelector('[data-consent]').onclick=()=>{dlg.close();recordOptIn(campaign)};
-  dlg.querySelector('[data-template]').onclick=()=>{dlg.close();confirmTemplate(campaign)};
-  dlg.showModal();
- }
  async function reviewCampaign(campaign){
   if(!app.admin)return alert('Only administrators can send WhatsApp campaigns.','warning');
   const args={connection_id:campaign.connection_id,campaign_id:campaign.id};
@@ -759,41 +740,6 @@
    alert('SocialBerries accepted '+result.accepted+' / '+result.attempted+' messages; '+result.remaining+' eligible customers remain. Acceptance is not delivery.','success');
    await fetchAll();marketingDraw();
   }catch(e){alert(e.message,'error')}
- }
- function recordOptIn(campaign=null){
-  const form=root?.querySelector('#grwc-audience-form');
-  const connectionId=campaign?.connection_id||form?.elements.connection_id?.value||'';
-  const companyId=campaignConnection(connectionId)?.company_id;
-  if(!companyId)return alert('Choose WhatsApp provider first.','warning');
-  const keys=new Set(campaign?.audience?.crm_ids||[...selected]);
-  const recipients=targets().filter(x=>keys.has(x.id)&&
-   (x.type==='Customer'||x.company_id===companyId)&&digits(x.mobile).length===10);
-  if(!recipients.length)return alert('No saved CRM contacts with valid phone numbers were found in the currently loaded list.','warning');
-  const fields='<p class="grwc-muted grwc-span">Only record explicit marketing permission the customer has already given. An existing CRM phone number does not prove permission. Sender: '+esc(name(companyId))+'.</p>'+
-   field('Customer / Lead','contact_key',options(recipients.map(x=>[x.id,x.name+' · '+x.mobile]),'Choose one contact'),true)+
-   '<label class="grwc-span">Permission source<input name="source" required minlength="12" placeholder="e.g. WhatsApp marketing checkbox on website"></label>'+
-   '<label class="grwc-span">Evidence<textarea name="evidence" rows="3" required minlength="10" placeholder="When and how customer agreed"></textarea></label>'+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirm this person explicitly opted in to WhatsApp marketing</label>'+
-   '<label class="grwc-span"><input type="checkbox" name="new"> Fresh opt-in after an earlier opt-out (only if applicable)</label>';
-  dialog('Record WhatsApp marketing opt-in',fields,async f=>{
-   await secureSend('record_consent',{connection_id:connectionId,contact_key:String(f.get('contact_key')||''),
-    consent_source:String(f.get('source')||''),evidence_note:String(f.get('evidence')||''),
-    attested:f.has('attested'),new_opt_in:f.has('new')});
-  },'Record opt-in','Customer marketing permission recorded');
- }
- function confirmTemplate(campaign=null){
-  const form=root?.querySelector('#grwc-audience-form'),connectionId=campaign?.connection_id||form?.elements.connection_id?.value||'';
-  const templateId=campaign?.template_id||form?.elements.template_id?.value||'',t=rows.templates.find(x=>x.id===templateId&&x.connection_id===connectionId);
-  if(!t)return alert('Select a marketing template first.','warning');
-  const fields='<p class="grwc-muted grwc-span">Verify this template in your actual SocialBerries account and paste its complete APPROVED MARKETING JSON with BODY text and any IMAGE header. This records an administrator attestation, not an API verification.</p>'+
-   '<p class="grwc-muted grwc-span">Template: '+esc(t.name)+' · Provider ID: '+esc(t.provider_template_id||'—')+'</p>'+
-   '<label class="grwc-span">Approved template JSON<textarea name="json" rows="7" required></textarea></label>'+
-   '<label class="grwc-span">Approval evidence<textarea name="note" rows="2" minlength="10" required placeholder="Who checked this template, where and when?"></textarea></label>'+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> I checked the template is approved in the actual provider account</label>';
-  dialog('Confirm approved marketing template',fields,async f=>{
-   await secureSend('confirm_template',{connection_id:connectionId,template_id:templateId,
-    approved_json:String(f.get('json')||''),confirmation_note:String(f.get('note')||''),attested:f.has('attested')});
-  },'Confirm template','Template approval evidence recorded');
  }
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
