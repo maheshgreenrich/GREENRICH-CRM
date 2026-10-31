@@ -1,0 +1,60 @@
+/* GreenRich CRM-led WhatsApp Marketing & Settings */
+#content .grwc{font:13px/1.55 Inter,system-ui,sans-serif;display:grid;gap:16px;color:#29405b;max-width:1540px;margin:0 auto}
+#content .grwc *{box-sizing:border-box}
+#content .grwc-hero{padding:24px 28px;background:linear-gradient(115deg,#fff,#f0fdf7);border:1px solid #dfeee8;border-radius:18px;display:flex;gap:18px;justify-content:space-between;align-items:center}
+#content .grwc-hero small{font-size:10px;letter-spacing:.13em;font-weight:800;color:#188969}
+#content .grwc-hero h2{font-size:24px!important;margin:6px 0 5px!important;color:#1b4256!important;letter-spacing:-.04em!important}
+#content .grwc-hero p{color:#718897;font-size:12px;margin:0}
+#content .grwc-chip{background:#fff4d9;border:1px solid #eedcaf;border-radius:30px;padding:8px 12px;font-size:10px;font-weight:800;color:#a56b18;white-space:nowrap}
+#content .grwc-notice{border-left:4px solid #dbaa49;background:#fffbf1;border-radius:9px;padding:12px 14px;font-size:12px;color:#8a6826}
+#content .grwc-tabs{display:flex;align-items:center;gap:6px;overflow:auto;padding:6px;background:white;border:1px solid #e5ebf4;border-radius:14px}
+#content .grwc-tabs button{width:auto!important;flex:0 0 auto!important;background:transparent!important;color:#617a95!important;padding:10px 14px!important;font-size:12px!important;font-weight:700!important;border:0!important;border-radius:9px!important}
+#content .grwc-tabs button.active{background:#dff8ec!important;color:#16855f!important}
+#content .grwc-panel{background:#fff;border:1px solid #e4ebf3;border-radius:17px;padding:22px 23px;min-width:0;box-shadow:0 6px 20px #26446d08}
+#content .grwc-title{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:17px}
+#content .grwc-title h3{font-size:16px!important;line-height:1.35!important;margin:0 0 4px!important;color:#233e60!important;font-weight:800!important}
+#content .grwc-title p{margin:0;font-size:11px;color:#8496ad}
+#content .grwc button{background:#eef6ff!important;color:#225c9d!important;border:1px solid #d5e6f6!important;padding:9px 13px!important;font-size:11px!important;font-weight:750!important;width:auto!important;min-height:35px!important;border-radius:9px!important}
+#content .grwc button:hover{filter:brightness(.97)}
+#content .grwc button:disabled{opacity:.5;cursor:not-allowed}
+#content .grwc label{display:grid;gap:5px;font-size:11px;color:#506c8c;font-weight:750;min-width:0}
+#content .grwc input:not([type=checkbox]),#content .grwc select,#content .grwc textarea{min-width:0;width:100%;height:41px!important;border:1px solid #d9e5f2!important;border-radius:9px!important;padding:9px 11px!important;background:#fcfdff!important;color:#2c496a!important;font-size:12px!important}
+#content .grwc input[type=checkbox]{width:17px;height:17px;accent-color:#15a479}
+#content .grwc-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-bottom:15px}
+#content .grwc-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:end}
+#content .grwc-form>button{justify-self:start}
+#content .grwc-form .grwc-span{grid-column:1/-1}
+#content .grwc-audience-summary{background:#f3f9ff;border:1px solid #e1eefc;padding:10px 14px;border-radius:10px;margin:12px 0;color:#5a7190;font-size:11px}
+#content .grwc-audience-summary b{font-size:14px;color:#2965b1}
+#content .grwc-tablewrap{max-width:100%;overflow:auto;border:1px solid #e7edf4;border-radius:11px}
+#content .grwc-tablewrap table{border-collapse:collapse;width:100%;min-width:620px}
+#content .grwc-tablewrap th{background:#f6faff;font-size:10px;color:#8295ad;text-align:left;padding:12px;white-space:nowrap}
+#content .grwc-tablewrap td{font-size:11px;color:#536b8a;padding:11px 12px;border-top:1px solid #edf2f8}
+#content .grwc-empty{padding:25px 14px;background:#fafcff;border:1px dashed #d9e5f0;border-radius:11px;text-align:center;color:#8ba0b5}
+#content .grwc-muted{font-size:11px!important;line-height:1.55!important;color:#8296ae!important;margin:11px 0!important}
+#content .grwc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#content .grwc-feature{padding:17px;background:#f8fbff;border:1px solid #e5edf7;border-radius:12px}
+#content .grwc-feature b{display:block;font-size:12px;color:#2b5476}
+#content .grwc-feature p{font-size:11px;color:#7790a7;line-height:1.55;margin:7px 0 0}
+#content .grwc-feature small{color:#b18035;font-size:10px}
+#content .grwc-steps{padding:15px 18px;margin-top:17px;background:#f6fbf9;border:1px solid #e2f0e9;border-radius:12px;color:#526e68}
+#content .grwc-steps b{font-size:13px;color:#24765f}
+#content .grwc-steps ol{padding-left:24px;display:grid;gap:7px;font-size:12px}
+#content .grwc-steps a{color:#1a65b0}
+#content .grwc-sheet{display:grid;grid-template-columns:minmax(150px,1fr) minmax(200px,1.3fr) auto;gap:12px;align-items:center;padding:13px 2px;border-bottom:1px solid #edf1f6}
+#content .grwc-sheet b{display:block;font-size:12px;color:#304b71}
+#content .grwc-sheet small{display:block;font-size:11px;color:#879ab2}
+body .grwc-dialog{width:min(650px,94vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid #dbe5f1;padding:0!important;border-radius:17px;box-shadow:0 22px 65px #142f4766;color:#24465c}
+body .grwc-dialog::backdrop{background:#12294280}
+body .grwc-dialog-head{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid #e7edf6}
+body .grwc-dialog-head h3{font-size:17px!important;margin:0!important;color:#26476b!important}
+body .grwc-dialog-head button{border:0!important;font-size:23px!important;background:transparent!important;cursor:pointer}
+body .grwc-dialog-fields{padding:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+body .grwc-dialog-fields label{display:grid;gap:5px;font-size:11px;font-weight:700;color:#59728e}
+body .grwc-dialog-fields input:not([type=checkbox]),body .grwc-dialog-fields select,body .grwc-dialog-fields textarea{width:100%;min-width:0;min-height:38px;padding:9px 10px;background:#fcfdff;border:1px solid #dce7f2;border-radius:9px;font-size:12px}
+body .grwc-dialog-fields .grwc-span{grid-column:1/-1}
+body .grwc-dialog-foot{padding:14px 22px;border-top:1px solid #e9eff6;display:flex;justify-content:flex-end;gap:9px}
+body .grwc-dialog-foot button{width:auto!important;padding:10px 16px!important;border:1px solid #d9e4f1;border-radius:9px;background:#f6faff;color:#36618c;font-size:12px}
+body .grwc-dialog-foot .grwc-primary{background:#168b65!important;color:white!important;border-color:#168b65!important}
+@media(max-width:800px){#content .grwc-filters{grid-template-columns:repeat(2,minmax(0,1fr))}#content .grwc-grid{grid-template-columns:1fr}}
+@media(max-width:540px){#content .grwc-hero{flex-direction:column;align-items:flex-start;padding:17px}#content .grwc-hero h2{font-size:20px!important}#content .grwc-panel{padding:16px}#content .grwc-filters,#content .grwc-form{grid-template-columns:1fr}#content .grwc-form .grwc-span{grid-column:auto}#content .grwc-sheet{grid-template-columns:1fr}body .grwc-dialog-fields{grid-template-columns:1fr;padding:15px}body .grwc-dialog-fields .grwc-span{grid-column:auto}}
