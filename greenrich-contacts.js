@@ -133,7 +133,9 @@
   return '<label>'+esc(label)+(required?' *':'')+
    '<div class="gr-contact-phone"><span>+91</span><input type="tel" name="'+name+'" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" placeholder="9876543210" value="'+esc(phone(val).slice(3))+'"'+(required?' required':'')+'></div></label>';
  }
- function openForm(kind,id='',owner=''){
+ async function openForm(kind,id='',owner=''){
+  try{await window.GreenRichFormBuilder?.ready?.(db,context.companyIds,true)}
+  catch(e){notify(e.message);return}
   if(kind==='lead'){window.GreenRichCRM?.switchPage?.('leads');window.GreenRichShell?.setPageWithoutRemount?.('leads');notify('Use the Leads & CRM pipeline to create, assign or move leads.');return;}
   const existing=id?allRecords().find(r=>r.id===id&&r._kind===kind&&(kind==='customer'||r._companyId===owner)):null;
   if(id&&!existing)return notify('Record not found. Refresh this page.');
@@ -176,10 +178,8 @@
   if(kind==='customer'&&window.GreenRichFormBuilder){
    const co=context.selectedCompany()==='all'?context.companyIds[0]:context.selectedCompany();
    form.dataset.formCompany=co;
-   window.GreenRichFormBuilder.decorate(form,co,'customer');
-   if(id)void window.GreenRichFormBuilder.recentAnswers(co,'customer',id).then(saved=>{
-    if(form.dataset.id===id&&dialog.open)window.GreenRichFormBuilder.decorate(form,co,'customer',saved)
-   }).catch(()=>{});
+   const saved=id?await window.GreenRichFormBuilder.recentAnswers(co,'customer',id):{};
+   window.GreenRichFormBuilder.decorate(form,co,'customer',saved);
   }
   // The full profile hides its customer directory, where this editor normally lives.
   // Move the same dialog to document.body so a visible modal never traps the UI.
@@ -200,17 +200,19 @@
   const fd=new FormData(form);const fields=Object.fromEntries([...fd.entries()].filter(([k])=>k!=='tag_ids'&&!k.startsWith('custom_')));
   const result={...old,...fields,tag_ids:fd.getAll('tag_ids')};
   for(const key of ['name','email','company','source','type','notes','address1','address2','city','state','pincode','gstin'])result[key]=clean(result[key]);
+  if(!phoneValid(result.mobile)||!phoneValid(result.mobile2))throw Error('Enter valid 10-digit mobile numbers.');
   result.mobile=phone(result.mobile);result.mobile2=phone(result.mobile2);
-  if(!result.name)throw Error('Enter a customer / lead name.');
-  if(!result.mobile||!phoneValid(result.mobile2))throw Error('Enter a valid +91 mobile number (10 digits).');
+  if(form.elements.namedItem('name')?.required&&!result.name)throw Error('Enter a customer / lead name.');
+  if((form.elements.namedItem('mobile')?.required&&!result.mobile)||!phoneValid(result.mobile)||!phoneValid(result.mobile2))throw Error('Enter a valid +91 mobile number (10 digits).');
   if(result.mobile2&&result.mobile===result.mobile2)throw Error('Both mobile fields cannot contain the same number.');
   if(result.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email))throw Error('Enter a valid email address.');
   if(result.pincode&&!/^\d{6}$/.test(result.pincode))throw Error('PIN code must contain 6 digits.');
   if(result.gstin&&!/^[0-9A-Z]{15}$/.test(result.gstin.toUpperCase()))throw Error('GSTIN must have 15 characters.');
   result.gstin=result.gstin.toUpperCase();
-  delete result._kind;delete result._companyId;delete result._savedAt;
+  delete result._kind;delete result._companyId;delete result._savedAt;delete result._wonLead;
   if(kind==='customer'){
-   if(!result.address1)throw Error('Address line 1 is required for customer records.');
+   if(form.elements.namedItem('address1')?.required&&!result.address1)throw Error('Address line 1 is required for customer records.');
+   result.email=result.email||null;result.address1=result.address1||null;result.mobile=result.mobile||null;
    result.country='India';
    delete result.products;delete result.enquiry_details;delete result.company_id;delete result.title;delete result.stage;delete result.value;delete result.followup;
   }else{

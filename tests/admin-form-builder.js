@@ -46,7 +46,7 @@ assert.ok(settings.includes("['forms','Form Builder']")&&settings.includes("tab=
 assert.ok(one.includes('openFormBuilder:host=>window.GreenRichFormBuilder.mount'));
 assert.ok(html.includes('greenrich-form-builder.js?v=')&&html.includes('greenrich-form-builder.css?v='));
 assert.ok(html.indexOf('greenrich-form-builder.js?v=')<html.indexOf('greenrich-lead-pipeline.js?v='));
-assert.ok(contacts.includes("GreenRichFormBuilder.decorate(form,co,'customer')"));
+assert.ok(contacts.includes("GreenRichFormBuilder.decorate(form,co,'customer',saved)"));
 assert.ok(contacts.includes("GreenRichFormBuilder.saveAnswers(co,'customer',saved.id,extra)"));
 assert.ok(contacts.includes("!k.startsWith('custom_')"),'Never send arbitrary columns to customers');
 assert.ok(pipeline.includes("GreenRichFormBuilder?.decorate?.(d.querySelector('form'),l.company_id,'lead_stage')"));
@@ -90,7 +90,7 @@ assert.throws(()=>form.validate('lead_create',multi),/missing or identical/);
 const customCfg=form.defaults('customer');
 customCfg[0].visible=false; // intentionally malicious override; should protect at runtime
 customCfg.push({...custom});
-const fakeDb={from:()=>({select:()=>({in:async()=>({data:[{company_id:'grow-india',form_key:'customer',fields:customCfg,version:1}],error:null})})})};
+const fakeDb={from:()=>({select:()=>({order:async()=>({data:[],error:null}),in:async()=>({data:[{company_id:'grow-india',form_key:'customer',fields:customCfg,version:1}],error:null})})})};
 (async()=>{
  await form.ready(fakeDb,['grow-india']);
  const actual=form.schema('grow-india','customer');

@@ -19,6 +19,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Verify live customer forms
+        run: npm ci --ignore-scripts && npm run test:forms
       - name: Check required app files
         run: |
           test -s index.html

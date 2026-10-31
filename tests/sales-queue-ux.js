@@ -18,7 +18,7 @@ assert.ok(contacts.includes('pointerdown')&&pipeline.includes('pointerdown'));
 assert.ok(contacts.includes('gr-contact-company')&&contacts.includes('gr-contact-stage'));
 assert.ok(pipeline.includes('contactIcons(l)')&&pipeline.includes("ico('stage','Move stage'"));
 assert.ok(!pipeline.includes("button('Link customer','customer'"));
-assert.ok(pipeline.includes('gr_pipeline_advance')&&pipeline.includes("const allowed=stages.filter(stage=>stage!==l.stage)"));
+assert.ok(pipeline.includes('gr_pipeline_advance')&&pipeline.includes("const allowed=stages"));
 assert.ok(pipeline.includes('datetime-local')&&pipeline.includes('lead_heat'));
 assert.ok(pipeline.includes('setInterval(checkReminders,60000)'),'In-app reminders checked while app is open');
 assert.ok(pipeline.includes("f.heat")&&pipeline.includes('Follow-ups today')&&pipeline.includes('Overdue follow-ups'));

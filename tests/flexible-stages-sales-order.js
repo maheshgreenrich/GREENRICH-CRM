@@ -7,7 +7,7 @@ const lead=read('greenrich-lead-pipeline.js'),crm=read('greenrich-crm-inline.js'
  html=read('secure.html');
 for(const [name,js] of [['leads',lead],['crm',crm],['cloud',cloud],['sales-ops',ops]])
  new vm.Script(js,{filename:name});
-assert.ok(lead.includes('const allowed=stages.filter(stage=>stage!==l.stage)'),'Every non-Won stage must allow direct moves');
+assert.ok(lead.includes('const allowed=stages'),'Every non-Won stage must allow direct moves');
 assert.ok(!lead.includes("l.stage==='Contacted'?['Qualified','Lost']"),'Remove stage-by-stage path');
 assert.ok(lead.includes("const orders=ctx.orders.filter"),'Show matching Sales Orders');
 assert.ok(lead.includes("o.payload?.lead_id===l.lead_id"),'New lead-created orders must match lead ID');

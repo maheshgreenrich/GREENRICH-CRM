@@ -291,10 +291,11 @@
  const selectFld=(label,name,items,required=true)=>'<label>'+escape(label)+'<select name="'+escape(name)+'" '+(required?'required':'')+'>'+choices(items,'')+'</select></label>';
  const noteFld=()=>'<label>Conversation details / reason (required)<textarea name="note" maxlength="4000" required placeholder="What was discussed? What is the next action?"></textarea></label>';
  const getLead=(ctx,id,company)=>ctx.leads.find(l=>l.lead_id===id&&l.company_id===company);
- function move(ctx,l,to){
+ async function move(ctx,l,to){
+  try{await window.GreenRichFormBuilder?.ready?.(ctx.db,ctx.companyIds,true)}catch(e){notify(ctx,e.message);return}
   if(l.stage==='Won'){notify(ctx,'This lead has already been converted.');return}
-   const allowed=stages.filter(stage=>stage!==l.stage);
-   const next=allowed.includes(to)?to:(allowed.includes('Contacted')?'Contacted':allowed[0]),first=l.stage==='New';
+   const allowed=stages;
+   const next=allowed.includes(to)?to:l.stage,first=l.stage==='New';
    const digits=value=>String(value||'').replace(/[^0-9]/g,'').slice(-10);
    const leadNumber=digits(l.mobile),leadEmail=String(l.email||'').trim().toLowerCase();
    const orders=ctx.orders.filter(o=>{
@@ -323,12 +324,12 @@
      ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
   const dateInput='<label>Next follow-up date and time *<input name="due" type="datetime-local" required value="'+
     escape(l.next_followup_at?new Date(l.next_followup_at).toLocaleString('sv-SE',{timeZone:'Asia/Kolkata'}).replace(' ','T').slice(0,16):'')+'"></label>';
-  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' · choose any next stage</p>'+
-   selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
+  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' · keep this stage or choose another</p>'+
+   selectFld('Move to stage','stage',allowed.map(x=>[x,x===l.stage?x+' — keep stage / reschedule':x]))+
    firstFields+noteFld()+
    '<div class="gl-move-heat">'+selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+'</div>'+dateInput+orderSelect+
-   '<p class="gl-note">Choose any next stage. Won requires a matching confirmed Sales Order, which also converts this lead into a customer. Lost closes follow-ups; other active stages require a future follow-up.</p>';
-  const d=dialog(ctx,'Update lead stage',body,async fd=>{
+   '<p class="gl-note">Keep the current stage to update notes and reschedule, or choose another stage. Won requires a matching confirmed Sales Order, which also converts this lead into a customer. Lost closes follow-ups; other active stages require a future follow-up.</p>';
+  const d=dialog(ctx,'Update lead / reschedule',body,async fd=>{
    const custom=window.GreenRichFormBuilder?.collect?.(d.querySelector('form'),l.company_id,'lead_stage')||{};
    const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
    // Product and tag interests are optional; when chosen, the server verifies them.

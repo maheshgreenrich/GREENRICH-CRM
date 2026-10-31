@@ -20,7 +20,7 @@ window.GreenRichFormBuilder=(()=>{
   const customer=[fixed('name','Customer full name','text',true,true),fixed('mobile','Primary mobile','tel',true,true),fixed('mobile2','Second mobile','tel'),
    fixed('email','Email address','email'),fixed('tag_ids','Customer tags','checkbox'),fixed('company','Company name'),fixed('type','Customer type','select'),
    fixed('address1','Address line 1','textarea',true,true),fixed('address2','Address line 2'),fixed('city','City'),fixed('state','State'),fixed('pincode','PIN code'),
-   fixed('country','Country'),fixed('gstin','GSTIN'),fixed('source','Customer source'),fixed('owner','Account owner'),fixed('notes','Customer notes','textarea')];
+   fixed('country','Country'),fixed('gstin','GSTIN'),fixed('source','Customer source','select'),fixed('owner','Account owner'),fixed('notes','Customer notes','textarea')];
   const sale=[fixed('date','Order date','date',true,true),fixed('internal_order_id','Sales Order number','text',true,true),
    fixed('company_id','Company','select',true,true),fixed('channel_id','Sales channel','select',true,true),
    fixed('customer_picker','Lead / Customer selection','select',true,true),fixed('product_id','Product','select',true,true),fixed('qty','Quantity','number',true,true),
@@ -40,6 +40,16 @@ window.GreenRichFormBuilder=(()=>{
  };
  const DEFAULTS=buildDefaults();
  let db=null,companies=[],cache=new Map(),loading=null;
+ const catalogs={customer_sources:[],customer_tags:[]};
+ const SOURCES={custom:'Custom choices',customer_sources:'Settings · Customer sources',customer_tags:'Settings · Customer tags',customer_types:'Customer types'};
+ const resolved=f=>({...f,options:f.optionSource&&f.optionSource!=='custom'?(f.optionSource==='customer_types'?['Individual','Retailer','Distributor','Business']:catalogs[f.optionSource]||[]):f.options||[]});
+ async function loadChoices(){
+  for(const [key,table] of [['customer_sources','gr_crm_sources'],['customer_tags','gr_crm_tags']]){
+   const {data,error}=await db.from(table).select('*').order('name');
+   if(error)throw Error('Could not load Settings choices: '+error.message);
+   catalogs[key]=(data||[]).filter(x=>x.active!==false).map(x=>x.name);
+  }
+ }
  const token=(company,key)=>company+'|'+key;
  const cloning=x=>JSON.parse(JSON.stringify(x));
  const defaults=key=>cloning(DEFAULTS[key]||[]);
@@ -53,21 +63,22 @@ window.GreenRichFormBuilder=(()=>{
    const base=system.get(x.id);
    if(!base)return {...x,system:false,protected:false};
    return {...base,...x,id:base.id,system:true,
-    required:x.required!==false,visible:x.visible!==false,
+    required:x.required===undefined?base.required:x.required===true,visible:x.visible!==false,
     when:x.when||null};
   });
   for(const base of DEFAULTS[key])if(!fields.some(x=>x.id===base.id))fields.push(cloning(base));
   return fields;
  }
- async function ready(client,ids){
+ async function ready(client,ids,refresh=false){
   if(client&&db!==client){db=client;cache=new Map();loading=null}
   companies=[...new Set((ids||[]).filter(Boolean))];
   if(!db)throw Error('CRM login is required for Form Builder');
-  if(loading)return loading;
+  if(loading&&!refresh)return loading;
   loading=(async()=>{
    const q=db.from('gr_form_schemas').select('company_id,form_key,fields,version').in('company_id',companies);
    const {data,error}=await q;if(error)throw Error('Form Builder settings could not load: '+error.message);
    for(const row of data||[])if(KEYS.includes(row.form_key)&&Array.isArray(row.fields))cache.set(token(row.company_id,row.form_key),row.fields);
+   await loadChoices();
    return true;
   })();
   try{return await loading}catch(e){loading=null;throw e}
@@ -97,7 +108,8 @@ window.GreenRichFormBuilder=(()=>{
      throw Error('Unknown conditional operator');
     if(String(rule.value||'').length>250)throw Error('Condition value too long');
    }
-   if(['select','checkbox','radio'].includes(f.type)&&(!native||f.options?.length)){
+   if(f.optionSource&&!Object.hasOwn(SOURCES,f.optionSource))throw Error('Unknown Settings choice source');
+   if(['select','checkbox','radio'].includes(f.type)&&(!f.optionSource||f.optionSource==='custom')&&(!native||f.options?.length)){
     if(!Array.isArray(f.options)||f.options.length<1||f.options.length>30||f.options.some(o=>typeof o!=='string'||!o.trim()||o.length>100))throw Error('Choice questions need 1–30 options, up to 100 characters each.');
    }
   }
@@ -210,7 +222,7 @@ window.GreenRichFormBuilder=(()=>{
     for(const input of wrap.querySelectorAll('input,select,textarea')){
      if(input.name!==field.id||input.dataset.grfbReadOnly==='1')continue;
      input.disabled=!show;
-     if(!['radio','checkbox'].includes(input.type))input.required=show&&field.required!==false;
+     if(!['radio','checkbox'].includes(input.type))input.required=show&&field.required===true&&!wrap.querySelector('[data-grfb-proxy]');
     }
    }
    if(!changed)break;
@@ -231,10 +243,11 @@ window.GreenRichFormBuilder=(()=>{
    return;
   }
   if(original.tagName==='SELECT'&&field.type==='select'){
-   if(field.options?.length&&form.id==='gr-ops-form'){
+   if(field.options?.length){
     const selected=original.value;
-    original.replaceChildren(...field.options.map(v=>new Option(v,v)));
-    if(field.options.includes(selected))original.value=selected;
+    original.replaceChildren(new Option('Choose',''),...field.options.map(v=>new Option(v,v)));
+    if(selected&&!field.options.includes(selected))original.append(new Option(selected,selected));
+    original.value=selected;
    }
    return;
   }
@@ -261,7 +274,9 @@ window.GreenRichFormBuilder=(()=>{
     possible.forEach(v=>{
      const item=document.createElement('span');item.className='grfb-option';
      const toggle=document.createElement('input');toggle.type=field.type;toggle.value=v;
-     toggle.checked=v===current;item.append(toggle,document.createTextNode(v));proxy.append(item);
+     toggle.checked=v===current;
+     if(field.type==='radio')toggle.addEventListener('change',()=>{if(toggle.checked)proxy.querySelectorAll('input').forEach(n=>{if(n!==toggle)n.checked=false})});
+     item.append(toggle,document.createTextNode(v));proxy.append(item);
     });
    }else if(simple.includes(field.type)){
     proxy=document.createElement('input');proxy.type=field.type;proxy.value=current;
@@ -273,6 +288,7 @@ window.GreenRichFormBuilder=(()=>{
      [...proxy.querySelectorAll('input:checked')].map(n=>n.value).join(','):
      ('value'in proxy?proxy.value:'');
     if(original.value!==value){
+     if(original.tagName==='SELECT'&&value&&![...original.options].some(o=>o.value===value))original.append(new Option(value,value));
      original.value=value;original.dispatchEvent(new Event('input',{bubbles:true}));
      original.dispatchEvent(new Event('change',{bubbles:true}));
     }
@@ -311,7 +327,10 @@ window.GreenRichFormBuilder=(()=>{
  }
  function decorate(form,company,key,values={}){
   if(!form||!db)return;
-  const fields=schema(company,key),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields,.gr-contact-fields')||form:form;
+  const previous={};
+  form.querySelectorAll('[data-grfb-custom=yes]').forEach(w=>{const nodes=[...w.querySelectorAll('[name]')];previous[w.dataset.grfbField]=nodes.some(n=>['checkbox','radio'].includes(n.type))?nodes.filter(n=>n.checked).map(n=>n.value):nodes[0]?.value||''});
+  values={...previous,...values};
+  const fields=schema(company,key).map(resolved),target=key==='customer'||key==='sales_order'?form.querySelector('#editor-fields,.gr-contact-fields')||form:form;
   keyForForm.set(form,key);
   if(!target)return;
   // Keep existing native application handlers. Only add layout & custom field nodes.
@@ -331,6 +350,7 @@ window.GreenRichFormBuilder=(()=>{
    wrap.dataset.grfbField=f.id;
    wrap.classList.toggle('grfb-full',f.layout==='wide');
    if(key==='customer'||key==='sales_order')wrap.classList.toggle('wide',f.layout==='wide');
+   if(key==='customer'){wrap.classList.toggle('gr-contact-wide',f.layout==='wide');wrap.style.gridColumn=f.layout==='wide'?'1 / -1':'auto';}
    const title=wrap.querySelector(':scope > span');
    if(f.system&&f.label){
     const labelText=f.label+(f.required?' *':'');
@@ -351,7 +371,7 @@ window.GreenRichFormBuilder=(()=>{
   const anchor=target.querySelector('.actions,.modal-actions');
   for(const field of fields){
    const wrap=wrapFor.get(field.id);if(!wrap)continue;
-   if(wrap.parentElement!==target)continue; // Never disassemble a composite CRM widget.
+   if(field.system&&wrap.parentElement!==target)continue; // Keep composite native widgets intact.
    if(anchor?.parentElement===target)target.insertBefore(wrap,anchor);
    else target.append(wrap);
   }
@@ -371,7 +391,13 @@ window.GreenRichFormBuilder=(()=>{
   return {fields,refresh:apply};
  }
  function collect(form,company,key){
-  const fields=schema(company,key).filter(onlyCustom),out={};
+  const all=schema(company,key);
+  for(const f of all.filter(f=>f.system&&f.required&& !['heading','button'].includes(f.type))){
+   const w=form.querySelector('[data-grfb-field="'+f.id+'"]');if(!w||w.hidden)continue;
+   const nodes=[...w.querySelectorAll('[name]')].filter(n=>n.name===f.id&&!n.disabled);
+   if(nodes.length&&!nodes.some(n=>['checkbox','radio'].includes(n.type)?n.checked:String(n.value||'').trim()))throw Error('Please answer required question: '+f.label);
+  }
+  const fields=all.filter(onlyCustom),out={};
   if(!fields.length)return out;
   for(const f of fields){
    if(f.type==='heading'||f.type==='button')continue;
@@ -383,7 +409,7 @@ window.GreenRichFormBuilder=(()=>{
    else if(f.type==='radio')value=inputs.find(el=>el.checked)?.value||'';
    else value=inputs[0]?.value?.trim?.()||'';
    if(f.required&&(Array.isArray(value)?!value.length:!String(value).trim()))throw Error('Please answer required question: '+f.label);
-   if((Array.isArray(value)?value.length:!!value))out[f.id]=value;
+   out[f.id]=value;
   }
   return out;
  }
@@ -408,7 +434,7 @@ window.GreenRichFormBuilder=(()=>{
  function mount(root,{client,companyIds,notify}={}){
   if(!root)return Promise.resolve();
   return (async()=>{
-   await ready(client,companyIds);
+   await ready(client,companyIds,true);
    let company=companyIds[0],key=KEYS[0],draft=schema(company,key),dirty=false;
    const message=notify||(()=>{});
    root.innerHTML='<div class="grfb"><div class="panel"><h2>Admin Form Builder</h2>'+
@@ -430,7 +456,8 @@ window.GreenRichFormBuilder=(()=>{
    const mark=()=>{dirty=true;$('#grfb-unsaved').textContent='Unsaved changes';drawPreview()};
    const drawPreview=()=>{
     const previewForm=document.createElement('form');previewForm.className='grfb-preview-form';
-    for(const f of draft){
+    for(const raw of draft){
+     const f=resolved(raw);
      if(!f.visible)continue;
      const el=customTag({...f,system:false});
      if(f.system&&['select','radio','checkbox'].includes(f.type)&&!f.options?.length){
@@ -483,7 +510,8 @@ window.GreenRichFormBuilder=(()=>{
      '<label class="grfb-switch"><input type="checkbox" data-edit="visible" '+(f.visible!==false?'checked':'')+'> Show this field</label>'+
      '<label class="grfb-switch"><input type="checkbox" data-edit="required" '+(f.required?'checked':'')+'> Required</label>'+
      (['select','radio','checkbox'].includes(f.type)?
-      '<label class="grfb-full">Choices (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'')+
+      '<label class="grfb-full">Options source<select data-edit="optionSource">'+Object.entries(SOURCES).map(([v,t])=>'<option value="'+v+'" '+((f.optionSource||'custom')===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label>'+
+      ((!f.optionSource||f.optionSource==='custom')?'<label class="grfb-full">Choices (one option per line)<textarea data-edit="options" rows="3">'+esc((f.options||[]).join('\n'))+'</textarea></label>':'<p class="grfb-full">Choices are loaded from Settings when the form opens.</p>'):'')+
      (f.system?'<p class="grfb-full grfb-core">Native CRM/ERP field: Admin can edit design and visibility. Original data requirements, approvals, GST/stock calculations and server validations still apply.</p>':'')+
      ruleMarkup(f,index)+
      '</div></article>').join('');
@@ -507,7 +535,7 @@ window.GreenRichFormBuilder=(()=>{
     const row=event.target.closest('[data-index]'),field=row&&draft[Number(row.dataset.index)];if(!field)return;
     const id=event.target.dataset.edit;if(!id)return;
     const value=event.target.type==='checkbox'?event.target.checked:event.target.value;
-    if(id==='label'||id==='placeholder'||id==='layout')field[id]=value;
+    if(id==='label'||id==='placeholder'||id==='layout'||id==='optionSource')field[id]=value;
     else if(id==='visible'||id==='required')field[id]=value
     else if(id==='options')field.options=value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
     else if(id==='rules_match'){field.conditions=field.conditions||{match:'all',rules:[]};field.conditions.match=value}
@@ -516,7 +544,7 @@ window.GreenRichFormBuilder=(()=>{
    });
    els.addEventListener('change',event=>{
     if(event.target.dataset.rulePart==='operator')redraw();
-    else if(event.target.dataset.edit==='type')redraw();
+    else if(['type','optionSource'].includes(event.target.dataset.edit))redraw();
    });
    const reorder=(from,to)=>{
     if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=draft.length||to>=draft.length||from===to)return;
@@ -581,5 +609,5 @@ window.GreenRichFormBuilder=(()=>{
    redraw();
   })();
  }
- return {KEYS,TITLES,TYPES,defaults,schema,ready,mount,decorate,collect,saveAnswers,recentAnswers,validate,matchesRule,matchesCondition};
+ return {KEYS,TITLES,TYPES,defaults,schema,ready,loadChoices,mount,decorate,collect,saveAnswers,recentAnswers,validate,matchesRule,matchesCondition};
 })();

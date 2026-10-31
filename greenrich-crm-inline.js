@@ -56,14 +56,14 @@ const consumesStock=s=>Boolean(s)&&!['Cancelled','Returned'].includes(s.status);
   if(current)current.stock=Number(current.stock)-Number(next.qty);
  }
 
-function validateCustomer(store,person,ignore){
+function validateCustomer(store,person,ignore,configured=false){
  const email=String(person.email||'').trim().toLowerCase();
  const mobile=cleanPhone(person.mobile),mobile2=cleanPhone(person.mobile2);
- if(!String(person.name||'').trim()||!String(person.address1||'').trim()||!email||!mobile)return 'Customer name, email, address and primary mobile are required.';
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return 'Enter a valid customer email address.';
- if(mobile.length!==10||(person.mobile2&&mobile2.length!==10))return 'Enter valid 10-digit mobile numbers.';
+ if(!configured&&(!String(person.name||'').trim()||!String(person.address1||'').trim()||!email||!mobile))return 'Customer name, email, address and primary mobile are required.';
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return 'Enter a valid customer email address.';
+ if((person.mobile&&mobile.length!==10)||(person.mobile2&&mobile2.length!==10))return 'Enter valid 10-digit mobile numbers.';
  if(mobile2&&mobile2===mobile)return 'The two mobile numbers must be different.';
- if(store.customers.some(c=>c.id!==ignore&&(String(c.email||'').trim().toLowerCase()===email||[cleanPhone(c.mobile),cleanPhone(c.mobile2)].filter(x=>x.length===10).some(p=>p===mobile||p===mobile2))))return 'Duplicate customer: email or mobile number already exists. Select the existing customer instead.';
+ if(store.customers.some(c=>c.id!==ignore&&((email&&String(c.email||'').trim().toLowerCase()===email)||[cleanPhone(c.mobile),cleanPhone(c.mobile2)].filter(x=>x.length===10).some(p=>p===mobile||p===mobile2))))return 'Duplicate customer: email or mobile number already exists. Select the existing customer instead.';
  return '';
 }
 const tagChecks=(store,name,chosen)=>'<div class="gr-tag-picks">'+(store.tags.length?store.tags.map(t=>'<label><input type="checkbox" name="'+esc(name)+'" value="'+esc(t.id)+'" '+(chosen.includes(t.id)?'checked':'')+'><span>'+esc(t.name)+'</span></label>').join(''):'<span class="gr-crm-help">No tags available. An Admin can create tags in Settings → Customer Tags.</span>')+'</div>';
@@ -810,7 +810,8 @@ async function saveEditor(event){
   row.active=row.active==='true';
  }else if(editing==='customers'){
   row.tag_ids=inputs.getAll('tag_ids');
-  const issue=validateCustomer(copy,row,editId);if(issue)return toast(issue);
+  const issue=validateCustomer(copy,row,editId,true);if(issue)return toast(issue);
+  row.name=row.name||'';row.email=row.email||null;row.address1=row.address1||null;row.mobile=row.mobile||null;
   try{
    const savedCustomer=await window.GreenRichSharedCustomers.saveCustomer({...row,...(editId?{id:editId}:{})});
    if(Object.keys(fbExtra).length){

@@ -73,3 +73,6 @@
 .grfb-native-choices .grfb-option input{width:16px!important;height:16px!important;min-height:16px!important}
 .grfb-design-button{border:1px solid #9bbdb3;border-radius:7px;background:#e2f3ed;color:#176449;padding:10px 14px}
 @media(max-width:720px){.grfb-rule{grid-template-columns:1fr 1fr}.grfb-rule>span{display:none}.grfb-rule>input{grid-column:1/-1}}
+
+/* Apply saved widths to actual CRM forms, including built-in fields. */
+[data-grfb-field].grfb-full{grid-column:1/-1}
