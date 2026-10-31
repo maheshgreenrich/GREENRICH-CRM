@@ -27,16 +27,17 @@
    if(r.error)throw Error(table+': '+r.error.message);
    return r.data||[];
   };
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id'):Promise.resolve([]),
    app.canCustomers?db.from('gr_crm_customers').select('id,name,mobile,email,source,type,tag_ids').limit(2000).then(r=>{if(r.error)throw r.error;return r.data||[]}):Promise.resolve([]),
    db.from('gr_crm_tags').select('id,name').limit(500).then(r=>r.data||[]),
    app.admin?db.from('gr_profiles').select('id,full_name,company_ids,active').eq('active',true).limit(300).then(r=>r.data||[]):Promise.resolve([]),
-   app.admin?read('gr_sheet_connections'):Promise.resolve([])
+   app.admin?read('gr_sheet_connections'):Promise.resolve([]),
+   app.admin?read('gr_wa_provider_leads'):Promise.resolve([])
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -175,13 +176,24 @@
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
    '<p class="grwc-muted">Template catalog has '+templ.length+' CRM draft/reference record(s). Existing SocialBerries template ID, language and category can be imported without recreating the message. A manually imported JSON is <b>unverified</b> until a provider lookup confirms it.</p>'+
    '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
-   '<button type="button" data-import-provider-template>Import Existing Template JSON (reference only)</button>'+
+   '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
    (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Name</th><th>Provider</th><th>Language</th><th>Verification</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'Approved record':'Not synced')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
-   '<section class="grwc-panel">'+headers('3 · WhatsApp and website enquiry → CRM Lead','Choose source, tags and salesperson for each inbound enquiry type. OTP-only login events must not create marketing leads.', '<button type="button" data-new-inbound>+ Mapping</button>')+
+   '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
+   '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
+   '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
+     '<div class="grwc-feature"><b>'+esc(p.display_name)+'</b><p>Company: '+esc(name(p.company_id))+' · Tool '+p.slot+'</p>'+
+     '<button type="button" data-sync-provider-leads="'+esc(p.id)+'">Sync SocialBerries Leads (up to 20 pages)</button></div>').join('')+'</div>'+
+   (rows.providerLeads.filter(l=>l.company_id===c).length?'<div class="grwc-tablewrap"><table><thead><tr><th>Contact</th><th>Mobile</th><th>Source</th><th>Provider status</th><th>CRM</th><th>Action</th></tr></thead><tbody>'+
+   rows.providerLeads.filter(l=>l.company_id===c).slice(0,250).map(l=>
+    '<tr><td>'+esc(l.name||'Unnamed')+'<small> '+esc(l.email||'')+'</small></td><td>'+esc(l.mobile)+'</td><td>'+esc(l.source)+'</td><td>'+esc(l.provider_status)+'</td><td>'+esc(l.imported_lead_id?'Imported':'Needs review')+'</td><td>'+
+    (l.imported_lead_id?'—':'<button type="button" data-import-provider-lead="'+esc(l.id)+'">Review & import</button>')+'</td></tr>').join('')+
+    '</tbody></table></div>':empty('No staged SocialBerries leads yet. Configure the connection, then click Sync Leads.'))+
+   '<p class="grwc-muted">The documented Get Leads API includes unusually required client fields in the GET request body. If its endpoint rejects page-only GET, ask SocialBerries for the correct GET request format; no records will be guessed or imported.</p></section>'+
+   '<section class="grwc-panel">'+headers('4 · WhatsApp and website enquiry → CRM Lead','Choose source, tags and salesperson for each inbound enquiry type. OTP-only login events must not create marketing leads.', '<button type="button" data-new-inbound>+ Mapping</button>')+
    (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common')+'</p><small>Awaiting verified webhook</small></div>').join(''):empty('No inbound assignment mappings.'))+'</section>'+
-   '<section class="grwc-panel">'+headers('4 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
+   '<section class="grwc-panel">'+headers('5 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
-   '<section class="grwc-panel">'+headers('5 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
+   '<section class="grwc-panel">'+headers('6 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
    '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity & history</b><p>Read-only GET users, campaign batches and phone-specific WhatsApp messages. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
   container.querySelectorAll('[data-sheet-template]').forEach(x=>{const sh=sheetRows.find(r=>r.id===x.dataset.sheetTemplate);x.value=sh?.welcome_template_id||''});
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
@@ -191,6 +203,9 @@
    if(check)return await checkProvider(check.dataset.testProvider,'test');
    if(batches)return await checkProvider(batches.dataset.batchesProvider,'batches');
    if(messages)return openMessageHistory(messages.dataset.messagesProvider);
+   const sync=e.target.closest('[data-sync-provider-leads]'),importLead=e.target.closest('[data-import-provider-lead]');
+   if(sync)return await syncProviderLeads(sync.dataset.syncProviderLeads,container);
+   if(importLead)return importStagedLead(importLead.dataset.importProviderLead,container);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
@@ -276,20 +291,63 @@
     alert('Provider batch status received.','success');
    }catch(err){alert('Connection test failed: '+err.message,'error')}
  }
+ async function syncProviderLeads(connectionId,container){
+  const p=rows.connections.find(x=>x.id===connectionId&&x.provider.toLowerCase()==='socialberries');
+  if(!p)return alert('Save a SocialBerries connection first.','warning');
+  if(!app.admin)return alert('Only Admin can sync SocialBerries leads.','error');
+  let count=0,pages=0;
+  try{
+   for(let page=1;page<=20;page++){
+    const res=await app.db.functions.invoke('greenrich-socialberries',{
+      body:{connection_id:connectionId,action:'sync_leads',page}});
+    if(res.error)throw Error(res.error.message||'Secure connection unavailable');
+    const info=res.data||{};
+    if(!info.ok)throw Error(info.message||info.error||'SocialBerries Get Leads failed');
+    count+=Number(info.synced)||0;pages++;
+    if(!info.has_more)break;
+   }
+   alert('SocialBerries staging updated: '+count+' provider leads across '+pages+' page(s). Review the list before importing. No messages sent.','success');
+   await fetchAll();settingsDraw(container);
+  }catch(error){alert('Synced '+count+' staged records before stopping. '+error.message,'warning');await fetchAll();settingsDraw(container)}
+ }
+ function importStagedLead(id,container){
+  const row=rows.providerLeads.find(x=>x.id===id),c=row?.company_id;
+  if(!row||!c||!app.admin)return alert('No permission to import provider lead.','error');
+  dialog('Review before CRM Lead import',
+   '<div class="grwc-notice grwc-span">SocialBerries → GreenRich ONE. Existing CRM lead/customer mobile numbers will be checked to avoid duplicates. No welcome message is sent during import.</div>'+
+   '<div class="grwc-feature grwc-span"><b>'+esc(row.name||'Unnamed lead')+'</b><p>'+esc(row.mobile||'No phone')+' · '+esc(row.email||'')+' · '+esc(row.source||'SocialBerries')+'</p></div>'+
+   field('Assign to salesperson','assignee',options(rows.profiles.filter(p=>p.company_ids?.includes(c)).map(p=>[p.id,p.full_name]),'Common sales queue')),
+   async fd=>{
+    const res=await app.db.rpc('gr_wa_import_provider_lead',{
+      p_staged_id:id,p_assignee:fd.get('assignee')||null});
+    if(res.error)throw Error(res.error.message);
+    const outcome=res.data||{};
+    if(outcome.status==='imported')alert('Lead imported to GreenRich ONE successfully. Lead ID: '+outcome.lead_id,'success');
+    else alert('No new lead created: '+String(outcome.status||'Unknown result')+'. Existing CRM record kept unchanged.','info');
+    await fetchAll();settingsDraw(container);
+   });
+ }
  function importProviderTemplate(company,container){
    const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
    if(!choices.length)return alert('First save a SocialBerries provider for this company in Tool 1 or Tool 2.','warning');
    dialog('Import existing SocialBerries template reference',
      field('SocialBerries tool','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose SocialBerries connection'),true)+
      '<div class="grwc-notice grwc-span">Copy the complete approved template JSON preview from SocialBerries, with id, name, language, category and components (including BODY text). This does not create a template in SocialBerries or send a message. Credentials do not belong here.</div>'+
-     note('Paste template preview JSON','preview_json'),
+     note('Paste one template JSON object or an array of template JSON objects (up to 50)','preview_json'),
      async fd=>{
        const connectionId=fd.get('connection_id');
        if(!choices.some(x=>x.id===connectionId))throw Error('Choose a matching company provider');
        let preview;try{preview=JSON.parse(String(fd.get('preview_json')||''))}catch{throw Error('Valid JSON is required')}
-       if(preview?.preview_template?.components)preview=preview.preview_template;
-       const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:preview});
-       if(out.error)throw Error(out.error.message);
+       const list=Array.isArray(preview)?preview:[preview];
+       if(!list.length||list.length>50)throw Error('Use 1–50 templates in a JSON array.');
+       let imported=0;
+       for(const item of list){
+        const t=item?.preview_template?.components?item.preview_template:item;
+        const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
+        if(out.error)throw Error('Imported '+imported+' reference(s). '+out.error.message);
+        imported++;
+       }
+       alert(imported+' existing provider template reference(s) saved as unverified. No messages sent.','success');
        await fetchAll();settingsDraw(container);
      });
  }
