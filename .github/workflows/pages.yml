@@ -43,6 +43,7 @@ jobs:
           node tests/customer-edit-lead-inline-marketing-filters.js
           node tests/whatsapp-provider-slot-edit.js
           node tests/whatsapp-registered-sender-and-provider-pending.js
+          node tests/socialberries-real-send-payload.js
           test -s greenrich-whatsapp-marketing.css
           node tests/whatsapp-marketing.js
           node --check greenrich-sidebar.js
