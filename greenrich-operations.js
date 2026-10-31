@@ -184,7 +184,7 @@
   apply(selectedCompany);
   if(!id)form.elements.namedItem('company_id')?.addEventListener('change',event=>apply(event.target.value));
   if(id)void window.GreenRichFormBuilder?.recentAnswers?.(selectedCompany,'ops_'+kind,id).then(values=>{
-   if(editor.open&&editor.dataset.recordId===id)apply(selectedCompany)&&window.GreenRichFormBuilder.decorate(form,selectedCompany,'ops_'+kind,values);
+   if(editor.open&&editor.dataset.recordId===id)window.GreenRichFormBuilder.decorate(form,selectedCompany,'ops_'+kind,values);
   }).catch(()=>{});
   editor.showModal();
  }
@@ -221,11 +221,12 @@
     await db.from('gr_ops_records').insert(values).select('record_id');
    if(response.error)throw Error(response.error.message);
    if(!response.data?.length)throw Error('Record was not saved. Verify permissions.');
+   let extrasIssue='';
    if(Object.keys(extra).length){
     try{await window.GreenRichFormBuilder.saveAnswers(company,'ops_'+k,payload.id,extra)}
-    catch(e){actionAlert('ERP record saved, but extra answers failed to save: '+e.message)}
+    catch(e){extrasIssue=' Additional form answers failed: '+e.message}
    }
-   dialog.close();actionAlert('Saved '+TYPES[k].label+' to shared GreenRich cloud.');await reload();
+   dialog.close();actionAlert('Saved '+TYPES[k].label+' to shared GreenRich cloud.'+extrasIssue);await reload();
   }catch(error){actionAlert('Save failed: '+error.message)}finally{button.disabled=false}
  }
  async function importExample(){
