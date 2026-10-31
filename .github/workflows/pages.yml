@@ -28,6 +28,9 @@ jobs:
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
+          node --check greenrich-whatsapp-marketing.js
+          test -s greenrich-whatsapp-marketing.css
+          node tests/whatsapp-marketing.js
           node --check greenrich-sidebar.js
           node --check greenrich-branding.js
           node tests/sidebar-logo-responsive.js
