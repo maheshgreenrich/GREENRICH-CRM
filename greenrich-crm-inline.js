@@ -42,7 +42,20 @@ function saveCompanyData(id,copy){
 }
 const editorData=()=>loadCompanyData($('#f-company_id')?.value||activeCompany);
 const cleanPhone=v=>{const x=String(v||'').replace(/\D/g,'');return x.length>10?x.slice(-10):x};
-const consumesStock=s=>!['Cancelled','Returned'].includes(s.status);
+const consumesStock=s=>Boolean(s)&&!['Cancelled','Returned'].includes(s.status);
+ // Stock delta for an active order. Cancel/return/delete releases it once.
+ function adjustStockForSale(copy,old,next){
+  const previous=old&&consumesStock(old)?copy.products.find(p=>p.id===old.product_id):null;
+  const current=next&&consumesStock(next)?copy.products.find(p=>p.id===next.product_id):null;
+  if(previous&&(!Number.isInteger(Number(previous.stock))||!Number.isInteger(Number(old.qty))||Number(old.qty)<1))throw Error('Existing order stock invalid; ask Admin to review.');
+  if(current&&(!Number.isInteger(Number(current.stock))||!Number.isInteger(Number(next.qty))||Number(next.qty)<1))throw Error('Invalid stock or quantity.');
+  const restore=previous?Number(old.qty):0;
+  const available=current?Number(current.stock)+(previous?.id===current.id?restore:0):0;
+  if(current&&available<Number(next.qty))throw Error('Insufficient stock for '+current.name+'. Available: '+available+', requested: '+next.qty);
+  if(previous)previous.stock=Number(previous.stock)+restore;
+  if(current)current.stock=Number(current.stock)-Number(next.qty);
+ }
+
 function validateCustomer(store,person,ignore){
  const email=String(person.email||'').trim().toLowerCase();
  const mobile=cleanPhone(person.mobile),mobile2=cleanPhone(person.mobile2);
@@ -557,7 +570,7 @@ function openEditor(k,id=''){
  if(k==='channels'&&!adminMode)return toast('Only Admin can manage sales channels');
  editing=k;editId=id;const existing=id?find(k,id):null;
  $('#editor-title').textContent=(existing?'Edit ':'Add ')+({sales:'Sale',products:'Product',channels:'Channel',customers:'Customer',leads:'Lead',tasks:'Follow-up'}[k]);
- const defaults={date:date(),qty:1,stock:0,tax:0,price:0,inclusive:'true',active:'true',status:k==='tasks'?'Open':'Completed',stage:'New',type:k==='channels'?'Marketplace':'Individual',country:'India',company_id:companyScope==='all'?'':activeCompany};
+ const defaults={date:date(),qty:1,stock:0,tax:0,price:0,inclusive:'true',active:'true',status:k==='tasks'?'Open':k==='sales'?'Pending':'Completed',stage:'New',type:k==='channels'?'Marketplace':'Individual',country:'India',company_id:companyScope==='all'?'':activeCompany};
  $('#editor-fields').replaceChildren(...specs[k].map(s=>field(s,s[0]==='company_id'&&existing?(existing._companyId||existing.company_id||activeCompany):(existing?.[s[0]]??defaults[s[0]]))));
  $('#price-summary').hidden=k!=='sales';
  if(k==='sales'){
@@ -720,11 +733,11 @@ async function saveEditor(event){
   else if(!copy.customers.some(c=>c.id===row.customer_id))return toast('Find and select an existing customer, or choose New Customer');
   if(old&&old.invoice_status==='Issued')return toast('Issued invoice is locked. Do not edit this order; contact Accounts for credit-note adjustments.');
   if(old&&window.GreenRichSalesOps?.isApproved?.(targetId,old.id))return toast('Approved orders are locked; contact the dispatch team for delivery updates.');
-  if(old&&consumesStock(old)){const previous=copy.products.find(p=>p.id===old.product_id);if(previous)previous.stock=Number(previous.stock||0)+Number(old.qty||0)}
-  if(!Number.isInteger(Number(product.stock))||Number(product.stock)<row.qty)return toast('Insufficient stock for '+product.name+'. Available: '+(Number(product.stock)||0)+', requested: '+row.qty+'. Update product stock first.');
-  const calc=getCalc(row.qty,row.unit_price,row.tax_rate,row.inclusive);
-  const status=row.status||old?.status||'Completed';
+  const status=row.status||old?.status||'Pending';
   if(!['Completed','Pending','Cancelled','Returned'].includes(status))return toast('Select a valid order status');
+  try{adjustStockForSale(copy,old,{product_id:row.product_id,qty:row.qty,status})}
+  catch(error){return toast(error.message,'error')}
+  const calc=getCalc(row.qty,row.unit_price,row.tax_rate,row.inclusive);
   if(fresh){
    try{const created=await window.GreenRichSharedCustomers.saveCustomer(fresh);row.customer_id=created.id;copy.customers.push(created)}
    catch(error){return toast('Unable to create shared customer: '+error.message)}
@@ -742,7 +755,7 @@ async function saveEditor(event){
     sku:product.sku,hsn:product.hsn||'',channel_name:channel.name,customer_name:customer.name,status
    });
   ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_city','new_state','new_pincode','new_gstin','new_tag_ids'].forEach(k=>delete row[k]);
-  if(consumesStock(row))product.stock-=row.qty;
+  // Product stock was already reserved or released once above.
  }else if(editing==='products'){
   row.price=Number(row.price);row.tax=Number(row.tax);row.stock=Number(row.stock);
   if(!Number.isFinite(row.price)||row.price<0||!Number.isFinite(row.tax)||row.tax<0||row.tax>100||!Number.isInteger(row.stock)||row.stock<0)return toast('Enter a valid price, GST rate (0–100) and whole-number stock');
@@ -843,7 +856,7 @@ async function removeRecord(k,id){
  const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
  if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
   if(k==='sales'&&window.GreenRichSalesOps?.isApproved?.(owner,id))return toast('Approved orders cannot be deleted after dispatch handoff.');
-  if(k==='sales'&&consumesStock(item)){const product=copy.products.find(p=>p.id===item.product_id);if(product&&Number.isInteger(Number(product.stock)))product.stock=Number(product.stock)+Number(item.qty||0)}
+  if(k==='sales'){try{adjustStockForSale(copy,item,null)}catch(error){return toast(error.message,'error')}}
  copy[k]=copy[k].filter(r=>r.id!==id);
  if(saveCompanyData(owner,copy)){render();toast('Record deleted')}
 }
