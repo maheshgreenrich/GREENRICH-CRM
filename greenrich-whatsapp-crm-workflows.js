@@ -14,8 +14,8 @@
  const options=(items,blank='None — do not send')=>'<option value="">'+esc(blank)+'</option>'+items.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
- const tmpl=t=>t.name+' · '+t.language+' · '+(t.provider_approval==='approved'?'Provider approved':'Not synced / unverified');
- const templateOptions=(c,selectedId='')=>templates(c).map(t=>[t.id,tmpl(t)]);
+ const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Approved in screenshot · API unverified':'API unverified');
+ const templateOptions=(c,connectionId='')=>templates(c).filter(t=>!connectionId||t.connection_id===connectionId).map(t=>[t.id,tmpl(t)]);
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
  const scoped=(a)=>a.filter(x=>scope==='all'||x.company_id===scope);
@@ -56,7 +56,7 @@
  }
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Campaign Handoff</h2><p>Your CRM is the audience source. SocialBerries remains the template and campaign delivery platform.</p></div><span class="grwc-chip">Provider API pending</span></div>'+
- '<div class="grwc-notice">No SocialBerries API credentials or verified template-sync endpoints are connected yet. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
+ '<div class="grwc-notice">Provider authentication and automatic template-list sync have not been verified. Existing templates can be linked by ID for campaign drafts; message content must come from SocialBerries. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
  '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['welcome','Lead Welcome'],['recurring','Repeat Service'],['sync','Incoming Leads']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),co=cd(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
@@ -69,16 +69,17 @@
    sel('Customer/Lead tag','grwc-tag',tags.map(t=>[t.id,t.name]),tag,'All tags')+
    sel('Salesperson','grwc-owner',rows.profiles.map(p=>[p.id,p.full_name]),owner,'All salespeople')+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
-   '<div class="grwc-audience-summary"><b>'+list.length+'</b> matching records · <b>'+chosen.length+'</b> selected · Duplicates will be removed by phone before provider sending</div>'+
+   '<div class="grwc-audience-summary"><b>'+list.length+'</b> loaded matching records · <b>'+chosen.length+'</b> selected · Marketing audience draft only. Sending requires provider verification and consent.</div>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Showing first 250 matching contacts. No marketing consent is inferred from a CRM record. Provider delivery must verify opt-in / opt-out before sending.</p></section>'+
+   '<p class="grwc-muted">Showing first 250 of '+list.length+' currently loaded matching contacts. The Select all action includes all '+list.length+' loaded matches, not just the first 250; additional CRM rows beyond this data load are not included. Choose one company before selecting everyone. No marketing consent is inferred from a CRM record.</p></section>'+
    '<section class="grwc-panel">'+headers('Choose existing SocialBerries template','Templates come from the provider catalog when the API connection is verified. Unverified CRM references cannot send messages.')+
    '<form id="grwc-audience-form" class="grwc-form">'+companyField(co)+
    '<label>WhatsApp tool<select name="connection_id" required>'+options(rows.connections.filter(x=>x.company_id===co).map(x=>[x.id,x.display_name]),'Select provider')+'</select></label>'+
-   '<label>Existing template<select name="template_id" required>'+options(templateOptions(co),'Choose provider template')+'</select></label>'+
+   '<label>Existing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+
-   '<p class="grwc-muted grwc-span">Clicking Save records a filtered CRM audience and chosen provider template. Actual send/campaign execution remains inside SocialBerries, when the integration API is ready.</p>'+
+   '<p class="grwc-muted grwc-span">Select a company and opt-in eligible contacts, then choose the existing SocialBerries template. The selected template may be metadata-only until the full approved template is retrieved. Save creates a draft; it does NOT send messages.</p>'+
    '<button type="submit">Save audience & template draft</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>';
  }
  function welcomeView(){
@@ -176,10 +177,11 @@
    '<li>Existing templates: import their preview JSON below until SocialBerries supplies its missing Get Templates endpoint. Message sending and inbound WhatsApp webhooks stay disabled until authentication, opt-in and webhook verification are implemented.</li>'+
    '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
-   '<p class="grwc-muted">Template catalog has '+templ.length+' CRM draft/reference record(s). Existing SocialBerries template ID, language and category can be imported without recreating the message. A manually imported JSON is <b>unverified</b> until a provider lookup confirms it.</p>'+
+   '<p class="grwc-muted">Template catalog has '+templ.length+' CRM draft/reference record(s). An existing template can be linked by its exact provider ID, name, category and language, without recreating the message. Screenshot/manual references remain <b>not API-verified</b>; actual message content is not guessed.</p>'+
    '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
+   '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Name</th><th>Provider</th><th>Language</th><th>Verification</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'Approved record':'Not synced')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Screenshot: APPROVED · API unverified':'Not API-verified · '+(t.body?'Preview recorded':'Metadata only'))+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
    '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
@@ -208,6 +210,7 @@
    const sync=e.target.closest('[data-sync-provider-leads]'),importLead=e.target.closest('[data-import-provider-lead]');
    if(sync)return await syncProviderLeads(sync.dataset.syncProviderLeads,container);
    if(importLead)return importStagedLead(importLead.dataset.importProviderLead,container);
+   if(e.target.closest('[data-import-template-metadata]'))return importTemplateMetadata(c,container);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
@@ -329,6 +332,31 @@
     await fetchAll();settingsDraw(container);
    });
  }
+ function importTemplateMetadata(company,container){
+  const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
+  if(!choices.length)return alert('Save a SocialBerries provider in this company first.','warning');
+  dialog('Link an existing SocialBerries template by ID',
+   '<div class="grwc-notice grwc-span">Use the exact ID, name, category and language from SocialBerries → WhatsApp → Templates. This links metadata only, not the actual message content. It does not send WhatsApp messages.</div>'+
+   field('SocialBerries provider','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose provider'),true)+
+   input('Existing Template ID','provider_template_id','')+
+   input('Existing Template Name','template_name','')+
+   field('Category','category',options([['marketing','MARKETING'],['utility','UTILITY'],['authentication','AUTHENTICATION']],'Choose category'),true)+
+   input('Language','language','en_US'),
+   async fd=>{
+    const conn=String(fd.get('connection_id')||'');
+    if(!choices.some(x=>x.id===conn))throw Error('Select the SocialBerries provider for this company');
+    const r=await app.db.rpc('gr_wa_import_template_metadata',{
+     p_connection:conn,
+     p_template_id:String(fd.get('provider_template_id')||'').trim(),
+     p_name:String(fd.get('template_name')||'').trim(),
+     p_category:String(fd.get('category')||'').trim(),
+     p_language:String(fd.get('language')||'').trim()
+    });
+    if(r.error)throw Error(r.error.message);
+    await fetchAll();
+    settingsDraw(container);
+   });
+ }
  function importProviderTemplate(company,container){
    const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
    if(!choices.length)return alert('First save a SocialBerries provider for this company in Tool 1 or Tool 2.','warning');
@@ -433,10 +461,32 @@
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-create-service]')){serviceDialog();return}
+   if(e.target.closest('[data-select-all-matching]')){
+    if(scope==='all')return alert('Choose one company above before selecting all contacts for a campaign.','warning');
+    const members=audience();
+    selected=new Set(members.map(x=>x.id));
+    marketingDraw();
+    alert(members.length+' currently loaded matching contacts selected for draft (not sent).','info');
+    return;
+   }
+   if(e.target.closest('[data-clear-all-matching]')){selected.clear();marketingDraw();return}
    const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);return}
    if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});return}
   };
   element.onchange=e=>{
+   const form=e.target.closest?.('#grwc-audience-form');
+   if(form&&(e.target.name==='company_id'||e.target.name==='connection_id')){
+    const c=form.querySelector('[name=company_id]')?.value||'';
+    const prov=form.querySelector('[name=connection_id]');
+    const tpl=form.querySelector('[name=template_id]');
+    if(e.target.name==='company_id'){
+     prov.innerHTML=options(rows.connections.filter(x=>x.company_id===c).map(x=>[x.id,x.display_name]),'Select provider');
+     tpl.innerHTML=options([], 'Choose provider first');
+    }else{
+     tpl.innerHTML=options(templateOptions(c,prov.value),'Choose a template for this provider');
+    }
+    return;
+   }
    const map={'grwc-company':'scope','grwc-kind':'kind','grwc-source':'source','grwc-tag':'tag','grwc-owner':'owner'};
    if(!map[e.target.id])return;
    const v=e.target.value;
@@ -449,6 +499,8 @@
    if(!can('create'))return alert('Marketing create permission required','error');
    const f=new FormData(e.target),companyId=f.get('company_id'),connectionId=f.get('connection_id'),templateId=f.get('template_id');
    if(!rows.connections.some(c=>c.id===connectionId&&c.company_id===companyId)||!rows.templates.some(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId))return alert('Select a matching provider/template.','error');
+   if(scope==='all')return alert('Choose one company in the audience filter before saving a campaign.','warning');
+   if(companyId!==scope)return alert('Campaign company must match the audience company filter.','warning');
    const audienceIds=[...selected],matches=audience().filter(x=>audienceIds.includes(x.id)&&x.company_id===companyId);
    if(!matches.length)return alert('Select at least one CRM contact for this company.','warning');
    try{
