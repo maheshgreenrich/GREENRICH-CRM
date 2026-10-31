@@ -39,7 +39,7 @@
  function box(title,body){return '<section class="ft-panel"><h2>'+e(title)+'</h2>'+body+'</section>'}
  const pill=status=>'<span class="ft-pill '+(status==='completed'?'online':status==='on_site'?'online':status==='cancelled'?'warn':'')+'">'+e(status.replaceAll('_',' '))+'</span>';
  function filterCompany(){return visits.filter(x=>x.company_id===company)}
- function ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
+ const ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
  function sessionState(){return openSession?'<span class="ft-pill online">● Shift checked in</span>':'<span class="ft-pill offline">● Not checked in</span>'}
  function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Live Team Tracking',team:'Supervisor Access'}[tab]||'Field Tracker'}
  function setupNav(){document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
