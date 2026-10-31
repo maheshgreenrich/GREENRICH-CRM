@@ -627,3 +627,15 @@
  #grCrmWorkspace .gr-crm-header{align-items:flex-start}
  #grCrmWorkspace .gr-crm-header-right{justify-content:space-between;width:100%}
 }
+
+/* Unified sales-order contact search: no records before typing; clear Lead vs Customer results. */
+#grCrmWorkspace .gr-customer-results button[data-choose-lead]{
+ background:#eff6ff!important;border-color:#c6dbfb!important;color:#1f4f96!important
+}
+#grCrmWorkspace .gr-customer-results button[data-choose-lead]:hover,
+#grCrmWorkspace .gr-customer-results button[data-choose-customer]:hover{
+ border-color:#4783dd!important;box-shadow:0 3px 12px #1e54a014
+}
+#grCrmWorkspace .gr-customer-results .gr-crm-help{padding:11px 13px;color:#7485a3;font-size:12px}
+#grCrmWorkspace .gr-customer-results button strong{font-size:12px;max-width:100%;overflow-wrap:anywhere}
+#grCrmWorkspace .gr-customer-results button span{font-size:11.5px;color:#687e9f;overflow-wrap:anywhere}
