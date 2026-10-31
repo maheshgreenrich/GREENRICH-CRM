@@ -58,3 +58,6 @@ body .grwc-dialog-foot button{width:auto!important;padding:10px 16px!important;b
 body .grwc-dialog-foot .grwc-primary{background:#168b65!important;color:white!important;border-color:#168b65!important}
 @media(max-width:800px){#content .grwc-filters{grid-template-columns:repeat(2,minmax(0,1fr))}#content .grwc-grid{grid-template-columns:1fr}}
 @media(max-width:540px){#content .grwc-hero{flex-direction:column;align-items:flex-start;padding:17px}#content .grwc-hero h2{font-size:20px!important}#content .grwc-panel{padding:16px}#content .grwc-filters,#content .grwc-form{grid-template-columns:1fr}#content .grwc-form .grwc-span{grid-column:auto}#content .grwc-sheet{grid-template-columns:1fr}body .grwc-dialog-fields{grid-template-columns:1fr;padding:15px}body .grwc-dialog-fields .grwc-span{grid-column:auto}}
+
+#content .grwc-selection-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 15px}
+#content .grwc-selection-toolbar button{width:auto!important}
