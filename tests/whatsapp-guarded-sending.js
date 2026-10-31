@@ -22,4 +22,6 @@ assert.ok(edge.includes('t.status!=="APPROVED"')&&edge.includes('String(t.catego
 assert.ok(edge.includes('String(x?.id)===String(template.provider_template_id)'),'Verification must match exact Meta template ID');
 assert.ok(edge.includes('provider_source:"verified_provider"'),'Only actual Meta verification may set verified_provider');
 assert.ok(edge.includes('components:template.provider_preview.components'),'SocialBerries preview must contain full approved template components');
+assert.ok(edge.includes('provider_error_message:outcome.reason||null'),'Provider errors must be saved');
+assert.ok(edge.includes('if(!response.ok)return {id:null,code:"HTTP_"'),'HTTP errors must be diagnosed');
 console.log('PASS: Secure SocialBerries send adapter has role, opt-in, approval, idempotency, live gate and bounded send controls.');

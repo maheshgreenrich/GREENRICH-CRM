@@ -54,4 +54,5 @@ pass('Template mismatch blocked',ui.includes('Correct the name to match the appr
 pass('Confirmation dialog preloads JSON',ui.includes('const jsonOf=t=>')&&ui.includes("note('Full approved template JSON','approved_json',jsonOf(list[0]))"));
 pass('Settings can verify with Meta',ui.includes('data-verify-meta-template')&&ui.includes('function verifyMetaTemplate(')&&ui.includes("secureSend('sync_meta_template'"));
 pass('Campaign image survives audience filter redraw',ui.includes('campaignImage=e.target.files?.[0]||null')&&ui.includes('const file=campaignImage||f.get(\'image\')')&&ui.includes('data-campaign-image-status'));
+pass('Failed sends display stored provider reasons',ui.includes('provider_error_message,created_at')&&ui.includes('No WhatsApp message was accepted.'));
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');

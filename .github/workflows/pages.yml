@@ -36,6 +36,7 @@ jobs:
           node tests/socialberries-diwali-template-link.js
           node tests/marketing-workspace-v2.js
           node tests/whatsapp-optin-form-validation.js
+          node tests/whatsapp-send-failure-diagnostics.js
           node tests/whatsapp-template-import-errors.js
           node tests/whatsapp-campaign-selection.js
           node tests/whatsapp-guarded-sending.js
