@@ -7,7 +7,7 @@ const hook=[
  ' window.__marketingTest={',
  "  seed:(incoming)=>{rows=incoming;app={companies:['grow-india','enviro-solutions'],admin:true};scope='all';selected=new Set();needle='';},",
  '  check:(ids)=>{selected=new Set(ids);},',
- '  search:(query)=>{needle=query;},',
+ '  search:(query)=>{needle=String(query).toLowerCase();},',
  '  setScope:(value)=>{scope=value;},',
  '  render:()=>audienceView(),',
  '  selected:()=>[...selected],',
