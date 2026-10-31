@@ -196,13 +196,21 @@
  async function refresh(ctx){await query(ctx);draw(ctx)}
  // Timer updates the alert without rebuilding the board or resetting filters.
  function updateDueCards(ctx){
-  if(!ctx.root?.isConnected)return;
-  const now=Date.now();
+  if(!ctx.root?.isConnected){
+   if(ctx.dueTriggerTimeout)clearTimeout(ctx.dueTriggerTimeout);
+   ctx.dueTriggerTimeout=null;return;
+  }
+  const now=Date.now();let next=Infinity;
   ctx.root.querySelectorAll('.gl-card[data-followup-at]').forEach(card=>{
    const at=Number(card.dataset.followupAt),due=at>0&&Number.isFinite(at)&&now>=at;
+   if(at>now&&Number.isFinite(at))next=Math.min(next,at);
    card.classList.toggle('gl-followup-due',due);
    const message=card.querySelector('.gl-due-alert');if(message)message.hidden=!due;
   });
+  // Trigger at the next scheduled deadline, rather than only on the
+  // 10-second fallback tick. Background browser throttling may delay it.
+  if(ctx.dueTriggerTimeout)clearTimeout(ctx.dueTriggerTimeout);
+  ctx.dueTriggerTimeout=Number.isFinite(next)?setTimeout(()=>updateDueCards(ctx),Math.min(2147483647,Math.max(0,next-Date.now()+30))):null;
  }
  function draw(ctx){
   const root=ctx.root;if(!root?.isConnected||ctx.profileOpen)return;
