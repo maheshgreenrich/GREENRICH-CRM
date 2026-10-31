@@ -110,6 +110,45 @@ Deno.serve(async request=>{
   if(adminAuth.error||adminAuth.data!==true)return res(403,{ok:false,error:"Company administrator permission required"});
   if(!apiKey(true))return res(503,{ok:false,error:"Supabase server credential unavailable"});
   const db=createClient(env("SUPABASE_URL"),apiKey(true),{auth:{autoRefreshToken:false,persistSession:false}});
+  // Read-only preflight: do not create campaigns while setup is incomplete.
+  // Report *all* blockers together so the user does not discover them one by one.
+  if(action==="preflight_marketing"){
+   const templateId=val(input.template_id,40),idList=input.crm_ids;
+   if(!validId(templateId)||!Array.isArray(idList)||idList.length<1||idList.length>500||
+    idList.some((id:unknown)=>typeof id!=="string"||id.length>160))
+    return res(400,{ok:false,error:"Choose an approved template and 1–500 CRM contacts"});
+   const found=await db.from("gr_wa_templates").select("*").eq("id",templateId)
+    .eq("company_id",company).eq("connection_id",connectionId).maybeSingle();
+   if(found.error)return res(422,{ok:false,error:"Could not verify the selected template"});
+   const t=found.data;
+   const cfg=creds(company,r.data.slot),blockers:string[]=[];
+   if(!cfg)blockers.push("SocialBerries API credentials are missing in Supabase Secrets");
+   if(!t||t.category!=="marketing"||t.provider_approval!=="approved"||
+    !["admin_confirmed","verified_provider"].includes(t.provider_source)||
+    !Array.isArray(t.provider_preview?.components)||!t.body)
+    blockers.push("Full approved MARKETING template is not confirmed in Settings");
+   if(env("SB_ENABLE_MARKETING_SEND")!=="true")
+    blockers.push("Live sending is disabled in Supabase Secrets");
+   const fakeCampaign={id:"00000000-0000-4000-8000-000000000000",audience:{crm_ids:idList}};
+   let checked:any;try{checked=await audience(db,fakeCampaign,company)}
+   catch(e){return res(422,{ok:false,error:e instanceof Error?e.message:"Could not validate audience"})}
+   if(!checked.eligible.length)
+    blockers.push("No selected recipients have documented WhatsApp marketing opt-in for this sender company");
+   if(checked.no_phone)blockers.push(checked.no_phone+" selected contacts are invalid, duplicates or leads from another sender company");
+   const withImage=input.has_image===true;
+   if(t?.provider_preview?.components){
+    const header=t.provider_preview.components.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
+    const isImage=String(header?.format).toUpperCase()==="IMAGE";
+    if(isImage&&!withImage)blockers.push("This approved template requires an image");
+    if(!isImage&&withImage)blockers.push("The approved template has no IMAGE header; remove the image");
+    if(checked.eligible.length)try{
+     components(t,checked.eligible[0],withImage?"https://example.com/approved.jpg":"");
+    }catch(e){blockers.push(e instanceof Error?e.message:"Invalid approved template parameters")}
+   }
+   return res(200,{ok:true,ready:!blockers.length,selected:checked.selected,
+    eligible:checked.eligible.length,not_eligible:checked.no_consent,
+    skipped:checked.no_phone,blockers});
+  }
   if(action==="record_consent"){
    const key=val(input.contact_key,190),source=val(input.consent_source,180),evidence=val(input.evidence_note,500);
    if(input.attested!==true||source.length<12||evidence.length<10)return res(400,{ok:false,error:"Confirm explicit opt-in and provide its source and evidence"});
