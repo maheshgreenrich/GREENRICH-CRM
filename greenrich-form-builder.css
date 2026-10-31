@@ -57,3 +57,19 @@
 .grfb-answer dt{color:#5c7483;font-size:11px;font-weight:750}
 .grfb-answer dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:12px;color:#244051}
 @media(max-width:620px){.grfb-answer dl{grid-template-columns:1fr}}
+
+/* Advanced visual rules builder */
+.grfb-condition{background:#f0f7f6;border:1px solid #c8ded8;border-radius:10px;padding:12px;margin-top:5px}
+.grfb-condition-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:9px;margin-bottom:12px}
+.grfb-condition-head strong{font-size:12px;color:#11674e}
+.grfb-condition-head label{display:flex;align-items:center;gap:8px;font-size:11px}
+.grfb-condition-head select{width:auto;min-width:160px}
+.grfb-rule{display:grid;grid-template-columns:auto minmax(115px,1fr) minmax(125px,1fr) minmax(100px,1fr) 33px;align-items:center;gap:7px;margin:8px 0}
+.grfb-rule>span{font-size:10px;font-weight:800;color:#11674e}
+.grfb-rule input,.grfb-rule select{min-width:0;width:100%}
+.grfb-rule button{padding:4px;min-height:34px}
+.grfb-native-choices,.grfb-custom .grfb-options{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.grfb-native-choices .grfb-option{display:inline-flex;align-items:center;gap:7px}
+.grfb-native-choices .grfb-option input{width:16px!important;height:16px!important;min-height:16px!important}
+.grfb-design-button{border:1px solid #9bbdb3;border-radius:7px;background:#e2f3ed;color:#176449;padding:10px 14px}
+@media(max-width:720px){.grfb-rule{grid-template-columns:1fr 1fr}.grfb-rule>span{display:none}.grfb-rule>input{grid-column:1/-1}}
