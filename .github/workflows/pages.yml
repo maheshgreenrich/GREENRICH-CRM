@@ -31,6 +31,7 @@ jobs:
           node --check greenrich-whatsapp-marketing.js
           node --check greenrich-whatsapp-crm-workflows.js
           node tests/socialberries-crm-workflows.js
+          node tests/socialberries-api-connection.js
           test -s greenrich-whatsapp-marketing.css
           node tests/whatsapp-marketing.js
           node --check greenrich-sidebar.js
