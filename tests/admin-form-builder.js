@@ -51,6 +51,9 @@ assert.ok(crm.includes("window.GreenRichFormBuilder.decorate($('#editor-form'),c
 assert.ok(crm.includes("GreenRichFormBuilder.saveAnswers(targetId,'sales_order',row.id,fbExtra)"));
 assert.ok(crm.includes("!key.startsWith('custom_')"),'Never mix new questions into Sale Order native columns');
 assert.ok(css.includes('.grfb-row')&&css.includes('.grfb-preview-form'));
+assert.ok(builder.includes('data-grfb="answers"')&&builder.includes('gr_form_answers'), 'Admin should be able to review saved custom answers');
+assert.ok(builder.includes("previewForm.addEventListener('change',update)"),'Preview must respond to selected stage or other conditions');
+assert.ok(crm.includes('await window.GreenRichCRMCloud.whenSynced(targetId);'),'Custom answers follow cloud-synchronized order');
 const customCfg=form.defaults('customer');
 customCfg[0].visible=false; // intentionally malicious override; should protect at runtime
 customCfg.push({...custom});
