@@ -151,7 +151,9 @@ Deno.serve(async request=>{
   }
   if(action==="record_consent"){
    const key=val(input.contact_key,190),source=val(input.consent_source,180),evidence=val(input.evidence_note,500);
-   if(input.attested!==true||source.length<12||evidence.length<10)return res(400,{ok:false,error:"Confirm explicit opt-in and provide its source and evidence"});
+   if(input.attested!==true)return res(400,{ok:false,error:"You must confirm that the customer actually gave permission for WhatsApp marketing."});
+   if(source.length<12)return res(400,{ok:false,error:"Choose a valid source where the customer explicitly opted in to WhatsApp marketing."});
+   if(evidence.length<10)return res(400,{ok:false,error:"Describe when and how the customer agreed (at least 10 characters). A value such as 1 is not evidence."});
    let row:any=null;
    if(key.startsWith("C:")&&validId(key.slice(2))){
     const q=await db.from("gr_crm_customers").select("id,name,mobile,mobile2").eq("id",key.slice(2)).maybeSingle();row=q.data;
