@@ -776,6 +776,7 @@ async function saveEditor(event){
    });
    if(result.error)throw result.error;
    toast('Sale completed! Lead converted to Won and linked to customer '+row.customer_name+'.','success');
+   window.GreenRichLeadPipeline?.celebrateWon?.(row.customer_name||'Customer');
    if(allowedTabs.includes('leads')){
     navigate('leads');window.GreenRichShell?.setPageWithoutRemount?.('leads');
     await window.GreenRichLeadPipeline?.refreshRoot?.($('#gr-lead-pipeline-root'));
