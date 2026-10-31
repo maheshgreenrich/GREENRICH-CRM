@@ -12,7 +12,7 @@ assert.ok(ui.includes("action:'sync_leads'"),'UI must call secure gateway sync a
 assert.ok(ui.includes("data-import-provider-lead"),'Manual import actions required, no silent lead creation');
 assert.ok(ui.includes("app.db.rpc('gr_wa_import_provider_lead'"),'Import uses secure Admin-only RPC');
 assert.ok(ui.includes("data-import-provider-template"),'Existing template reference import visible');
-assert.ok(ui.includes("const list=Array.isArray(preview)?preview:[preview]"),'Support multiple provider template JSON objects');
+assert.ok(ui.includes("const list=Array.isArray(parsed)?parsed:[parsed]"),'Support multiple provider template JSON objects');
 assert.ok(ui.includes("if(!list.length||list.length>50)"),'Bound template import');
 assert.ok(api.includes('if(action==="sync_leads")'),'Server API must implement staged sync');
 assert.ok(api.includes('providerRead(cfg,"leads/"'),'Use the supplied documented read-only GET Leads API');
