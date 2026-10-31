@@ -761,6 +761,10 @@ async function saveEditor(event){
  if(editing==='sales'&&!editId&&row.lead_id){
   try{
    await window.GreenRichCRMCloud.whenSynced(targetId);
+   const originalLead=copy.leads.find(l=>(l.id||l.lead_id)===row.lead_id);
+   if(originalLead?.stage==='Won'){
+    toast('Repeat purchase saved for an existing converted customer. The original Won stage is unchanged.','success');return;
+   }
    if(!['Issued','Confirmed','Approved','Completed','Dispatched'].includes(row.status)){
     toast('Sales Order saved. Change the order to Completed before converting this lead to Won.','info');return;
    }
