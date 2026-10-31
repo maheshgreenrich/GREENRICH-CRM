@@ -620,6 +620,7 @@
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
   current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();
+  startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
   try{await fetchAll();marketingDraw()}
   catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
@@ -627,6 +628,54 @@
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-create-service]')){serviceDialog();return}
+   if(e.target.closest('[data-service-all]')){
+    if(serviceCompany==='all')return alert('Choose one company before selecting all after-sales customers.','warning');
+    const all=serviceTargets().filter(x=>x.type==='Customer'&&x.company_id===serviceCompany);
+    serviceSelected=new Set(all.map(x=>x.id));marketingDraw();
+    return alert(all.length+' loaded matching customers selected for draft (not sent).','info');
+   }
+   if(e.target.closest('[data-service-clear]')){serviceSelected.clear();marketingDraw();return}
+   if(e.target.closest('[data-service-bulk]')){bulkServiceDialog();return}
+   const serviceItem=e.target.closest('[data-service-select]');
+   if(serviceItem){
+    if(serviceItem.checked)serviceSelected.add(serviceItem.dataset.serviceSelect);
+    else serviceSelected.delete(serviceItem.dataset.serviceSelect);
+    return;
+   }
+   const incoming=e.target.closest('[data-inbound-history]');
+   if(incoming){
+    const x=targets().find(t=>t.id===incoming.dataset.inboundHistory);
+    if(!app.admin||!x?.company_id)return alert('An Admin and linked company are required for provider chat history.','warning');
+    const conn=rows.connections.find(c=>c.company_id===x.company_id&&c.provider.toLowerCase()==='socialberries');
+    if(!conn)return alert('SocialBerries provider is not configured for this company.','warning');
+    return openMessageHistory(conn.id,x.mobile);
+   }
+   if(e.target.closest('[data-provider-report]')){
+    if(!app.admin)return alert('Admin permission required for provider reporting.','warning');
+    if(scope==='all')return alert('Select one company to check its SocialBerries campaigns.','warning');
+    const conn=rows.connections.find(c=>c.company_id===scope&&c.provider.toLowerCase()==='socialberries');
+    if(!conn)return alert('No SocialBerries provider configured for this company.','warning');
+    return await checkProvider(conn.id,'batches');
+   }
+   if(e.target.closest('[data-check-send-readiness]')){
+    const form=element.querySelector('#grwc-audience-form');
+    const c=form?.elements.company_id.value,connection=form?.elements.connection_id.value,
+      tid=form?.elements.template_id.value;
+    const t=rows.templates.find(x=>x.id===tid&&x.connection_id===connection&&x.company_id===c);
+    const checked=audience().filter(x=>selected.has(x.id));
+    const why=[];
+    if(scope==='all'||c!==scope)why.push('choose one company');
+    if(!checked.length)why.push('select at least one customer or lead');
+    if(!t)why.push('choose SocialBerries and an existing template');
+    if(!t?.body||!t?.provider_preview?.components)why.push('sync the approved template content/components from SocialBerries');
+    if(t?.provider_approval!=='approved')why.push('verify the template approval through the provider API');
+    const consent=rows.consents||[];
+    const blocked=checked.filter(x=>!consent.some(w=>w.company_id===c&&sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
+    if(blocked.length)why.push('confirm WhatsApp marketing opt-in for '+blocked.length+' selected recipients');
+    why.push('activate an audited provider bulk-send adapter (currently disabled)');
+    alert('Sending is disabled. Requirements: '+why.join('; ')+'. No message was sent.','warning');
+    return;
+   }
    if(e.target.closest('[data-select-all-matching]')){
     if(scope==='all')return alert('Choose one company above before selecting all contacts for a campaign.','warning');
     const members=audience();
@@ -653,13 +702,47 @@
     }
     return;
    }
-   const map={'grwc-company':'scope','grwc-kind':'kind','grwc-source':'source','grwc-tag':'tag','grwc-owner':'owner'};
+   const map={'grwc-company':'scope','grwc-kind':'kind','grwc-source':'source','grwc-tag':'tag','grwc-owner':'owner',
+     'grwc-product':'product','grwc-stage':'leadStage','grwc-date-from':'startDate','grwc-date-to':'endDate',
+     'grwc-service-company':'serviceCompany','grwc-service-type':'serviceType','grwc-service-source':'serviceSource',
+     'grwc-service-tag':'serviceTag','grwc-service-product':'serviceProduct','grwc-service-order':'serviceOrder',
+     'grwc-service-delivery':'serviceDelivery','grwc-service-from':'serviceStart','grwc-service-to':'serviceEnd'};
    if(!map[e.target.id])return;
    const v=e.target.value;
-   switch(e.target.id){case 'grwc-company':scope=v;break;case 'grwc-kind':kind=v;break;case 'grwc-source':source=v;break;case 'grwc-tag':tag=v;break;case 'grwc-owner':owner=v}
+   switch(e.target.id){
+    case 'grwc-company':scope=v;selected.clear();break;
+    case 'grwc-kind':kind=v;break;
+    case 'grwc-source':source=v;break;
+    case 'grwc-tag':tag=v;break;
+    case 'grwc-owner':owner=v;break;
+    case 'grwc-product':product=v;break;
+    case 'grwc-stage':leadStage=v;break;
+    case 'grwc-date-from':startDate=v;break;
+    case 'grwc-date-to':endDate=v;break;
+    case 'grwc-service-company':serviceCompany=v;serviceSelected.clear();break;
+    case 'grwc-service-type':serviceType=v;break;
+    case 'grwc-service-source':serviceSource=v;break;
+    case 'grwc-service-tag':serviceTag=v;break;
+    case 'grwc-service-product':serviceProduct=v;break;
+    case 'grwc-service-order':serviceOrder=v;break;
+    case 'grwc-service-delivery':serviceDelivery=v;break;
+    case 'grwc-service-from':serviceStart=v;break;
+    case 'grwc-service-to':serviceEnd=v;break;
+   }
    marketingDraw();
   };
-  element.oninput=e=>{if(e.target.id==='grwc-search'){needle=e.target.value.toLowerCase();const pos=e.target.selectionStart;marketingDraw();const inp=element.querySelector('#grwc-search');inp?.focus();inp?.setSelectionRange(pos,pos)}};
+  element.oninput=e=>{
+   const ids={'grwc-search':'needle','grwc-service-search':'serviceNeedle','grwc-inbound-lookup':'inboundNeedle'};
+   if(!ids[e.target.id])return;
+   const field=e.target.id,pos=e.target.selectionStart;
+   if(field==='grwc-search')needle=e.target.value.toLowerCase();
+   if(field==='grwc-service-search')serviceNeedle=e.target.value.toLowerCase();
+   if(field==='grwc-inbound-lookup')inboundNeedle=e.target.value.toLowerCase();
+   marketingDraw();
+   const input=element.querySelector('#'+field);
+   input?.focus();
+   try{input?.setSelectionRange(pos,pos)}catch{}
+  };
   element.onsubmit=async e=>{
    if(e.target.id!=='grwc-audience-form')return;e.preventDefault();
    if(!can('create'))return alert('Marketing create permission required','error');
