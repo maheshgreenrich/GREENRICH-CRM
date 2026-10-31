@@ -66,12 +66,19 @@ const fd=x=>({get:key=>x[key]??null});
  editProvider('grow-india',1,container);
  assert.ok(form.body.includes('grow-india'));
  await form.submit(fd({company_id:'enviro-solutions',display_name:'Grow India Updated',provider:'socialberries',
-    sender_phone:'+919888888888',notes:'grow-only'}));
+    sender_phone:'9888888888',notes:'grow-only'}));
  assert.equal(dbRows.length,2);
  assert.equal(dbRows.find(x=>x.company_id==='grow-india').id,'grow-uuid');
  assert.equal(dbRows.find(x=>x.company_id==='grow-india').display_name,'Grow India Updated');
+ assert.equal(dbRows.find(x=>x.company_id==='grow-india').sender_phone,'+919888888888','10-digit sender normalized to E.164');
  assert.equal(dbRows.find(x=>x.company_id==='enviro-solutions').display_name,'Enviro Provider Edit');
  const count=writeCount;
+ editProvider('grow-india',1,container);
+ await assert.rejects(
+  form.submit(fd({display_name:'Incorrect sender',provider:'socialberries',
+   sender_phone:'+9198000000000',notes:'must reject extra digit'})),
+  /exact registered 10-digit Indian WhatsApp business sender/);
+ assert.equal(writeCount,count,'Invalid 13-digit sender never reaches database');
  editProvider('fake-company',1,container);
  assert.equal(writeCount,count,'Unknown company must not be written');
  ctx.app.admin=false;
