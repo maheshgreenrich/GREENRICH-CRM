@@ -807,7 +807,11 @@ async function saveEditor(event){
   row.tag_ids=inputs.getAll('tag_ids');
   const issue=validateCustomer(copy,row,editId);if(issue)return toast(issue);
   try{
-   await window.GreenRichSharedCustomers.saveCustomer({...row,...(editId?{id:editId}:{})});
+   const savedCustomer=await window.GreenRichSharedCustomers.saveCustomer({...row,...(editId?{id:editId}:{})});
+   if(Object.keys(fbExtra).length){
+    try{await window.GreenRichFormBuilder.saveAnswers(targetId,'customer',savedCustomer.id,fbExtra)}
+    catch(e){toast('Customer saved; additional questions could not save: '+e.message,'warning')}
+   }
    attachSharedCustomers(data);$('#editor').close();render();
    toast(editId?'Shared customer updated':'Customer saved for all GreenRich employees');
   }catch(error){toast('Unable to save shared customer: '+error.message)}
@@ -819,6 +823,10 @@ async function saveEditor(event){
  if(editing!=='sales')row.id=editId||uid();
  if(old)Object.assign(old,row);else copy[editing].push(row);
  if(!saveCompanyData(targetId,copy))return;
+ if(editing==='sales'&&Object.keys(fbExtra).length){
+  try{await window.GreenRichFormBuilder.saveAnswers(targetId,'sales_order',row.id,fbExtra)}
+  catch(e){toast('Sales Order saved; additional questions could not save: '+e.message,'warning')}
+ }
  $('#editor').close();render();
  if(editing==='sales'&&targetId===activeCompany&&allowedTabs.includes('sales'))navigate('sales');
  toast((editing==='sales'?'Sales order '+row.internal_order_id+' saved. Draft invoice '+row.invoice_number+' created.':'Saved successfully')+(targetId!==activeCompany?' Switch to '+companyLabel(targetId)+' to view it.':''),'success');
@@ -974,6 +982,8 @@ window.GreenRichCRM={
   if(companyId==='all'&&permittedCompanies.length!==2)throw Error('Both Companies requires access to both companies.');
   companyScope=companyId;const workingId=companyId==='all'?permittedCompanies[0]:companyId;
   if(!client||!window.GreenRichSharedCustomers)throw Error('Shared customer service is unavailable. Refresh the page.');
+  try{await window.GreenRichFormBuilder?.ready?.(client,permittedCompanies)}
+  catch(error){toast('Form Builder settings unavailable: '+error.message,'warning')}
   activeCompany=workingId;activeCompanyName=companyName;adminMode=adminTools===true;allowDashboardExport=exportAllowed===true||isAdmin===true;allowInvoiceIssue=issueAllowed===true||isAdmin===true;
   if(!container||!document.getElementById('grCrmTemplate'))throw Error('CRM workspace template is missing');
   charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
