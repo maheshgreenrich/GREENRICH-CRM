@@ -73,6 +73,7 @@ jobs:
           node tests/unified-contacts-management.js
           node --check greenrich-dashboard.js
           node --check greenrich-dashboard-v2.js
+          node tests/dashboard-navigation-refresh.js
           test -s greenrich-dashboard-v2.css
           node tests/modern-business-intelligence.js
           node --check greenrich-actions.js

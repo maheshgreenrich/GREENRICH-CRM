@@ -15,7 +15,9 @@
  const bars=(items,formatter=fmt)=>{const good=items.filter(x=>x[1]>0).slice(0,12),max=Math.max(1,...good.map(x=>x[1]));return good.length?'<div class="gr-exec-bars">'+good.map(([name,n])=>'<div class="gr-exec-bar"><div><span>'+e(name)+'</span><b>'+e(formatter(n))+'</b></div><section><i style="width:'+Math.max(3,Math.round(n/max*100))+'%"></i></section></div>').join('')+'</div>':'<div class="gr-exec-empty">No matching records</div>'};
  const ring=items=>{const colors=['#295dd5','#55a4ed','#15a6a1','#ffa347','#9278dd'],total=items.reduce((n,x)=>n+x[1],0);let x=0;const stops=items.map(([_,n],i)=>{const start=x;x+=total?n/total*360:0;return colors[i%colors.length]+' '+start+'deg '+x+'deg'});return '<div class="gr-exec-ring-wrap"><div class="gr-exec-ring" style="background:'+(total?'conic-gradient('+stops.join(',')+')':'#e7eefb')+'"><div><b>'+fmt(total)+'</b><small>Total</small></div></div><div class="gr-exec-ring-legend">'+items.map(([name,n],i)=>'<div><span><i style="background:'+colors[i%colors.length]+'"></i>'+e(name)+'</span><strong>'+fmt(n)+'</strong></div>').join('')+'</div></div>'};
  const stats=items=>'<div class="gr-exec-stats">'+items.map(([name,value])=>'<div><small>'+e(name)+'</small><strong>'+e(value)+'</strong></div>').join('')+'</div>';
- let host=null,client=null,companyIds=[],selected='all',userId='',notice=()=>{},records={sales:[],products:[],leads:[],dispatch:[],attendance:[],customers:[]},widgets=W.map(x=>x[0]),staff=[],isAdmin=false,role='',canExport=false,refreshing=false,refreshToken=0,interval=null;
+ let host=null,viewRoot=null,client=null,companyIds=[],selected='all',userId='',notice=()=>{},records={sales:[],products:[],leads:[],dispatch:[],attendance:[],customers:[]},widgets=W.map(x=>x[0]),staff=[],isAdmin=false,role='',canExport=false,refreshing=false,refreshToken=0,interval=null;
+ const isActive=()=>!!viewRoot?.isConnected&&!!host?.contains(viewRoot);
+ function stop(){refreshToken++;viewRoot=null;if(interval)clearInterval(interval);interval=null}
  async function paged(table,build){const all=[];for(let i=0;i<10000;i+=1000){const response=await build(i,i+999);if(response.error)throw Error(table+': '+response.error.message);all.push(...(response.data||[]));if((response.data||[]).length<1000)break}return all}
  const input=id=>host?.querySelector(id)?.value||'';
  const inRange=(str,from,to)=>{const d=String(str||'').slice(0,10);return d&&(!from||d>=from)&&(!to||d<=to)};
@@ -48,7 +50,7 @@
    customers:records.customers.filter(c=>customerIds.has(c.id)),from,to,restricted};
  }
  function draw(){
-  if(!host)return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
+  if(!isActive())return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
   const salesCount=new Set(f.sales.map(r=>r.company_id+'|'+(r.internal_order_id||r.id))).size;
   const linked=s=>dispatch.some(d=>d.company_id===s.company_id&&d.source_sale_id===s.id);
   const approved=f.sales.filter(s=>linked(s)||s.approval_status==='Approved').length;
@@ -171,7 +173,7 @@
  }
 
  async function refresh(){
-  if(!host?.isConnected||refreshing)return;refreshing=true;const seq=++refreshToken;
+  if(!isActive()||refreshing)return;refreshing=true;const seq=++refreshToken;
   try{
    const [crm,dispatch,att,prefs,customers,leadPipeline,staffRows,tagRows]=await Promise.all([
     paged('CRM',(a,b)=>client.from('gr_crm_records').select('company_id,kind,payload').in('company_id',companyIds).in('kind',['sales','products','leads']).range(a,b)),
@@ -183,7 +185,7 @@
     Promise.all(companyIds.map(c=>client.rpc('gr_pipeline_staff',{p_company:c}))),
     client.from('gr_crm_tags').select('id,name').limit(500)
    ]);
-   if(seq!==refreshToken)return;const fresh={sales:[],products:[],leads:[],dispatch,attendance:att.error?[]:att.data||[],customers:customers.error?[]:customers.data||[]};
+   if(seq!==refreshToken||!isActive())return;const fresh={sales:[],products:[],leads:[],dispatch,attendance:att.error?[]:att.data||[],customers:customers.error?[]:customers.data||[]};
    for(const row of crm)if(fresh[row.kind]&&row.payload)fresh[row.kind].push({...row.payload,company_id:row.company_id});
    fresh.leads=leadPipeline.map(l=>({...fresh.leads.find(x=>x.company_id===l.company_id&&(x.id===l.lead_id||x.lead_id===l.lead_id))||{},...l}));
    records=fresh;staff=[...new Map(staffRows.flatMap(r=>r.data||[]).map(p=>[p.id,p])).values()];
@@ -198,11 +200,11 @@
    namedChoices('#gr-exec-person','All salespeople',isAdmin?staff.map(p=>[p.id,p.full_name]):[]);
    host.querySelector('#gr-exec-loading').hidden=true;draw();
    if(att.error)notice('Attendance summary unavailable to this role');
-  }catch(error){const el=host?.querySelector('#gr-exec-loading');if(el){el.hidden=false;el.textContent='Unable to refresh dashboard: '+error.message}}
+  }catch(error){if(seq!==refreshToken||!isActive())return;const el=host?.querySelector('#gr-exec-loading');if(el){el.hidden=false;el.textContent='Unable to refresh dashboard: '+error.message}}
   finally{refreshing=false}
  }
  async function mount(container,config){
-  if(interval)clearInterval(interval);host=container;client=config.db;companyIds=config.companyIds;selected=config.selectedCompany;userId=config.userId;notice=config.notify||(()=>{});isAdmin=!!config.admin;role=config.role||'';canExport=!!config.canExport;
+  stop();host=container;client=config.db;companyIds=config.companyIds;selected=config.selectedCompany;userId=config.userId;notice=config.notify||(()=>{});isAdmin=!!config.admin;role=config.role||'';canExport=!!config.canExport;
   container.innerHTML='<div class="gr-exec"><div class="gr-exec-heading"><div><span>GREENRICH ONE · BUSINESS INTELLIGENCE</span><h2>Performance overview</h2><p>Live operational charts from the shared GreenRich database</p></div><small id="gr-exec-count">Loading…</small></div>'+
    '<div class="gr-exec-filters"><label>Period<select id="gr-exec-period"><option value="today">Today</option><option value="week">This week</option><option value="month" selected>This month</option><option value="last30">Last 30 days</option><option value="all">All time</option><option value="custom">Custom dates</option></select></label>'+
    '<label>Company<select id="gr-exec-company"><option value="all">Both companies</option>'+companyIds.map(id=>'<option value="'+id+'">'+e(company(id))+'</option>').join('')+'</select></label>'+
@@ -214,6 +216,7 @@
    (isAdmin?'<label>Salesperson<select id="gr-exec-person"><option value="all">All salespeople</option></select></label>':'')+
    '<label>From<input type="date" id="gr-exec-from"></label><label>To<input type="date" id="gr-exec-to"></label><label>Attendance day<input type="date" id="gr-exec-attendance-date" value="'+today()+'"></label><div class="gr-exec-actions"><button id="gr-exec-reset" type="button">Reset</button><button id="gr-exec-refresh" type="button">↻ Refresh</button>'+(canExport?'<button id="gr-exec-excel" type="button">Export Excel</button><button id="gr-exec-pdf" type="button">Export PDF</button>':'')+'</div></div>'+
    '<div class="gr-exec-loading" id="gr-exec-loading">Loading charts from GreenRich cloud…</div><div class="gr-exec-kpis" id="gr-exec-kpis"></div><div class="gr-exec-grid" id="gr-exec-panels"></div><p class="gr-exec-note">All figures are based on accessible records. Company/module RLS and Admin-set widget visibility apply. Stock is current, not historical.</p></div>';
+  viewRoot=host.querySelector('.gr-exec');
   const co=host.querySelector('#gr-exec-company');if(companyIds.length===1){co.value=companyIds[0];co.disabled=true}else if(companyIds.includes(selected))co.value=selected;
   host.querySelectorAll('.gr-exec-filters input,.gr-exec-filters select').forEach(el=>el.addEventListener('change',()=>{if(el.id==='gr-exec-attendance-date'){void refresh();return}if(el.type==='date')host.querySelector('#gr-exec-period').value='custom';draw()}));
   host.querySelector('#gr-exec-reset').onclick=()=>{host.querySelector('#gr-exec-period').value='month';co.value=companyIds.includes(selected)?selected:'all';for(const id of ['#gr-exec-source','#gr-exec-channel','#gr-exec-product','#gr-exec-tag','#gr-exec-stage','#gr-exec-order-status','#gr-exec-person','#gr-exec-customer-type']){const el=host.querySelector(id);if(el)el.value='all'}for(const id of ['#gr-exec-from','#gr-exec-to'])host.querySelector(id).value='';host.querySelector('#gr-exec-attendance-date').value=today();void refresh()};
@@ -222,7 +225,7 @@
    host.querySelector('#gr-exec-excel').onclick=()=>void exportExcel();
    host.querySelector('#gr-exec-pdf').onclick=()=>void exportPdf();
   }
-  void refresh();interval=setInterval(()=>{if(host?.isConnected)void refresh()},60000);
+  void refresh();interval=setInterval(()=>{if(isActive())void refresh()},60000);
  }
  async function preferences(container,{db,people,notify}){
   const peopleActive=people.filter(p=>p.active);
@@ -237,5 +240,5 @@
   container.querySelector('#gr-exec-save').onclick=async event=>{event.currentTarget.disabled=true;try{const widgets=[...choices.querySelectorAll('input:checked')].map(x=>x.value);const r=await db.from('gr_dashboard_preferences').upsert({user_id:person.value,widgets,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(r.error)throw Error(r.error.message);message.textContent='Saved '+person.selectedOptions[0].textContent+' dashboard access';notify?.(message.textContent)}catch(error){message.textContent=error.message}finally{event.currentTarget.disabled=false}};
   if(peopleActive.length)await load();else message.textContent='No active users';
  }
- window.GreenRichExecutiveDashboard={mount,preferences,widgets:W,periodStart};
+ window.GreenRichExecutiveDashboard={mount,preferences,widgets:W,periodStart,stop};
 })();

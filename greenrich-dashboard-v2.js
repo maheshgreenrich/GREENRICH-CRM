@@ -11,7 +11,10 @@
  const ORDER=['day_sales','channel_sales','sales','company_sales','leads','conversion','salespeople','telecaller','attendance','customers','followups','order_status','dispatch','stock','recent','accounts'];
  const ACCESS={attendance:'attendance',sales:'sales',day_sales:'sales',channel_sales:'sales',company_sales:'sales',leads:'leads',order_status:'sales',dispatch:'dispatch',stock:'stock',telecaller:'leads',customers:'customers',followups:'leads',conversion:'leads',salespeople:'leads',recent:'sales',accounts:'accounts'};
  const emptyRecords=()=>({sales:[],products:[],leads:[],dispatch:[],attendance:[],customers:[],tags:[],channels:[]});
- let host=null,client=null,config=null,records=emptyRecords(),visible=[],staff=[],errors={},loading=false,timer=null,subscription=null,debounce=null,epoch=0,stamp='',available=true;
+ let host=null,viewRoot=null,client=null,config=null,records=emptyRecords(),visible=[],staff=[],errors={},loading=false,timer=null,subscription=null,debounce=null,epoch=0,stamp='',available=true;
+ // #content remains connected across menu changes. Only the dashboard's own
+ // .gr2 element proves this screen is still open.
+ const isActive=()=>!!viewRoot?.isConnected&&!!host?.contains(viewRoot);
  const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const number=v=>Number.isFinite(Number(v))?Number(v):0;
  const fmt=v=>new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}).format(number(v));
@@ -107,7 +110,7 @@
   choices('#gr2-type','All customer types',[...new Set(records.customers.map(x=>x.type).filter(Boolean))].map(x=>[x,x]));
  }
  function draw(){
-  if(!host?.isConnected)return;
+  if(!isActive())return;
   const f=filtered(),sale=f.sales.filter(s=>!['Cancelled','Returned'].includes(s.status)),won=f.leads.filter(l=>l.stage==='Won');
   const orderCount=countUnique(sale,s=>s.company_id+'|'+(s.internal_order_id||s.order_id||s.id));
   const due=f.followups.filter(l=>new Date(l.next_followup_at).valueOf()<=Date.now());
@@ -166,7 +169,7 @@
  const asyncLoad=async(fn,field,defaultValue=[])=>{try{const d=await fn();if(d.error)throw Error(d.error.message);return d.data||defaultValue}catch(err){errors[field]=err.message;return defaultValue}};
  async function paged(name,make){const result=[];for(let i=0;i<10000;i+=750){const r=await make(i,i+749);if(r.error)throw Error(r.error.message);result.push(...(r.data||[]));if(!r.data||r.data.length<750)break}return result}
  async function refresh(){
-  if(!host?.isConnected||loading)return;
+  if(!isActive()||loading)return;
   loading=true;const token=epoch,button=query('#gr2-refresh');
   if(button){button.disabled=true;button.textContent='Refreshing…'}
   errors={};
@@ -187,7 +190,7 @@
     access.leads?asyncLoad(()=>client.from('gr_crm_tags').select('id,name').limit(750),'tags'):Promise.resolve([])
    ];
    const [pref,crm,leads,dispatch,customers,attendance,staffData,tags]=await Promise.all(tasks);
-   if(token!==epoch||!host?.isConnected)return;
+   if(token!==epoch||!isActive())return;
    const fresh=emptyRecords();
    for(const r of crm||[]){if(!r.payload||!fresh[r.kind])continue;fresh[r.kind].push({...r.payload,id:r.payload.id||r.record_id,company_id:r.company_id})}
    const storedLeads=new Map(fresh.leads.map(l=>[l.company_id+'|'+l.id,l]));
@@ -199,8 +202,8 @@
    updateChoices();draw();
    const loadingEl=query('#gr2-loading');if(loadingEl)loadingEl.hidden=true;
    if(Object.keys(errors).length)window.GreenRichNotify?.('Some dashboard modules could not be loaded. Check your access settings.','warning');
-  }catch(err){const el=query('#gr2-loading');if(el){el.hidden=false;el.textContent='Dashboard could not refresh: '+err.message}window.GreenRichNotify?.(err.message,'error')}
-  finally{loading=false;if(button){button.disabled=false;button.textContent='↻ Refresh'}}
+  }catch(err){if(token!==epoch||!isActive())return;const el=query('#gr2-loading');if(el){el.hidden=false;el.textContent='Dashboard could not refresh: '+err.message}window.GreenRichNotify?.(err.message,'error')}
+  finally{loading=false;if(button?.isConnected){button.disabled=false;button.textContent='↻ Refresh'}}
  }
  function sheetData(){
   const f=filtered(),sections=[],hasAny=visible.some(has);
@@ -264,9 +267,12 @@
   query('#gr2-advanced').open=false;draw();
  }
  function stop(){
-  if(timer)clearInterval(timer);timer=null;if(debounce)clearTimeout(debounce);debounce=null;
+  // Invalidate any in-flight fetch *before* another page replaces #content.
+  epoch++;viewRoot=null;
+  if(timer)clearInterval(timer);timer=null;
+  if(debounce)clearTimeout(debounce);debounce=null;
   if(subscription&&client?.removeChannel)void client.removeChannel(subscription);
-  subscription=null;epoch++;
+  subscription=null;
  }
  async function mount(container,cfg){
   stop();host=container;client=cfg.db;config=cfg;records=emptyRecords();visible=W.map(x=>x[0]);staff=[];stamp='';errors={};
@@ -288,6 +294,7 @@
    '<div class="gr2-buttons"><span id="gr2-active">Loading widgets</span><button id="gr2-reset" type="button">Reset filters</button><button id="gr2-refresh" type="button">↻ Refresh</button>'+
    (cfg.canExport?'<button class="gr2-excel" id="gr2-excel" type="button">↓ Export Excel</button><button class="gr2-pdf" id="gr2-pdf" type="button">↓ Export PDF</button>':'')+'</div></div>'+
    '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Salesperson sales value uses Won leads linked to order IDs. Data refreshes automatically and when CRM changes are received.</div></div>';
+  viewRoot=host.querySelector('.gr2');
   if(cfg.companyIds?.length===1){query('#gr2-company').value=cfg.companyIds[0];query('#gr2-company').disabled=true}
   else if((cfg.companyIds||[]).includes(cfg.selectedCompany))query('#gr2-company').value=cfg.selectedCompany;
   host.addEventListener('change',event=>{
@@ -299,15 +306,17 @@
   query('#gr2-refresh').onclick=()=>void refresh();
   if(cfg.canExport){query('#gr2-excel').onclick=()=>void exportFile('excel');query('#gr2-pdf').onclick=()=>void exportFile('pdf')}
   await refresh();
-  timer=setInterval(()=>{if(host?.isConnected&&document.visibilityState!=='hidden')void refresh()},45000);
+  // Navigation may have removed this dashboard while its initial query ran.
+  if(!isActive())return;
+  timer=setInterval(()=>{if(isActive()&&document.visibilityState!=='hidden')void refresh()},45000);
   if(client?.channel){
    try{subscription=client.channel('gr2-bi-'+Date.now()).on('postgres_changes',{event:'*',schema:'public',table:'gr_crm_records'},()=>{
     if(debounce)clearTimeout(debounce);
-    debounce=setTimeout(()=>{if(host?.isConnected)void refresh()},750);
+    debounce=setTimeout(()=>{if(isActive())void refresh()},750);
    }).subscribe()}catch(err){console.warn('Dashboard realtime channel unavailable; polling remains active',err)}
   }
  }
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&host?.isConnected)void refresh()});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&isActive())void refresh()});
  window.GreenRichExecutiveDashboard={...previous,mount,widgets:W,periodStart:previous.periodStart||periodStart};
- window.GreenRichDashboardV2={filtered,filters,refresh,stop};
+ window.GreenRichDashboardV2={filtered,filters,refresh,stop,isActive};
 })();
