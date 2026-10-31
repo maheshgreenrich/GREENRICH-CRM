@@ -3,7 +3,7 @@
    No network calls to undocumented provider endpoints and no simulated sends. */
 (()=>{
  let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set();
- let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null;
+ let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null,campaignImage=null;
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  const name=id=>companies[id]||id;
@@ -120,7 +120,7 @@
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
-   '<label>Optional image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
+   '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg,image/webp"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<p class="grwc-muted grwc-span">Only approved templates with complete message content and opted-in contacts can be sent. A screenshot reference must first be synced once in Settings → WhatsApp Integration.</p>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
@@ -791,7 +791,7 @@
  }
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
-  current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();
+  current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;
   startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
   try{await fetchAll();marketingDraw()}
@@ -844,6 +844,12 @@
   };
   element.onchange=e=>{
    const form=e.target.closest?.('#grwc-audience-form');
+   if(form&&e.target.name==='image'){
+    campaignImage=e.target.files?.[0]||null;
+    const status=form.querySelector('[data-campaign-image-status]');
+    if(status)status.textContent=campaignImage?'Selected for sending: '+campaignImage.name:'No image selected';
+    return;
+   }
    if(form&&e.target.name==='connection_id'){
     const connectionId=e.target.value,c=campaignConnection(connectionId)?.company_id||'';
     const tpl=form.querySelector('[name=template_id]');
@@ -911,7 +917,7 @@
     return alert('None of the '+selected.size+' selected contacts can be sent by this provider. '+invalid+' invalid mobile number(s), '+otherLeads+' lead(s) from a different company.','warning');
    }
    const excluded=selected.size-matches.length;
-   const file=f.get('image');
+   const file=campaignImage||f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
    const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
    if(hasFile&&(!allowed[file.type]||file.size>5*1024*1024))
