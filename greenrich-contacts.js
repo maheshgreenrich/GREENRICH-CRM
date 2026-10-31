@@ -173,6 +173,14 @@
   form.innerHTML='<div class="gr-contact-fields">'+cols.join('')+'</div><div class="gr-contact-dialog-actions">'+
    '<button type="button" data-contact-close>Cancel</button><button class="gr-contact-primary" type="submit">Save '+kind+'</button></div>';
   if(id&&kind==='lead')form.elements.namedItem('company_id').disabled=true;
+  if(kind==='customer'&&window.GreenRichFormBuilder){
+   const co=context.selectedCompany()==='all'?context.companyIds[0]:context.selectedCompany();
+   form.dataset.formCompany=co;
+   window.GreenRichFormBuilder.decorate(form,co,'customer');
+   if(id)void window.GreenRichFormBuilder.recentAnswers(co,'customer',id).then(saved=>{
+    if(form.dataset.id===id&&dialog.open)window.GreenRichFormBuilder.decorate(form,co,'customer',saved)
+   }).catch(()=>{});
+  }
   // The full profile hides its customer directory, where this editor normally lives.
   // Move the same dialog to document.body so a visible modal never traps the UI.
   const parent=dialog.parentElement;
@@ -189,7 +197,7 @@
   }
  }
  function payloadFromForm(form,kind,old={}){
-  const fd=new FormData(form);const fields=Object.fromEntries([...fd.entries()].filter(([k])=>k!=='tag_ids'));
+  const fd=new FormData(form);const fields=Object.fromEntries([...fd.entries()].filter(([k])=>k!=='tag_ids'&&!k.startsWith('custom_')));
   const result={...old,...fields,tag_ids:fd.getAll('tag_ids')};
   for(const key of ['name','email','company','source','type','notes','address1','address2','city','state','pincode','gstin'])result[key]=clean(result[key]);
   result.mobile=phone(result.mobile);result.mobile2=phone(result.mobile2);
@@ -254,10 +262,17 @@
   if(!context.permission(kind,id?'edit':'create'))return notify('Not permitted.');
   const existing=id?allRecords().find(r=>r.id===id&&r._kind===kind&&(kind==='customer'||r._companyId===owner)):null;
   try{
+   const co=form.dataset.formCompany||context.selectedCompany();
+   const extra=kind==='customer'?window.GreenRichFormBuilder?.collect?.(form,co,'customer')||{}:{};
    const row=payloadFromForm(form,kind,existing||{});
    busy=true;const button=form.querySelector('[type=submit]');button.disabled=true;
-   if(kind==='customer')await persistCustomer(row,id);
-   else await persistLead(row,id,owner);
+   if(kind==='customer'){
+    const saved=await persistCustomer(row,id);
+    if(Object.keys(extra).length){
+     try{await window.GreenRichFormBuilder.saveAnswers(co,'customer',saved.id,extra)}
+     catch(e){notify('Customer saved, but additional answers could not save: '+e.message)}
+    }
+   }else await persistLead(row,id,owner);
    form.closest('dialog')?.close();notify((kind==='customer'?'Customer':'Lead')+' saved successfully.');
    draw();
   }catch(error){notify('Save failed: '+error.message)}
