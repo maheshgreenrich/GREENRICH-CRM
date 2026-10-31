@@ -11,15 +11,51 @@
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  let db,user,profile,company='',tab='shift',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],openSession=null;
  let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null;
+ let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
+ const isWindows=()=>/Windows/i.test(navigator.userAgent||'');
+ function locationError(err){
+  if(err?.code===1)return Error((isWindows()?'Windows Location services may be OFF, or this browser site is blocked. Open Windows Settings > Privacy & security > Location and turn on Location services. Then allow Location for this website in the browser.':'Location access was blocked. Enable device Location and allow this website to use it.')+' After updating permissions, return here and click Test GPS Access.');
+  if(err?.code===3)return Error('Location request timed out. Turn on device location, try near a window or outdoors, or use a GPS-enabled phone.');
+  return Error('Location could not be determined. Check system Location services, browser site permission, network and GPS availability. Desktop PCs may not have a GPS sensor.');
+ }
+ async function browserGPSPermission(){
+  try{if(!navigator.permissions?.query)return 'Not available';
+   const response=await navigator.permissions.query({name:'geolocation'});
+   return response.state==='granted'?'Allowed':response.state==='denied'?'Blocked':'Ask each time';
+  }catch{return 'Not available'}
+ }
+ function displayGPSFeedback(){
+  const n=$('#ft-gps-feedback');if(!n)return;
+  n.textContent=gpsState.message;
+  n.className='ft-gps-feedback'+(gpsState.level==='error'?' error':gpsState.level==='success'?' success':'');
+ }
+
  const notify=(msg,err=false)=>{const n=$('#ft-notice');n.hidden=false;n.className='ft-notice'+(err?' error':'');n.textContent=msg;n.scrollIntoView({block:'nearest',behavior:'smooth'});};
  const run=async(fn)=>{try{return await fn()}catch(err){notify(err?.message||String(err),true);return null}};
  async function rpc(name,args){const r=await db.rpc(name,args);if(r.error)throw Error(r.error.message);return r.data}
  async function q(table,cols='*',configure=x=>x){const result=await configure(db.from(table).select(cols));if(result.error)throw Error(result.error.message);return result.data||[]}
- function hasGPS(){if(!window.isSecureContext||!navigator.geolocation)throw Error('GPS requires HTTPS and a location-enabled browser. Open this page on your phone and allow location access.');}
+ function hasGPS(){
+  if(!window.isSecureContext)throw Error('Location requires HTTPS. Open the secure GreenRich Field Tracker website, not a downloaded file.');
+  if(!navigator.geolocation)throw Error('This browser cannot use location. Check Windows Location services, browser permissions or use a location-enabled phone.');
+ }
  function locate(){hasGPS();return new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(
   p=>{const c=p.coords;if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||!Number.isFinite(c.accuracy))return reject(Error('GPS coordinates unavailable'));resolve({p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy});},
-  err=>reject(Error(err.code===1?'Location permission denied. Enable location access for this site.':err.code===3?'GPS request timed out. Move outdoors and try again.':'Location unavailable. Enable phone GPS and mobile data.')),
+  err=>reject(locationError(err)),
   {enableHighAccuracy:true,timeout:20000,maximumAge:0}));}
+ async function testGPS(){
+  gpsState={level:'info',message:'Checking device location. If prompted, allow location for this site. No shift or visit record will be saved.'};
+  displayGPSFeedback();
+  try{
+   const p=await locate(),perm=await browserGPSPermission();
+   if(p.p_accuracy>3000){
+    gpsState={level:'error',message:'Location was detected, but accuracy is ±'+Math.round(p.p_accuracy)+' metres. Field check-in requires accuracy within 3 km. Use a GPS-enabled phone outdoors. Browser permission: '+perm+'.'};
+   }else{
+    gpsState={level:'success',message:'Location access WORKS. Browser permission: '+perm+'. Current accuracy: ±'+Math.round(p.p_accuracy)+' metres. This was a test only; no check-in or GPS history was saved.'};
+   }
+  }catch(err){const perm=await browserGPSPermission();gpsState={level:'error',message:err.message+' Browser permission: '+perm+'.'};}
+  displayGPSFeedback();
+ }
+
  function activeHere(){return openSession&&openSession.company_id===company}
  function stopTracking(){if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}}
  function startTracking(){
@@ -108,6 +144,14 @@
      btn('Check Out With Current GPS','checkout','', 'ft-btn-danger'):
      '<p>Check in to record your server time and GPS coordinates. Location history will update approximately once a minute while this page is visible.</p>'+
      btn('Check In With Current GPS','checkin','','ft-btn')))+
+   box('GPS Permission & Setup',
+    '<p>First test your GPS here. Testing does not create a shift, service visit or location-history record.</p>'+
+    '<div class="ft-row">'+btn('Test GPS Access (No Check In)','testgps','','ft-btn-soft')+
+    '<a class="ft-btn ft-btn-ghost" href="https://support.microsoft.com/en-us/windows/privacy/windows-location-service-and-privacy" target="_blank" rel="noopener noreferrer">Windows Location Help</a></div>'+
+    '<p id="ft-gps-feedback" class="ft-gps-feedback'+(gpsState.level==='error'?' error':gpsState.level==='success'?' success':'')+'">'+e(gpsState.message)+'</p>'+
+    '<div class="ft-gps-guide"><b>Windows computer:</b> Settings → Privacy & security → Location → Turn on Location services. Then click the site controls icon beside the browser address → Site settings → Location → Allow. Refresh and test again.'+
+    '<p><b>Android phone:</b> Turn on device Location, then allow location permission for your browser and this site. A phone normally gives better GPS accuracy than a desktop PC.</p>'+
+    '<p><b>System location OFF?</b> The browser cannot switch it on. Use the System settings button in the Windows popup.</p></div>')+
    box('Location sharing & privacy',
     '<p class="ft-note">GPS is only collected after Check In, during an active shift, when this page is open and visible. Phone lock, browser suspension, no network or GPS permission denial may stop updates. You can stop location sharing by checking out. The admin can review locations collected during authorized shifts.</p>'+
     '<p><b>Important:</b> Pilot attendance stays separate from official GreenRich ONE attendance and payroll until approved.</p>')+
@@ -224,6 +268,7 @@
   if(ev.target.closest('#ft-new-form button[type=submit]'))return;
  }
  async function actionHandler(action,id){
+  if(action==='testgps'){await testGPS();return}
   if(action==='checkin'){
    if(openSession)throw Error('Already checked in. Check out before starting a new shift.');
    const p=await locate();const s=await rpc('gr_field_clock_in',{p_company:company,...p});
