@@ -16,7 +16,7 @@ const checks=[
  ['template name selectable for campaign draft',script.includes("templateOptions(c,prov.value)")],
  ['template filtered to selected provider',script.includes("t.connection_id===connectionId")],
  ['select all matching loaded contacts',script.includes("data-select-all-matching")&&script.includes("selected=new Set(members.map(x=>x.id))")],
- ['all-company selection must be scoped',script.includes("if(scope==='all')return alert('Choose one company")],
+ ['campaign company scopes all-company audience',script.includes("if(!app.companies.includes(companyId))")&&script.includes('x.company_id===companyId')&&script.includes("selected=new Set(members.map(x=>x.id))")],
  ['draft only',script.includes("status:'draft'")&&script.includes('Nothing is sent automatically')],
  ['does not create a messaging API caller',!script.includes("action:'send'")]
 ];

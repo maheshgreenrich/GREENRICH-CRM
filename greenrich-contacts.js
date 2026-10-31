@@ -138,7 +138,9 @@
   const existing=id?allRecords().find(r=>r.id===id&&r._kind===kind&&(kind==='customer'||r._companyId===owner)):null;
   if(id&&!existing)return notify('Record not found. Refresh this page.');
   if(!context.permission(kind,id?'edit':'create'))return notify('Your role does not have permission to '+(id?'edit':'add')+' '+kind+' records.');
-  const record=existing||{},dialog=root.querySelector('#gr-contact-dialog'),form=root.querySelector('#gr-contact-form');
+  const dialog=root?.querySelector('#gr-contact-dialog'),form=root?.querySelector('#gr-contact-form');
+  if(!dialog||!form)return notify('Customer editor is unavailable. Return to Customers and try again.');
+  const record=existing||{};
   form.dataset.kind=kind;form.dataset.id=id;form.dataset.company=owner;
   root.querySelector('#gr-contact-dialog-title').textContent=(id?'Edit ':'Add ')+(kind==='lead'?'Lead':'Customer');
   const cols=[
@@ -171,7 +173,20 @@
   form.innerHTML='<div class="gr-contact-fields">'+cols.join('')+'</div><div class="gr-contact-dialog-actions">'+
    '<button type="button" data-contact-close>Cancel</button><button class="gr-contact-primary" type="submit">Save '+kind+'</button></div>';
   if(id&&kind==='lead')form.elements.namedItem('company_id').disabled=true;
-  dialog.showModal();
+  // The full profile hides its customer directory, where this editor normally lives.
+  // Move the same dialog to document.body so a visible modal never traps the UI.
+  const parent=dialog.parentElement;
+  if(dialog.closest('[hidden]')){
+   document.body.append(dialog);
+   dialog.addEventListener('close',()=>{
+    if(parent?.isConnected)parent.append(dialog);
+    else dialog.remove();
+   },{once:true});
+  }
+  try{dialog.showModal()}catch(error){
+   if(dialog.parentElement!==parent&&parent?.isConnected)parent.append(dialog);
+   return notify('Could not open customer editor: '+error.message);
+  }
  }
  function payloadFromForm(form,kind,old={}){
   const fd=new FormData(form);const fields=Object.fromEntries([...fd.entries()].filter(([k])=>k!=='tag_ids'));
@@ -243,7 +258,7 @@
    busy=true;const button=form.querySelector('[type=submit]');button.disabled=true;
    if(kind==='customer')await persistCustomer(row,id);
    else await persistLead(row,id,owner);
-   root.querySelector('#gr-contact-dialog').close();notify((kind==='customer'?'Customer':'Lead')+' saved successfully.');
+   form.closest('dialog')?.close();notify((kind==='customer'?'Customer':'Lead')+' saved successfully.');
    draw();
   }catch(error){notify('Save failed: '+error.message)}
   finally{busy=false;const button=form.querySelector('[type=submit]');if(button)button.disabled=false}
@@ -404,6 +419,12 @@
   if(!container)return;
   container.innerHTML=markup();
   container.querySelector('#gr-contact-form').onsubmit=submit;
+  container.querySelector('#gr-contact-dialog').addEventListener('click',event=>{
+   if(event.target.closest('[data-contact-close]')){
+    event.stopPropagation();
+    event.currentTarget.close();
+   }
+  });
   container.addEventListener('click',async event=>{
    const btn=event.target.closest('button');if(!btn)return;
    if(btn.dataset.contactAdd){openForm(btn.dataset.contactAdd);return}

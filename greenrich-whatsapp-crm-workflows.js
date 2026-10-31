@@ -109,14 +109,14 @@
    '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
    list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Customers without a reliable company match in existing dispatch/consent records are excluded from company-specific sends until assigned. Showing first 250 of '+list.length+' currently loaded matching contacts. The Select all action includes all '+list.length+' loaded matches, not just the first 250; additional CRM rows beyond this data load are not included. Choose one company before selecting everyone. No marketing consent is inferred from a CRM record.</p></section>'+
+   '<p class="grwc-muted">The top Company dropdown is only an audience filter. You may leave it on Both companies. The campaign Company below determines the sending company and only selected contacts linked to that company are included in its draft. Records without a verified company association are skipped. Showing the first 250 of '+list.length+' loaded matches; more CRM rows may exist. Marketing consent is not inferred from a CRM record.</p></section>'+
    '<section class="grwc-panel">'+headers('Choose existing SocialBerries template','Templates come from the provider catalog when the API connection is verified. Unverified CRM references cannot send messages.')+
    '<form id="grwc-audience-form" class="grwc-form">'+companyField(co)+
    '<label>WhatsApp tool<select name="connection_id" required>'+options(rows.connections.filter(x=>x.company_id===co).map(x=>[x.id,x.display_name]),'Select provider')+'</select></label>'+
    '<label>Existing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign reference<input name="name" maxlength="160" placeholder="e.g. Diwali offer - Chennai" required></label>'+ 
    '<label>Optional campaign image<input type="file" name="image" accept="image/png,image/jpeg,image/webp"></label>'+
-   '<p class="grwc-muted grwc-span">Select a company and opt-in eligible contacts, then choose the existing SocialBerries template. The selected template may be metadata-only until the full approved template is retrieved. Save creates a draft; it does NOT send messages.</p>'+
+   '<p class="grwc-muted grwc-span">The Company selected here is the campaign owner; it does not need to match the audience filter above. Only selected, company-matched contacts can be saved for this campaign. Other-company and unlinked contacts are excluded automatically. Saving a draft does NOT send messages.</p>'+
    '<button type="submit" class="grwc-primary">Save campaign draft</button><button type="button" data-check-send-readiness>Check sending readiness</button><button type="button" disabled title="Sending requires confirmed provider API, approved template components and marketing opt-in">Send WhatsApp marketing (not enabled)</button><button type="button" data-refresh-crm>Refresh template references</button><button type="button" data-open-settings>Configure WhatsApp</button></form></section>'+campaignReports();
  }
  function campaignReports(){
@@ -688,7 +688,7 @@
     const t=rows.templates.find(x=>x.id===tid&&x.connection_id===connection&&x.company_id===c);
     const checked=audience().filter(x=>selected.has(x.id));
     const why=[];
-    if(scope==='all'||c!==scope)why.push('choose one company');
+    if(!c||!app.companies.includes(c))why.push('choose an authorized campaign company');
     if(!checked.length)why.push('select at least one customer or lead');
     if(!t)why.push('choose SocialBerries and an existing template');
     if(!t?.body||!t?.provider_preview?.components)why.push('sync the approved template content/components from SocialBerries');
@@ -701,7 +701,6 @@
     return;
    }
    if(e.target.closest('[data-select-all-matching]')){
-    if(scope==='all')return alert('Choose one company above before selecting all contacts for a campaign.','warning');
     const members=audience();
     selected=new Set(members.map(x=>x.id));
     marketingDraw();
@@ -772,10 +771,10 @@
    if(!can('create'))return alert('Marketing create permission required','error');
    const f=new FormData(e.target),companyId=f.get('company_id'),connectionId=f.get('connection_id'),templateId=f.get('template_id');
    if(!rows.connections.some(c=>c.id===connectionId&&c.company_id===companyId)||!rows.templates.some(t=>t.id===templateId&&t.company_id===companyId&&t.connection_id===connectionId))return alert('Select a matching provider/template.','error');
-   if(scope==='all')return alert('Choose one company in the audience filter before saving a campaign.','warning');
-   if(companyId!==scope)return alert('Campaign company must match the audience company filter.','warning');
+   if(!app.companies.includes(companyId))return alert('Select an authorized campaign company.','error');
    const audienceIds=[...selected],matches=audience().filter(x=>audienceIds.includes(x.id)&&x.company_id===companyId);
-   if(!matches.length)return alert('Select at least one CRM contact for this company.','warning');
+   if(!matches.length)return alert('No selected contacts belong to the campaign company. Select matching contacts or change the campaign company; the top filter can remain Both companies.','warning');
+   const excluded=audienceIds.length-matches.length;
    const file=f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
    const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
@@ -805,7 +804,7 @@
       .update({attachment_path:path,attachment_mime:file.type}).eq('id',record.id).eq('company_id',companyId);
      if(update.error)throw Error('Campaign draft saved and image uploaded, but image link failed: '+update.error.message);
     }
-    alert('Campaign draft saved for '+matches.length+' selected CRM records. '+eligible.length+
+    alert('Campaign draft saved for '+matches.length+' company-matched CRM records'+(excluded?' ('+excluded+' selected from other/unlinked companies excluded)':'')+'. '+eligible.length+
       ' have recorded marketing consent. No message sent.','success');
     await fetchAll();marketingDraw();
    }catch(error){

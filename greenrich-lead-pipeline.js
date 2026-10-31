@@ -21,8 +21,10 @@
 
  const styles=`
 
- .gr-lead-full-screen{position:fixed;inset:0;z-index:1200;overflow:auto;background:#f4f7fc;padding:clamp(12px,3vw,35px);overscroll-behavior:contain}
- .gr-lead-full-screen .grlp{max-width:1400px;margin:0 auto}
+ .gl-lead-detail-inline{position:relative;display:block;width:100%;max-width:100%;min-width:0;min-height:72vh;overflow:visible;background:#f4f7fc;padding:clamp(12px,2vw,24px);border:1px solid #dee8f5;border-radius:16px}
+ .gl-lead-detail-inline .grlp{max-width:100%;margin:0 auto}
+ .gl-lead-detail-inline .grlp-full{width:100%;max-width:100%}
+ .gl-lead-detail-inline .grlp{max-width:100%;margin:0 auto}
  .gl-won-search{display:grid;gap:7px;margin:9px 0}
  .gl-won-search input{width:100%;border:1px solid #cbd8e9;border-radius:8px;padding:10px}
  .gr-won-celebrate{position:fixed;inset:0;z-index:9999;pointer-events:none;display:grid;place-items:center;background:#0b245047;animation:grwonfade 3.4s forwards}
@@ -183,7 +185,7 @@
  const showMessage=(ctx,e)=>notify(ctx,e?.message||String(e));
  async function refresh(ctx){await query(ctx);draw(ctx)}
  function draw(ctx){
-  const root=ctx.root;if(!root?.isConnected)return;
+  const root=ctx.root;if(!root?.isConnected||ctx.profileOpen)return;
   const rows=picked(ctx),wins=rows.filter(l=>l.stage==='Won'),quoted=rows.filter(l=>l.stage==='Quotation');
   const localDay=d=>new Date(d).toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});
   const today=localDay(Date.now());
@@ -312,11 +314,18 @@
   });
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
-  const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
-   due.closest('label').hidden=won||stage.value==='Lost';due.required=!won&&stage.value!=='Lost';order.closest('label').hidden=!won;order.required=won;
-   d.querySelector('.gl-move-heat').hidden=won;
-   d.querySelector('.gl-won-search').hidden=!won;
-  };stage.onchange=controls;controls();
+  const controls=()=>{
+   if(!d.isConnected||!stage)return;
+   const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
+   const dueLabel=due?.closest('label'),orderLabel=order?.closest('label');
+   if(dueLabel)dueLabel.hidden=won||stage.value==='Lost';
+   if(due)due.required=!won&&stage.value!=='Lost';
+   if(orderLabel)orderLabel.hidden=!won;
+   if(order)order.required=won;
+   const heatPanel=d.querySelector('.gl-move-heat'),searchPanel=d.querySelector('.gl-won-search');
+   if(heatPanel)heatPanel.hidden=won;
+   if(searchPanel)searchPanel.hidden=!won;
+  };if(stage){stage.onchange=controls;controls()}
   const search=d.querySelector('[name=order_search]');
   const orderPicker=d.querySelector('[name=order]');
   const allOrderOptions=[...orderPicker.options].map(option=>option.cloneNode(true));
@@ -341,13 +350,21 @@
   if(action==='profile'||action==='quick'){
     if(!l)return;
     if(action==='quick'){await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,quick:true});return}
-    const page=document.createElement('div');page.className='gr-lead-full-screen';
-    page.setAttribute('role','region');page.setAttribute('aria-label','Lead full profile');
-    const previous=document.activeElement,scrollY=window.scrollY;
-    document.body.append(page);
-    const close=()=>{page.remove();previous?.focus?.({preventScroll:true});window.scrollTo(0,scrollY)};
-    try{await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,host:page,onClose:close})}
-    catch(error){close();notify(ctx,'Could not open lead profile: '+error.message)}
+    const page=document.createElement('section');page.className='gl-lead-detail-inline';
+    page.setAttribute('role','region');page.setAttribute('aria-label','Lead 360 profile inside CRM');
+    const previous=document.activeElement;
+    ctx.profileOpen=true;
+    ctx.root.replaceChildren(page);
+    const close=()=>{
+     ctx.profileOpen=false;
+     page.remove();
+     if(ctx.root.isConnected)draw(ctx);
+     previous?.focus?.({preventScroll:true});
+    };
+    try{
+     await window.GreenRichLeadProfile.open({db:ctx.db,company:l.company_id,leadId:l.lead_id,host:page,onClose:close});
+     if(page.isConnected)page.scrollIntoView({block:'start'});
+    }catch(error){close();notify(ctx,'Could not open lead profile: '+error.message)}
     return;
    }
   if(action==='move'){move(ctx,l);return}
