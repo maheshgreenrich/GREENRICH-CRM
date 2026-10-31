@@ -14,7 +14,7 @@
  const options=(items,blank='None — do not send')=>'<option value="">'+esc(blank)+'</option>'+items.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
- const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_approval==='approved'?'Verified':'Not API-verified');
+ const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Approved in screenshot · API unverified':'API unverified');
  const templateOptions=(c,connectionId='')=>templates(c).filter(t=>!connectionId||t.connection_id===connectionId).map(t=>[t.id,tmpl(t)]);
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
@@ -56,7 +56,7 @@
  }
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Campaign Handoff</h2><p>Your CRM is the audience source. SocialBerries remains the template and campaign delivery platform.</p></div><span class="grwc-chip">Provider API pending</span></div>'+
- '<div class="grwc-notice">No SocialBerries API credentials or verified template-sync endpoints are connected yet. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
+ '<div class="grwc-notice">Provider authentication and automatic template-list sync have not been verified. Existing templates can be linked by ID for campaign drafts; message content must come from SocialBerries. Saved selections and schedules are <strong>drafts only</strong>. Nothing is sent automatically.</div>'+
  '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['welcome','Lead Welcome'],['recurring','Repeat Service'],['sync','Incoming Leads']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),co=cd(),tags=rows.tags,ids=new Set(list.map(x=>x.id));
@@ -181,7 +181,7 @@
    '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.body?'Message preview recorded · Not API-verified':'Metadata only · Not API-verified')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_approval==='approved'?'API-verified':t.provider_preview?.status==='APPROVED'?'Screenshot: APPROVED · API unverified':'Not API-verified · '+(t.body?'Preview recorded':'Metadata only'))+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
    '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
