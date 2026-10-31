@@ -125,7 +125,7 @@
   return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
    'Local campaign drafts and provider batch references. Read/opened statuses require verified provider statistics; replied/not replied require incoming-message events.')+
    '<div class="grwc-grid grwc-kpis">'+
-   [['CRM drafts',relevant.length],['Provider batches linked',completed.length],['Read / opened','—'],['Responded','—'],['Not responded','—']].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
+   [['Loaded CRM drafts',relevant.length],['Provider batches linked',completed.length],['Read / opened','—'],['Responded','—'],['Not responded','—']].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
    (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Created</th><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Status</th><th>Image</th></tr></thead><tbody>'+
     relevant.map(x=>'<tr><td>'+esc(date(x.created_at))+'</td><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+esc(x.status==='draft'?'Draft · not sent':x.status)+'</td><td>'+esc(x.attachment_path?'Attached':'—')+'</td></tr>').join('')+
     '</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
@@ -195,8 +195,9 @@
  }
  function inboundView(){
   const rules=scoped(rows.inbound);
+  const lookupDigits=inboundNeedle.replace(/\D/g,'');
   const matches=inboundNeedle?targets().filter(x=>
-   String(x.mobile||'').replace(/\D/g,'').includes(inboundNeedle.replace(/\D/g,''))||
+   (lookupDigits.length>=4&&String(x.mobile||'').replace(/\D/g,'').includes(lookupDigits))||
    x.name.toLowerCase().includes(inboundNeedle.toLowerCase())):[];
   return '<section class="grwc-panel">'+headers('Incoming WhatsApp enquiries',
    'Match a WhatsApp number to an existing CRM contact and open its provider chat history. New inbound events require an authenticated SocialBerries webhook.')+
