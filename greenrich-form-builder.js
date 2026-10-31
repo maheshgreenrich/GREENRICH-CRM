@@ -265,7 +265,11 @@ window.GreenRichFormBuilder=(()=>{
     '<p class="grfb-instruction">Reorder using ↑ ↓ or drag-and-drop. Edit question labels, visibility, required status, layout and rules. System-required questions are locked to protect live sales and CRM data. New questions are saved in the secure custom answers history.</p></div>'+
     '<div class="grfb-layout"><div class="grfb-editor panel"><div class="grfb-heading"><h3>Configure questions</h3><span id="grfb-unsaved"></span></div><div id="grfb-fields"></div></div>'+
     '<div class="grfb-preview panel"><h3>Live form preview</h3><p>Preview shows the visual layout and conditions; actual CRM records are unchanged until Save & Publish.</p><div id="grfb-preview"></div>'+
-    '<button type="button" data-grfb="reset">Reset unsaved edits</button></div></div></div>';
+    '<button type="button" data-grfb="reset">Reset unsaved edits</button></div></div>'+
+    '<div class="panel grfb-history"><div class="grfb-heading"><h3>Saved custom question answers</h3>'+
+    '<button type="button" data-grfb="answers">Refresh Answers</button></div>'+
+    '<p>Admin can review the last 50 answers recorded for this company and form. Answers are not part of the default customer/order columns.</p>'+
+    '<div id="grfb-answers">Select Refresh Answers to review recorded responses.</div></div></div>';
    const $=q=>root.querySelector(q),els=$('#grfb-fields'),preview=$('#grfb-preview');
    $('#grfb-company').value=company;$('#grfb-form').value=key;
    const mark=()=>{dirty=true;$('#grfb-unsaved').textContent='Unsaved changes';drawPreview()};
@@ -316,7 +320,8 @@ window.GreenRichFormBuilder=(()=>{
    };
    const switchTo=()=>{
     if(dirty&&!confirm('Discard unsaved Form Builder edits?')){ $('#grfb-company').value=company;$('#grfb-form').value=key;return}
-    company=$('#grfb-company').value;key=$('#grfb-form').value;draft=schema(company,key);dirty=false;redraw();
+    company=$('#grfb-company').value;key=$('#grfb-form').value;draft=schema(company,key);dirty=false;
+    $('#grfb-answers').textContent='Select Refresh Answers to review recorded responses.';redraw();
    };
    $('#grfb-company').addEventListener('change',switchTo);$('#grfb-form').addEventListener('change',switchTo);
    els.addEventListener('input',event=>{
@@ -351,6 +356,22 @@ window.GreenRichFormBuilder=(()=>{
     mark();redraw();els.lastElementChild?.scrollIntoView({block:'nearest',behavior:'smooth'});
    };
    root.querySelector('[data-grfb=reset]').onclick=()=>{if(dirty&&!confirm('Discard all unsaved edits?'))return;draft=schema(company,key);dirty=false;redraw()};
+   root.querySelector('[data-grfb=answers]').onclick=async event=>{
+    const button=event.currentTarget,out=$('#grfb-answers');button.disabled=true;
+    out.textContent='Loading saved answers…';
+    try{
+     const {data,error}=await db.from('gr_form_answers').select('entity_id,answers,created_at')
+      .eq('company_id',company).eq('form_key',key).order('created_at',{ascending:false}).limit(50);
+     if(error)throw Error(error.message);
+     const labels=new Map(schema(company,key).map(f=>[f.id,f.label]));
+     out.innerHTML=(data||[]).length?(data||[]).map(row=>
+      '<details class="grfb-answer"><summary>'+esc(new Date(row.created_at).toLocaleString('en-IN'))+
+      ' · Record '+esc(row.entity_id)+'</summary><dl>'+
+      Object.entries(row.answers||{}).map(([id,val])=>'<dt>'+esc(labels.get(id)||id)+'</dt><dd>'+
+       esc(Array.isArray(val)?val.join(', '):typeof val==='object'?JSON.stringify(val):String(val))+'</dd>').join('')+
+      '</dl></details>').join(''):'No custom answers saved for this form yet.';
+    }catch(e){out.textContent='Could not load answers: '+e.message}finally{button.disabled=false}
+   };
    root.querySelector('[data-grfb=save]').onclick=async event=>{
     const button=event.currentTarget;button.disabled=true;
     try{
