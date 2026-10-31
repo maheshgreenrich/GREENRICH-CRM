@@ -357,11 +357,11 @@
    '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
-   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Meta approval and CRM verification are different. Click Verify with Meta to fetch the approved BODY/HEADER, or use the complete approved provider JSON. A screenshot does not contain the message text.</p>'+
+   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Template content and approval verification are separate. Importing JSON saves message content but not a verified approval. Verify through your authorized Meta WABA or compare the JSON with the approved SocialBerries template and confirm it below.</p>'+
    '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · full content not synced':'Awaiting verification')+(t.category==='marketing'?' <button type="button" data-verify-meta-template="'+esc(t.id)+'">Verify with Meta</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting verification')+(t.category==='marketing'?' <button type="button" data-verify-meta-template="'+esc(t.id)+'">Verify with Meta</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-settings-confirm-template>Confirm existing approved template</button></div></div>'+
@@ -596,12 +596,13 @@
  function settingsTemplateApproval(company,container){
   const list=rows.templates.filter(x=>x.company_id===company&&x.category==='marketing');
   if(!list.length)return alert('Import your existing approved marketing template under Templates first.','warning');
-  dialog('Confirm provider-approved MARKETING template',
-   '<p class="grwc-muted grwc-span">Copy complete APPROVED template JSON including ID, language, category, BODY and any IMAGE HEADER from the actual SocialBerries/Meta account. This records administrator confirmation, not an API check.</p>'+
+  const jsonOf=t=>Array.isArray(t?.provider_preview?.components)?JSON.stringify(t.provider_preview,null,2):'';
+  const d=dialog('Confirm provider-approved MARKETING template',
+   '<p class="grwc-muted grwc-span">The imported JSON is prefilled for you. Check it against the ACTUAL approved template in SocialBerries, including both buttons and their URLs. A screenshot-generated JSON is not proof of approval.</p>'+
    field('Existing marketing template','template_id',options(list.map(x=>[x.id,x.name+' · '+x.provider_template_id]),'Choose template'),true)+
-   note('Full approved template JSON','approved_json','')+
+   note('Full approved template JSON','approved_json',jsonOf(list[0]))+
    note('Approval evidence: who verified, where, when','confirmation_note','')+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> I confirmed this template is approved in SocialBerries</label>',
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I compared BODY, HEADER and BUTTONS with the exact approved template in SocialBerries</label>',
    async f=>{
     const id=String(f.get('template_id')||''),t=list.find(x=>x.id===id);
     if(!t)throw Error('Choose an existing marketing template');
@@ -610,6 +611,10 @@
      attested:f.has('attested')});
     await fetchAll();settingsDraw(container);
    },'Confirm template','Approved marketing-template details confirmed. No message sent.');
+  d.querySelector('select[name="template_id"]')?.addEventListener('change',e=>{
+   const item=list.find(t=>t.id===e.target.value);
+   const box=d.querySelector('textarea[name="approved_json"]');if(box)box.value=jsonOf(item);
+  });
  }
  function importTemplateMetadata(company,container){
   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
@@ -637,28 +642,45 @@
    });
  }
  function importProviderTemplate(company,container){
-   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
-   if(!choices.length)return alert('First save a SocialBerries provider for this company in Tool 1 or Tool 2.','warning');
-   dialog('Import existing SocialBerries template reference',
-     field('SocialBerries tool','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose SocialBerries connection'),true)+
-     '<div class="grwc-notice grwc-span">Copy the complete approved template JSON preview from SocialBerries, with id, name, language, category and components (including BODY text). This does not create a template in SocialBerries or send a message. Credentials do not belong here.</div>'+
-     note('Paste one template JSON object or an array of template JSON objects (up to 50)','preview_json'),
-     async fd=>{
-       const connectionId=fd.get('connection_id');
-       if(!choices.some(x=>x.id===connectionId))throw Error('Choose a matching company provider');
-       let preview;try{preview=JSON.parse(String(fd.get('preview_json')||''))}catch{throw Error('Valid JSON is required')}
-       const list=Array.isArray(preview)?preview:[preview];
-       if(!list.length||list.length>50)throw Error('Use 1–50 templates in a JSON array.');
-       let imported=0;
-       for(const item of list){
-        const t=item?.preview_template?.components?item.preview_template:item;
-        const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
-        if(out.error)throw Error('Imported '+imported+' reference(s). '+out.error.message);
-        imported++;
-       }
-       alert(imported+' existing provider template reference(s) saved as unverified. No messages sent.','success');
-       await fetchAll();settingsDraw(container);
-     });
+  const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
+  if(!choices.length)return alert('First save a SocialBerries provider for this company.','warning');
+  dialog('Import existing SocialBerries template JSON',
+   field('SocialBerries provider','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose connection'),true)+
+   '<p class="grwc-notice grwc-span">Use the actual approved template JSON from SocialBerries, with exact ID, name, language, category and components. Screenshot-created JSON must still be checked against the provider-approved template, especially button types and URLs.</p>'+
+   '<label class="grwc-span">Choose a JSON file<input name="json_file" type="file" accept=".json,application/json"></label>'+
+   note('Or paste complete JSON (single template or array)','preview_json'),
+   async fd=>{
+    const connectionId=String(fd.get('connection_id')||'');
+    if(!choices.some(x=>x.id===connectionId))throw Error('Choose the correct SocialBerries provider');
+    const file=fd.get('json_file');let content=String(fd.get('preview_json')||'').trim();
+    if(file&&typeof file.text==='function'&&file.size){
+     if(file.size>100000)throw Error('JSON file must be smaller than 100 KB');
+     content=await file.text();
+    }
+    let parsed;try{parsed=JSON.parse(content)}catch{throw Error('Choose a valid JSON file or paste valid JSON')}
+    const list=Array.isArray(parsed)?parsed:[parsed];
+    if(!list.length||list.length>50)throw Error('Import 1–50 templates at once');
+    const existing=rows.templates.filter(t=>t.company_id===company&&t.connection_id===connectionId);
+    for(const item of list){
+     const t=item?.preview_template?.components?item.preview_template:item;
+     if(!t||typeof t!=='object'||!t.id||!t.name||!Array.isArray(t.components))
+      throw Error('Template JSON must contain id, name and components');
+     const prior=existing.find(x=>String(x.provider_template_id)===String(t.id));
+     if(prior&&prior.name!==t.name)
+      throw Error('Template ID '+t.id+' is already linked to "'+prior.name+'". Imported JSON says "'+t.name+'". Correct the name to match the approved provider template.');
+     if(prior&&['verified_provider','admin_confirmed'].includes(prior.provider_source))
+      throw Error('Template '+prior.name+' is already verified. Do not overwrite its approved content with unverified JSON.');
+    }
+    let imported=0;
+    for(const item of list){
+     const t=item?.preview_template?.components?item.preview_template:item;
+     const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
+     if(out.error)throw Error('Imported '+imported+' templates. '+out.error.message);
+     imported++;
+    }
+    await fetchAll();settingsDraw(container);
+    alert(imported+' JSON record(s) imported with message content. They still require confirmation against the approved provider template.','success');
+   },'Import JSON','Template JSON imported. See template status below.');
  }
  function editProvider(c,slot,container){
   // A provider slot belongs permanently to one company. The former form
@@ -732,7 +754,19 @@
  }
  async function secureSend(action,args){
   const r=await app.db.functions.invoke('greenrich-whatsapp-send',{body:{action,...args}});
-  if(r.error)throw Error(r.error.message||'Secure sending backend unavailable');
+  if(r.error){
+   // supabase-js masks 4xx/5xx JSON responses as "non-2xx status code".
+   let detail='';
+   try{
+    const response=r.error.context;
+    if(response&&typeof response.json==='function'){
+     const body=await response.json();
+     detail=typeof body?.error==='string'?body.error:
+      Array.isArray(body?.blockers)?body.blockers.join('; '):'';
+    }
+   }catch{}
+   throw Error(detail||r.error.message||'Secure WhatsApp backend unavailable');
+  }
   if(!r.data?.ok)throw Error(r.data?.error||r.data?.blockers?.join('; ')||'WhatsApp request failed');
   return r.data;
  }
