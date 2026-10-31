@@ -48,4 +48,6 @@ pass('One-time Settings consent is accessible',ui.includes('data-settings-optin'
 pass('One-time Settings template confirmation is accessible',ui.includes('data-settings-confirm-template')&&ui.includes('function settingsTemplateApproval(company,container)')&&ui.includes("secureSend('confirm_template'"));
 pass('Marketing remains one button',ui.includes('data-send-campaign')&&!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template'));
 
+pass('Template catalog labels reported Meta approval distinctly',ui.includes('Meta APPROVED reported · content not synced'));
+pass('Settings can verify with Meta',ui.includes('data-verify-meta-template')&&ui.includes('function verifyMetaTemplate(')&&ui.includes("secureSend('sync_meta_template'"));
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');

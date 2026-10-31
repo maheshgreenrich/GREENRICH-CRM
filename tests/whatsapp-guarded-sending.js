@@ -15,4 +15,11 @@ assert.ok(edge.includes('return res(200,{ok:true,ready:!blockers.length'),'Prefl
 assert.ok(edge.includes('norm(x.mobile)||norm(x.mobile2)'),'Send gateway must use valid secondary customer mobile');
 assert.ok(edge.includes('norm(row?.mobile)||norm(row?.mobile2)'),'Consent gateway must support secondary customer mobile');
 assert.ok(!edge.includes('if(checked.no_phone)blockers.push'),'Skipped invalid contacts must not block eligible senders');
+assert.ok(edge.includes('if(action==="sync_meta_template")'),'Missing Meta WABA approved-template verification');
+assert.ok(edge.includes('prefix+"_META_WABA_ID"')&&edge.includes('prefix+"_META_ACCESS_TOKEN"'),'Missing per-company Meta secret names');
+assert.ok(edge.includes('https://graph.facebook.com/')&&edge.includes('message_templates'),'Meta must use official fixed endpoint');
+assert.ok(edge.includes('t.status!=="APPROVED"')&&edge.includes('String(t.category).toUpperCase()!=="MARKETING"'),'Meta template status/category must be strict');
+assert.ok(edge.includes('String(x?.id)===String(template.provider_template_id)'),'Verification must match exact Meta template ID');
+assert.ok(edge.includes('provider_source:"verified_provider"'),'Only actual Meta verification may set verified_provider');
+assert.ok(edge.includes('components:template.provider_preview.components'),'SocialBerries preview must contain full approved template components');
 console.log('PASS: Secure SocialBerries send adapter has role, opt-in, approval, idempotency, live gate and bounded send controls.');
