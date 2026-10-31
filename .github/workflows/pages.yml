@@ -25,6 +25,10 @@ jobs:
           test -s styles.css
           test -s app.js
           node --check app.js
+          test -s field-tracker.html
+          test -s field-tracker.css
+          test -s field-tracker.js
+          node --check field-tracker.js
           test -s greenrich-one.js
           test -s greenrich-one.css
           node --check greenrich-one.js
