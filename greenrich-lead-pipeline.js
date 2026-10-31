@@ -98,7 +98,7 @@
    allRows(ctx.db,'gr_lead_pipeline','*',q=>q.in('company_id',cs)),
    Promise.all(cs.map(async co=>{const {data,error}=await ctx.db.rpc('gr_pipeline_staff',{p_company:co});if(error)throw error;return (data||[]).map(p=>({...p,company_id:co}))})),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','sales').limit(1000),
-   ctx.db.from('gr_crm_customers').select('id,name,mobile').order('name').limit(1000),
+   ctx.db.from('gr_crm_customers').select('id,name,mobile,mobile2,email').order('name').limit(1000),
    ctx.db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',cs).eq('kind','products').limit(1000),
    ctx.db.from('gr_crm_sources').select('id,name,active').eq('active',true).order('name'),
    ctx.db.from('gr_crm_tags').select('id,name').order('name'),
@@ -218,7 +218,7 @@
      '<div class="gl-card-actions gl-icon-row">'+contactIcons(l)+
      ico('quick','Quick view','quick',l)+ico('stage','Move stage','move',l)+ico('history','History','detail',l)+
      (ctx.canViewTeam?ico('assign','Assign employee','assign',l):'')+
-     (l.stage==='Quotation'?ico('order','Create Sales Order','order',l):'')+
+     (l.stage!=='Won'&&l.stage!=='Lost'?ico('order','Create Sales Order','order',l):'')+
      '</div></article>').join('')+'</div></section>').join('')+'</div>';
   root.querySelectorAll('[data-gl-filter]').forEach(el=>el.onchange=()=>{ctx.filters[el.dataset.glFilter]=el.value;
    if(el.dataset.glFilter==='company')ctx.filters.product=[];
@@ -258,18 +258,22 @@
  const noteFld=()=>'<label>Conversation details / reason (required)<textarea name="note" maxlength="4000" required placeholder="What was discussed? What is the next action?"></textarea></label>';
  const getLead=(ctx,id,company)=>ctx.leads.find(l=>l.lead_id===id&&l.company_id===company);
  function move(ctx,l,to){
-  const allowed=l.stage==='New'?['Contacted','Qualified','Quotation','Lost']:
-   l.stage==='Contacted'?['Qualified','Lost']:
-   l.stage==='Qualified'?['Quotation','Lost']:
-   l.stage==='Quotation'?['Won','Lost']:
-   l.stage==='Lost'?['Contacted']:[];
-  if(!allowed.length){notify(ctx,'Won leads are closed. Ask Admin if a correction is needed.');return}
-  const next=allowed.includes(to)?to:allowed[0],first=l.stage==='New';
-  const orders=ctx.orders.filter(o=>o.company_id===l.company_id&&
-   ['Issued','Confirmed','Approved','Completed','Dispatched'].includes(o.payload?.status));
-  const orderSelect='<div class="gl-won-search"><label>Search Sales Order ID, customer or mobile<input type="search" name="order_search" placeholder="SO ID, customer name, mobile, amount…" autocomplete="off" aria-label="Search issued Sales Orders"></label></div>'+
+  if(l.stage==='Won'){notify(ctx,'This lead has already been converted.');return}
+   const allowed=stages.filter(stage=>stage!==l.stage);
+   const next=allowed.includes(to)?to:(allowed.includes('Contacted')?'Contacted':allowed[0]),first=l.stage==='New';
+   const digits=value=>String(value||'').replace(/[^0-9]/g,'').slice(-10);
+   const leadNumber=digits(l.mobile),leadEmail=String(l.email||'').trim().toLowerCase();
+   const orders=ctx.orders.filter(o=>{
+     if(o.company_id!==l.company_id||!['Issued','Confirmed','Approved','Completed','Dispatched'].includes(o.payload?.status))return false;
+     const c=ctx.customers.find(c=>c.id===o.payload?.customer_id);
+     return (l.customer_id&&l.customer_id===o.payload?.customer_id)||
+       (o.payload?.lead_id===l.lead_id&&o.payload?.company_id===l.company_id)||
+       (leadNumber.length===10&&[c?.mobile,c?.mobile2,o.payload?.customer_mobile].some(n=>digits(n)===leadNumber))||
+       (leadEmail&&[c?.email,o.payload?.customer_email].some(mail=>String(mail||'').trim().toLowerCase()===leadEmail));
+   });
+  const orderSelect='<div class="gl-won-search"><label>Search this lead’s Sales Orders by ID, customer or mobile<input type="search" name="order_search" placeholder="SO ID, customer name, mobile, amount…" autocomplete="off" aria-label="Search issued Sales Orders"></label></div>'+
    '<label>Issued Sales Order — required for Won<select name="order">'+
-    '<option value="">Select exact customer-linked Sales Order</option>'+orders.map(o=>{
+    '<option value="">Select matching Sales Order</option>'+orders.map(o=>{
       const customer=ctx.customers.find(c=>c.id===o.payload?.customer_id);
       const text=[o.payload?.internal_order_id||o.payload?.order_id||o.record_id,
         customer?.name||o.payload?.customer_name||'Customer not linked',
@@ -278,23 +282,23 @@
       return '<option value="'+escape(o.record_id)+'">'+escape(text)+'</option>';
     }).join('')+'</select></label>';
   const products=ctx.products.filter(p=>p.company_id===l.company_id&&p.payload?.active!==false);
-  const firstFields=first?'<div class="gl-first-interests"><h4>Required when moving from New</h4>'+
-   '<fieldset><legend>Interested products *</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
+  const firstFields=first?'<div class="gl-first-interests"><h4>Optional when moving from New</h4>'+
+   '<fieldset><legend>Interested products</legend>'+products.map(p=>'<label><input type="checkbox" name="products" value="'+escape(p.record_id)+'" '+
      (p.record_id===l.product_id?'checked':'')+'>'+escape(p.payload?.name||p.record_id)+'</label>').join('')+'</fieldset>'+
-   '<fieldset><legend>Approved tags *</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
+   '<fieldset><legend>Approved tags</legend>'+ctx.approvedTags.map(t=>'<label><input type="checkbox" name="tags" value="'+escape(t.id)+'" '+
      ((l.tag_ids||[]).includes(t.id)?'checked':'')+'>'+escape(t.name)+'</label>').join('')+'</fieldset></div>':'';
   const dateInput='<label>Next follow-up date and time *<input name="due" type="datetime-local" required value="'+
     escape(l.next_followup_at?new Date(l.next_followup_at).toLocaleString('sv-SE',{timeZone:'Asia/Kolkata'}).replace(' ','T').slice(0,16):'')+'"></label>';
-  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' → '+escape(next)+'</p>'+
+  const body='<p class="gl-caption">'+escape(l.contact||l.title)+' · '+escape(l.stage)+' · choose any next stage</p>'+
    selectFld('Move to stage','stage',allowed.map(x=>[x,x]))+
    firstFields+noteFld()+
    '<div class="gl-move-heat">'+selectFld('Lead priority','heat',[['Hot','Hot'],['Warm','Warm'],['Cold','Cold']])+'</div>'+dateInput+orderSelect+
-   '<p class="gl-note">Search and select an issued Sales Order. GreenRich verifies the order customer against this lead before Won conversion. All other stages need a follow-up date and time.</p>';
+   '<p class="gl-note">Choose any next stage. Won requires a matching confirmed Sales Order, which also converts this lead into a customer. Lost closes follow-ups; other active stages require a future follow-up.</p>';
   const d=dialog(ctx,'Update lead stage',body,async fd=>{
    const stage=fd.get('stage'),products=first?fd.getAll('products'):[],tags=first?fd.getAll('tags'):[];
-   if(first&&(!products.length||!tags.length))throw Error('Select at least one product and tag before leaving New.');
-   if(stage==='Won'&&!fd.get('order'))throw Error('Choose an issued customer-linked Sales Order.');
-   if(stage!=='Won'&&!fd.get('due'))throw Error('Next follow-up date and time required.');
+   // Product and tag interests are optional; when chosen, the server verifies them.
+   if(stage==='Won'&&!fd.get('order'))throw Error('Choose a matching issued or completed Sales Order.');
+   if(!['Won','Lost'].includes(stage)&&!fd.get('due'))throw Error('Next follow-up date and time required.');
    const due=fd.get('due')?new Date(fd.get('due')).toISOString():null;
    const {error}=stage==='Won'
      ?await ctx.db.rpc('gr_pipeline_win_with_order',{p_company:l.company_id,p_lead:l.lead_id,p_order:fd.get('order'),p_note:fd.get('note')})
@@ -309,7 +313,7 @@
   const stage=d.querySelector('[name=stage]');stage.value=next;
   const heat=d.querySelector('[name=heat]');heat.value=l.lead_heat||'Warm';
   const controls=()=>{const won=stage.value==='Won',due=d.querySelector('[name=due]'),order=d.querySelector('[name=order]');
-   due.closest('label').hidden=won;due.required=!won;order.closest('label').hidden=!won;order.required=won;
+   due.closest('label').hidden=won||stage.value==='Lost';due.required=!won&&stage.value!=='Lost';order.closest('label').hidden=!won;order.required=won;
    d.querySelector('.gl-move-heat').hidden=won;
    d.querySelector('.gl-won-search').hidden=!won;
   };stage.onchange=controls;controls();
@@ -348,7 +352,7 @@
    }
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
-   if(!l.customer_id){notify(ctx,'Link this lead to an existing customer before creating its sales order.');return}
+   
    if(typeof window.GreenRichCRM?.createOrderForLead!=='function')throw Error('Sales Order editor is unavailable. Refresh the CRM.');
    window.GreenRichCRM.createOrderForLead(l);return;
   }
