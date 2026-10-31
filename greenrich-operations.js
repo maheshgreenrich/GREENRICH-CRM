@@ -178,6 +178,14 @@
    type.fields.map(([key,label,control,required])=>'<label>'+esc(label)+(required?' *':'')+options(key,control,{required,current:item[key]})+'</label>').join('')+
    '<div class="gr-ops-form-buttons"><button type="button" data-cancel-record>Cancel</button><button class="gr-ops-primary" type="submit" data-save-record>Save record</button></div>';
   if(id)editor.querySelector('[name=company_id]').value=recordCompany;
+  const form=editor.querySelector('#gr-ops-form');
+  const selectedCompany=id?recordCompany:form.elements.namedItem('company_id')?.value||companyIds[0];
+  const apply=co=>window.GreenRichFormBuilder?.decorate?.(form,co,'ops_'+kind);
+  apply(selectedCompany);
+  if(!id)form.elements.namedItem('company_id')?.addEventListener('change',event=>apply(event.target.value));
+  if(id)void window.GreenRichFormBuilder?.recentAnswers?.(selectedCompany,'ops_'+kind,id).then(values=>{
+   if(editor.open&&editor.dataset.recordId===id)apply(selectedCompany)&&window.GreenRichFormBuilder.decorate(form,selectedCompany,'ops_'+kind,values);
+  }).catch(()=>{});
   editor.showModal();
  }
  async function saveRecord(event){
@@ -186,6 +194,9 @@
   const k=dialog.dataset.kind,current=id?rows.find(r=>r.kind===k&&r.record_id===id):null,
    company=id?current?.company_id:form.elements.namedItem('company_id')?.value;
   if(!companyIds.includes(company))return actionAlert('This company is not assigned to your account.');
+  let extra={};
+  try{extra=window.GreenRichFormBuilder?.collect?.(form,company,'ops_'+k)||{}}
+  catch(err){return actionAlert('Form questions: '+err.message)}
   const payload={...(current?.payload||{}),id:id||uid()};
   for(const [field,,control] of TYPES[k].fields){
    const value=form.elements.namedItem(field)?.value?.trim()||'';
@@ -210,6 +221,10 @@
     await db.from('gr_ops_records').insert(values).select('record_id');
    if(response.error)throw Error(response.error.message);
    if(!response.data?.length)throw Error('Record was not saved. Verify permissions.');
+   if(Object.keys(extra).length){
+    try{await window.GreenRichFormBuilder.saveAnswers(company,'ops_'+k,payload.id,extra)}
+    catch(e){actionAlert('ERP record saved, but extra answers failed to save: '+e.message)}
+   }
    dialog.close();actionAlert('Saved '+TYPES[k].label+' to shared GreenRich cloud.');await reload();
   }catch(error){actionAlert('Save failed: '+error.message)}finally{button.disabled=false}
  }
@@ -233,6 +248,8 @@
   isAdmin=role==='Admin';caps=Object.fromEntries([...new Set(Object.values(TYPES).map(x=>x.module))].map(module=>
    [module,Object.fromEntries(['view','create','edit','delete'].map(action=>[action,isAdmin||Boolean(can(module,action))]))]));
   kind='overview';rows=[];version++;
+  try{await window.GreenRichFormBuilder?.ready?.(db,companyIds)}
+  catch(e){actionAlert('Form Builder settings unavailable: '+e.message)}
   host.innerHTML='<div class="gr-ops"><div class="gr-ops-banner"><div><span>GREENRICH ONE · ERP OPERATIONS</span><h2>Operations & Production</h2><p>Material to vendor, production to QC, and delivery readiness</p></div>'+
    '<label>Working company<select id="gr-ops-company"><option value="all">Both companies</option>'+companyIds.map(id=>'<option value="'+id+'">'+esc(companyName(id))+'</option>').join('')+'</select></label></div>'+
    '<div class="gr-ops-notice" id="gr-ops-alert" role="status" hidden></div>'+
