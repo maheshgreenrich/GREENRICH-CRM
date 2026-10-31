@@ -454,12 +454,32 @@
       alert((data.message||data.error||'Provider check failed')+missing,'warning');return;
     }
     if(action==='test')return alert('Read-only SocialBerries API connected. Authentication successful. User count: '+(data.users_count??'not returned')+'. Sending is still disabled.','success');
-    const lines=(data.batches||[]).map(b=>[b.name,b.status,b.total_clients_count,b.completed_clients_count].join(' · '));
-    dialog('SocialBerries Campaign Status (read-only)',
-     '<p class="grwc-muted grwc-span">'+esc(data.count||0)+' total provider batches. Showing page '+esc(data.page||1)+'.</p>'+
-     '<pre class="grwc-span" style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(lines.join('\n')||'No batches returned')+'</pre>',
-     async()=>{});
-    alert('Provider batch status received.','success');
+    const d=document.createElement('dialog');d.className='grwc-dialog';
+    d.innerHTML='<div class="grwc-dialog-head"><h3>SocialBerries campaign reports</h3><button type="button" data-close>×</button></div>'+
+      '<div class="grwc-dialog-fields"><p class="grwc-muted grwc-span">'+esc(data.count||0)+' provider batches · Page '+esc(data.page||1)+'. Provider batches are not automatically linked to GreenRich CRM campaign drafts.</p>'+
+      '<div class="grwc-tablewrap grwc-span"><table><thead><tr><th>Campaign</th><th>Status</th><th>Recipients</th><th>Details</th></tr></thead><tbody>'+
+      (data.batches||[]).map(b=>'<tr><td>'+esc(b.name||'—')+'</td><td>'+esc(b.status||'—')+'</td><td>'+esc(b.total_clients_count??'—')+'</td><td><button type="button" data-batch-stats="'+esc(b.id)+'">Read status</button></td></tr>').join('')+
+      '</tbody></table></div><div class="grwc-feature grwc-span" id="grwc-batch-detail">Select a batch to view sent, delivered, read and failed counts. Replies are not measured by this endpoint.</div></div>'+
+      '<div class="grwc-dialog-foot"><button type="button" data-close>Close</button></div>';
+    document.body.append(d);
+    d.onclose=()=>d.remove();
+    d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.close());
+    d.onclick=async ev=>{
+     const b=ev.target.closest('[data-batch-stats]');if(!b)return;
+     const box=d.querySelector('#grwc-batch-detail');
+     box.textContent='Loading provider batch statistics…';
+     try{
+      const r=await app.db.functions.invoke('greenrich-socialberries',{
+       body:{connection_id:id,action:'batch_detail',batch_id:b.dataset.batchStats}});
+      if(r.error||!r.data?.ok)throw Error(r.error?.message||r.data?.message||'Provider report unavailable');
+      const p=r.data,stats=p.statistics||{};
+      box.innerHTML='<b>'+esc(p.name)+'</b><p>Provider status: '+esc(p.status)+'</p>'+
+       '<div class="grwc-grid">'+['total_messages','pending','sent','delivered','read','failed'].map(key=>
+         '<div class="grwc-feature"><small>'+esc(key.replace('_',' '))+'</small><b>'+esc(stats[key]??'—')+'</b></div>').join('')+'</div>'+
+       '<p class="grwc-muted">READ status is not guaranteed to mean a person opened the message. Responded / Not responded are unavailable until inbound events are connected.</p>';
+     }catch(error){box.textContent='Could not load batch detail: '+error.message}
+    };
+    d.showModal();
    }catch(err){alert('Connection test failed: '+err.message,'error')}
  }
  async function syncProviderLeads(connectionId,container){
