@@ -44,6 +44,11 @@ async function enter(){
   $('#userName').textContent=profile.full_name;$('#userRole').textContent=roleName();configureCompanySelector();
   document.title='GreenRich ONE · '+(company?.company_name||'CRM');
   if(window.GreenRichAttendance?.configure)window.GreenRichAttendance.configure({client:db,user,profile,roles,permissions});
+  window.GreenRichWhatsAppWorkflows?.configure?.({
+   db,companies:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),
+   userId:user.id,admin:roleName()==='Admin',notify:toast,permission:act=>can('marketing',act),
+   canLeads:can('leads','view'),canCustomers:can('customers','view')
+  });
   show('app');window.GreenRichFollowupAlarm?.start({db,userId:user.id,companyIds:window.GreenRichCompanies.allowed(),role:roleName()});window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
   // Attendance status is useful but should never block dashboard navigation or first paint.
   void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
@@ -178,11 +183,10 @@ async function render(){
   else if(page==='operations')await operations(c)
   else if(page==='accounts')await window.GreenRichAccounts.mount(c,{db,companyId:window.GreenRichCompanies.selected(user.id)})
    else if(page==='marketing'){
-    if(!window.GreenRichWhatsAppMarketing)throw Error('WhatsApp Marketing module is not loaded. Refresh GreenRich ONE.');
-    await window.GreenRichWhatsAppMarketing.mount(c,{db,companies:window.GreenRichCompanies.allowed(),
+    if(!window.GreenRichWhatsAppWorkflows)throw Error('CRM Marketing module is not loaded. Refresh GreenRich ONE.');
+    await window.GreenRichWhatsAppWorkflows.mountMarketing(c,{db,companies:window.GreenRichCompanies.allowed(),
       selectedCompany:window.GreenRichCompanies.selected(user.id),userId:user.id,admin:roleName()==='Admin',
-      permission:action=>can('marketing',action),
-      crmPermissions:{customers:can('customers','view'),leads:can('leads','view')},notify:toast});
+      permission:action=>can('marketing',action),canLeads:can('leads','view'),canCustomers:can('customers','view'),notify:toast});
    }
   else if(crmMap[page])await crmWorkspace(c,crmMap[page]);
   else await placeholder(c)
@@ -365,6 +369,11 @@ async function settings(c){
    openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
    openSources:host=>window.GreenRichSources.mount(host,{db,notify:toast}),
    openSheetIntegrations:host=>window.GreenRichSheetManager.mount(host,{db,companyIds:window.GreenRichCompanies.allowed(),notify:toast}),
+    openWhatsAppSettings:host=>window.GreenRichWhatsAppWorkflows.mountSettings(host,{
+     db,companies:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),
+     userId:user.id,admin:true,permission:action=>can('marketing',action),
+     canLeads:can('leads','view'),canCustomers:can('customers','view'),notify:toast
+    }),
   onCompanyChange:(id,name)=>{
    document.title='GreenRich ONE · '+name;
    configureCompanySelector();
