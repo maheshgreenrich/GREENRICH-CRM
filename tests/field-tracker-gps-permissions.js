@@ -6,8 +6,8 @@ assert.ok(source.includes("if(action==='testgps'){await testGPS();return}"),
  'Explicit GPS test must not run check-in RPC');
 assert.ok(source.includes("Test GPS Access (No Check In)"),
  'The pilot must expose a non-recording GPS test');
-assert.ok(source.includes("Windows Settings > Privacy & security > Location"),
- 'Windows system location troubleshooting must be displayed');
+assert.ok(source.includes("Windows computer:")&&source.includes("Location services"),
+ 'Windows system and website permission troubleshooting must be displayed');
 assert.ok(source.includes("gr_field_clock_in"),'Real check-in must remain available');
 const start=source.indexOf(' const isWindows=()=>');
 const end=source.indexOf(' function stopTracking(){',start);
