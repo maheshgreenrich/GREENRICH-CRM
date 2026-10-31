@@ -754,11 +754,7 @@
   try{await fetchAll();marketingDraw()}
   catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
   element.onclick=async e=>{
-   if(e.target.closest('[data-record-optin]')){await recordOptIn();return}
-   if(e.target.closest('[data-confirm-template]')){await confirmTemplate();return}
-   if(e.target.closest('[data-save-and-review]')){const form=element.querySelector('#grwc-audience-form');if(form){form.dataset.reviewAfter='1';form.requestSubmit()}return}
    const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
-   const optin=e.target.closest('[data-consent-campaign]');if(optin){const row=rows.campaigns.find(c=>c.id===optin.dataset.consentCampaign);if(row)recordOptIn(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-refresh-crm]')){try{await fetchAll();marketingDraw();alert('Latest GreenRich template references and CRM data loaded. SocialBerries automatic template API is not connected.','success')}catch(error){alert(error.message,'error')}return}
@@ -792,31 +788,11 @@
     if(!conn)return alert('No SocialBerries provider configured for this company.','warning');
     return await checkProvider(conn.id,'batches');
    }
-   if(e.target.closest('[data-check-send-readiness]')){
-    const form=element.querySelector('#grwc-audience-form');
-    const connection=form?.elements.connection_id.value,tid=form?.elements.template_id.value;
-    const sender=campaignConnection(connection),c=sender?.company_id||'';
-    const t=rows.templates.find(x=>x.id===tid&&x.connection_id===connection&&x.company_id===c);
-    const checked=campaignTargets(c),ignored=audience().filter(x=>selected.has(x.id)).length-checked.length;
-    const why=[];
-    if(!sender)why.push('choose an authorized WhatsApp provider');
-    if(!checked.length)why.push('select a customer or matching-company lead with a valid phone');
-    if(ignored)why.push(ignored+' records have invalid mobiles or are leads from another company');
-    if(!t)why.push('choose SocialBerries and an existing template');
-    if(!t?.body||!t?.provider_preview?.components)why.push('sync the approved template content/components from SocialBerries');
-    if(t?.provider_approval!=='approved')why.push('verify the template approval through the provider API');
-    const consent=rows.consents||[];
-    const blocked=checked.filter(x=>!consent.some(w=>w.company_id===c&&sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
-    if(blocked.length)why.push('confirm WhatsApp marketing opt-in for '+blocked.length+' selected recipients');
-    why.push('save a draft and use Review / Send for server-side credentials and approval verification');
-    alert('Audience check: '+why.join('; ')+'. No message sent.','info');
-    return;
-   }
    if(e.target.closest('[data-select-all-matching]')){
     const members=audience();
     selected=new Set(members.map(x=>x.id));
     marketingDraw();
-    alert(members.length+' currently loaded matching contacts selected for draft (not sent).','info');
+    alert(members.length+' currently loaded matching contacts selected.','info');
     return;
    }
    if(e.target.closest('[data-clear-all-matching]')){selected.clear();marketingDraw();return}
