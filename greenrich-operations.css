@@ -103,3 +103,16 @@
 .gr-vendor-po{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid #e0e9f6;border-radius:9px;padding:18px;margin:12px 0}.gr-vendor-po strong{font-size:14px}.gr-vendor-po-details{background:#f6f8fc;padding:20px;border-radius:8px;margin-top:15px}.gr-vendor-po-details dl{display:grid;grid-template-columns:1fr 1fr;gap:18px}.gr-vendor-po-details dt{font-size:12px;color:#64748b}.gr-vendor-po-details dd{margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .gr-vendor-empty{padding:24px 8px;color:#718096;text-align:center}.gr-vendors [data-vendor-message]:not([hidden]){background:#edf4ff;padding:14px;border-radius:8px;overflow-wrap:anywhere}
 @media(max-width:640px){.gr-vendors{padding:18px 14px}.gr-vendor-form{grid-template-columns:1fr;gap:16px}.gr-vendors .gr-ops-heading{align-items:flex-start;flex-wrap:wrap}.gr-vendor-add{align-items:stretch;flex-direction:column}.gr-vendor-po-details dl{grid-template-columns:1fr}.gr-vendor-po{align-items:flex-start}.gr-vendor-list th:first-child{width:65%}}
+
+/* Material master: compact table and two-column editor from approved layout. */
+.gr-material-stock-note{font-size:12px;color:#64748b;padding:0 18px;line-height:1.5}
+.gr-ops-dialog.gr-material-dialog{width:min(820px,calc(100vw - 32px));max-height:90vh;border-radius:12px}
+.gr-material-dialog #gr-ops-form{padding:24px;gap:24px 20px}
+.gr-material-dialog #gr-ops-form label{min-width:0}
+.gr-material-dialog .gr-material-actions{grid-column:1/-1;justify-content:flex-end;margin:0 0 4px}
+.gr-material-dialog .gr-material-notes{grid-column:1/-1!important}
+.gr-material-dialog textarea{min-height:90px;resize:vertical}
+.gr-material-dialog input,.gr-material-dialog select{min-height:42px;width:100%;box-sizing:border-box}
+.gr-material-dialog button:focus-visible,.gr-material-dialog input:focus,.gr-material-dialog select:focus{outline:2px solid #2563eb;outline-offset:2px}
+@media(max-width:540px){.gr-material-dialog #gr-ops-form{grid-template-columns:1fr;padding:18px;gap:18px}.gr-material-dialog .gr-material-actions{flex-wrap:wrap}}
+#gr-ops-form-error:not([hidden]){grid-column:1/-1;color:#9f1239;background:#fff1f2;border-radius:8px;padding:12px;order:-1;margin:0}

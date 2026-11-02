@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+(async()=>{
+ const dom=new JSDOM('<main id="root"></main>',{runScripts:'outside-only',url:'https://example.test'}),w=dom.window,root=w.document.querySelector('main');
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
+ w.eval(fs.readFileSync('greenrich-operations.js','utf8'));
+ const mk=(kind,id,payload,company='grow-india')=>({company_id:company,kind,record_id:id,payload:{id,...payload},updated_at:'2026-11-02T00:00:00Z'});
+ let records=[mk('material','m1',{code:'RM-001',name:'Steel',qty:999,type:'RM',uom:'kg',status:'Validated',preferred_vendor:'Supplier',notes:'keep'}),mk('material','m1',{code:'RM-001',name:'Other company',qty:888,type:'RM',uom:'kg'},'enviro'),mk('vendor','v1',{name:'Supplier'}),mk('vendor','v2',{name:'Other supplier'},'enviro')],saved,writeCount=0;
+ const db={from(table){let filters=[],body,mode='read';const q={select(){return q},in(){return q},range(){return q},eq(k,v){filters.push([k,v]);return q},update(b){body=b;mode='update';return q},insert(b){body=b;mode='insert';return q},then(resolve,reject){let out;if(table==='gr_crm_records')out={data:[{company_id:'grow-india',record_id:'p1',payload:{sku:'RM-001',stock:8}},{company_id:'enviro',record_id:'p2',payload:{sku:'RM-001',stock:23}}]};else if(mode==='read')out={data:records};else{writeCount++;saved=mode==='insert'?body:records.find(r=>filters.every(([k,v])=>r[k]===v));if(mode==='insert')records.push(body);else Object.assign(saved,body);out={data:[{record_id:saved.record_id}]}}return Promise.resolve(out).then(resolve,reject)}};return q},channel(){return{on(){return this},subscribe(){return this}}}};
+ const flush=async()=>{for(let i=0;i<6;i++)await new Promise(r=>setImmediate(r))};
+ await w.GreenRichOperations.mount(root,{client:db,companies:['grow-india','enviro'],selection:'all',role:'Admin',can:()=>true});
+ root.querySelector('[data-ops-tab=material]').click();await flush();
+ assert.deepEqual([...root.querySelectorAll('th')].map(t=>t.textContent),['Company','Material code','Item / material description','Stock quantity','Unit','Manage']);
+ assert.deepEqual([...root.querySelectorAll('[data-material-stock]')].map(c=>c.textContent),['8','23']);assert(!root.querySelector('#gr-ops-body').textContent.includes('999'));
+ root.querySelector('[data-edit-company="enviro"]').click();let form=root.querySelector('#gr-ops-form');
+ assert.equal(form.elements.name.value,'Other company');assert(!form.elements.qty);assert(!form.elements.type);assert(!form.elements.status);assert(form.elements.uom);
+ assert.equal(form.elements.preferred_vendor.getAttribute('list'),'gr-material-vendors');assert.equal(form.querySelector('datalist').textContent,'');assert.equal(form.querySelector('datalist option').value,'Other supplier');
+ form.elements.name.value='Edited other company';form.elements.preferred_vendor.value='Other supplier';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await flush();
+ assert.equal(saved.company_id,'enviro');assert.equal(saved.payload.qty,888);assert.equal(saved.payload.preferred_vendor_id,'v2');assert.equal(records[0].payload.name,'Steel');
+ root.querySelector('[data-new-record]').click();form=root.querySelector('#gr-ops-form');
+ form.elements.code.value='FG-099';form.elements.name.value='New finished product';form.elements.preferred_vendor.value='Invalid vendor';let before=writeCount;
+ form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await flush();assert.equal(writeCount,before);assert(root.querySelector('#gr-ops-alert').textContent.includes('Select a source vendor'));
+ form.elements.preferred_vendor.value='Supplier';form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await flush();assert.equal(saved.payload.type,'FG');assert.equal(saved.payload.qty,null);assert.equal(saved.payload.preferred_vendor_id,'v1');assert.equal(saved.payload.name,'New finished product');assert.equal(root.querySelector('#gr-ops-editor').open,false);
+ assert([...root.querySelectorAll('[data-material-stock]')].some(c=>c.textContent==='Not recorded'));
+ dom.window.close();console.log('PASS Material master: screenshot columns, company-scoped stock, simplified editor, vendor search/link, create/edit persistence and preserved existing metadata');
+})().catch(e=>{console.error(e);process.exitCode=1});

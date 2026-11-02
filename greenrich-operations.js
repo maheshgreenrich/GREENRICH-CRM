@@ -7,7 +7,7 @@
  const date=()=>new Date().toISOString().slice(0,10);
  const uid=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'ops-'+Date.now()+'-'+Math.random().toString(36).slice(2);
  const TYPES={
-  material:{label:'Material master',module:'stock',fields:[['code','Material code','text',true],['name','Item / material description','text',true],['type','Material level','select:FG,SFG,IM,RM',true],['qty','Reference quantity','number'],['uom','Unit','select:nos,kg,mtr,ltr,sets'],['operation','Operation / routing','text'],['preferred_vendor','Source vendor','text'],['source_type','Source method','select:Make,Buy,Job work / verify'],['status','Review status','select:Draft,Review requested,Validated'],['notes','Notes','textarea']]},
+  material:{label:'Material master',module:'stock',fields:[['code','Material code','text',true],['name','Item / material description','text',true],['type','Material level','select:FG,SFG,IM,RM',true],['qty','Reference quantity','number'],['uom','Unit','select:nos,unit,kg,mtr,ltr,sets'],['operation','Operation / routing','text'],['preferred_vendor','Source vendor','text'],['source_type','Source method','select:Make,Buy,Job work / verify'],['status','Review status','select:Draft,Review requested,Validated'],['notes','Notes','textarea']]},
   vendor:{label:'Vendor master',module:'purchase',fields:[['name','Vendor name','text',true],['contact','Contact person','text'],['phone','Phone','tel'],['email','Email','email'],['gstin','GSTIN','text'],['location','Location / address','textarea'],['state','State','text'],['city','City','text'],['pincode','Pincode','text'],['category','Supplies / service','text'],['status','Approval status','select:Draft,Review requested,Approved'],['notes','Notes','textarea']]},
   bom:{label:'Multi-level BOM',module:'stock',fields:[['parent_code','Parent product code','text',true],['child_code','Required component code','text',true],['qty','Required quantity per parent','number',true],['uom','UOM','select:nos,kg,mtr,ltr,sets',true],['revision','BOM revision','text',true],['status','Review status','select:Draft,Review requested,Validated'],['notes','Mapping / change notes','textarea']]},
   requisition:{label:'Purchase requisitions',module:'purchase',fields:[['order_ref','Sales / work order reference','text'],['material_code','Required material code','text',true],['quantity','Required quantity','number',true],['uom','UOM','select:nos,kg,mtr,ltr,sets',true],['need_by','Required by','date'],['requester','Requested by','text'],['status','Status','select:Draft,Submitted,Approved,Ordered,Closed'],['notes','Shortage / purpose','textarea']]},
@@ -44,9 +44,9 @@
  const canEdit=(id,action)=>isAdmin||Boolean(caps[TYPES[id]?.module]?.[action]);
  const allKind=id=>rows.filter(r=>r.kind===id).map(r=>({...r.payload,_companyId:r.company_id,_savedAt:r.updated_at}));
  const scopeRows=id=>allKind(id).filter(r=>companyScope==='all'||r._companyId===companyScope);
- const actionAlert=message=>{const area=host?.querySelector('#gr-ops-alert');if(area){area.hidden=false;area.textContent=message}};
+ const actionAlert=message=>{const area=host?.querySelector('#gr-ops-alert');if(area){area.hidden=false;area.textContent=message}const inline=host?.querySelector('#gr-ops-editor[open] #gr-ops-form-error');if(inline){inline.hidden=false;inline.textContent=message}};
  const pill=x=>'<span class="gr-ops-pill">'+esc(x||'Draft')+'</span>';
- const colsFor=id=>TYPES[id].fields.filter(([key])=>['code','name','type','parent_code','child_code','vendor','material_code','po_number','work_number','job_ref','order_ref','quantity','qty','status','review_status','due_on','expected_on'].includes(key)).slice(0,6);
+ const colsFor=id=>id==='material'?[['code','Material code'],['name','Item / material description'],['_stock','Stock quantity'],['uom','Unit']]:TYPES[id].fields.filter(([key])=>['code','name','type','parent_code','child_code','vendor','material_code','po_number','work_number','job_ref','order_ref','quantity','qty','status','review_status','due_on','expected_on'].includes(key)).slice(0,6);
  function filterCompany(){
   if(kind==='vendor'&&!window.GreenRichVendors.leave()){host.querySelector('#gr-ops-company').value=companyScope;return;}
   const value=host.querySelector('#gr-ops-company')?.value;
@@ -84,16 +84,37 @@
   let list=scopeRows(kind).sort((a,b)=>String(b._savedAt||'').localeCompare(String(a._savedAt||'')));
   if(search)list=list.filter(row=>Object.values(row).some(value=>String(value??'').toLowerCase().includes(search)));
   const fields=colsFor(kind);
-  const body=list.length?list.map(item=>'<tr><td>'+esc(companyName(item._companyId))+'</td>'+
-    fields.map(([key])=>'<td>'+esc(item[key]??'—')+'</td>').join('')+
-    '<td>'+pill(item.status)+' '+(canEdit(kind,'edit')?'<button class="gr-ops-rowbutton" type="button" data-edit-record="'+esc(item.id)+'" data-edit-company="'+esc(item._companyId)+'">Edit</button>':'')+'</td></tr>').join(''):
+  const body=list.length?list.map(item=>'<tr data-ops-search="'+esc(Object.values(item).join(' '))+'"><td>'+esc(companyName(item._companyId))+'</td>'+
+    fields.map(([key])=>key==='_stock'?'<td data-material-stock data-material-company="'+esc(item._companyId)+'" data-material-id="'+esc(item.id)+'">Loading…</td>':'<td>'+esc(item[key]??'—')+'</td>').join('')+
+    '<td>'+(kind==='material'?'':pill(item.status)+' ')+(canEdit(kind,'edit')?'<button class="gr-ops-rowbutton" type="button" data-edit-record="'+esc(item.id)+'" data-edit-company="'+esc(item._companyId)+'">Edit</button>':'')+'</td></tr>').join(''):
     '<tr><td colspan="'+(fields.length+2)+'" class="gr-ops-empty">No '+esc(type.label.toLowerCase())+' records match this view.</td></tr>';
   host.querySelector('#gr-ops-body').innerHTML='<section class="gr-ops-surface"><div class="gr-ops-heading"><div><h3>'+esc(type.label)+'</h3><p>Shared company-scoped records · '+list.length+' displayed</p></div>'+
     (canEdit(kind,'create')?'<button class="gr-ops-primary" type="button" data-new-record="'+kind+'">+ New record</button>':'')+'</div>'+
     '<div class="gr-ops-tools"><input id="gr-ops-search" type="search" value="'+esc(search)+'" placeholder="Search description, reference, vendor or status…"><button type="button" data-refresh="yes">Refresh</button></div>'+
     '<div class="gr-ops-scroll"><table class="gr-ops-table"><thead><tr><th>Company</th>'+fields.map(([_,label])=>'<th>'+esc(label)+'</th>').join('')+'<th>Manage</th></tr></thead><tbody>'+body+'</tbody></table></div></section>'+
     (kind==='bom'?bomInspector():'')+
+    (kind==='material'?'<p class="gr-material-stock-note">Stock is shown from the linked CRM product (matching material code / SKU). Unlinked stock is shown as Not recorded.</p>':'')+
     (['work_order','goods_receipt','qc','dispatch_check'].includes(kind)?'<div class="gr-ops-note">These records track status and evidence. They do not yet perform automatic warehouse inventory adjustments or release statutory documents.</div>':'');
+  if(kind==='material')void drawMaterialStock();
+ }
+ let stockRequest=0;
+ async function drawMaterialStock(){
+  const request=++stockRequest,target=host.querySelector('#gr-ops-body');
+  try{
+   const products=[];
+   for(let start=0;;start+=1000){
+    const r=await db.from('gr_crm_records').select('company_id,record_id,payload').in('company_id',companyIds).eq('kind','products').range(start,start+999);
+    if(r.error)throw Error(r.error.message);products.push(...(r.data||[]));if((r.data||[]).length<1000)break;
+   }
+   if(request!==stockRequest||kind!=='material'||!target.isConnected)return;
+   target.querySelectorAll('[data-material-stock]').forEach(cell=>{
+    const material=allKind('material').find(m=>m.id===cell.dataset.materialId&&m._companyId===cell.dataset.materialCompany);
+    const matches=material?products.filter(p=>p.company_id===material._companyId&&(material.crm_product_id?p.record_id===material.crm_product_id:String(p.payload.sku||'').trim().toLowerCase()===String(material.code||'').trim().toLowerCase())):[];
+    const value=matches.length===1?matches[0].payload.stock:null;
+    cell.textContent=value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?String(Number(value)):'Not recorded';
+    cell.title=matches.length===1?'Current CRM product stock':'No unique CRM product linked by material code / SKU';
+   });
+  }catch(error){if(request===stockRequest&&kind==='material')target.querySelectorAll('[data-material-stock]').forEach(cell=>{cell.textContent='Unavailable';cell.title='CRM stock could not be loaded. Refresh to retry.'})}
  }
  function bomInspector(){
   const drafts=scopeRows('bom'),missing=drafts.filter(l=>!(Number(l.qty)>0)||!l.parent_code||!l.child_code),validated=drafts.filter(l=>l.status==='Validated');
@@ -173,27 +194,41 @@
  function openEditor(id='',recordCompany=''){
   const editor=host.querySelector('#gr-ops-editor'),obj=id?rows.find(r=>r.kind===kind&&r.company_id===recordCompany&&r.record_id===id):null;
   if(id&&!obj)return actionAlert('Record not found; refresh.');
-  const item=obj?.payload||{},type=TYPES[kind];
-  editor.dataset.kind=kind;editor.dataset.recordId=id;
+  const item={...(obj?.payload||{})},type=TYPES[kind];
+  if(kind==='material'&&item.preferred_vendor_id){const vendor=rows.find(r=>r.kind==='vendor'&&r.company_id===recordCompany&&r.record_id===item.preferred_vendor_id);if(vendor)item.preferred_vendor=vendor.payload.name;}
+  editor.dataset.kind=kind;editor.dataset.recordId=id;editor.dataset.company=recordCompany;editor.classList.toggle('gr-material-dialog',kind==='material');
   editor.querySelector('#gr-ops-dialog-title').textContent=(id?'Edit ':'New ')+type.label;
-  editor.querySelector('#gr-ops-form').innerHTML='<label>Company<select name="company_id" '+(id?'disabled':'')+'>'+companyIds.filter(cid=>companyScope==='all'||companyScope===cid||id).map(cid=>'<option value="'+cid+'" '+((id?recordCompany:companyScope===cid)?'selected':'')+'>'+esc(companyName(cid))+'</option>').join('')+'</select></label>'+
-   type.fields.map(([key,label,control,required])=>'<label>'+esc(label)+(required?' *':'')+options(key,control,{required,current:item[key]})+'</label>').join('')+
-   '<div class="gr-ops-form-buttons"><button type="button" data-cancel-record>Cancel</button><button class="gr-ops-primary" type="submit" data-save-record>Save record</button></div>';
+  editor.querySelector('#gr-ops-form').innerHTML='<label>Company'+(kind==='material'?' *':'')+'<select name="company_id" '+(id?'disabled':'')+'>'+companyIds.filter(cid=>companyScope==='all'||companyScope===cid||id).map(cid=>'<option value="'+cid+'" '+((id?recordCompany:companyScope===cid)?'selected':'')+'>'+esc(companyName(cid))+'</option>').join('')+'</select></label>'+
+   (kind==='material'?['code','name','uom','operation','preferred_vendor','source_type','notes'].map(key=>type.fields.find(f=>f[0]===key)):type.fields).map(([key,label,control,required])=>'<label>'+esc(label)+(required?' *':'')+options(key,control,{required,current:item[key]})+'</label>').join('')+
+   '<div class="gr-ops-form-buttons"><button type="button" data-cancel-record>Cancel</button><button class="gr-ops-primary" type="submit" data-save-record>Save record</button></div><p id="gr-ops-form-error" role="alert" hidden></p>';
   if(id)editor.querySelector('[name=company_id]').value=recordCompany;
   const form=editor.querySelector('#gr-ops-form');
   const selectedCompany=id?recordCompany:form.elements.namedItem('company_id')?.value||companyIds[0];
-  const apply=co=>window.GreenRichFormBuilder?.decorate?.(form,co,'ops_'+kind);
+  const materialLayout=()=>{
+   if(kind!=='material')return;
+   const actions=form.querySelector('.gr-ops-form-buttons');actions.style.order='-1';actions.classList.add('gr-material-actions');
+   form.elements.namedItem('notes')?.closest('label')?.classList.add('gr-material-notes');
+   const input=form.elements.namedItem('preferred_vendor');if(!input)return;
+   const company=form.elements.namedItem('company_id').value;
+   const vendors=rows.filter(r=>r.kind==='vendor'&&r.company_id===company);
+   if(input.tagName==='INPUT'){
+    input.setAttribute('list','gr-material-vendors');input.placeholder='Search vendor';input.autocomplete='off';
+    let list=form.querySelector('#gr-material-vendors');if(!list){list=document.createElement('datalist');list.id='gr-material-vendors';form.append(list)}
+    list.innerHTML=vendors.map(r=>'<option value="'+esc(r.payload.name)+'"></option>').join('');
+   }
+  };
+  const apply=co=>{window.GreenRichFormBuilder?.decorate?.(form,co,'ops_'+kind);materialLayout()};
   apply(selectedCompany);
   if(!id)form.elements.namedItem('company_id')?.addEventListener('change',event=>apply(event.target.value));
   if(id)void window.GreenRichFormBuilder?.recentAnswers?.(selectedCompany,'ops_'+kind,id).then(values=>{
-   if(editor.open&&editor.dataset.recordId===id)window.GreenRichFormBuilder.decorate(form,selectedCompany,'ops_'+kind,values);
+   if(editor.open&&editor.dataset.recordId===id){window.GreenRichFormBuilder.decorate(form,selectedCompany,'ops_'+kind,values);materialLayout();}
   }).catch(()=>{});
   editor.showModal();
  }
  async function saveRecord(event){
   event.preventDefault();
   const dialog=host.querySelector('#gr-ops-editor'),form=event.currentTarget,id=dialog.dataset.recordId;
-  const k=dialog.dataset.kind,current=id?rows.find(r=>r.kind===k&&r.record_id===id):null,
+  const k=dialog.dataset.kind,current=id?rows.find(r=>r.kind===k&&r.record_id===id&&r.company_id===dialog.dataset.company):null,
    company=id?current?.company_id:form.elements.namedItem('company_id')?.value;
   if(!companyIds.includes(company))return actionAlert('This company is not assigned to your account.');
   let extra={};
@@ -201,6 +236,7 @@
   catch(err){return actionAlert('Form questions: '+err.message)}
   const payload={...(current?.payload||{}),id:id||uid()};
   for(const [field,,control] of TYPES[k].fields){
+   if(!form.elements.namedItem(field))continue;
    const value=form.elements.namedItem(field)?.value?.trim()||'';
    payload[field]=control==='number'?(value===''?null:Number(value)):value;
   }
@@ -210,6 +246,14 @@
    if(payload.parent_code===payload.child_code)return actionAlert('A material cannot contain itself.');
    if(!mat.some(r=>r.code===payload.parent_code)||!mat.some(r=>r.code===payload.child_code))return actionAlert('Add the parent and child to Material Master first.');
    if(payload.status==='Validated'&&(!isAdmin||!(payload.qty>0)))return actionAlert('Only Admin can validate BOM lines, and quantity must be greater than zero.');
+  }
+  if(k==='material'){
+   if(!payload.name)return actionAlert('Item / material is required.');
+   if(!id){payload.type=/^(FG|SFG|IM|RM)(?:-|$)/i.exec(payload.code)?.[1]?.toUpperCase()||'RM';payload.status='Draft';payload.qty=null;}
+   const selectedVendor=rows.filter(r=>r.kind==='vendor'&&r.company_id===company&&String(r.payload.name||'').trim().toLowerCase()===String(payload.preferred_vendor||'').trim().toLowerCase());
+   if(payload.preferred_vendor&&selectedVendor.length!==1&&payload.preferred_vendor!==current?.payload?.preferred_vendor)return actionAlert('Select a source vendor from this company’s Vendor master.');
+   payload.preferred_vendor_id=selectedVendor.length===1?selectedVendor[0].record_id:payload.preferred_vendor?current?.payload?.preferred_vendor_id||null:null;
+   if(selectedVendor.length===1)payload.preferred_vendor=selectedVendor[0].payload.name;
   }
   if(k==='material'&&!payload.code)return actionAlert('Material code is required.');
   if(k==='material'&&allKind('material').some(r=>r._companyId===company&&r.code===payload.code&&r.id!==id))return actionAlert('Material code already exists for this company.');
@@ -272,7 +316,7 @@
   });
   host.querySelector('#gr-ops-form').onsubmit=saveRecord;
   host.addEventListener('change',event=>{if(event.target.id==='gr-ops-plan-company'){const id=event.target.value;host.querySelectorAll('#gr-ops-plan-product option').forEach(option=>{option.hidden=option.dataset.company!==id});const valid=[...host.querySelectorAll('#gr-ops-plan-product option')].find(option=>!option.hidden);if(valid)host.querySelector('#gr-ops-plan-product').value=valid.value;}});
-  host.addEventListener('input',event=>{if(event.target.id==='gr-ops-search'){const term=event.target.value.toLowerCase();host.querySelectorAll('.gr-ops-table tbody tr').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(term))}});
+  host.addEventListener('input',event=>{if(event.target.id==='gr-ops-search'){const term=event.target.value.toLowerCase();host.querySelectorAll('.gr-ops-table tbody tr').forEach(row=>row.hidden=!(row.dataset.opsSearch||row.textContent).toLowerCase().includes(term))}});
   draw();await reload();
   if(host?.isConnected){
    channel=db.channel('greenrich-ops-'+Math.random().toString(36).slice(2))
