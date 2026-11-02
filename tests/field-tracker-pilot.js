@@ -8,7 +8,7 @@ const dir=fs.readFileSync('supabase/migrations/20261031181000_field_tracking_dir
 const secure=fs.readFileSync('secure.html','utf8');
 new vm.Script(js,{filename:'field-tracker.js'});
 assert.ok(html.includes('field-tracker.js')&&html.includes('field-tracker.css'),'Standalone page loads its resources');
-assert.ok(!secure.includes('field-tracker.html'),'Pilot must not be added to live GreenRich ONE menu');
+assert.ok(fs.readFileSync('greenrich-one.js','utf8').includes("service:'Service and Installation'"),'Field Tracker belongs to Service and Installation');
 assert.ok(html.includes('Separate trial workspace')&&html.includes('does not change ERP attendance'));
 assert.ok(html.includes('ft-monitor-link')&&html.includes('ft-team-link'));
 for(const x of ['gr_field_clock_in','gr_field_clock_out','gr_field_record_point','gr_field_create_visit',

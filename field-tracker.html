@@ -2,6 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#123e35"><meta name="robots" content="noindex,nofollow">
+<base target="_top">
 <title>GreenRich Field Tracker | Standalone Pilot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,6 +12,8 @@
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="./greenrich-public-config.js"></script>
 <script defer src="./field-tracker.js?v=pilot-gps-4"></script>
+<script>if(new URLSearchParams(location.search).get('embedded')==='1')document.documentElement.classList.add('ft-embedded');</script>
+<style>.ft-embedded .ft-top,.ft-embedded .ft-footer{display:none}.ft-embedded .ft-shell{max-width:none;margin:0;padding:0}</style>
 </head><body>
 <div class="ft-shell">
  <header class="ft-top"><div class="ft-brand"><div class="ft-logo">G</div><div>

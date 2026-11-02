@@ -1,8 +1,8 @@
 'use strict';
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
-const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','marketing','operations','purchase','accounts','settings'];
-const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
+const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','marketing','operations','service','purchase','accounts','settings'];
+const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',service:'Service and Installation',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
 const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
@@ -15,7 +15,7 @@ const crmAccess=()=>({
  channels:roleName()==='Admin',
  reports:roleName()==='Admin'
 });
-const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||can(m)||(m==='operations'&&(can('stock')||can('purchase')||can('dispatch')||can('accounts')))||
+const canOpenPage=m=>['channels','reports','users','roles'].includes(m)?false:m==='settings'?roleName()==='Admin':m==='attendance'||m==='service'||can(m)||(m==='operations'&&(can('stock')||can('purchase')||can('dispatch')||can('accounts')))||
  (m==='crm'&&crmAccess().dashboard)||
  (m==='customers'&&crmAccess().customers)||
  (m==='orders'&&crmAccess().sales)||
@@ -53,7 +53,7 @@ async function enter(){
   // Attendance status is useful but should never block dashboard navigation or first paint.
   void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
   await render();
- }catch(e){window.GreenRichFollowupAlarm?.stop();await db.auth.signOut();show('login');toast(e.message)}
+ }catch(e){window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login');toast(e.message)}
 }
 const menuIcons={
  crm:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 2 5-7"/><circle cx="19" cy="6" r="1"/>',
@@ -69,6 +69,7 @@ const menuIcons={
  marketing:'<path d="M12 3C6.8 3 2.5 6.9 2.5 11.7c0 1.8.6 3.5 1.6 4.9L3 21l4.8-1.3c1.3.7 2.8 1 4.2 1 5.3 0 9.5-3.8 9.5-8.8S17.2 3 12 3Z"/><path d="M8 8.8c.5 3 3.1 5.6 6.2 6.4l1.8-1.4-2.2-1.2-1.2 1-2.3-2.1.8-1.3-1.5-2Z"/>',
  orders:'<path d="M4 7h16l-1 13H5L4 7ZM8 7a4 4 0 0 1 8 0"/>',
  stock:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/>',
+ service:'<path d="M14 6a5 5 0 0 0-6 6l-5 5a2 2 0 0 0 4 4l5-5a5 5 0 0 0 6-6l-3 3-4-4 3-3z"/>',
  operations:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7zM11 7h2M7 11v2M17 11v2"/>',
  purchase:'<path d="M3 4h2l2.2 11h11l2.1-8H6M10 20h.01M18 20h.01"/>',
  accounts:'<rect x="2" y="5" width="20" height="16" rx="2"/><path d="M2 10h20M16 15h3"/>',
@@ -180,6 +181,7 @@ async function render(){
   if(page==='dashboard')await dashboard(c);
   else if(page==='attendance')await attendance(c);
   else if(page==='settings'){crmCache=null;await settings(c)}
+  else if(page==='service')serviceInstallation(c)
   else if(page==='operations')await operations(c)
   else if(page==='accounts')await window.GreenRichAccounts.mount(c,{db,companyId:window.GreenRichCompanies.selected(user.id)})
    else if(page==='marketing'){
@@ -319,7 +321,7 @@ async function permissionPage(c){
  const builtin=new Set(['Admin','Director','Sales','Telecaller','Marketing','Operation','Accounts','Developer']);
  function draw(){
   const selected=select.value,role=roles.find(x=>x.id===selected);$('#deleteRole').disabled=!role||builtin.has(role.name)||people.some(p=>p.role_id===selected);
-  $('#permBody').innerHTML=modules.filter(m=>m!=='operations').map(m=>'<tr><td>'+esc(labels[m])+'</td>'+act.map(action=>{
+  $('#permBody').innerHTML=modules.filter(m=>m!=='operations'&&m!=='service').map(m=>'<tr><td>'+esc(labels[m])+'</td>'+act.map(action=>{
    const p=permissions.find(x=>x.role_id===selected&&x.module===m&&x.action===action);
    const locked=role?.name==='Admin';
    return '<td><label style="display:flex;align-items:center;gap:5px"><input type="checkbox" data-module="'+m+'" data-action="'+action+'" '+(p?.allowed?'checked':'')+' '+(locked?'disabled':'')+'> Allow</label><select data-module="'+m+'" data-action="'+action+'" '+(locked?'disabled':'')+'>'+['own','team','all'].map(v=>'<option value="'+v+'" '+((p?.data_scope||'own')===v?'selected':'')+'>'+v+'</option>').join('')+'</select></td>'
@@ -381,12 +383,15 @@ async function settings(c){
   }
  });
 }
+function serviceInstallation(c){
+ c.innerHTML='<nav aria-label="Service and Installation modules" class="gr-crm-tabs"><button type="button" class="active" aria-current="page">Field Tracker</button></nav><iframe id="grFieldTracker" title="Field Tracker" src="./field-tracker.html?embedded=1" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 180px);min-height:600px;border:0;border-radius:12px;margin-top:16px"></iframe>';
+}
 async function operations(c){
  if(!window.GreenRichOperations)throw Error('Operations module is missing. Refresh GreenRich ONE.');
  await window.GreenRichOperations.mount(c,{client:db,companies:window.GreenRichCompanies.allowed(),selection:window.GreenRichCompanies.selected(user.id),role:roleName(),can});
 }
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. Sales & CRM features are available in this same workspace. Connected CRM records are shared across authorized browsers and devices.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
-$('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{window.GreenRichDashboardV2?.stop?.();localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{window.GreenRichDashboardV2?.stop?.();window.GreenRichFollowupAlarm?.stop();await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
+$('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{window.GreenRichDashboardV2?.stop?.();localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{window.GreenRichDashboardV2?.stop?.();window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
 window.GreenRichShell={
  setPageWithoutRemount:target=>{
   if(!crmMap[target]||!canOpenPage(target))return;
