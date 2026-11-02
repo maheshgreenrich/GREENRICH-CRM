@@ -1,5 +1,5 @@
 'use strict';
-/* GreenRich ONE responsive sidebar; a saved preference for desktop and mobile. */
+/* GreenRich ONE responsive sidebar; a saved desktop preference; mobile opens only on request. */
 (()=>{
  const widthQuery='(max-width: 760px)';
  const storagePrefix='gr-one-sidebar-collapsed-v1-';
@@ -15,6 +15,7 @@
   app.classList.toggle('gr-sidebar-collapsed',collapsed);
   app.classList.toggle('gr-sidebar-expanded',!collapsed);
   sidebar.classList.toggle('open',!collapsed);
+  sidebar.inert=viewportMobile&&collapsed;
   const title=collapsed?'Expand menu':'Collapse menu';
   toggle.setAttribute('aria-label',title);
   toggle.setAttribute('title',title);
@@ -23,7 +24,7 @@
   if(backdrop){backdrop.hidden=collapsed||!viewportMobile;backdrop.setAttribute('aria-hidden','true')}
   if(persist)try{localStorage.setItem(key(viewportMobile),String(collapsed))}catch{}
  }
- function setInitial(){viewportMobile=isMobile();apply(stored(viewportMobile)??viewportMobile,false)}
+ function setInitial(){viewportMobile=isMobile();apply(viewportMobile?true:(stored(false)??false),false)}
  function toggle(){apply(!collapsed)}
  function collapseMobile(){if(initialized&&isMobile()&&!collapsed)apply(true)}
  function init({userId:nextUserId}){
