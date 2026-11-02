@@ -6,8 +6,8 @@ The Operations & Production tabs are Process Overview, Master Material, Vendor, 
 
 - Add/edit materials in Raw Materials (RW/RM) or Master Material (SFG). Set their unit and reorder level. Enable **Has job work** only for raw materials that go to outside processing.
 - Keep unit definitions consistent. Material units cannot change after stock posting.
-- Existing workbook reference quantities are not physical inventory. Admin can enter a counted opening raw-material balance once, with an audit note. SFG stock is credited only by accepted SFG POs or job-work output.
-- In Stock & Products, save the finished product as Multiple BOM with SFG items and quantities per unit. Existing Composter SFG lines are retained.
+- Existing workbook reference quantities are not physical inventory. Admin can enter a counted opening raw-material balance once, with an audit note. SFG stock is credited by accepted SFG POs, job-work output, or an explicit RM → SFG assembly.
+- In Stock & Products, save the finished product as Multiple BOM with SFG items and quantities per unit. Existing Composter SFG lines are retained. For each SFG, use Master Material → Edit semi-finished good to enter its own RM BOM with the quantity of every raw material needed per SFG. Existing legacy IM/BOM mappings are retained; they are not silently converted into new recipes.
 - Admin: Process Overview → Production settings sets the Director approval threshold and QC checklist. No prior numeric PO limit was found; the initial threshold is zero, requiring Admin/Director approval for every PO. Existing purchase approval permissions still apply below the configured limit.
 
 ## Purchase and production
@@ -37,3 +37,13 @@ Operation uses stock/purchase permissions. Accounts is read-only for POs and rec
 - No existing stock is inferred from workbook quantities; no business sample records are inserted by this release.
 - Rollback integration suite: `tests/production-workflow.sql`. It exercises real functions and direct authenticated RLS and rolls back all fixtures/profile changes. Browser logic: `npm run test:forms`. Existing JS suites remain part of Pages CI.
 - Backup/export production documents, balances, events and settings together with `gr_ops_records` and CRM products. Do not restore balances independently of the ledger/documents. If rollback is needed, revert frontend assets first; retain posted database records for reconciliation rather than dropping tables.
+
+## SFG raw-material recipes and direct assembly
+
+Each new/edited SFG requires one or more distinct RW/RM ingredients with positive quantities (up to six decimal places). Ingredient units are taken from the raw-material master. The SFG list shows **SFG stock** (posted assembled goods) separately from **Can assemble from RM** (minimum of available ingredient stock / required per-unit quantity, rounded down). Build capacity is shared across recipes; it does not reserve the same raw stock for every SFG.
+
+Open a raw material → **Move to SFG** to choose a linked SFG, or open the SFG itself → **Move to SFG**. Enter how many SFG units to assemble and check availability. Confirmation rechecks every component server-side, consumes all required raw materials and posts the SFG output in one transaction. Insufficient stock rolls back the entire action. Assembly records retain the actual recipe snapshot and ledger references.
+
+For Job Work output, the issued raw material must belong to the selected SFG recipe, and actual usage must meet that output's requirement. That issued material is not deducted from warehouse stock a second time. Other raw ingredients in the SFG recipe are deducted from available warehouse stock when the output is accepted. Configure the SFG recipe before accepting job output. Output-free partial returns remain available.
+
+Release SQL: `supabase/releases/sfg_raw_material_bom.sql`; migrations `sfg_raw_material_bom` and `sfg_job_require_recipe`. The base release SQL also contains the current consolidated definition. New stock-ledger movement types are `SFG_RM_USE` (negative raw stock), `SFG_ASSEMBLY` (positive SFG stock) and `JOB_OTHER_RM_USE` (negative additional raw inputs). Rollback-only acceptance tests are in `tests/sfg-assembly.sql`.

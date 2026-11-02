@@ -7,7 +7,7 @@ begin
  if actor is null then raise exception 'Test requires existing company Admin';end if;
  perform set_config('request.jwt.claim.sub',actor::text,true);
  r=public.gr_production_action(company,'material_save',jsonb_build_object('material',jsonb_build_object('code',pid||'-RW','name','Test sheet','type','RW','uom','kg','has_job_work',true)),gen_random_uuid());raw=r->>'material_id';
- r=public.gr_production_action(company,'material_save',jsonb_build_object('material',jsonb_build_object('code',pid||'-SFG','name','Test part','type','SFG','uom','nos','has_job_work',false)),gen_random_uuid());sfg=r->>'material_id';
+ r=public.gr_production_action(company,'material_save',jsonb_build_object('material',jsonb_build_object('code',pid||'-SFG','name','Test part','type','SFG','uom','nos','has_job_work',false,'rm_bom',jsonb_build_array(jsonb_build_object('material_id',raw,'quantity',1)))),gen_random_uuid());sfg=r->>'material_id';
  insert into public.gr_crm_records(company_id,kind,record_id,payload) values(company,'products',pid,jsonb_build_object('id',pid,'name','Test assembly','sku',pid,'stock',4,'inventory_mode','bom','bom_components',jsonb_build_array(jsonb_build_object('material_id',sfg,'quantity',2))));
  r=public.gr_production_action(company,'po_create',jsonb_build_object('vendor_id',(select record_id from public.gr_ops_records where company_id=company and kind='vendor' limit 1),'lines',jsonb_build_array(jsonb_build_object('material_id',raw,'quantity',50,'rate',10,'gst',18),jsonb_build_object('material_id',sfg,'quantity',1,'rate',5,'gst',0))),gen_random_uuid());po=(r->>'id')::uuid;
  perform public.gr_production_action(company,'po_approve',jsonb_build_object('id',po),gen_random_uuid());

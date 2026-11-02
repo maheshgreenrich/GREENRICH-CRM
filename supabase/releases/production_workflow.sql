@@ -5,7 +5,7 @@ revoke all on schema gr_production_private from public,anon;
 grant usage on schema gr_production_private to authenticated;
 create sequence if not exists gr_production_private.document_sequence;
 create table public.gr_production_balances(company_id text not null references public.gr_companies(id),material_id text not null,quantity numeric(18,6) not null default 0 check(quantity>=0),updated_at timestamptz not null default now(),primary key(company_id,material_id));
-create table public.gr_production_documents(company_id text not null references public.gr_companies(id),id uuid not null default gen_random_uuid(),kind text not null check(kind in('po','job','qc','receipt','return','rework')),number text not null unique,status text not null,payload jsonb not null default '{}',created_by uuid not null references public.gr_profiles(id),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),primary key(company_id,id));
+create table public.gr_production_documents(company_id text not null references public.gr_companies(id),id uuid not null default gen_random_uuid(),kind text not null check(kind in('po','job','qc','receipt','return','rework','assembly')),number text not null unique,status text not null,payload jsonb not null default '{}',created_by uuid not null references public.gr_profiles(id),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),primary key(company_id,id));
 create table public.gr_production_events(id bigint generated always as identity primary key,company_id text not null references public.gr_companies(id),document_id uuid not null,material_id text,product_id text,movement text not null,quantity numeric(18,6) not null,reference text not null,actor uuid not null references public.gr_profiles(id),created_at timestamptz not null default now());
 create index on public.gr_production_events(company_id,material_id,created_at desc);
 create index on public.gr_production_documents(company_id,kind,created_at desc);
@@ -57,6 +57,23 @@ create function gr_production_private.requirements(c text,pid text,n numeric) re
  from(select value->>'material_id' mid,max(value->>'code') code,max(value->>'name') name,max(value->>'uom') uom,sum((value->>'quantity')::numeric) q from jsonb_array_elements(result) group by 1)x left join public.gr_production_balances b on b.company_id=c and b.material_id=x.mid;
  return result;
  end $$;
+create function gr_production_private.sfg_requirements(c text,sid text,n numeric) returns jsonb language plpgsql stable set search_path='' as $$
+ declare s jsonb;line jsonb;m jsonb;q numeric;result jsonb='[]';
+ begin
+ if n is null or n<=0 or n<>trunc(n) or n>100000 then raise exception 'Enter a positive whole-number SFG quantity (maximum 100000)';end if;
+ s=gr_production_private.material(c,sid);
+ if s->>'type'<>'SFG' or jsonb_typeof(s->'rm_bom') is distinct from 'array' or jsonb_array_length(s->'rm_bom')=0 then raise exception 'Save the raw-material BOM for this SFG first';end if;
+ for line in select value from jsonb_array_elements(s->'rm_bom') loop
+ m=gr_production_private.material(c,line->>'material_id');
+ if m->>'type' not in('RM','RW') then raise exception 'SFG BOM can contain raw materials only';end if;
+ q=(line->>'quantity')::numeric*n;
+ if q is null or q<=0 or q<>round(q,6) or q::text in('NaN','Infinity','-Infinity') then raise exception 'Invalid raw-material requirement';end if;
+ result=result||jsonb_build_array(jsonb_build_object('material_id',line->>'material_id','code',m->>'code','name',m->>'name','uom',m->>'uom','quantity',q));
+ end loop;
+ select jsonb_agg(jsonb_build_object('material_id',x.mid,'code',x.code,'name',x.name,'uom',x.uom,'quantity',x.q,'available',coalesce(b.quantity,0),'shortage',greatest(x.q-coalesce(b.quantity,0),0))) into result
+ from(select value->>'material_id' mid,max(value->>'code') code,max(value->>'name') name,max(value->>'uom') uom,sum((value->>'quantity')::numeric) q from jsonb_array_elements(result) group by 1)x left join public.gr_production_balances b on b.company_id=c and b.material_id=x.mid;
+ return result;
+ end $$;
 create function gr_production_private.command(c text,action text,input jsonb,request_id uuid) returns jsonb language plpgsql security definer set search_path='' as $$
  #variable_conflict use_column
  <<body>>
@@ -66,8 +83,9 @@ create function gr_production_private.command(c text,action text,input jsonb,req
  select r.name into role_name from public.gr_profiles p join public.gr_roles r on r.id=p.role_id where p.id=auth.uid() and p.active and c=any(p.company_ids);
  if role_name is null then raise exception 'Company access denied';end if;
  required_resource=case when action like 'po_%' then 'po' else 'stock' end;
- required_action=case when action='readiness' then 'view' when action='po_approve' then 'approve' when action in('po_create','job_issue','quality_move','material_save') then 'create' else 'edit' end;
+ required_action=case when action in('readiness','sfg_readiness') then 'view' when action='po_approve' then 'approve' when action in('po_create','job_issue','quality_move','sfg_assemble','material_save') then 'create' else 'edit' end;
  if not gr_production_private.allowed(c,required_resource,required_action) then raise exception 'Role is not permitted to perform this action';end if;
+ if action='sfg_readiness' then return gr_production_private.sfg_requirements(c,input->>'sfg_id',(input->>'quantity')::numeric);end if;
  if action='readiness' then return gr_production_private.requirements(c,input->>'product_id',(input->>'quantity')::numeric);end if;
  if request_id is null then raise exception 'Request ID required';end if;
  perform pg_advisory_xact_lock(hashtextextended('gr_production:'||c,0));
@@ -95,6 +113,18 @@ create function gr_production_private.command(c text,action text,input jsonb,req
  if not gr_production_private.allowed(c,'stock','edit') then raise exception 'Edit permission required';end if;
  m=v||m||jsonb_build_object('id',input->>'material_id');
  else m=m||jsonb_build_object('id',id::text);end if;
+ if m->>'type'='SFG' then
+ lines=m->'rm_bom';
+ if jsonb_typeof(lines) is distinct from 'array' or jsonb_array_length(lines) not between 1 and 100 then raise exception 'Add 1–100 raw-material BOM lines for this semi-finished good';end if;
+ payload='[]';
+ for line in select value from jsonb_array_elements(lines) loop
+ v=gr_production_private.material(c,line->>'material_id');amount=(line->>'quantity')::numeric;
+ if v->>'type' not in('RW','RM') or amount is null or amount<=0 or amount<>round(amount,6) or amount::text in('NaN','Infinity','-Infinity') then raise exception 'Select a raw material and positive quantity (up to six decimal places)';end if;
+ if exists(select 1 from jsonb_array_elements(payload)x where x->>'material_id'=line->>'material_id') then raise exception 'Combine duplicate raw materials into one BOM line';end if;
+ payload=payload||jsonb_build_array(jsonb_build_object('material_id',line->>'material_id','quantity',amount));
+ end loop;
+ m=jsonb_set(m,'{rm_bom}',payload);
+ end if;
  if exists(select 1 from public.gr_ops_records where company_id=c and kind='material' and lower(payload->>'code')=lower(m->>'code') and record_id<>m->>'id') then raise exception 'Material code already exists';end if;
  insert into public.gr_ops_records(company_id,kind,record_id,payload) values(c,'material',m->>'id',m) on conflict(company_id,kind,record_id) do update set payload=excluded.payload,updated_at=now();
  result=jsonb_build_object('message','Material saved','material_id',m->>'id');
@@ -159,12 +189,30 @@ create function gr_production_private.command(c text,action text,input jsonb,req
  if output>0 then m=gr_production_private.material(c,input->>'sfg_id');if m->>'type'<>'SFG' or used<=0 then raise exception 'Select an SFG output and actual raw material used';end if;end if;
  id=gen_random_uuid();num=gr_production_private.number('JWR',c);
  if returned>0 then perform gr_production_private.post(c,id,doc.payload->>'material_id',returned,'JOB_RETURN',num);end if;
- if output>0 then perform gr_production_private.post(c,id,input->>'sfg_id',output,'JOB_SFG',num);end if;
+ if output>0 then
+ reqs=gr_production_private.sfg_requirements(c,input->>'sfg_id',output);
+ if not exists(select 1 from jsonb_array_elements(reqs)x where x->>'material_id'=doc.payload->>'material_id') then raise exception 'Issued raw material is not part of the selected SFG BOM';end if;
+ for line in select value from jsonb_array_elements(reqs) loop
+ if line->>'material_id'=doc.payload->>'material_id' then
+ if used<(line->>'quantity')::numeric then raise exception 'Actual usage is less than the BOM requirement for this SFG output';end if;
+ else perform gr_production_private.post(c,id,line->>'material_id',-(line->>'quantity')::numeric,'JOB_OTHER_RM_USE',num);end if;
+ end loop;
+ perform gr_production_private.post(c,id,input->>'sfg_id',output,'JOB_SFG',num);
+ end if;
  insert into public.gr_production_events(company_id,document_id,material_id,movement,quantity,reference,actor) values(c,id,doc.payload->>'material_id','JOB_USED',used,num,auth.uid()),(c,id,doc.payload->>'material_id','WASTAGE',waste,num,auth.uid());
  insert into public.gr_production_documents(company_id,id,kind,number,status,payload,created_by) values(c,id,'return',num,'Posted',jsonb_build_object('job_id',doc.id,'stn',doc.number,'material_id',doc.payload->>'material_id','allotted',used+waste,'used',used,'waste',waste,'returned',returned,'output',output,'sfg_id',input->>'sfg_id','note',input->>'note'),auth.uid());
  payload=doc.payload||jsonb_build_object('used',(doc.payload->>'used')::numeric+used,'waste',(doc.payload->>'waste')::numeric+waste,'returned',(doc.payload->>'returned')::numeric+returned,'output',(doc.payload->>'output')::numeric+output,'remaining',remaining);
  new_status=case when remaining=0 then 'Completed' else 'Partly completed' end;
  update public.gr_production_documents set payload=body.payload,status=new_status,updated_at=now() where company_id=c and public.gr_production_documents.id=doc.id;result=jsonb_build_object('number',num,'remaining',remaining,'status',new_status);
+ elsif action='sfg_assemble' then
+ select payload into m from public.gr_ops_records where company_id=c and kind='material' and record_id=input->>'sfg_id' for update;
+ amount=(input->>'quantity')::numeric;reqs=gr_production_private.sfg_requirements(c,input->>'sfg_id',amount);
+ if exists(select 1 from jsonb_array_elements(reqs)x where (x->>'shortage')::numeric>0) then raise exception 'Raw-material shortage. All BOM components are required to assemble this SFG';end if;
+ id=gen_random_uuid();num=gr_production_private.number('SFG',c);
+ for line in select value from jsonb_array_elements(reqs) loop perform gr_production_private.post(c,id,line->>'material_id',-(line->>'quantity')::numeric,'SFG_RM_USE',num);end loop;
+ perform gr_production_private.post(c,id,input->>'sfg_id',amount,'SFG_ASSEMBLY',num);
+ insert into public.gr_production_documents(company_id,id,kind,number,status,payload,created_by) values(c,id,'assembly',num,'Posted',jsonb_build_object('sfg_id',input->>'sfg_id','sfg_name',m->>'name','quantity',amount,'requirements',reqs,'note',input->>'note'),auth.uid());
+ result=jsonb_build_object('number',num,'sfg_added',amount);
  elsif action='quality_move' then
  amount=(input->>'quantity')::numeric;
  select payload into product from public.gr_crm_records where company_id=c and kind='products' and record_id=input->>'product_id' for update;
