@@ -502,7 +502,7 @@ function renderTables(){
  q=$('#tasks-search').value.toLowerCase();const taskFilter=$('#task-filter').value;
  $('#tasks-table').innerHTML=scopeRows('tasks').filter(t=>(taskFilter==='all'||(taskFilter==='done')===(t.status==='Done'))&&[t.title,t.contact,t.owner,companyLabel(t._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>(a.due||'').localeCompare(b.due||'')).map(t=>'<tr><td>'+esc(t.due)+'</td><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.notes)+'</small></td><td>'+esc(t.contact)+'<small>'+esc(companyLabel(t._companyId))+'</small></td><td>'+esc(t.owner)+'</td><td><span class="pill '+(t.status==='Done'?'good':'warn')+'">'+esc(t.status)+'</span></td><td>'+act('tasks',t.id)+'</td></tr>').join('')||empty(6);
  q=$('#products-search').value.toLowerCase();
- $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(p.active?'good':'warn')+'">'+(p.active?'Active':'Inactive')+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
+ $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(window.GreenRichProductBOM.status(p)==='Active'?'good':'warn')+'">'+window.GreenRichProductBOM.status(p)+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
  $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
 }
 function render(){
@@ -700,6 +700,7 @@ function openEditor(k,id=''){
   $('#f-tax_rate').readOnly=true;$('#f-inclusive').disabled=true;
   if(!existing)switchCompany();else{const p=editorData().products.find(x=>x.id===existing.product_id);$('#gr-stock-preview').textContent=p?'Available stock: '+Number(p.stock||0)+' units':'';pricePreview()}
  }
+ if(k==='products')window.GreenRichProductBOM.mount($('#editor-form'),{client:pipelineConfig.client,product:existing||{},products:co=>loadCompanyData(co).products||[]});
  if(k==='customers'){$('#f-company_id')?.remove();} // Customer records belong to the currently active company.
  const formKey=k==='sales'?'sales_order':k==='customers'?'customer':'';
  if(formKey&&window.GreenRichFormBuilder){
@@ -801,6 +802,7 @@ async function saveEditor(event){
   ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_address2','new_city','new_state','new_pincode','new_gstin','new_type','new_source','new_notes','new_tag_ids'].forEach(k=>delete row[k]);
   // Product stock was already reserved or released once above.
  }else if(editing==='products'){
+  try{Object.assign(row,window.GreenRichProductBOM.collect(form))}catch(error){return toast(error.message,'error')}
   row.price=Number(row.price);row.tax=Number(row.tax);row.stock=Number(row.stock);
   if(!Number.isFinite(row.price)||row.price<0||!Number.isFinite(row.tax)||row.tax<0||row.tax>100||!Number.isInteger(row.stock)||row.stock<0)return toast('Enter a valid price, GST rate (0–100) and whole-number stock');
   if(copy.products.some(p=>p.id!==editId&&p.sku.toLowerCase()===row.sku.toLowerCase()))return toast('SKU must be unique for this company');
