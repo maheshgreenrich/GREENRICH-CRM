@@ -2,9 +2,9 @@
 .gr-account{position:relative;min-width:0}
 #grAccountToggle,#grAccountLogout{display:none}
 @media(max-width:760px){
- #app .main>header.gr-app-header{grid-template-columns:44px minmax(0,1fr)!important;grid-template-rows:44px auto!important;gap:10px!important;padding:12px!important}
- #app .main>header.gr-app-header .gr-header-controls{grid-column:2!important;grid-row:1!important;display:flex!important;gap:10px!important;width:100%;min-width:0}
- #app .main>header.gr-app-header .gr-header-controls .gr-header-company-picker{flex:1 1 0!important;width:auto!important;min-width:0!important}
+ #app .main>header.gr-app-header{grid-template-columns:44px minmax(0,1fr)!important;grid-template-rows:44px auto!important;gap:8px!important;padding:10px!important}
+ #app .main>header.gr-app-header .gr-header-controls{grid-column:2!important;grid-row:1!important;display:flex!important;gap:6px!important;width:100%;min-width:0}
+ #app .main>header.gr-app-header .gr-header-controls .gr-header-company-picker{flex:1 1 130px!important;width:auto!important;min-width:0!important;max-width:160px!important}
  #app .main>header.gr-app-header .gr-header-company-picker>span{display:none!important}
  #app .main>header.gr-app-header .gr-header-controls #headerCompanySelect{height:44px!important;font-size:12px!important;font-weight:600!important;text-overflow:ellipsis;padding-right:26px!important}
  #app .main>header.gr-app-header .gr-header-page{grid-column:1/-1!important;grid-row:2!important;padding:2px 0 0}
@@ -20,4 +20,19 @@
  #app .main>header.gr-app-header .gr-header-controls .gr-account .profile small{display:block!important;text-align:left!important;font-size:12px!important}
  #grAccountLogout{display:block;min-height:44px;width:100%;margin-top:5px;border:1px solid #dce4f0;border-radius:8px;background:#f5f7fc;color:#2454a8;font-size:13px;font-weight:600;text-align:left;padding:10px 12px}
  #grAccountToggle:focus-visible,#grAccountLogout:focus-visible{outline:2px solid #2355c6;outline-offset:3px}
+}
+
+@media(max-width:760px){
+ #app .main>header.gr-app-header .gr-header-controls{justify-content:flex-start!important}
+ #app .main>header.gr-app-header .gr-header-controls #attendanceQuick{display:flex!important;flex:0 0 auto!important;width:auto!important}
+ #app .main>header.gr-app-header #attendanceQuick .gr-attendance-switch-wrap{gap:0;width:auto}
+ #app .main>header.gr-app-header #attendanceQuick .gr-switch-label,
+ #app .main>header.gr-app-header #attendanceQuick #grClockInfo,
+ #app .main>header.gr-app-header #attendanceQuick .gr-switch-track{display:none!important}
+ #app .main>header.gr-app-header #grAttendanceSwitch{min-width:68px;min-height:44px;padding:8px 10px;border:1px solid #2355c6;border-radius:10px;background:#2355c6;color:#fff;font-size:12px;font-weight:600;justify-content:center;gap:0}
+ #grAttendanceSwitch[data-state="out"] #grSwitchAction,#grAttendanceSwitch[data-state="in"] #grSwitchAction{display:none}
+ #grAttendanceSwitch[data-state="out"]::after{content:"Login"}
+ #grAttendanceSwitch[data-state="in"]::after{content:"Logout"}
+ #app .main>header.gr-app-header #grAttendanceSwitch[data-state="in"]{background:#eef4ff;color:#2355c6}
+ #app .main>header.gr-app-header #grAttendanceSwitch[data-state="finished"],#app .main>header.gr-app-header #grAttendanceSwitch[data-state="marked"]{background:#f3f6fc;border-color:#dce4f0;color:#61718b}
 }
