@@ -7,7 +7,7 @@ const html=fs.readFileSync('secure.html','utf8'),
 new vm.Script(ops);new vm.Script(ui);
 assert.ok(html.includes('greenrich-erp-pilot.js?v=20261030-erp-pilot-2'),'Pilot script must load');
 assert.ok(html.indexOf('greenrich-erp-pilot.js?v=')<html.indexOf('greenrich-operations.js?v='),'Load before Operations shell');
-assert.ok(ops.includes("['pilot','Connected Order-to-Stock · Pilot','stock']"),'ERP pilot inside existing Operations sidebar');
+assert.ok(!ops.includes("['pilot','Connected Order-to-Stock · Pilot','stock']"),'Pilot must not appear among the seven live production tabs');
 assert.ok(ops.includes('GreenRichPilot.mount('));
 for(const stage of ['STOCK_CHECK','VENDOR_PO','RM_RECEIPT','ISSUE','JOBWORK','RECEIVE','ASSEMBLY','STICKER','INSPECTION','QC','STOCK','DISPATCH','SERVICE'])
  assert.ok(ui.includes(stage)&&sql.includes("'"+stage+"'"),'Missing '+stage);

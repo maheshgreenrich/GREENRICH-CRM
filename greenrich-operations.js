@@ -21,10 +21,8 @@
   service:{label:'Installation, warranty & service',module:'customers',fields:[['customer','Customer name','text',true],['product_code','Product code','text'],['serial_batch','Serial / batch','text'],['installation_date','Installation date','date'],['warranty_end','Warranty end date','date'],['technician','Assigned technician','text'],['status','Service stage','select:Installation pending,Installed,Ticket open,In service,Resolved,AMC follow-up'],['notes','Site, ticket, complaint / consumable','textarea']]}
  };
  const TABS=[
-  ['overview','Process overview',null],['pilot','Connected Order-to-Stock · Pilot','stock'],['training','Learn Production · Demo','stock'],['material','Materials / RM','stock'],['vendor','Vendors','purchase'],['bom','BOM & routing','stock'],
-  ['work_order','Production','stock'],['requisition','Purchase requests','purchase'],['purchase_order','Purchase orders','purchase'],
-  ['goods_receipt','Material receipts','purchase'],['job_work','Job work','purchase'],['qc','Quality control','stock'],
-  ['dispatch_check','Dispatch release','dispatch'],['receivable','Collections','accounts'],['service','After-sales service','customers']
+  ['overview','Process Overview','stock'],['material','Master Material','stock'],['vendor','Vendor','purchase'],
+  ['job_work','Job Work','stock'],['raw_material','Raw Materials','stock'],['purchase_order','Purchase Order','purchase'],['qc','Quality Check','stock']
  ];
  const FLOW=[
   ['Lead & qualification','Marketing / Sales','Source, lead register, call logs, Hot/Warm/Cold and site requirement'],
@@ -38,9 +36,9 @@
   ['Delivery & collection','Logistics / Sales / Accounts','POD, shortage/damage closure, invoice and receipt allocation'],
   ['Installation & AMC','Service / Sales','Installation, warranty, service ticket and consumable follow-up']
  ];
- let host=null,db=null,companyIds=[],companyScope='all',caps={},isAdmin=false,kind='overview',rows=[],version=0,channel=null,refreshTimer=null;
+ let productionRole='',host=null,db=null,companyIds=[],companyScope='all',caps={},isAdmin=false,kind='overview',rows=[],version=0,channel=null,refreshTimer=null;
  const companyName=id=>id==='grow-india'?'GreenRich Grow India Pvt Ltd':'GreenRich Enviro Solutions Pvt Ltd';
- const allowedType=id=>id==='overview'||(['training','pilot'].includes(id)?Boolean(caps.stock?.view):Boolean(caps[TYPES[id]?.module]?.view));
+ const allowedType=id=>{if(['Sales','Telecaller','Marketing'].includes(productionRole))return false;if(productionRole==='Accounts')return ['purchase_order','vendor'].includes(id)&&Boolean(caps.purchase?.view);return Boolean(caps[['vendor','purchase_order'].includes(id)?'purchase':'stock']?.view)};
  const canEdit=(id,action)=>isAdmin||Boolean(caps[TYPES[id]?.module]?.[action]);
  const allKind=id=>rows.filter(r=>r.kind===id).map(r=>({...r.payload,_companyId:r.company_id,_savedAt:r.updated_at}));
  const scopeRows=id=>allKind(id).filter(r=>companyScope==='all'||r._companyId===companyScope);
@@ -48,7 +46,7 @@
  const pill=x=>'<span class="gr-ops-pill">'+esc(x||'Draft')+'</span>';
  const colsFor=id=>id==='material'?[['code','Material code'],['name','Item / material description'],['_stock','Stock quantity'],['uom','Unit']]:TYPES[id].fields.filter(([key])=>['code','name','type','parent_code','child_code','vendor','material_code','po_number','work_number','job_ref','order_ref','quantity','qty','status','review_status','due_on','expected_on'].includes(key)).slice(0,6);
  function filterCompany(){
-  if(kind==='vendor'&&!window.GreenRichVendors.leave()){host.querySelector('#gr-ops-company').value=companyScope;return;}
+  if((kind==='vendor'&&!window.GreenRichVendors.leave())||(kind!=='vendor'&&!window.GreenRichProduction.leave())){host.querySelector('#gr-ops-company').value=companyScope;return;}
   const value=host.querySelector('#gr-ops-company')?.value;
   if(value==='all'&&companyIds.length===2)companyScope='all';
   else if(companyIds.includes(value))companyScope=value;
@@ -61,6 +59,7 @@
    if(r.error)throw Error(r.error.message);
    result.push(...(r.data||[]));if((r.data||[]).length<1000)break;
   }
+  if(kind==='vendor'){const live=await db.from('gr_production_documents').select('company_id,id,number,payload,updated_at,status').in('company_id',companyIds).eq('kind','po');if(!live.error)for(const d of live.data||[]){result.push({company_id:d.company_id,kind:'purchase_order',record_id:d.id,updated_at:d.updated_at,payload:{id:d.id,po_number:d.number,vendor_id:d.payload.vendor_id,vendor:d.payload.vendor?.name,material_code:d.payload.lines?.map(l=>l.code).join(', '),quantity:d.payload.lines?.map(l=>l.quantity+' '+l.uom).join(', '),expected_on:d.payload.delivery_date,status:d.status,notes:d.payload.terms}})}}
   rows=result;
  }
  async function reload(){
@@ -170,6 +169,7 @@
    button.classList.toggle('active',button.dataset.opsTab===kind);
    button.setAttribute('aria-current',button.dataset.opsTab===kind?'page':'false');
   });
+  if(kind!=='vendor'&&TABS.some(t=>t[0]===kind)){void window.GreenRichProduction.render({root:host.querySelector('#gr-ops-body'),db,tab:kind,scope:companyScope,companies:companyIds,companyName,role:productionRole,can:(module,action)=>Boolean(caps[module]?.[action])});return;}
   if(kind==='vendor')window.GreenRichVendors.render({root:host.querySelector('#gr-ops-body'),db,rows,scope:companyScope,companies:companyIds,companyName,can:action=>canEdit('vendor',action),fields:TYPES.vendor.fields,poFields:TYPES.purchase_order.fields,control:options,reload});
   else if(kind==='overview')drawOverview();
   else if(kind==='pilot'){
@@ -292,10 +292,10 @@
  async function mount(container,{client,companies,selection,role,can}){
   if(channel&&db)await db.removeChannel(channel);if(refreshTimer)clearTimeout(refreshTimer);
   db=client;host=container;companyIds=companies;companyScope=selection==='all'&&companies.length===2?'all':companies.includes(selection)?selection:companies[0];
-  isAdmin=role==='Admin';caps=Object.fromEntries([...new Set(Object.values(TYPES).map(x=>x.module))].map(module=>
-   [module,Object.fromEntries(['view','create','edit','delete'].map(action=>[action,isAdmin||Boolean(can(module,action))]))]));
-  window.GreenRichVendors?.reset();
-  kind='overview';rows=[];version++;
+  productionRole=role;isAdmin=role==='Admin';caps=Object.fromEntries([...new Set(Object.values(TYPES).map(x=>x.module))].map(module=>
+   [module,Object.fromEntries(['view','create','edit','delete','approve','export'].map(action=>[action,isAdmin||Boolean(can(module,action))]))]));
+  window.GreenRichVendors?.reset();window.GreenRichProduction?.reset();
+  kind=role==='Accounts'?'purchase_order':'overview';rows=[];version++;
   try{await window.GreenRichFormBuilder?.ready?.(db,companyIds)}
   catch(e){actionAlert('Form Builder settings unavailable: '+e.message)}
   host.innerHTML='<div class="gr-ops"><div class="gr-ops-banner"><div><span>GREENRICH ONE · ERP OPERATIONS</span><h2>Operations & Production</h2><p>Material to vendor, production to QC, and delivery readiness</p></div>'+
@@ -306,7 +306,7 @@
   const c=host.querySelector('#gr-ops-company');if(companyIds.length<2){c.value=companyIds[0];c.querySelector('[value=all]').remove();c.disabled=true}else c.value=companyScope;
   c.onchange=filterCompany;
   host.addEventListener('click',event=>{
-   const tab=event.target.closest('[data-ops-tab]');if(tab){if(kind==='vendor'&&!window.GreenRichVendors.leave())return;kind=tab.dataset.opsTab;draw();return}
+   const tab=event.target.closest('[data-ops-tab]');if(tab){if(!allowedType(tab.dataset.opsTab))return;if(kind==='vendor'&&!window.GreenRichVendors.leave())return;if(kind!=='vendor'&&!window.GreenRichProduction.leave())return;kind=tab.dataset.opsTab;draw();if(kind==='vendor')void reload();return}
    const create=event.target.closest('[data-new-record]');if(create){openEditor();return}
    const edit=event.target.closest('[data-edit-record]');if(edit){openEditor(edit.dataset.editRecord,edit.dataset.editCompany);return}
    if(event.target.closest('[data-cancel-record]')){host.querySelector('#gr-ops-editor').close();return}
@@ -320,7 +320,10 @@
   draw();await reload();
   if(host?.isConnected){
    channel=db.channel('greenrich-ops-'+Math.random().toString(36).slice(2))
-    .on('postgres_changes',{event:'*',schema:'public',table:'gr_ops_records'},reloadSoon).subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'gr_ops_records'},reloadSoon)
+    .on('postgres_changes',{event:'*',schema:'public',table:'gr_production_balances'},reloadSoon)
+    .on('postgres_changes',{event:'*',schema:'public',table:'gr_production_documents'},reloadSoon)
+    .on('postgres_changes',{event:'*',schema:'public',table:'gr_crm_records',filter:'kind=eq.products'},reloadSoon).subscribe();
   }
  }
  window.GreenRichOperations={mount,TYPES,TABS,FLOW};

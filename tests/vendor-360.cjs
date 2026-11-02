@@ -5,6 +5,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require
  const dom=new JSDOM('<main id="root"></main>',{runScripts:'outside-only',url:'https://example.test'}),w=dom.window;
  w.confirm=()=>true;
  w.eval(fs.readFileSync('greenrich-vendors.js','utf8'));
+ w.GreenRichProduction={render({root}){root.innerHTML='<p>Production</p>'},leave:()=>true,reset(){}};
  w.eval(fs.readFileSync('greenrich-operations.js','utf8'));
  const root=w.document.getElementById('root'),stamp='2026-11-01T00:00:00Z';
  const row=(kind,id,payload,company='grow-india')=>({kind,record_id:id,company_id:company,payload:{id,...payload},updated_at:stamp});
