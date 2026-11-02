@@ -1,6 +1,10 @@
 {
   "name": "greenrich-crm",
   "private": true,
-  "scripts": {"test:forms": "node tests/admin-form-builder.js && node tests/form-builder-dom.cjs"},
-  "devDependencies": {"jsdom": "30.1.3"}
+  "scripts": {
+    "test:forms": "node tests/admin-form-builder.js && node tests/form-builder-dom.cjs && node tests/vendor-360.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.3"
+  }
 }

@@ -62,6 +62,7 @@ jobs:
           node --check greenrich-branding.js
           node tests/sidebar-logo-responsive.js
           node --check greenrich-operations.js
+          node --check greenrich-vendors.js
           node --check greenrich-workflow-training.js
           node --check greenrich-erp-pilot.js
           node tests/connected-erp-pilot.js

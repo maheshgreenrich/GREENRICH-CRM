@@ -8,7 +8,7 @@
  const uid=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'ops-'+Date.now()+'-'+Math.random().toString(36).slice(2);
  const TYPES={
   material:{label:'Material master',module:'stock',fields:[['code','Material code','text',true],['name','Item / material description','text',true],['type','Material level','select:FG,SFG,IM,RM',true],['qty','Reference quantity','number'],['uom','Unit','select:nos,kg,mtr,ltr,sets'],['operation','Operation / routing','text'],['preferred_vendor','Source vendor','text'],['source_type','Source method','select:Make,Buy,Job work / verify'],['status','Review status','select:Draft,Review requested,Validated'],['notes','Notes','textarea']]},
-  vendor:{label:'Vendor master',module:'purchase',fields:[['name','Vendor name','text',true],['contact','Contact person','text'],['phone','Phone','tel'],['email','Email','email'],['gstin','GSTIN','text'],['location','Location / address','textarea'],['category','Supplies / service','text'],['status','Approval status','select:Draft,Review requested,Approved'],['notes','Notes','textarea']]},
+  vendor:{label:'Vendor master',module:'purchase',fields:[['name','Vendor name','text',true],['contact','Contact person','text'],['phone','Phone','tel'],['email','Email','email'],['gstin','GSTIN','text'],['location','Location / address','textarea'],['state','State','text'],['city','City','text'],['pincode','Pincode','text'],['category','Supplies / service','text'],['status','Approval status','select:Draft,Review requested,Approved'],['notes','Notes','textarea']]},
   bom:{label:'Multi-level BOM',module:'stock',fields:[['parent_code','Parent product code','text',true],['child_code','Required component code','text',true],['qty','Required quantity per parent','number',true],['uom','UOM','select:nos,kg,mtr,ltr,sets',true],['revision','BOM revision','text',true],['status','Review status','select:Draft,Review requested,Validated'],['notes','Mapping / change notes','textarea']]},
   requisition:{label:'Purchase requisitions',module:'purchase',fields:[['order_ref','Sales / work order reference','text'],['material_code','Required material code','text',true],['quantity','Required quantity','number',true],['uom','UOM','select:nos,kg,mtr,ltr,sets',true],['need_by','Required by','date'],['requester','Requested by','text'],['status','Status','select:Draft,Submitted,Approved,Ordered,Closed'],['notes','Shortage / purpose','textarea']]},
   purchase_order:{label:'Supplier purchase orders',module:'purchase',fields:[['po_number','Purchase order ID','text',true],['vendor','Vendor name','text',true],['material_code','Material code','text',true],['quantity','Quantity','number',true],['unit_price','Unit price (₹)','number'],['expected_on','Expected delivery','date'],['status','Status','select:Draft,Awaiting approval,Issued,Part received,Received,Closed,Cancelled'],['notes','Revision / approval evidence','textarea']]},
@@ -48,6 +48,7 @@
  const pill=x=>'<span class="gr-ops-pill">'+esc(x||'Draft')+'</span>';
  const colsFor=id=>TYPES[id].fields.filter(([key])=>['code','name','type','parent_code','child_code','vendor','material_code','po_number','work_number','job_ref','order_ref','quantity','qty','status','review_status','due_on','expected_on'].includes(key)).slice(0,6);
  function filterCompany(){
+  if(kind==='vendor'&&!window.GreenRichVendors.leave()){host.querySelector('#gr-ops-company').value=companyScope;return;}
   const value=host.querySelector('#gr-ops-company')?.value;
   if(value==='all'&&companyIds.length===2)companyScope='all';
   else if(companyIds.includes(value))companyScope=value;
@@ -148,7 +149,8 @@
    button.classList.toggle('active',button.dataset.opsTab===kind);
    button.setAttribute('aria-current',button.dataset.opsTab===kind?'page':'false');
   });
-  if(kind==='overview')drawOverview();
+  if(kind==='vendor')window.GreenRichVendors.render({root:host.querySelector('#gr-ops-body'),db,rows,scope:companyScope,companies:companyIds,companyName,can:action=>canEdit('vendor',action),fields:TYPES.vendor.fields,poFields:TYPES.purchase_order.fields,control:options,reload});
+  else if(kind==='overview')drawOverview();
   else if(kind==='pilot'){
    const body=host.querySelector('#gr-ops-body');
    if(!window.GreenRichPilot){body.textContent='Connected ERP pilot failed to load. Please refresh.';return;}
@@ -248,6 +250,7 @@
   db=client;host=container;companyIds=companies;companyScope=selection==='all'&&companies.length===2?'all':companies.includes(selection)?selection:companies[0];
   isAdmin=role==='Admin';caps=Object.fromEntries([...new Set(Object.values(TYPES).map(x=>x.module))].map(module=>
    [module,Object.fromEntries(['view','create','edit','delete'].map(action=>[action,isAdmin||Boolean(can(module,action))]))]));
+  window.GreenRichVendors?.reset();
   kind='overview';rows=[];version++;
   try{await window.GreenRichFormBuilder?.ready?.(db,companyIds)}
   catch(e){actionAlert('Form Builder settings unavailable: '+e.message)}
@@ -259,7 +262,7 @@
   const c=host.querySelector('#gr-ops-company');if(companyIds.length<2){c.value=companyIds[0];c.querySelector('[value=all]').remove();c.disabled=true}else c.value=companyScope;
   c.onchange=filterCompany;
   host.addEventListener('click',event=>{
-   const tab=event.target.closest('[data-ops-tab]');if(tab){kind=tab.dataset.opsTab;draw();return}
+   const tab=event.target.closest('[data-ops-tab]');if(tab){if(kind==='vendor'&&!window.GreenRichVendors.leave())return;kind=tab.dataset.opsTab;draw();return}
    const create=event.target.closest('[data-new-record]');if(create){openEditor();return}
    const edit=event.target.closest('[data-edit-record]');if(edit){openEditor(edit.dataset.editRecord,edit.dataset.editCompany);return}
    if(event.target.closest('[data-cancel-record]')){host.querySelector('#gr-ops-editor').close();return}

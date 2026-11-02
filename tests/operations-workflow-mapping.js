@@ -33,7 +33,7 @@ assert.ok(ops.includes('quality_cleared')&&ops.includes('commercial_cleared')&&o
 assert.ok(app.includes('operations:')&&app.includes("page==='operations'"),'Operations must be directly accessible from sidebar');
 assert.ok(html.includes('greenrich-operations-seed.js?v=20261030-ops-1'));
 assert.ok(html.includes('greenrich-operations.js?v='),'Operations module must be loaded with a versioned asset');
-assert.ok(html.includes('greenrich-operations.css?v=20261030-ops-1'));
+assert.ok(html.includes('greenrich-operations.css?v='));
 assert.ok(html.includes('greenrich-workflow-training.js?v=20261030-training-1'),'Training module must load before Operations');
 assert.ok(css.includes('.gr-ops-flow')&&css.includes('.gr-ops-dialog'),'Operations workspace mobile layout');
 assert.ok(sql.includes('enable row level security')&&sql.includes('gr_ops_allowed')&&sql.includes('company=any(p.company_ids)'));
