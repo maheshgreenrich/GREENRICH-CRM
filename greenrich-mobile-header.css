@@ -1,38 +1,37 @@
-/* Compact mobile header: navigation, company switcher, account; page title below. */
-.gr-account{position:relative;min-width:0}
-#grAccountToggle,#grAccountLogout{display:none}
+/* Shared desktop, tablet and mobile header; company and sign-out live in account menu. */
+#app .main>header.gr-app-header{grid-template-columns:minmax(0,1fr) auto!important;gap:16px!important;padding:16px 22px!important;overflow:visible}
+#app .main>header.gr-app-header .gr-header-controls{display:flex!important;align-items:center;gap:20px!important;min-width:0}
+#app .main>header.gr-app-header .gr-header-controls #attendanceQuick{display:flex!important;width:auto!important;flex:0 0 auto!important}
+#app .main>header.gr-app-header #attendanceQuick .gr-attendance-switch-wrap{width:auto;gap:0}
+#app .main>header.gr-app-header .gr-switch-label,#app .main>header.gr-app-header #grClockInfo{display:none!important}
+#app .main>header.gr-app-header #grAttendanceSwitch{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 13px;border-radius:28px;font-size:12px;white-space:nowrap}
+.gr-account{position:relative;min-width:0;border-left:1px solid #e1e8f3;padding-left:18px}
+#grAccountToggle{display:flex;align-items:center;justify-content:flex-end;gap:14px;min-height:48px;background:transparent;border:0;padding:0;border-radius:24px;color:#1e3c69;cursor:pointer}
+.gr-account-avatar{width:48px;height:48px;flex:0 0 48px;display:block}
+.gr-account-identity{display:flex;flex-direction:column;gap:4px;text-align:right;min-width:0}
+.gr-account-identity b{font-size:13px;font-weight:650;max-width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#app .main>header.gr-app-header .gr-account-identity small{font-size:11px;color:#61718b;letter-spacing:0}
+#grAccountToggle[aria-expanded=true] .gr-account-avatar{outline:3px solid #d9e6ff;border-radius:50%}
+#grAccountPanel{position:absolute;top:calc(100% + 14px);right:0;z-index:20;width:min(330px,calc(100vw - 24px));padding:20px;border:1px solid #dce4f0;border-radius:16px;background:#fff;box-shadow:0 14px 36px #10274820;display:grid;gap:16px}
+#grAccountPanel[hidden]{display:none!important}
+#app .main>header.gr-app-header .gr-header-controls #grAccountPanel .gr-header-company-picker{display:flex!important;flex-direction:column!important;width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;gap:7px!important}
+#app .main>header.gr-app-header .gr-header-controls #grAccountPanel .gr-header-company-picker span{display:block!important;font-size:10px!important;letter-spacing:.08em!important;color:#61718b!important}
+#app .main>header.gr-app-header .gr-header-controls #headerCompanySelect{height:44px!important;width:100%!important;font-size:12px!important;font-weight:600!important;background:#f8faff!important;border-radius:10px!important;min-width:0!important}
+#grAccountLogout{display:block;min-height:44px;width:100%;padding:12px;border:0;border-radius:12px;background:#e5f0fc;color:#234b83;font-size:14px;font-weight:650;text-align:center;cursor:pointer}
+#grAccountLogout:hover{background:#d7e8fb}
+#grAccountToggle:focus-visible,#grAccountLogout:focus-visible{outline:2px solid #2355c6;outline-offset:4px}
+@media(max-width:1100px){
+ .gr-account-identity b{max-width:150px}
+ #app .main>header.gr-app-header .gr-header-controls{gap:14px!important}
+ .gr-account{padding-left:14px}
+}
+@media(max-width:1024px){.gr-account-identity{display:none}.gr-account{border:0;padding-left:0}}
 @media(max-width:760px){
- #app .main>header.gr-app-header{grid-template-columns:44px minmax(0,1fr)!important;grid-template-rows:44px auto!important;gap:8px!important;padding:10px!important}
- #app .main>header.gr-app-header .gr-header-controls{grid-column:2!important;grid-row:1!important;display:flex!important;gap:6px!important;width:100%;min-width:0}
- #app .main>header.gr-app-header .gr-header-controls .gr-header-company-picker{flex:1 1 130px!important;width:auto!important;min-width:0!important;max-width:160px!important}
- #app .main>header.gr-app-header .gr-header-company-picker>span{display:none!important}
- #app .main>header.gr-app-header .gr-header-controls #headerCompanySelect{height:44px!important;font-size:12px!important;font-weight:600!important;text-overflow:ellipsis;padding-right:26px!important}
- #app .main>header.gr-app-header .gr-header-page{grid-column:1/-1!important;grid-row:2!important;padding:2px 0 0}
+ #app .main>header.gr-app-header{grid-template-columns:44px minmax(0,1fr)!important;grid-template-rows:48px auto!important;gap:10px!important;padding:12px!important}
+ #app .main>header.gr-app-header .gr-header-controls{grid-column:2!important;grid-row:1!important;justify-content:flex-end!important;gap:12px!important;width:100%}
+ #app .main>header.gr-app-header .gr-header-page{grid-column:1/-1!important;grid-row:2!important;padding:0}
  #app .main>header.gr-app-header .gr-header-page-overline{display:none!important}
  #app .main>header.gr-app-header #title{font-size:17px!important;line-height:1.4!important;overflow-wrap:anywhere}
- .gr-account{flex:0 0 44px}
- #grAccountToggle{display:grid;place-items:center;width:44px;height:44px;padding:10px;background:#eef4ff;border:1px solid #dce7f7;border-radius:12px;color:#2355c6}
- #grAccountToggle svg{width:22px;height:22px}
- #grAccountToggle[aria-expanded=true]{background:#2355c6;color:#fff}
- #app .main>header.gr-app-header .gr-header-controls .gr-account .profile{display:none!important}
- #app .main>header.gr-app-header .gr-header-controls .gr-account.open .profile{display:flex!important;position:absolute;right:0;top:54px;z-index:20;width:min(280px,calc(100vw - 24px));max-width:none!important;min-width:0!important;padding:16px!important;border:1px solid #dce4f0!important;border-radius:12px;background:#fff;box-shadow:0 12px 32px #10274826;align-items:flex-start!important;text-align:left!important;gap:7px!important}
- #app .main>header.gr-app-header .gr-header-controls .gr-account .profile b{max-width:100%!important;white-space:normal;overflow-wrap:anywhere;font-size:14px!important}
- #app .main>header.gr-app-header .gr-header-controls .gr-account .profile small{display:block!important;text-align:left!important;font-size:12px!important}
- #grAccountLogout{display:block;min-height:44px;width:100%;margin-top:5px;border:1px solid #dce4f0;border-radius:8px;background:#f5f7fc;color:#2454a8;font-size:13px;font-weight:600;text-align:left;padding:10px 12px}
- #grAccountToggle:focus-visible,#grAccountLogout:focus-visible{outline:2px solid #2355c6;outline-offset:3px}
-}
-
-@media(max-width:760px){
- #app .main>header.gr-app-header .gr-header-controls{justify-content:flex-start!important}
- #app .main>header.gr-app-header .gr-header-controls #attendanceQuick{display:flex!important;flex:0 0 auto!important;width:auto!important}
- #app .main>header.gr-app-header #attendanceQuick .gr-attendance-switch-wrap{gap:0;width:auto}
- #app .main>header.gr-app-header #attendanceQuick .gr-switch-label,
- #app .main>header.gr-app-header #attendanceQuick #grClockInfo,
- #app .main>header.gr-app-header #attendanceQuick .gr-switch-track{display:none!important}
- #app .main>header.gr-app-header #grAttendanceSwitch{min-width:68px;min-height:44px;padding:8px 10px;border:1px solid #2355c6;border-radius:10px;background:#2355c6;color:#fff;font-size:12px;font-weight:600;justify-content:center;gap:0}
- #grAttendanceSwitch[data-state="out"] #grSwitchAction,#grAttendanceSwitch[data-state="in"] #grSwitchAction{display:none}
- #grAttendanceSwitch[data-state="out"]::after{content:"Login"}
- #grAttendanceSwitch[data-state="in"]::after{content:"Logout"}
- #app .main>header.gr-app-header #grAttendanceSwitch[data-state="in"]{background:#eef4ff;color:#2355c6}
- #app .main>header.gr-app-header #grAttendanceSwitch[data-state="finished"],#app .main>header.gr-app-header #grAttendanceSwitch[data-state="marked"]{background:#f3f6fc;border-color:#dce4f0;color:#61718b}
+ #app .main>header.gr-app-header #grAttendanceSwitch{font-size:12px!important;min-height:44px;gap:7px;padding:9px 11px}
+ #grAccountPanel{top:calc(100% + 12px);padding:18px}
 }
