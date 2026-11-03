@@ -13,7 +13,14 @@ assert.match(html,/class="gr-app-header"/,'Global header should have a dedicated
 const topHeader=html.match(/<header class="gr-app-header">([\s\S]*?)<\/header>/)?.[1]||'';
 assert.ok(topHeader.includes('class="gr-header-page"'),'Page title must occupy its own header zone');
 assert.ok(topHeader.includes('class="gr-header-controls"'),'Company selector and account controls should align in one group');
-assert.ok(topHeader.indexOf('id="attendanceQuick"')<topHeader.indexOf('class="profile"'),'Attendance switch must stay before user profile');
+const attendancePosition=topHeader.indexOf('id="attendanceQuick"'),accountPosition=topHeader.indexOf('id="grAccountToggle"');
+assert.ok(attendancePosition>=0&&accountPosition>attendancePosition,'Attendance switch must stay before user account toggle');
+const {JSDOM}=require('jsdom');
+const headerDocument=new JSDOM(topHeader).window.document;
+const accountPanel=headerDocument.getElementById('grAccountPanel');
+assert.ok(accountPanel?.hidden,'Account dropdown must start closed');
+assert.ok(accountPanel.contains(headerDocument.getElementById('headerCompanySelect')),'Company selector must live in account dropdown');
+assert.ok(accountPanel.contains(headerDocument.getElementById('grAccountLogout')),'Sign out must live in account dropdown');
 assert.ok(shell.includes('.gr-header-controls'),'Responsive header design missing');
 assert.ok(shell.includes('grid-template-columns:auto minmax(0,1fr)!important'),'Mobile header should use a balanced responsive grid');
 assert.ok(template.includes('id="gr-customer-directory"')&&template.includes('id="gr-customer-profile"'),'Customers must have a full-page details view');
