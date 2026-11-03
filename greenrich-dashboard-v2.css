@@ -186,3 +186,70 @@
 #content .gr2-leader>div>strong small{display:block;text-align:right;font-weight:650;color:#268b72;font-size:10px}
 #content .gr2-leader>div>strong{line-height:1.35}
 @media(max-width:680px){#content .gr2-split{grid-template-columns:1fr;gap:15px}#content .gr2-split>div+div{padding:15px 0 0;border-left:0;border-top:1px solid #edf1f8}}
+/* 2026 dashboard refresh: quieter surfaces, stronger hierarchy, consistent icons. */
+#content .gr2{--gr2-muted:#61718b;--gr2-shadow:0 4px 18px #19386206;gap:20px}
+#content .gr2-heading{background:transparent;border:0;box-shadow:none;padding:6px 0 4px;border-radius:0}
+#content .gr2-heading::after{display:none}
+#content .gr2-heading h2{font-size:28px!important}
+#content .gr2-heading p,#content .gr2-panel-title p,#content .gr2-foot,#content .gr2-disclaimer{color:#61718b!important}
+#content .gr2-toolbar{padding:16px 20px;border-radius:16px;box-shadow:none}
+#content .gr2-kpi{min-height:150px;border-radius:16px;padding:20px}
+#content .gr2-kpi::after{display:none}
+#content .gr2-kpi-symbol{float:right;margin:0 0 10px 10px;width:36px;height:36px;border-radius:50%;background:#f0f4fb;color:#426089}
+#content .gr2-kpi-symbol svg,#content .gr2-panel-icon svg{width:20px;height:20px}
+#content .gr2-kpi strong{clear:both;font-size:30px!important;letter-spacing:-.035em}
+#content .gr2-kpi[data-color=blue]{background:linear-gradient(125deg,#1e459f,#356be0);border-color:#2355c6;color:#fff}
+#content .gr2-kpi[data-color=blue] small,#content .gr2-kpi[data-color=blue] strong,#content .gr2-kpi[data-color=blue] p{color:#fff!important}
+#content .gr2-kpi[data-color=blue] .gr2-kpi-symbol{background:#ffffff20;color:#fff}
+#content .gr2-panel{border-radius:16px;padding:22px;box-shadow:none}
+#content .gr2-panel-icon{width:34px;height:34px;flex-basis:34px;border-radius:10px}
+#content .gr2-panel-title h3{font-size:18px!important;font-weight:650!important}
+#content .gr2-panel-title small{display:none}
+#content .gr2-panel-title p{font-size:12px!important}
+#content .gr2-panel-stock,#content .gr2-panel-customers,#content .gr2-panel-leads{grid-column:span 6}
+#content .gr2-panel-followups{grid-column:span 6}
+#content .gr2-mini{background:#f6f8fc;border:0;border-radius:10px}
+#content .gr2-columns{height:250px}
+#content .gr2-column-track{height:180px;flex:none;width:100%}
+#content .gr2-column small{color:#526580;overflow-wrap:anywhere}
+#content .gr2-legend span{white-space:normal;overflow-wrap:anywhere}
+#content .gr2-legend{min-width:0}
+#content .gr2-donut-wrap{flex-wrap:wrap}
+#content .gr2-bar-track{height:12px}
+#content .gr3-chart{display:block;width:100%;height:auto;overflow:visible;margin:12px 0}
+#content .gr3-chart text{fill:#526580;font:12px Inter,system-ui,sans-serif}
+#content .gr3-grid{fill:none;stroke:#e5ebf4;stroke-dasharray:3 5}
+#content .gr3-data{margin:12px 0 18px;border-top:1px solid #edf1f7;padding-top:5px}
+#content .gr3-data summary{min-height:44px;display:flex;align-items:center;gap:8px;color:#2355c6;font-size:12px;cursor:pointer;font-weight:600}
+#content .gr3-data summary::before{content:'+';font-size:18px}
+#content .gr3-data[open] summary::before{content:'−'}
+#content .gr3-data table{min-width:0;width:100%}
+#content .gr3-data td,#content .gr3-data th{white-space:normal;overflow-wrap:anywhere}
+#content .gr3-data .gr2-table-wrap{max-height:260px}
+#content .gr3-pie-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin:20px 0}
+#content .gr3-pie{width:160px;height:160px;flex:0 0 160px;border-radius:50%;box-shadow:0 0 0 8px #f6f8fc}
+#content .gr3-caption{font-size:12px;color:#61718b;line-height:1.6}
+#content .gr3-subheading{font-size:13px!important;color:#426089!important;margin:22px 0 10px!important}
+#content .gr2 summary:focus-visible,#content .gr2 button:focus-visible{outline:2px solid #2355c6;outline-offset:3px}
+#content .gr2-buttons button{min-height:44px}
+@media(max-width:1100px){#content .gr2-panel-stock,#content .gr2-panel-customers,#content .gr2-panel-leads,#content .gr2-panel-followups{grid-column:span 6}}
+@media(max-width:830px){#content .gr2-panel{grid-column:span 12!important}#content .gr2-heading h2{font-size:24px!important}}
+@media(max-width:480px){
+ #content .gr2{gap:14px}
+ #content .gr2-heading{padding:4px 0;gap:10px}
+ #content .gr2-eyebrow{font-size:8px;letter-spacing:.08em}
+ #content .gr2-kpi{padding:14px 12px;min-height:144px}
+ #content .gr2-kpi-symbol{width:28px;height:28px;margin-left:5px}
+ #content .gr2-kpi-symbol svg{width:17px;height:17px}
+ #content .gr2-kpi strong{font-size:23px!important}
+ #content .gr2-kpi small{font-size:11px!important}
+ #content .gr2-panel{padding:18px 14px}
+ #content .gr2-toolbar{padding:14px 12px}
+ #content .gr3-chart text{font-size:18px}
+ #content .gr3-pie-wrap{justify-content:center;gap:20px}
+ #content .gr3-pie-wrap .gr2-legend{flex-basis:100%}
+ #content .gr2-panel-title h3{font-size:17px!important}
+}
+@media(prefers-reduced-motion:reduce){#content .gr2 *{transition:none!important;animation:none!important}}
+
+#content .gr2-donut b{font-size:clamp(13px,1.6vw,21px);max-width:100%;padding:0 4px;overflow-wrap:anywhere;text-align:center}

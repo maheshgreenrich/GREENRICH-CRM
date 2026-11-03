@@ -55,6 +55,7 @@ function testDOM(){
    clearInterval:id=>timers.delete(id),
    setTimeout:(fn)=>{const id=next++;timers.set(id,fn);return id},
    clearTimeout:id=>timers.delete(id)};
+ vm.runInNewContext(fs.readFileSync('greenrich-dashboard-charts.js','utf8'),context);
  vm.runInNewContext(v2,context);
  return {host,window,timers,toasts,db,dbCalls:()=>dbCalls};
 }

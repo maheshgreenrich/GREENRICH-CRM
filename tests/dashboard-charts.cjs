@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const ctx={window:{},Intl,Date,Map,Math,Number,String};vm.runInNewContext(fs.readFileSync('greenrich-dashboard-charts.js','utf8'),ctx);const c=ctx.window.GreenRichDashboardCharts;
+assert.equal(c.bins([100,100]).length,1);assert.equal(c.bins([100,100])[0].count,2);
+for(const values of [[],[0],[0,1,2,3,4,5,6,7,8,9,10],[10,500,80000]])assert.equal(c.bins(values).reduce((n,r)=>n+r.count,0),values.length);
+assert.equal(c.orderTotals([{company_id:'a',order_id:'1',total:5},{company_id:'a',order_id:'1',total:10},{company_id:'b',order_id:'1',total:7}]).join(','),'15,7');
+const daily=c.daily([{date:'2026-11-01',v:4},{date:'2026-11-03',v:2}],r=>r.date,r=>r.v,'2026-11-01','2026-11-03');assert.equal(daily.length,3);assert.equal(daily[1][1],0);
+const months=c.daily([{date:'2026-01-01',v:9}],r=>r.date,r=>r.v,'2026-01-01','2026-04-01');assert.equal(months.length,4);assert.equal(months[3][1],0);
+assert(c.series([['2026-11-01',0]]).includes('View chart data'));assert(!c.histogram([0,0]).includes('NaN'));
+assert(c.scatter([{price:null,stock:5},{price:20,stock:null}]).includes('Not enough'));
+assert(!c.pie([['<script>',2]]).includes('<script>'));assert(c.pie(Array.from({length:10},(_,i)=>['Type '+i,i+1])).includes('Other'));
+console.log('PASS chart bins conserve counts, order aggregation, zero dates, monthly ranges, missing data and escaping');

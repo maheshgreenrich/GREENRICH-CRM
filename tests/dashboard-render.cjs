@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs');const {JSDOM}=require('jsdom');
+(async()=>{
+ const dom=new JSDOM('<main id="content"></main>',{runScripts:'outside-only'}),w=dom.window,d=w.document;
+ const today=new Date().toISOString().slice(0,10),widgets=['day_sales','channel_sales','sales','company_sales','leads','conversion','customers','stock'];
+ w.GreenRichExecutiveDashboard={widgets:widgets.map(x=>[x,x])};const errors=[];w.GreenRichNotify=(m)=>errors.push(m);
+ const records=[];for(let i=0;i<12;i++)records.push({company_id:i%2?'enviro-solutions':'grow-india',kind:'sales',record_id:'o'+i,payload:{id:'o'+i,order_id:'o'+i,date:today,total:100+i*50,channel:'Channel '+i,status:'Approved'}});
+ for(let i=0;i<3;i++)records.push({company_id:'grow-india',kind:'products',record_id:'p'+i,payload:{id:'p'+i,name:'Product '+i,stock:i*7,price:100+i*300}});
+ const tables={gr_dashboard_preferences:null,gr_crm_records:records,gr_lead_pipeline:[{company_id:'grow-india',lead_id:'l1',created_at:today,stage:'New',source:'Website'}],gr_crm_customers:[{id:'c1',name:'Customer',type:'Business',created_at:today}]};
+ const db={from(name){const chain=new Proxy({}, {get(_,k){if(k==='then')return resolve=>Promise.resolve({data:tables[name]??(name==='gr_dashboard_preferences'?null:[])}).then(resolve);return ()=>chain}});return chain},rpc:async()=>({data:[]})};
+ for(const file of ['greenrich-dashboard-charts.js','greenrich-dashboard-v2.js'])w.eval(fs.readFileSync(file,'utf8'));
+ await w.GreenRichExecutiveDashboard.mount(d.querySelector('main'),{db,admin:true,userId:'test',companyIds:['grow-india','enviro-solutions'],canExport:false});
+ assert.deepEqual(errors,[]);assert(d.querySelector('.gr3-pie'));assert.equal(d.querySelectorAll('svg.gr3-chart').length,4);assert(d.querySelector('.gr2-panel-channel_sales').textContent.includes('Other'));assert(!d.querySelector('main').innerHTML.includes('NaN'));
+ const company=d.querySelector('#gr2-company');company.value='grow-india';company.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(w.GreenRichDashboardV2.filtered().sales.length,6);
+ const details=d.querySelector('.gr3-data');details.open=true;assert(details.querySelectorAll('tbody tr').length>0);
+ w.GreenRichDashboardV2.stop();
+ await w.GreenRichExecutiveDashboard.mount(d.querySelector('main'),{db,admin:false,canModule:m=>m==='customers',userId:'restricted',companyIds:['grow-india'],canExport:false});
+ assert(!d.querySelector('.gr2-panel-sales'));assert(!d.querySelector('.gr2-panel-stock'));assert(d.querySelector('.gr2-panel-customers'));w.GreenRichDashboardV2.stop();dom.window.close();
+ console.log('PASS dashboard DOM: charts render, all categories retained, company filter, data tables, restricted role');
+})().catch(e=>{console.error(e);process.exit(1)});

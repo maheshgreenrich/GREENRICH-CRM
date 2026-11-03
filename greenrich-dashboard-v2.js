@@ -5,6 +5,7 @@
 (()=>{
  const previous=window.GreenRichExecutiveDashboard;
  if(!previous)throw Error('Dashboard core must load before Business Intelligence v2');
+ const charts=window.GreenRichDashboardCharts;
  const W=previous.widgets;
  const LABELS=Object.fromEntries(W);
  const C=['#3869e9','#14b8a6','#8b5cf6','#f59e0b','#ec4899','#0ea5e9','#10b981','#ef646b'];
@@ -36,30 +37,15 @@
  const label=(name,value)=>'<div class="gr2-mini"><span>'+e(name)+'</span><strong>'+e(value)+'</strong></div>';
  const panel=(id,subtitle,inner,extra='')=>'<section class="gr2-panel gr2-panel-'+e(id)+'" data-widget="'+e(id)+'"><div class="gr2-panel-title"><div><small>'+e(LABELS[id]||id)+'</small><h3>'+e({
   day_sales:'Revenue trend',channel_sales:'Sales by channel',sales:'Sales overview',company_sales:'Company performance',
-  leads:'Lead sources',conversion:'Lead conversion funnel',salespeople:'Salesperson performance',
+  leads:'Lead sources',conversion:'Lead stage distribution',salespeople:'Salesperson performance',
   telecaller:'Telecaller & conversion',attendance:'Team attendance',customers:'Customer insights',
   followups:'Follow-up priorities',order_status:'Sales order approvals',dispatch:'Dispatch pipeline',
-  stock:'Products & stock',recent:'Latest sales orders',accounts:'Accounts & finance'
- }[id]||LABELS[id])+'</h3><p>'+e(subtitle)+'</p></div><span class="gr2-panel-icon" aria-hidden="true">'+e({
-  sales:'₹',day_sales:'↗',channel_sales:'◉',company_sales:'▥',leads:'◎',conversion:'⇄',
-  salespeople:'★',telecaller:'☎',attendance:'✓',customers:'♙',followups:'◷',
-  order_status:'✓',dispatch:'↗',stock:'▣',recent:'≡',accounts:'₹'
- }[id]||'•')+'</span></div>'+inner+(extra?'<p class="gr2-foot">'+e(extra)+'</p>':'')+'</section>';
+  stock:'Stock & price insights',recent:'Latest sales orders',accounts:'Accounts & finance'
+ }[id]||LABELS[id])+'</h3><p>'+e(subtitle)+'</p></div><span class="gr2-panel-icon" aria-hidden="true">'+charts.icon(id)+'</span></div>'+inner+(extra?'<p class="gr2-foot">'+e(extra)+'</p>':'')+'</section>';
  const listBars=(items,colors=C,formatter=fmt,limit=7)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,limit),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-bars">'+rows.map(([key,value],i)=>'<div class="gr2-bar-row"><div class="gr2-bar-line"><span title="'+e(key)+'">'+e(key)+'</span><b>'+e(formatter(value))+'</b></div><div class="gr2-bar-track"><i style="width:'+(number(value)===0?0:Math.max(2,number(value)/max*100))+'%;background:'+colors[i%colors.length]+'"></i></div></div>').join('')+'</div>':note('No matching data for these filters')};
- const donut=items=>{const nonzero=items.filter(x=>number(x[1])>0).slice(0,8),total=sum(nonzero,x=>x[1]);let angle=0;const stops=nonzero.map(([_,v],i)=>{const start=angle;angle+=number(v)/total*100;return C[i%C.length]+' '+start+'% '+angle+'%'}).join(',');
-  return total?'<div class="gr2-donut-wrap"><div class="gr2-donut" style="background:conic-gradient('+stops+')"><div><b>'+fmt(total)+'</b><small>Total</small></div></div><div class="gr2-legend">'+nonzero.map(([name,value],i)=>'<div><i style="background:'+C[i%C.length]+'"></i><span>'+e(name)+'</span><strong>'+fmt(value)+'</strong></div>').join('')+'</div></div>':note('No records for the selected period')};
- const trend=(rows,from,to)=>{const daily=new Map();for(const r of rows){const day=dateKey(r.date||r.order_date||r.created_at);if(day)daily.set(day,(daily.get(day)||0)+number(r.total))}const keys=[...daily.keys()].sort(),groups=new Map();const monthly=keys.length>55||(from&&to&&(new Date(to)-new Date(from))/86400000>65);
-  for(const key of keys){const k=monthly?key.slice(0,7):key;groups.set(k,(groups.get(k)||0)+daily.get(key))}
-  const a=[...groups].slice(-25),values=a.map(x=>x[1]);if(!values.length)return note('No sales orders match your selected filters');
-  const top=Math.max(1,...values),w=670,h=220,pad=28,innerW=w-2*pad,innerH=h-2*pad;
-  const coords=values.map((v,i)=>[pad+(values.length===1?innerW/2:i*innerW/(values.length-1)),pad+innerH-(v/top*innerH)]);
-  const points=coords.map(x=>x.join(',')).join(' '),end=coords[coords.length-1];
-  const fill='M'+coords[0][0]+','+(h-pad)+' L'+coords.map(p=>p.join(',')).join(' L')+' L'+end[0]+','+(h-pad)+' Z';
-  return '<div class="gr2-chart-scroll"><svg class="gr2-line" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Revenue line chart for selected sales dates"><defs><linearGradient id="gr2Area" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#5b8bfa" stop-opacity=".29"/><stop offset="100%" stop-color="#5b8bfa" stop-opacity="0"/></linearGradient></defs>'+
-   [0,1,2,3,4].map(i=>'<line x1="'+pad+'" x2="'+(w-pad)+'" y1="'+(pad+i*innerH/4)+'" y2="'+(pad+i*innerH/4)+'" stroke="#e8eef8" stroke-dasharray="3 5"/>').join('')+
-   '<path d="'+fill+'" fill="url(#gr2Area)"/><polyline points="'+points+'" fill="none" stroke="#3669e9" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>'+
-   coords.map(([x,y],i)=>'<circle cx="'+x+'" cy="'+y+'" r="4" fill="#fff" stroke="#3869e9" stroke-width="2"><title>'+e(a[i][0])+' · '+e(money(a[i][1]))+'</title></circle>').join('')+
-   [0,Math.floor((a.length-1)/2),a.length-1].filter((x,i,b)=>b.indexOf(x)===i).map(i=>'<text x="'+coords[i][0]+'" y="'+(h-3)+'" text-anchor="middle" font-size="12" fill="#8291a8">'+e(a[i][0].slice(5))+'</text>').join('')+'</svg></div><div class="gr2-under"><span>Actual sales records</span><strong>'+money(sum(rows,'total'))+'</strong></div>'};
+ const donut=(items,formatter=fmt)=>{const all=items.filter(x=>number(x[1])>0),nonzero=all.length>8?[...all.slice(0,7),['Other',sum(all.slice(7),x=>x[1])]]:all,total=sum(nonzero,x=>x[1]);let angle=0;const stops=nonzero.map(([_,v],i)=>{const start=angle;angle+=number(v)/total*100;return C[i%C.length]+' '+start+'% '+angle+'%'}).join(',');
+  return total?'<div class="gr2-donut-wrap"><div class="gr2-donut" style="background:conic-gradient('+stops+')"><div><b>'+formatter(total)+'</b><small>Total</small></div></div><div class="gr2-legend">'+nonzero.map(([name,value],i)=>'<div><i style="background:'+C[i%C.length]+'"></i><span>'+e(name)+'</span><strong>'+formatter(value)+'</strong></div>').join('')+'</div></div>':note('No records for the selected period')};
+ const trend=(rows,from,to)=>charts.series(charts.daily(rows,r=>dateKey(r.date||r.order_date||r.created_at),r=>number(r.total),from,to),{area:true,yLabel:'Revenue (₹)',xLabel:'Date'})+'<div class="gr2-under"><span>Selected period revenue</span><strong>'+money(sum(rows,'total'))+'</strong></div>';
  const columns=(items,formatter=fmt)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,10),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-columns">'+rows.map(([k,v],i)=>'<div class="gr2-column"><span>'+e(formatter(v))+'</span><div class="gr2-column-track"><i style="height:'+(number(v)===0?0:Math.max(3,number(v)/max*100))+'%;background:'+C[i%C.length]+'"></i></div><small title="'+e(k)+'">'+e(k)+'</small></div>').join('')+'</div>':note('No matching revenue records')};
  function filters(){
   const p=val('#gr2-period')||'month',from=p==='custom'?val('#gr2-from'):periodStart(p),to=p==='custom'?val('#gr2-to'):p==='all'?'':today();
@@ -126,7 +112,7 @@
    ['Present days',fmt(f.attendance.filter(a=>/present|in|worked/i.test(a.status||'')).length),'attendance','green'],
    ['Stock alerts',fmt(f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length),'stock','amber']
   ].filter(k=>canId(k[2]));
-  query('#gr2-kpis').innerHTML=kpis.map(([name,v,_,color],i)=>'<article class="gr2-kpi" data-color="'+color+'"><span class="gr2-kpi-symbol">'+['↗','▤','♙','◎','◷','↗','✓','!'][i%8]+'</span><small>'+e(name)+'</small><strong>'+e(v)+'</strong><p>'+e(f.period==='all'?'All accessible records':f.from&&f.to?f.from+' — '+f.to:'Current filter')+'</p></article>').join('')||note('Your administrator has not enabled dashboard widgets for this role.');
+  query('#gr2-kpis').innerHTML=kpis.map(([name,v,_,color],i)=>'<article class="gr2-kpi" data-color="'+color+'"><span class="gr2-kpi-symbol">'+charts.icon(_)+'</span><small>'+e(name)+'</small><strong>'+e(v)+'</strong><p>'+e(f.period==='all'?'All accessible records':f.from&&f.to?f.from+' — '+f.to:'Current filter')+'</p></article>').join('')||note('Your administrator has not enabled dashboard widgets for this role.');
   const approved=sale.filter(s=>!!f.dispatch.find(d=>d.company_id===s.company_id&&d.source_sale_id===s.id)||s.approval_status==='Approved');
   const pending=sale.filter(s=>!approved.includes(s));
   const stages=['New','Contacted','Qualified','Quotation','Won','Lost'];
@@ -139,25 +125,25 @@
     orderValue:sum(sale.filter(x=>orders.has(x.company_id+'|'+x.id)),'total')};
   }).filter(x=>x.all).sort((a,b)=>b.orderValue-a.orderValue||b.won-a.won||b.all-a.all).slice(0,8);
   const content={
-   day_sales:()=>panel('day_sales','Sales date · income by day or month',trend(sale,f.from,f.to)),
-   channel_sales:()=>panel('channel_sales','Revenue distribution by recorded order channel',donut(group(sale,s=>s.channel_name||s.channel,s=>s.total))),
-   sales:()=>panel('sales','Filtered sales orders and amount',label('Revenue',money(sum(sale,'total')))+label('Order count',fmt(orderCount))+label('Units sold',fmt(sum(sale,s=>s.qty||s.quantity)))+label('Average order',orderCount?money(sum(sale,'total')/orderCount):'₹0')+listBars([['GST',sum(sale,s=>s.tax_amount||s.tax_total)],['Taxable value',sum(sale,s=>s.taxable||s.subtotal)]],C,money,2)),
+   day_sales:()=>panel('day_sales','Area chart · sales order value by day or month',trend(sale,f.from,f.to)),
+   channel_sales:()=>panel('channel_sales','Revenue distribution by recorded order channel',donut(group(sale,s=>s.channel_name||s.channel,s=>s.total),money)),
+   sales:()=>panel('sales','Filtered sales orders and amount',label('Revenue',money(sum(sale,'total')))+label('Order count',fmt(orderCount))+label('Units sold',fmt(sum(sale,s=>s.qty||s.quantity)))+label('Average order',orderCount?money(sum(sale,'total')/orderCount):'₹0')+'<h4 class="gr3-subheading">Order value distribution</h4>'+charts.histogram(charts.orderTotals(sale))),
    company_sales:()=>panel('company_sales','Both GreenRich companies · order values',columns(group(sale,s=>company(s.company_id),s=>s.total),money)),
    leads:()=>panel('leads','Lead creation date · recorded marketing source',
-     '<div class="gr2-split"><div><h4>Enquiries by source</h4>'+listBars(bySource,C,fmt,9)+'</div><div><h4>Product enquiries</h4>'+
+     charts.series(charts.daily(f.leads,l=>dateKey(l.created_at||l.date),()=>1,f.from,f.to),{yLabel:'New leads',xLabel:'Date'})+'<div class="gr2-split"><div><h4>Enquiries by source</h4>'+listBars(bySource,C,fmt,9)+'</div><div><h4>Product enquiries</h4>'+
      listBars(group(f.leads,l=>records.products.find(p=>p.id===l.product_id&&p.company_id===l.company_id)?.name||l.product_interest||l.product_id||'Unspecified'),C,fmt,7)+'</div></div>',
      'Sources and product interests from accessible lead records'),
    conversion:()=>panel('conversion','Stages and customer conversions',donut(stageCounts)+label('Conversion rate',pct(won.length,f.leads.length))+label('Won leads',fmt(won.length))),
    salespeople:()=>panel('salespeople','Won leads versus assigned enquiries',owned.length?'<div class="gr2-leader">'+owned.map((p,i)=>'<div><span class="gr2-place">'+(i+1)+'</span><span class="gr2-person">'+e(p.name)+'</span><div class="gr2-leader-track"><i style="width:'+Math.round(100*p.won/Math.max(1,p.all))+'%"></i></div><strong>'+fmt(p.won)+' / '+fmt(p.all)+'<small>'+money(p.orderValue)+'</small></strong></div>').join('')+'</div>':note('No assigned leads in this period')),
    telecaller:()=>{const calls=f.leads.filter(l=>/telecall|telephone|phone call/i.test(l.source||'')||/telecall/i.test(staff.find(p=>p.id===l.assigned_to)?.role||''));return panel('telecaller','Source or owner identified as telecalling',label('Telecalling leads',fmt(calls.length))+label('Won',fmt(calls.filter(l=>l.stage==='Won').length))+label('Conversion',pct(calls.filter(l=>l.stage==='Won').length,calls.length))+label('Calls today','Not tracked')+listBars(group(calls,l=>staff.find(p=>p.id===l.assigned_to)?.full_name||'Unassigned'),C,fmt,6),'Calls today remain Not tracked until a call-log or dialer integration is connected.')},
    attendance:()=>panel('attendance','Recorded attendance in the selected date range',donut(group(f.attendance,a=>a.status||'Unknown'))+label('Entries',fmt(f.attendance.length))+(errors.attendance?note('Attendance is unavailable for this account: '+errors.attendance):''),'Attendance is employee-based, not attributed to a company.'),
-   customers:()=>panel('customers','Shared customer directory · linked-company scope',label('Customers',fmt(f.customers.length))+label('New in period',fmt(f.customers.filter(c=>inRange(c.created_at,f.from,f.to)).length))+listBars(group(f.customers,c=>c.type||'Unspecified'),C,fmt,6)),
+   customers:()=>panel('customers','Shared customer directory · linked-company scope',label('Customers',fmt(f.customers.length))+label('New in period',fmt(f.customers.filter(c=>inRange(c.created_at,f.from,f.to)).length))+charts.pie(group(f.customers,c=>c.type||'Unspecified'))),
    followups:()=>panel('followups','Scheduled dates · overdue and due now',label('Due / overdue',fmt(due.length))+label('Scheduled in range',fmt(f.followups.length))+
      (f.followups.length?'<div class="gr2-activity">'+f.followups.slice().sort((a,b)=>new Date(a.next_followup_at)-new Date(b.next_followup_at)).slice(0,6).map(l=>'<div><span class="gr2-dot"></span><div><strong>'+e(l.contact||l.title||'Lead')+'</strong><small>'+e(l.stage||'')+' · '+e(dateKey(l.next_followup_at))+'</small></div><b>'+e(new Date(l.next_followup_at).getTime()<=Date.now()?'Due':'Upcoming')+'</b></div>').join('')+'</div>':note('No follow-ups in this period'))),
    order_status:()=>panel('order_status','Pending, approved and cancelled orders',donut([['Approved',approved.length],['Pending',pending.length],['Cancelled / returned',f.sales.filter(s=>['Cancelled','Returned'].includes(s.status)).length]])),
    dispatch:()=>panel('dispatch','Latest recorded delivery and courier stages',listBars(group(f.dispatch,d=>d.status||'Pending'),C,fmt,8)+label('Total dispatch orders',fmt(f.dispatch.length))),
    stock:()=>panel('stock','Current stock · date filters do not change stock snapshot',label('Products',fmt(f.products.length))+label('Low stock (≤5)',fmt(f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length))+
-     listBars(f.products.slice().sort((a,b)=>number(a.stock)-number(b.stock)).slice(0,7).map(p=>[p.name||p.sku||'Product',number(p.stock)]),C,fmt,7)),
+     charts.scatter(f.products)+'<h4 class="gr3-subheading">Lowest stock products</h4>'+listBars(f.products.slice().sort((a,b)=>number(a.stock)-number(b.stock)).slice(0,7).map(p=>[p.name||p.sku||'Product',number(p.stock)]),C,fmt,7)),
    recent:()=>panel('recent','Recent orders matching the selected filters',sale.length?'<div class="gr2-table-wrap"><table class="gr2-table"><thead><tr><th>Sales order ID</th><th>Customer</th><th>Company</th><th>Channel</th><th>Date</th><th>Status</th><th>Value</th></tr></thead><tbody>'+sale.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,12).map(s=>'<tr><td><strong>'+e(s.internal_order_id||s.order_id||s.id)+'</strong></td><td>'+e(s.customer_name||'—')+'</td><td>'+e(company(s.company_id))+'</td><td>'+e(s.channel_name||'—')+'</td><td>'+e(dateKey(s.date))+'</td><td><span class="gr2-status">'+e(s.status||'Recorded')+'</span></td><td><b>'+e(money(s.total))+'</b></td></tr>').join('')+'</tbody></table></div>':note('No matching sales orders')),
    accounts:()=>panel('accounts','Accounting ledger connection status',note('Accounts ledger tables are not installed. Receivables, payables and cash balances cannot be reported yet.'),'Connect and authorize the Accounts posting tables to enable verified financial figures.')
   };
