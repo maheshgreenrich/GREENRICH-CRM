@@ -233,38 +233,124 @@
   }catch(error){actionMessage('Approval failed: '+error.message)}
   finally{button.disabled=false}
  }
- function openDispatch(id,readonly=false){
+ async function openPacking(id){
+  const order=dispatchRows.find(x=>x.id===id);
+  if(!order)return actionMessage('Dispatch order not found');
+  if(!window.GreenRichDocuments?.packingHtml||!window.GreenRichInvoices?.savePaper)
+   return actionMessage('Packing Slip PDF module has not loaded. Refresh CRM.');
+  const existing=root.querySelector('#gr-packing-dialog');if(existing)existing.remove();
+  const modal=document.createElement('dialog');modal.id='gr-packing-dialog';modal.className='gr-packing-dialog';
+  modal.innerHTML='<div class="gr-packing-tools"><div><h2>Packing Slip · '+esc(order.order_id)+'</h2><p>Customer: '+esc(order.customer_name||'—')+'</p></div>'+
+   '<div class="gr-packing-actions"><button type="button" class="btn soft" data-pack-close>Close</button>'+
+   '<button type="button" class="btn primary" data-pack-download>Download Packing Slip PDF</button></div></div>'+
+   '<div class="gr-packing-preview"><div id="gr-packing-document">Preparing document…</div></div>';
+  root.append(modal);modal.addEventListener('close',()=>modal.remove());
+  modal.querySelector('[data-pack-close]').onclick=()=>modal.close();
+  modal.showModal();
+  try{
+   await Promise.all([window.GreenRichDocuments.load(db,[order.company_id]),window.GreenRichInvoices.load(db)]);
+   if(!modal.isConnected)return;
+   const seller=window.GreenRichInvoices.currentProfile(order.company_id);
+   modal.querySelector('#gr-packing-document').innerHTML=window.GreenRichDocuments.packingHtml(order,seller);
+   modal.querySelector('[data-pack-download]').onclick=async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try{
+     await window.GreenRichInvoices.savePaper(modal.querySelector('#gr-packing-paper'),
+      'Packing-Slip-'+order.order_id);
+     actionMessage('Packing Slip PDF downloaded');
+    }catch(error){actionMessage('Packing Slip PDF failed: '+error.message)}
+    finally{button.disabled=false}
+   };
+  }catch(error){modal.querySelector('#gr-packing-document').textContent='Packing slip unavailable: '+error.message;actionMessage(error.message)}
+ }
+ function updateServiceFields(){
+  const form=q('#gr-dispatch-editor-form'),panel=q('#gr-dispatch-service-panel'),extra=q('#gr-dispatch-service-extra');
+  if(!form||!panel||!extra)return;
+  const delivery=form.elements.namedItem('status')?.value==='Delivered';
+  const required=delivery&&form.elements.namedItem('service_followup')?.value==='yes';
+  panel.hidden=!delivery;
+  extra.hidden=!required;
+  for(const name of ['service_assignee','service_due']){
+   const input=form.elements.namedItem(name);if(input)input.required=required;
+  }
+ }
+ async function loadServicePeople(company){
+  const select=q('#gr-dispatch-service-person');if(!select)return;
+  select.innerHTML='<option value="">Loading available employees…</option>';
+  const response=await db.rpc('gr_field_followup_directory',{p_company:company});
+  if(response.error){select.innerHTML='<option value="">Unable to load employees</option>';throw Error(response.error.message)}
+  const persons=(response.data||[]).filter(p=>p.id&&p.full_name).sort((a,b)=>a.full_name.localeCompare(b.full_name));
+  select.innerHTML='<option value="">Select service employee</option>'+persons.map(p=>
+   '<option value="'+esc(p.id)+'">'+esc(p.full_name)+'</option>').join('');
+  if(!persons.length)actionMessage('No active employee found for this company. Check Admin user access.');
+ }
+ async function openDispatch(id,readonly=false){
   const order=dispatchRows.find(item=>item.id===id);
   if(!order)return actionMessage('Dispatch record not found; refresh first');
   selectedDispatch=id;
-  q('#gr-dispatch-editor-title').textContent=(readonly?'Dispatch details · ':'Update dispatch · ')+order.order_id;
+  const linked=serviceFor(order),locked=readonly||order.status==='Delivered';
+  q('#gr-dispatch-editor-title').textContent=(locked?'Dispatch details · ':'Update dispatch · ')+order.order_id;
   q('#gr-dispatch-editor-info').innerHTML='<p><strong>'+esc(order.customer_name||'Customer')+'</strong> · '+esc(order.product_name)+' · '+num(order.quantity)+' units</p><p>'+esc(adapter.companyLabel(order.company_id))+' · '+money(order.order_total)+' · '+esc(order.shipping_address||'Shipping address not recorded')+'</p>'+
-   '<p>Approved: '+esc(new Date(order.approved_at).toLocaleString('en-IN'))+'</p>';
+   '<p>Approved: '+esc(new Date(order.approved_at).toLocaleString('en-IN'))+'</p>'+
+   (linked?'<p><b>Service decision:</b> '+(linked.needs_service?'Service follow-up assigned':'No service follow-up needed')+
+     (linked.due_at?' · '+esc(new Date(linked.due_at).toLocaleString('en-IN')):'')+'</p>':'');
+  const form=q('#gr-dispatch-editor-form');
   for(const field of ['status','courier_name','tracking_number','tracking_url','dispatch_note']){
-   const element=q('#gr-dispatch-editor-form').elements.namedItem(field);if(element)element.value=order[field]|| (field==='status'?'Pending':'');
-   if(element)element.disabled=readonly;
+   const element=form.elements.namedItem(field);
+   if(element){element.value=order[field]|| (field==='status'?'Pending':'');element.disabled=locked}
   }
-  q('#gr-dispatch-editor-form').querySelector('button[type="submit"]').hidden=readonly;
+  form.elements.namedItem('service_followup').value=linked?.needs_service?'yes':'no';
+  form.elements.namedItem('service_followup').disabled=locked;
+  form.elements.namedItem('service_due').value='';
+  form.elements.namedItem('service_notes').value='';
+  const person=form.elements.namedItem('service_assignee');
+  person.innerHTML='<option value="">Select service employee</option>';
+  person.disabled=locked;
+  const button=form.querySelector('button[type="submit"]');button.hidden=locked;
+  updateServiceFields();
   q('#gr-dispatch-editor').showModal();
+  if(!locked){
+   try{await loadServicePeople(order.company_id)}catch(error){actionMessage('Service employee list: '+error.message)}
+   updateServiceFields();
+  }
  }
  async function saveDispatch(event){
   event.preventDefault();if(!canDispatch)return actionMessage('Your role cannot update Dispatch');
   const current=dispatchRows.find(r=>r.id===selectedDispatch);
-  if(!current)return actionMessage('Dispatch row missing');
+  if(!current)return actionMessage('Dispatch order missing');
+  if(current.status==='Delivered')return actionMessage('Delivered orders are locked. Open Details to review.');
   const form=event.currentTarget,values=Object.fromEntries(new FormData(form).entries());
   for(const key of Object.keys(values))values[key]=text(values[key]);
   if(!['Pending','Packed','Shipped','Delivered'].includes(values.status))return actionMessage('Invalid stage');
   const sequence=['Pending','Packed','Shipped','Delivered'];
   if(sequence.indexOf(values.status)<sequence.indexOf(current.status))return actionMessage('Cannot move a dispatched order backward');
-  if(values.status==='Delivered'&&!['Shipped','Delivered'].includes(current.status))return actionMessage('Mark the order Shipped before Delivered');
-  if(['Shipped','Delivered'].includes(values.status)&&(!values.courier_name||!values.tracking_number))return actionMessage('Courier name and tracking number are required to ship');
-  if(values.tracking_url&&!safeUrl(values.tracking_url))return actionMessage('Use a valid http/https courier tracking URL');
-  const payload={status:values.status,courier_name:values.courier_name||null,tracking_number:values.tracking_number||null,
-   tracking_url:values.tracking_url||null,dispatch_note:values.dispatch_note||null,updated_at:new Date().toISOString()};
-  if(values.status==='Shipped'&&!current.dispatched_at)payload.dispatched_at=new Date().toISOString();
-  if(values.status==='Delivered'&&!current.delivered_at)payload.delivered_at=new Date().toISOString();
+  if(values.status==='Delivered'&&current.status!=='Shipped')return actionMessage('Mark the order Shipped before Delivered');
+  if(['Shipped','Delivered'].includes(values.status)&&(!values.courier_name||!values.tracking_number))
+   return actionMessage('Courier and tracking number are required to ship');
+  if(values.tracking_url&&!safeUrl(values.tracking_url))return actionMessage('Use a valid http/https tracking URL');
+  const serviceRequired=values.status==='Delivered'&&values.service_followup==='yes';
+  if(serviceRequired&&(!values.service_assignee||!values.service_due))return actionMessage('Choose a service person and follow-up date');
   const button=form.querySelector('button[type="submit"]');button.disabled=true;
   try{
+   if(values.status==='Delivered'){
+    const date=serviceRequired?new Date(values.service_due):null;
+    if(serviceRequired&&(!Number.isFinite(date.getTime())||date.getTime()<Date.now()-60000))
+     throw Error('Choose a valid future date for service follow-up');
+    const done=await db.rpc('gr_dispatch_deliver_with_service',{
+     p_dispatch:selectedDispatch,p_courier:values.courier_name,p_tracking:values.tracking_number,
+     p_url:values.tracking_url||null,p_note:values.dispatch_note||null,p_service:serviceRequired,
+     p_assignee:serviceRequired?values.service_assignee:null,
+     p_due:serviceRequired?date.toISOString():null,p_service_note:serviceRequired?values.service_notes||'':''
+    });
+    if(done.error)throw Error(done.error.message);
+    q('#gr-dispatch-editor').close();await delayedRefresh();
+    actionMessage(serviceRequired?'Delivered. Service visit created and assigned to employee.':'Delivered. No service follow-up required.');
+    if(serviceRequired)window.GreenRichShell?.openPage?.('service');
+    return;
+   }
+   const payload={status:values.status,courier_name:values.courier_name||null,tracking_number:values.tracking_number||null,
+    tracking_url:values.tracking_url||null,dispatch_note:values.dispatch_note||null,updated_at:new Date().toISOString()};
+   if(values.status==='Shipped'&&!current.dispatched_at)payload.dispatched_at=new Date().toISOString();
    const response=await db.from('gr_dispatch_orders').update(payload).eq('id',selectedDispatch).eq('status',current.status).select('*').single();
    if(response.error)throw Error(response.error.message);
    q('#gr-dispatch-editor').close();await delayedRefresh();actionMessage('Dispatch updated: '+values.status);
@@ -311,6 +397,8 @@
   q('#gr-customer-history-close').onclick=()=>q('#gr-customer-history-dialog').close();
   q('#gr-dispatch-editor-close').onclick=()=>q('#gr-dispatch-editor').close();
   q('#gr-dispatch-editor-form').onsubmit=saveDispatch;
+  q('#gr-dispatch-stage').onchange=updateServiceFields;
+  q('#gr-dispatch-service-choice').onchange=updateServiceFields;
   root.addEventListener('click',event=>{
    const approve=event.target.closest('[data-approve-order]');
    if(approve&&root.contains(approve)){void approveOrder(approve.dataset.approveOrder,approve.dataset.approveCompany,approve);return}
