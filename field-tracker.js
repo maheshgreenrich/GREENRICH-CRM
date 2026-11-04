@@ -8,9 +8,18 @@
  const stamp=d=>d?new Date(d).toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata'}):'—';
  const coord=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?'<a href="https://www.google.com/maps?q='+encodeURIComponent(a+','+b)+'" target="_blank" rel="noopener noreferrer" class="ft-link">View GPS location</a>':'—';
  const todayLocal=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
+ const indiaDay=(date=new Date())=>{
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+  const get=type=>parts.find(x=>x.type===type)?.value||'';
+  return get('year')+'-'+get('month')+'-'+get('day');
+ };
+ const staffColors=['#2563eb','#e11d48','#059669','#9333ea','#d97706','#0891b2','#be185d','#4f46e5','#0f766e','#ca8a04','#a21caf','#dc2626'];
+ const staffColor=id=>{let n=0;for(const c of String(id||''))n=(n*31+c.charCodeAt(0))>>>0;return staffColors[n%staffColors.length]};
+ const timeOnly=d=>new Date(d).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
+
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  let db,user,profile,company='',tab='visits',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
- let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null;
+ let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null,monitorDate=indiaDay(),monitorPerson='all';
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
  let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
  const isNetworkError=err=>/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(String(err?.message||err||''));
@@ -113,7 +122,7 @@
  function startTracking(){
   stopTracking();if(!openSession||document.visibilityState==='hidden')return;
   try{hasGPS();watch=navigator.geolocation.watchPosition(async p=>{
-   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<55000)return;
+   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<29*60*1000)return;
    lastGpsSent=Date.now();const c=p.coords;
    try{await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy})}
    catch(err){notify('GPS history paused: '+err.message,true);stopTracking();}
@@ -150,8 +159,17 @@
   $('#ft-refresh').onclick=()=>run(reload);
   $('#ft-nav').addEventListener('click',ev=>{const item=ev.target.closest('[data-tab]');if(!item)return;const target=item.dataset.tab;
    if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin)||(target==='shift'&&!myFieldCompanies.includes(company)))return;
-   tab=target;render();if(tab==='monitor')void run(()=>drawMap());});
+   tab=target;if(tab==='monitor')void run(reload);else render();});
   $('#ft-content').addEventListener('click',onClick);
+  $('#ft-content').addEventListener('change',ev=>{
+   if(ev.target.id==='ft-monitor-date'){
+    const day=ev.target.value;
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)||day>indiaDay())return notify('Choose today or an earlier date.',true);
+    monitorDate=day;void run(reload);
+   }else if(ev.target.id==='ft-monitor-person'){
+    monitorPerson=ev.target.value;render();void run(drawMap);
+   }
+  });
   await reload();monitorTimer=setInterval(()=>{if(document.visibilityState==='visible'&&tab==='monitor'&&!refreshing)void run(reload)},30000);
  }
  async function reload(){
@@ -165,7 +183,7 @@
     q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1)),
     q('gr_field_sessions','*',x=>x.eq('company_id',company).order('checkin_at',{ascending:false}).limit(300)),
     q('gr_field_photos','id,company_id,visit_id,uploaded_by,object_path,notes,lat,lng,accuracy_m,captured_at',x=>x.eq('company_id',company).order('captured_at',{ascending:false}).limit(250)),
-    isSupervisor?q('gr_field_points','id,session_id,user_id,lat,lng,accuracy_m,recorded_at',x=>x.eq('company_id',company).order('recorded_at',{ascending:false}).limit(600)):Promise.resolve([]),
+    isSupervisor&&tab==='monitor'?rpc('gr_field_monitor_day',{p_company:company,p_day:monitorDate}):Promise.resolve([]),
     q('gr_crm_customers','id,name,mobile,address1,address2,city',x=>x.order('name').limit(200)),
     q('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,lead_heat,assigned_to',x=>x.eq('company_id',company).order('updated_at',{ascending:false}).limit(250)),
     isAdmin?q('gr_field_supervisors','company_id,user_id',x=>x.eq('company_id',company)):Promise.resolve([]),
@@ -292,41 +310,90 @@
      '</tbody></table></div>':'<div class="ft-empty">No visit history available.</div>')+
   (isSupervisor?box('Recent Field Shift Logs',shiftTable(sessions.slice(0,70))):box('My Field Shift Logs',shiftTable(sessions.filter(x=>x.user_id===user.id).slice(0,50)))));
  }
+ function monitoredPoints(){
+  return (points||[]).filter(p=>(monitorPerson==='all'||p.user_id===monitorPerson)&&
+   Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Number.isFinite(Date.parse(p.recorded_at)))
+   .slice().sort((a,b)=>new Date(a.recorded_at)-new Date(b.recorded_at));
+ }
+ function monitoredGroups(){
+  const groups=new Map();
+  for(const p of monitoredPoints()){
+   if(!groups.has(p.user_id))groups.set(p.user_id,[]);
+   groups.get(p.user_id).push(p);
+  }
+  return [...groups.entries()].map(([userId,list])=>({userId,list,color:staffColor(userId),last:list[list.length-1]}))
+   .sort((a,b)=>ownerName(a.userId).localeCompare(ownerName(b.userId)));
+ }
+ function monitorFresh(stamp){
+  return monitorDate===indiaDay()&&Date.now()-new Date(stamp).getTime()<40*60*1000&&
+   Date.now()-new Date(stamp).getTime()>-60000;
+ }
  function drawMonitor(){
-  const active=sessions.filter(x=>!x.checkout_at);
-  const latest=active.map(s=>{const p=points.find(x=>x.session_id===s.id);return {session:s,p:p||{lat:s.checkin_lat,lng:s.checkin_lng,recorded_at:s.checkin_at,accuracy_m:s.checkin_accuracy_m}}});
-  const live=latest.filter(x=>Date.now()-new Date(x.p.recorded_at).getTime()<120000).length;
-  return '<div class="ft-cards"><div class="ft-card"><small>Active shifts</small><strong>'+active.length+'</strong></div>'+
-   '<div class="ft-card"><small>Recent GPS updates (2 min)</small><strong>'+live+'</strong></div>'+
-   '<div class="ft-card"><small>Company visits</small><strong>'+filterCompany().length+'</strong></div></div>'+
-   box('Field Staff & Customer Site Map','<p>Employee markers show last reported GPS; site circles show recorded visit locations. Stale markers are not live positions. Map refreshes about every 30 seconds while visible.</p>'+
-    '<div id="ft-map" class="ft-map" role="img" aria-label="Latest GPS coordinates of checked-in employees"></div>')+
-   box('Active Employee Positions',latest.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Shift started</th><th>Last GPS update</th><th>Accuracy</th><th>Position</th><th>History</th></tr></thead><tbody>'+
-   latest.map(x=>'<tr><td><b>'+e(ownerName(x.session.user_id))+'</b></td><td>'+fmt(x.session.checkin_at)+'</td><td>'+
-    fmt(x.p.recorded_at)+' <span class="ft-pill '+(Date.now()-new Date(x.p.recorded_at).getTime()<120000?'online':'offline')+'">'+
-    (Date.now()-new Date(x.p.recorded_at).getTime()<120000?'Recent':'Stale')+'</span></td><td>±'+Math.round(x.p.accuracy_m)+' m</td><td>'+coord(x.p.lat,x.p.lng)+'</td><td>'+btn('Show route','route',x.session.id,'ft-btn-sm ft-btn-ghost')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ft-empty">No employee has an active field shift.</div>');
+  const groups=monitoredGroups(),total=groups.reduce((n,g)=>n+g.list.length,0);
+  const fresh=groups.filter(g=>monitorFresh(g.last.recorded_at)).length;
+  const staffed=[...new Set((points||[]).map(p=>p.user_id))].sort((a,b)=>ownerName(a).localeCompare(ownerName(b)));
+  const names=staffed.includes(monitorPerson)?staffed:monitorPerson==='all'?staffed:[monitorPerson,...staffed];
+  const filter='<div class="ft-monitor-filters">'+
+   '<label>Attendance date (IST)<input type="date" id="ft-monitor-date" max="'+indiaDay()+'" value="'+e(monitorDate)+'"></label>'+
+   '<label>Employee<select id="ft-monitor-person"><option value="all">All field employees</option>'+
+   names.map(id=>'<option value="'+e(id)+'" '+(monitorPerson===id?'selected':'')+'>'+e(ownerName(id))+'</option>').join('')+
+   '</select></label>'+btn('Show Today','monitorToday','','ft-btn-soft')+'</div>';
+  const legend=groups.length?'<div class="ft-map-legend">'+groups.map(g=>'<span class="ft-legend-item"><i style="background:'+g.color+'"></i><b>'+e(ownerName(g.userId))+
+   '</b> · '+g.list.length+' samples</span>').join('')+'</div>':'';
+  const latestTable=groups.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Last recorded (IST)</th><th>GPS status</th><th>Accuracy</th><th>Location</th><th>Points</th></tr></thead><tbody>'+
+   groups.map(g=>'<tr><td><span class="ft-table-dot" style="background:'+g.color+'"></span><b>'+e(ownerName(g.userId))+'</b></td>'+
+   '<td>'+fmt(g.last.recorded_at)+'</td><td><span class="ft-pill '+(monitorFresh(g.last.recorded_at)?'online':'offline')+'">'+
+   (monitorFresh(g.last.recorded_at)?'Recent (within 40 min)':'Last known · not live')+'</span></td><td>±'+Math.round(g.last.accuracy_m)+' m</td>'+
+   '<td>'+coord(g.last.lat,g.last.lng)+'</td><td>'+g.list.length+'</td></tr>').join('')+
+   '</tbody></table></div>':'<div class="ft-empty">No GPS samples for the selected date and employee. Check Admin GPS assignment, staff attendance and browser Location permission.</div>';
+  const log=monitoredPoints().sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at));
+  const logTable=log.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Date & time (IST)</th><th>Accuracy</th><th>Map location</th></tr></thead><tbody>'+
+   log.map(p=>'<tr><td><span class="ft-table-dot" style="background:'+staffColor(p.user_id)+'"></span>'+e(ownerName(p.user_id))+'</td>'+
+   '<td>'+fmt(p.recorded_at)+'</td><td>±'+Math.round(p.accuracy_m)+' m</td><td>'+coord(p.lat,p.lng)+'</td></tr>').join('')+
+   '</tbody></table></div>':'<p class="ft-note">No half-hour GPS history for the selected day.</p>';
+  return filter+'<div class="ft-cards"><div class="ft-card"><small>Employees with recorded GPS</small><strong>'+groups.length+'</strong></div>'+
+   '<div class="ft-card"><small>Recent positions (within 40 min)</small><strong>'+fresh+'</strong></div>'+
+   '<div class="ft-card"><small>30-minute map samples</small><strong>'+total+'</strong></div></div>'+
+   box('Field Staff Movement Map',
+    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded 30-minute samples; these are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
+    legend+'<div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
+    '<p class="ft-note">GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
+   box('Employee Latest Recorded Positions',latestTable)+
+   box('Movement History · 30-minute GPS Snapshots',logTable);
  }
  async function drawMap(){
   if(tab!=='monitor'||!isSupervisor||!$('#ft-map'))return;
-  if(!window.L){$('#ft-map').textContent='Map tiles unavailable. GPS locations are listed below with map links.';return}
-  const active=sessions.filter(x=>!x.checkout_at);
+  if(!window.L){$('#ft-map').textContent='Map tiles unavailable. Use the GPS location links in the table.';return}
   if(map){map.remove();map=null}
   map=window.L.map('ft-map').setView([11.0,78.0],6);
   window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
    {attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
   const marks=[];
-  for(const s of active){
-   const p=points.find(x=>x.session_id===s.id)||{lat:s.checkin_lat,lng:s.checkin_lng,recorded_at:s.checkin_at};
-   const m=window.L.marker([p.lat,p.lng]).addTo(map);
-   const el=document.createElement('div');el.textContent=ownerName(s.user_id)+' · Last update '+fmt(p.recorded_at);
-   m.bindPopup(el);marks.push([p.lat,p.lng]);
+  for(const g of monitoredGroups()){
+   const line=g.list.map(p=>[p.lat,p.lng]);
+   if(line.length>1)window.L.polyline(line,{color:g.color,weight:3,opacity:.75,dashArray:'6 6'}).addTo(map);
+   for(const p of g.list){
+    const dot=window.L.circleMarker([p.lat,p.lng],{radius:5,color:g.color,fillColor:g.color,fillOpacity:.9,weight:2}).addTo(map);
+    const desc=document.createElement('div');
+    desc.textContent=ownerName(g.userId)+' · '+fmt(p.recorded_at)+' · Accuracy ±'+Math.round(p.accuracy_m)+' m';
+    dot.bindPopup(desc);marks.push([p.lat,p.lng]);
+   }
+   const p=g.last,initials=ownerName(g.userId).split(/\\s+/).slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
+   const pin=window.L.divIcon({className:'ft-staff-pin-wrap',html:'<div class="ft-staff-pin" style="--pin-color:'+g.color+'">'+e(initials||'●')+'</div>',iconSize:[40,48],iconAnchor:[20,46],popupAnchor:[0,-44]});
+   const marker=window.L.marker([p.lat,p.lng],{icon:pin,zIndexOffset:1000}).addTo(map);
+   const detail=document.createElement('div');
+   detail.textContent=ownerName(g.userId)+' · Last recorded '+fmt(p.recorded_at)+(monitorFresh(p.recorded_at)?' · Recent':' · Not live');
+   marker.bindPopup(detail);
   }
-  for(const v of filterCompany().filter(v=>Number.isFinite(v.arrival_lat)&&Number.isFinite(v.arrival_lng)).slice(0,75)){
-    const site=window.L.circleMarker([v.arrival_lat,v.arrival_lng],{radius:6,weight:2,fillOpacity:.45}).addTo(map);
+  for(const v of filterCompany().filter(v=>(monitorPerson==='all'||v.assigned_to===monitorPerson)&&
+   v.arrival_at&&indiaDay(new Date(v.arrival_at))===monitorDate&&
+   Number.isFinite(v.arrival_lat)&&Number.isFinite(v.arrival_lng)).slice(0,100)){
+    const site=window.L.circleMarker([v.arrival_lat,v.arrival_lng],{radius:7,color:'#475569',weight:2,fillColor:'#fff',fillOpacity:.65}).addTo(map);
     const label=document.createElement('div');label.textContent='Customer site: '+(v.contact_name||v.title)+' · '+v.visit_type+' · '+fmt(v.arrival_at);
     site.bindPopup(label);marks.push([v.arrival_lat,v.arrival_lng]);
-   }
-   if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.3),{maxZoom:14});
+  }
+  if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.25),{maxZoom:15});
+  else $('#ft-map').insertAdjacentHTML('afterend','<p class="ft-note">No map pins recorded for the selected date and employee.</p>');
   setTimeout(()=>map?.invalidateSize(),100);
  }
  function drawTeam(){
@@ -353,6 +420,7 @@
   if(ev.target.closest('#ft-new-form button[type=submit]'))return;
  }
  async function actionHandler(action,id){
+  if(action==='monitorToday'){monitorDate=indiaDay();monitorPerson='all';await reload();return}
   if(action==='followdone'){await rpc('gr_field_complete_followup',{p_id:id});notify('Follow-up marked done.');await reload();return}
    if(action==='testgps'){await testGPS();return}
   if(action==='testbackend'){await testBackend();return}
