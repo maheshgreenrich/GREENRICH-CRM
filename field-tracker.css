@@ -34,3 +34,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .ft-embedded .ft-shell{min-height:0}
 @media(max-width:600px){.ft-grid{grid-template-columns:minmax(0,1fr)}.ft-headside{flex-wrap:wrap}.ft-panel{padding:16px}.ft-heading h1{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.ft-btn{transition:none}}
+
+/* Direct service-visit completion: keep the primary action and errors visible. */
+.ft-modal-error{margin:10px 0 16px;padding:12px 14px;border:1px solid #edb7b0;border-radius:10px;background:#fff1ef;color:#992c27;font-size:13px;line-height:1.45}
+.ft-modal-error[hidden]{display:none!important}
+.ft-closure-guide{padding:10px 12px;border:1px solid #d8e3f5;border-radius:9px;background:#f4f8ff;color:#30527c;font-size:12px;line-height:1.5}
+.ft-visit .ft-actions [data-action="complete"]{font-weight:700;white-space:normal;min-width:175px}
+.ft-modal .ft-form [type="submit"]{width:100%;min-height:46px;font-weight:700}
+@media(max-width:680px){.ft-visit .ft-actions{width:100%;justify-content:stretch}.ft-visit .ft-actions .ft-btn{flex:1 1 170px}.ft-modal-inner{padding:16px}}
