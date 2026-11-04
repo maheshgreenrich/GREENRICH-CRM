@@ -375,6 +375,7 @@ async function settings(c){
    openFieldAccess:host=>window.GreenRichFieldSettings.mountAccess(host,{db,companies:window.GreenRichCompanies.allowed(),notify:toast}),
    openFieldSettings:host=>window.GreenRichFieldSettings.mountRules(host,{db,companies:window.GreenRichCompanies.allowed(),notify:toast}),
   openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
+  openDocumentDesigner:host=>window.GreenRichDocuments.settings(host,{db,companies:window.GreenRichCompanies.allowed(),notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
    openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
@@ -402,6 +403,7 @@ async function operations(c){
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. Sales & CRM features are available in this same workspace. Connected CRM records are shared across authorized browsers and devices.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
 $('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{window.GreenRichDashboardV2?.stop?.();localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{window.GreenRichFieldGPS?.stop();window.GreenRichDashboardV2?.stop?.();window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
 window.GreenRichShell={
+ openPage:target=>{if(!canOpenPage(target))return;page=target;navigation();void render()},
  setPageWithoutRemount:target=>{
   if(!crmMap[target]||!canOpenPage(target))return;
   page=target;navigation();$('#title').textContent=labels[target];
