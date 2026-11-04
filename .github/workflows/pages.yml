@@ -188,6 +188,8 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-document-designer.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-designer.js &&
                grep -q "Packing Slip PDF" /tmp/gr-live-dispatch.js &&
                grep -q "gr_dispatch_deliver_with_service" /tmp/gr-live-dispatch.js &&
+               grep -q "gr_dispatch_save_packing" /tmp/gr-live-dispatch.js &&
+               grep -q "carton_count" /tmp/gr-live-designer.js &&
                grep -q "Document Designer" /tmp/gr-live-designer.js &&
                grep -q "Field Location Access" /tmp/gr-live-settings.js &&
                grep -q "Live Staff & GPS" /tmp/gr-live-map.html; then
