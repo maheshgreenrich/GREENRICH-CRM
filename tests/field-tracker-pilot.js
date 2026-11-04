@@ -9,7 +9,7 @@ const secure=fs.readFileSync('secure.html','utf8');
 new vm.Script(js,{filename:'field-tracker.js'});
 assert.ok(html.includes('field-tracker.js')&&html.includes('field-tracker.css'),'Standalone page loads its resources');
 assert.ok(fs.readFileSync('greenrich-one.js','utf8').includes("service:'Service and Installation'"),'Field Tracker belongs to Service and Installation');
-assert.ok(html.includes('Separate trial workspace')&&html.includes('does not change ERP attendance'));
+assert.ok(html.includes('Service & Installation')&&html.includes('My Visits'),'Field visit page should prioritize service actions');
 assert.ok(html.includes('ft-monitor-link')&&html.includes('ft-team-link'));
 for(const x of ['gr_field_clock_in','gr_field_clock_out','gr_field_record_point','gr_field_create_visit',
  'gr_field_arrive','gr_field_add_photo','gr_field_finish_visit','gr_field_assign_supervisor'])
@@ -39,4 +39,4 @@ assert.ok(dir.includes('gr_field_directory')&&dir.includes('gr_field_supervisor'
 assert.ok(!js.includes('grm_attendance')&&!js.includes(".from('gr_attendance')"),'Pilot must not change official attendance');
 assert.ok(!js.includes('navigator.serviceWorker'),'No hidden background tracking');
 assert.ok(css.includes('@media(max-width:900px)'),'Phone layout required');
-console.log('PASS: Isolated field pilot JS syntax, GPS consent, roles, visits, photo RLS, recurring service, lead heat and attendance separation.');
+console.log('PASS: Field visits UI, GPS consent, roles, visit closure, photo RLS, recurring service, and lead heat.');
