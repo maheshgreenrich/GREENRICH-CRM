@@ -56,7 +56,9 @@ vm.runInNewContext(
  await assert.rejects(context.helpers.locateForField('check-in'),/4.8 km/);
  assert.equal(fix,2,'Only one retry for coarse GPS');
  assert.match(context.helpers.getGPS().message,/Nothing has been saved/);
- assert.ok(source.includes("locateForField('check-out')")&&source.includes("locateForField('visit completion')"),
- 'Photo and shift recording must use the same accuracy validation');
+ assert.ok(source.includes("locateForField('check-out')")&&
+  (source.includes("locateForField('visit completion')")||
+   source.includes("locateForField(arrived?'visit completion':'visit arrival')")),
+ 'Photo and shift recording must use the same GPS accuracy validation');
  console.log('PASS: browser permission, GPS accuracy retry, coarse location rejection, no check-in or database writes.');
 })().catch(err=>{console.error(err);process.exitCode=1;});
