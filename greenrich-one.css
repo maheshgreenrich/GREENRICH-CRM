@@ -231,3 +231,16 @@ aside .logo{
 .gr-due-shortcuts button{width:auto!important;border:1px solid #e4c98d;background:#fff9e9;color:#885a11;padding:8px 11px;font-size:12px;font-weight:700;border-radius:8px}
 .gr-due-shortcuts button:hover{background:#ffedbf}
 @media(max-width:560px){#toast{bottom:12px!important;right:12px!important;left:12px!important;max-width:none!important}.gr-due-content{padding:15px}}
+
+/* Prominent Field Location Access entry, independent of the older Settings tab order. */
+#gr-company-admin .gr-gps-settings-hero{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+#gr-company-admin .gr-gps-settings-hero>div{flex:1 1 290px}
+#gr-company-admin .gr-gps-settings-hero h2{font-weight:750}
+#gr-company-admin .gr-gps-settings-hero p{max-width:790px}
+#gr-company-admin .gr-gps-direct-link{display:inline-flex;align-items:center;justify-content:center;min-height:43px;padding:9px 14px;background:#2254b7;color:white;border-radius:9px;text-decoration:none;font-weight:700;font-size:13px}
+#gr-company-admin .gr-gps-direct-link:hover{background:#173f92;color:#fff}
+#gr-company-admin [data-settings-tab="fieldaccess"]{border:2px solid #1f59bd;background:#eff5ff;color:#12448d;font-weight:800}
+#gr-company-admin [data-settings-tab="fieldaccess"].gr-current-settings-tab{background:#1f59bd;color:white}
+#gr-company-admin .gr-settings-tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#gr-company-admin .gr-settings-version{margin:12px 0 0;font-size:11px;color:#5c7598}
+@media(max-width:650px){#gr-company-admin .gr-gps-direct-link{width:100%;text-align:center}#gr-company-admin .gr-settings-tabs button{flex:1 1 140px;max-width:none}}
