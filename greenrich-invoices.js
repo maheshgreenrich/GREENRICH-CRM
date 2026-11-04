@@ -254,7 +254,7 @@
    if(shipCharge>0&&shippingTax>0)rows+=taxRateRow(freightHSN,shipCharge,freightRate,shippingTax);
   }
   const isDraft=status!=='Issued';
-  return '<article class="gr-invoice-paper" id="gr-invoice-paper">'+
+  const originalHtml='<article class="gr-invoice-paper" id="gr-invoice-paper">'+
    '<header class="gr-invoice-heading">INVOICE'+(isDraft?'<span class="gr-invoice-draft">DRAFT · NOT ISSUED</span>':'')+'</header>'+
    '<div class="gr-invoice-top"><div class="gr-invoice-left"><section class="gr-invoice-party gr-invoice-seller"><strong>'+e(seller.legal_name||companyTitle(model.companyId))+'</strong><div>'+e([seller.address,seller.city_state_pincode].filter(Boolean).join('\n')).replace(/\n/g,'<br>')+'</div><div>Phone: '+e(seller.phone||'—')+'</div><div>GSTIN/UIN: '+e(seller.gstin||'Not configured')+'</div><div>State: '+e(seller.state_name||'—')+(seller.state_code?', Code: '+e(seller.state_code):'')+'</div><div>Email: '+e(seller.email||'—')+'</div></section>'+
    valueBlock('Consignee (Ship to)',ship.name,ship,shipAddress,model.buyerState)+
@@ -279,6 +279,7 @@
    '<p>Company PAN: '+e(seller.pan||'—')+'</p><strong>Declaration</strong><p>'+e(seller.default_declaration||'—')+'</p></div>'+
    '<div class="gr-invoice-sign"><strong>for '+e(seller.legal_name||companyTitle(model.companyId))+'</strong><span>'+e(seller.signatory||'Authorised Signatory')+'</span></div></div>'+
    '<p class="gr-invoice-computer">This is a Computer Generated Invoice</p></article>';
+  return window.GreenRichDocuments?.invoiceHtml?window.GreenRichDocuments.invoiceHtml(originalHtml,model.companyId,status,model):originalHtml;
  }
  const numFixed=n=>new Intl.NumberFormat('en-IN',{minimumFractionDigits:3,maximumFractionDigits:3}).format(numeric(n));
  async function loadLibrary(url,check){
@@ -321,8 +322,10 @@
   if(!companyIds.includes(companyId))throw Error('Unknown company');
   const dialog=root.querySelector('#gr-invoice-dialog');if(!dialog)throw Error('Invoice dialog is not available.');
   if(!profiles[companyId])await load(client);
+  if(window.GreenRichDocuments?.load)await window.GreenRichDocuments.load(client,[companyId]);
   const seller=currentProfile(companyId),status=sale.invoice_status||'Draft';
   const current= status==='Issued'&&sale.invoice_snapshot ?sale.invoice_snapshot:modelFor({companyId,sale,product,customer});
+  if(status!=='Issued'&&window.GreenRichDocuments?.current)current.document_config=window.GreenRichDocuments.current(companyId,'invoice');
   const missingFields=missing(current);
   const banner=missingFields.length?'<div class="gr-invoice-warning">Before issuing, complete: '+e(missingFields.join(', '))+'.</div>':'<div class="gr-invoice-ready">Company and tax information is ready for review.</div>';
   dialog.innerHTML='<div class="gr-invoice-tools"><div><h2>Invoice · '+e(sale.invoice_number||'Draft')+'</h2><p>'+e(companyTitle(companyId))+' · '+e(status==='Issued'?'Issued':'Automatic draft, not issued')+'</p></div><div class="gr-invoice-tool-actions"><button class="btn soft" type="button" id="gr-invoice-close">Close</button><button class="btn soft" type="button" id="gr-invoice-pdf">↓ Download PDF</button><button class="btn soft" type="button" id="gr-invoice-share">Share PDF</button><button class="btn primary" type="button" id="gr-invoice-issue" '+(status==='Issued'||missingFields.length||!canIssue?'disabled':'')+'>'+(status==='Issued'?'Already issued':'Issue Invoice')+'</button></div></div>'+banner+'<div class="gr-invoice-paper-scroll">'+renderDocument(current,status)+'</div>'+
@@ -351,5 +354,5 @@
   };
   dialog.showModal();
  }
- window.GreenRichInvoices={load,currentProfile,settings,applyProductCodes,modelFor,missing,renderDocument,nextInvoiceId,words,open};
+ window.GreenRichInvoices={load,currentProfile,settings,applyProductCodes,modelFor,missing,renderDocument,nextInvoiceId,words,open,savePaper:savePdf};
 })();
