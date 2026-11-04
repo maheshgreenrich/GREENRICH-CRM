@@ -408,7 +408,7 @@
    '<form class="ft-form">'+
    '<label class="wide">Visit report / service notes *<textarea name="notes" minlength="'+Number(policy.min_notes)+'" maxlength="4000" required placeholder="Work completed, equipment condition, customer response, result and next action"></textarea></label>'+
    '<label class="wide">Attach site photo '+(photoNeeded?'*':'(optional)')+
-   '<input type="file" name="photo" '+(photoNeeded?'required ':'')+'accept="image/jpeg,image/png,image/webp" capture="environment">'+
+   '<input type="file" name="photo" '+(photoNeeded?'required ':'')+'accept="image/jpeg,image/png,image/webp">'+
    '<small>Camera or gallery · JPG, PNG, WebP · max 5 MB. Photos are saved privately with GPS.</small></label>'+
    (linkedLead?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
    (sales?'<label>Sales result * <select name="outcome" required><option value="">Choose result</option><option value="converted">Converted to order</option><option value="follow_up">Follow-up needed</option><option value="pending">Decision pending</option><option value="not_interested">Not interested</option></select></label>':'')+
