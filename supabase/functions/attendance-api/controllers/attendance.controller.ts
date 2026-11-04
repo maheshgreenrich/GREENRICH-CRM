@@ -56,8 +56,8 @@ export async function handle(req:Request,db:Db,actor:Actor):Promise<Response>{
  const url=new URL(req.url),q=url.searchParams;
  const route=url.pathname.split('/attendance-api')[1]||'/';
  const method=req.method.toUpperCase(),pagination=page(q),ip=ipAddress(req);
- if(method==='POST'&&route==='/attendance/check-in')return response(await service.clock(db,actor,'in',ip),201);
- if(method==='POST'&&route==='/attendance/check-out')return response(await service.clock(db,actor,'out',ip));
+ if(method==='POST'&&route==='/attendance/check-in')return response(await service.clock(db,actor,'in',ip,await bodyJSON(req)),201);
+ if(method==='POST'&&route==='/attendance/check-out')return response(await service.clock(db,actor,'out',ip,await bodyJSON(req)));
  if(method==='GET'&&route==='/attendance/me'){const range=dateRange(q);return response(await service.myHistory(db,actor,range.from,range.to,pagination))}
  if(method==='GET'&&route==='/attendance/me/summary')return response(await service.mySummary(db,actor,month(q.get('month')||new Date().toISOString().slice(0,7))));
  if(method==='POST'&&route==='/attendance/corrections'){

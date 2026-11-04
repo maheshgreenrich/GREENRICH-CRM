@@ -1,0 +1,44 @@
+name: Field staff GPS and visit checks
+on:
+  push:
+    branches:
+      - feature/field-staff-attendance-and-visit-rules
+    paths:
+      - 'field-tracker.*'
+      - 'greenrich-field-*.js'
+      - 'greenrich-one.js'
+      - 'greenrich-company-admin.js'
+      - 'greenrich-attendance-inline.js'
+      - 'supabase/migrations/20261104090000_field_staff_attendance_visit_rules.sql'
+      - 'tests/field-*.js'
+      - 'package.json'
+      - '.github/workflows/field-tracking-ci.yml'
+  pull_request:
+    paths:
+      - 'field-tracker.*'
+      - 'greenrich-field-*.js'
+      - 'greenrich-one.js'
+      - 'greenrich-company-admin.js'
+      - 'greenrich-attendance-inline.js'
+      - 'supabase/migrations/20261104090000_field_staff_attendance_visit_rules.sql'
+      - 'tests/field-*.js'
+      - 'package.json'
+      - '.github/workflows/field-tracking-ci.yml'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate field attendance, visit completion and map contracts
+        run: npm run test:field
+      - name: Check changed JavaScript syntax
+        run: |
+          node --check greenrich-field-gps.js
+          node --check greenrich-field-settings.js
+          node --check greenrich-one.js
+          node --check greenrich-company-admin.js
+          node --check greenrich-attendance-inline.js
+          node --check field-tracker.js

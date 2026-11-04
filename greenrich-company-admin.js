@@ -31,8 +31,8 @@
   if(ctx.role!=='Admin')throw Error('Only Admin may manage company settings');
   currentUser=ctx.user.id;
   if(!latest.length)await configure({userId:ctx.user.id,companyIds:access,db:ctx.db});
-  let currentTab=['companies','branding','users','roles','tags','sheets','sources','invoices','channels','reports','dashboard','whatsapp','forms'].includes(ctx.initialTab)?ctx.initialTab:'companies';
-  const tabs=[['companies','Company Profiles'],['branding','Workspace Logo'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['forms','Form Builder'],['sheets','Google Sheet Leads'],['sources','Lead Sources'],['invoices','Invoice Settings'],['dashboard','Dashboard Access'],['whatsapp','WhatsApp Integration'],['channels','Sales Channels'],['reports','Import & Export']];
+  let currentTab=['companies','branding','users','roles','tags','sheets','sources','invoices','channels','reports','dashboard','whatsapp','forms','field'].includes(ctx.initialTab)?ctx.initialTab:'companies';
+  const tabs=[['companies','Company Profiles'],['branding','Workspace Logo'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['forms','Form Builder'],['field','Field Staff & Visits'],['sheets','Google Sheet Leads'],['sources','Lead Sources'],['invoices','Invoice Settings'],['dashboard','Dashboard Access'],['whatsapp','WhatsApp Integration'],['channels','Sales Channels'],['reports','Import & Export']];
   root.innerHTML='<div id="gr-company-admin"><div class="panel"><h2>Settings</h2><p>Manage the two companies, employee-specific company access, customer tags, roles and Admin tools.</p><div class="gr-settings-tabs">'+tabs.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div></div><div id="gr-company-settings-content"></div></div>';
   const host=root.querySelector('#gr-company-settings-content'),notice=ctx.notify;
   async function showCompanyCards(){
@@ -63,6 +63,7 @@
     try{await ctx.openFormBuilder(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
     return;
    }
+   if(tab==='field'){host.innerHTML='<div class="panel">Loading Field Staff settings…</div>';try{await ctx.openFieldSettings(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(tab==='sheets'){host.innerHTML='<div class="panel">Loading Google Sheet leads…</div>';try{await ctx.openSheetIntegrations(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(tab==='sources'){host.innerHTML='<div class="panel">Loading Lead Sources...</div>';try{await ctx.openSources(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(tab==='dashboard'){host.innerHTML='<div class="panel">Loading dashboard access...</div>';try{await ctx.openDashboardAccess(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}

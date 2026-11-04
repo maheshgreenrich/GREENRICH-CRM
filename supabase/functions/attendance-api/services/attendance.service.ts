@@ -7,8 +7,10 @@ export function requireManager(actor:Actor){if(!isManager(actor))bad('Attendance
 export function requireAction(actor:Actor,action:string){if(!hasAction(actor,action))bad('Attendance '+action+' / All access required',403)}
 export function requireAnyAction(actor:Actor,actions:string[]){if(!actions.some(action=>hasAction(actor,action)))bad('Attendance management permission required',403)}
 const monthBounds=(month:string)=>{const from=month+'-01',d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return [from,d.toISOString().slice(0,10)]};
-export async function clock(db:Db,actor:Actor,mode:'in'|'out',ip:string|null){
- return invoke(db,'grm_clock',{p_actor:actor.id,p_mode:mode,p_ip:ip});
+export async function clock(db:Db,actor:Actor,mode:'in'|'out',ip:string|null,location:any={}){
+ return invoke(db,'grm_clock_with_location',{p_actor:actor.id,p_mode:mode,p_ip:ip,
+   p_company:location?.companyId||null,p_lat:location?.latitude??null,
+   p_lng:location?.longitude??null,p_accuracy:location?.accuracy??null});
 }
 export async function myHistory(db:Db,actor:Actor,from:string,to:string,page:Page){
  return pageQuery(db.from('grm_attendance').select('*',{count:'exact'}).eq('user_id',actor.id).is('deleted_at',null).gte('date',from).lte('date',to).order('date',{ascending:false}),page);

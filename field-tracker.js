@@ -9,7 +9,7 @@
  const coord=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?'<a href="https://www.google.com/maps?q='+encodeURIComponent(a+','+b)+'" target="_blank" rel="noopener noreferrer" class="ft-link">View GPS location</a>':'—';
  const todayLocal=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
- let db,user,profile,company='',tab='shift',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],openSession=null;
+ let db,user,profile,company='',tab='visits',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
  let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null;
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
  let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
@@ -127,10 +127,11 @@
  function box(title,body){return '<section class="ft-panel"><h2>'+e(title)+'</h2>'+body+'</section>'}
  const pill=status=>'<span class="ft-pill '+(status==='completed'?'online':status==='on_site'?'online':status==='cancelled'?'warn':'')+'">'+e(status.replaceAll('_',' '))+'</span>';
  function filterCompany(){return visits.filter(x=>x.company_id===company)}
+  const ruleFor=kind=>visitRules[kind]||{photo_required:kind==='sales'||kind==='site',min_notes:10};
  const ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
  function sessionState(){return openSession?'<span class="ft-pill online">● Shift checked in</span>':'<span class="ft-pill offline">● Not checked in</span>'}
  function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Live Team Tracking',team:'Supervisor Access'}[tab]||'Field Tracker'}
- function setupNav(){document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
+ function setupNav(){document.querySelector('#ft-nav [data-tab="shift"]').hidden=!myFieldCompanies.includes(company);document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
  async function bootstrap(){
   if(!window.supabase||!window.GREENRICH_PUBLIC_CONFIG)throw Error('Secure Supabase login library or public configuration is unavailable');
   const cfg=window.GREENRICH_PUBLIC_CONFIG;
@@ -145,10 +146,10 @@
   company=ids.includes('grow-india')?'grow-india':ids[0];$('#ft-user').textContent=profile.full_name;
   $('#ft-company').innerHTML=ids.map(id=>'<option value="'+e(id)+'">'+e(companies[id])+'</option>').join('');
   $('#ft-company').value=company;
-  $('#ft-company').onchange=async ev=>{company=ev.target.value;tab='shift';await run(reload)};
+  $('#ft-company').onchange=async ev=>{company=ev.target.value;tab='visits';await run(reload)};
   $('#ft-refresh').onclick=()=>run(reload);
   $('#ft-nav').addEventListener('click',ev=>{const item=ev.target.closest('[data-tab]');if(!item)return;const target=item.dataset.tab;
-   if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin))return;
+   if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin)||(target==='shift'&&!myFieldCompanies.includes(company)))return;
    tab=target;render();if(tab==='monitor')void run(()=>drawMap());});
   $('#ft-content').addEventListener('click',onClick);
   await reload();monitorTimer=setInterval(()=>{if(document.visibilityState==='visible'&&tab==='monitor'&&!refreshing)void run(reload)},30000);
@@ -158,7 +159,7 @@
   try{
    isSupervisor=await rpc('gr_field_supervisor',{p_company:company});
    isAdmin=await rpc('gr_field_is_admin',{p_company:company});
-   const [dir,allVisits,shift,allSessions,allPhotos,allPoints,allCustomers,allLeads,allSupervisors]=await Promise.all([
+   const [dir,allVisits,shift,allSessions,allPhotos,allPoints,allCustomers,allLeads,allSupervisors,allRules,allFollowupTeam,allFollowups,fieldCompanies]=await Promise.all([
     rpc('gr_field_directory',{p_company:company}),
     q('gr_field_visits','*',x=>x.eq('company_id',company).order('due_at',{ascending:false}).limit(300)),
     q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1)),
@@ -167,9 +168,14 @@
     isSupervisor?q('gr_field_points','id,session_id,user_id,lat,lng,accuracy_m,recorded_at',x=>x.eq('company_id',company).order('recorded_at',{ascending:false}).limit(600)):Promise.resolve([]),
     q('gr_crm_customers','id,name,mobile,address1,address2,city',x=>x.order('name').limit(200)),
     q('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,lead_heat,assigned_to',x=>x.eq('company_id',company).order('updated_at',{ascending:false}).limit(250)),
-    isAdmin?q('gr_field_supervisors','company_id,user_id',x=>x.eq('company_id',company)):Promise.resolve([])
+    isAdmin?q('gr_field_supervisors','company_id,user_id',x=>x.eq('company_id',company)):Promise.resolve([]),
+     rpc('gr_field_visit_rules_for_company',{p_company:company}),
+     rpc('gr_field_followup_directory',{p_company:company}),
+     q('gr_field_visit_followups','id,company_id,visit_id,assigned_to,due_at,notes,status',x=>x.eq('company_id',company).order('due_at',{ascending:true}).limit(200)),
+     rpc('gr_field_my_enabled_companies',{})
    ]);
-   team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;
+   team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;visitRules=allRules||{};followupTeam=allFollowupTeam||[];followups=allFollowups||[];myFieldCompanies=fieldCompanies||[];
+    if(tab==='shift'&&!myFieldCompanies.includes(company))tab='visits';
    // Check across companies so a staff member cannot start a second shift.
    const wasOpen=openSession?.id;const shiftAcross=await q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1));
    openSession=shiftAcross[0]||null;
@@ -218,12 +224,19 @@
  list.map(s=>'<tr><td><b>'+e(ownerName(s.user_id))+'</b></td><td>'+fmt(s.checkin_at)+'</td><td>'+coord(s.checkin_lat,s.checkin_lng)+'</td><td>'+fmt(s.checkout_at)+'</td><td>'+coord(s.checkout_lat,s.checkout_lng)+'</td><td>'+btn('GPS route','route',s.id,'ft-btn-ghost ft-btn-sm')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ft-empty">No field shift records yet.</div>'}
  function drawVisits(){
   const items=filterCompany().filter(v=>v.assigned_to===user.id).sort((a,b)=>(a.status==='completed')-(b.status==='completed')||new Date(a.due_at)-new Date(b.due_at));
-  return box('My Assigned Visits','<p>Schedule a visit, check in to your shift, record arrival GPS, upload at least one photo with notes, then complete the visit.</p>'+
-   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned yet. Use Schedule Visit to create your first visit.</div>'));
+  const assigned=followups.filter(f=>f.assigned_to===user.id&&f.status==='pending').sort((x,y)=>new Date(x.due_at)-new Date(y.due_at));
+  return box('My Assigned Visits','<p>Record arrival GPS, finish with current GPS and notes. Photos follow Admin settings.</p>'+
+   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned yet.</div>'))+
+   (assigned.length?box('My Upcoming Follow-ups',assigned.slice(0,40).map(f=>{
+     const v=visits.find(x=>x.id===f.visit_id);
+     return '<div class="ft-listitem"><b>'+e(v?.title||'Customer follow-up')+'</b><p>Assigned to you · '+fmt(f.due_at)+
+      '<br>'+e(f.notes)+(v?.contact_name?'<br>Customer: '+e(v.contact_name):'')+'</p>'+btn('Mark follow-up done','followdone',f.id,'ft-btn-sm ft-btn-ghost')+'</div>';
+    }).join('')):'');
  }
  function visitCard(v){
   const pp=photos.filter(p=>p.visit_id===v.id);
-  const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
+  const follow=followups.filter(f=>f.visit_id===v.id).map(f=>'<br><b>Next action:</b> '+e(followupTeam.find(t=>t.id===f.assigned_to)?.full_name||'Assigned staff')+' · '+fmt(f.due_at)+' · '+e(f.notes)).join('');
+   const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
   const actions=v.status==='planned'?
    btn('Arrived · GPS check-in','arrive',v.id,'ft-btn'):'';
   const extra=v.status==='on_site'?btn('Upload photo proof','upload',v.id,'ft-btn-soft')+
@@ -234,13 +247,13 @@
    (v.arrival_at?'<br><b>Arrived:</b> '+fmt(v.arrival_at)+' · '+coord(v.arrival_lat,v.arrival_lng):'')+
    (v.completed_at?'<br><b>Completed:</b> '+fmt(v.completed_at)+' · '+coord(v.completed_lat,v.completed_lng):'')+
    '<br><b>Proof:</b> '+pp.length+' photo(s)'+(v.recurrence_every?'<br><b>Repeat:</b> Every '+v.recurrence_every+' '+e(v.recurrence_unit):'')+'</p>'+
-   (v.completion_notes?'<p><b>Report:</b> '+e(v.completion_notes)+'</p>':'')+'</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
+   (v.completion_notes?'<p><b>Report:</b> '+e(v.completion_notes)+(v.sales_outcome?' · <b>Sales result:</b> '+e(v.sales_outcome.replaceAll('_',' ')):'')+follow+'</p>':'')+'</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
  }
  function drawNew(){
   return box('Schedule a service, sales or site visit',
    '<p>Staff can schedule their own visits; supervisors can assign jobs to other staff. Service repeats are automatically scheduled after completion, not sent over WhatsApp.</p>'+
    '<form id="ft-new-form" class="ft-form">'+
-   '<label>Visit type <select name="type" required><option value="service">Service / maintenance</option><option value="sales">Sales conversation</option><option value="site">Site visit</option></select></label>'+
+   '<label>Visit type <select name="type" required><option value="service">Service / maintenance</option><option value="installation">Installation</option><option value="sales">Sales conversation</option><option value="site">Site visit</option></select></label>'+
    '<label>Assigned employee <select name="assignee">'+team.map(x=>'<option value="'+e(x.id)+'" '+(x.id===user.id?'selected':'')+'>'+e(x.full_name)+'</option>').join('')+'</select></label>'+
    '<label>Customer from CRM (optional)<select name="customer"><option value="">Select customer or enter details</option>'+
    customers.map(x=>'<option value="'+e(x.id)+'" data-name="'+e(x.name)+'" data-phone="'+e(x.mobile||'')+'" data-address="'+e([x.address1,x.address2,x.city].filter(Boolean).join(', '))+'">'+e(x.name)+'</option>').join('')+'</select></label>'+
@@ -264,7 +277,7 @@
     v.map(x=>'<tr><td><b>'+e(x.title)+'</b><br>'+e(ownerName(x.assigned_to))+'<br>'+e(x.contact_name||'')+'</td><td>'+pill(x.status)+'<br>'+e(x.visit_type)+'</td>'+
      '<td>'+fmt(x.due_at)+'</td><td>'+fmt(x.arrival_at)+'<br>'+coord(x.arrival_lat,x.arrival_lng)+'</td>'+
      '<td>'+fmt(x.completed_at)+'<br>'+coord(x.completed_lat,x.completed_lng)+'</td>'+
-     '<td>'+e(x.completion_notes||x.notes||'—')+(x.lead_heat?'<br><b>Lead: '+e(x.lead_heat)+'</b>':'')+'</td>'+
+     '<td>'+e(x.completion_notes||x.notes||'—')+(x.lead_heat?'<br><b>Lead: '+e(x.lead_heat)+'</b>':'')+(x.sales_outcome?'<br><b>Sales: '+e(x.sales_outcome.replaceAll('_',' '))+'</b>':'')+followups.filter(f=>f.visit_id===x.id).map(f=>'<br><b>Follow-up:</b> '+e(followupTeam.find(t=>t.id===f.assigned_to)?.full_name||'Assigned staff')+' · '+fmt(f.due_at)+' · '+e(f.notes)).join('')+'</td>'+
      '<td>'+btn('Photos ('+photos.filter(p=>p.visit_id===x.id).length+')','proof',x.id,'ft-btn-sm ft-btn-ghost')+'</td></tr>').join('')+
      '</tbody></table></div>':'<div class="ft-empty">No visit history available.</div>')+
   (isSupervisor?box('Recent Field Shift Logs',shiftTable(sessions.slice(0,70))):box('My Field Shift Logs',shiftTable(sessions.filter(x=>x.user_id===user.id).slice(0,50)))));
@@ -276,7 +289,7 @@
   return '<div class="ft-cards"><div class="ft-card"><small>Active shifts</small><strong>'+active.length+'</strong></div>'+
    '<div class="ft-card"><small>Recent GPS updates (2 min)</small><strong>'+live+'</strong></div>'+
    '<div class="ft-card"><small>Company visits</small><strong>'+filterCompany().length+'</strong></div></div>'+
-   box('Field Staff Location Map','<p>Only staff who explicitly checked in are shown. A stale marker is the last reported position, not guaranteed real-time GPS. The page refreshes approximately every 30 seconds while visible.</p>'+
+   box('Field Staff & Customer Site Map','<p>Employee markers show last reported GPS; site circles show recorded visit locations. Stale markers are not live positions. Map refreshes about every 30 seconds while visible.</p>'+
     '<div id="ft-map" class="ft-map" role="img" aria-label="Latest GPS coordinates of checked-in employees"></div>')+
    box('Active Employee Positions',latest.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Shift started</th><th>Last GPS update</th><th>Accuracy</th><th>Position</th><th>History</th></tr></thead><tbody>'+
    latest.map(x=>'<tr><td><b>'+e(ownerName(x.session.user_id))+'</b></td><td>'+fmt(x.session.checkin_at)+'</td><td>'+
@@ -298,7 +311,12 @@
    const el=document.createElement('div');el.textContent=ownerName(s.user_id)+' · Last update '+fmt(p.recorded_at);
    m.bindPopup(el);marks.push([p.lat,p.lng]);
   }
-  if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.3),{maxZoom:14});
+  for(const v of filterCompany().filter(v=>Number.isFinite(v.arrival_lat)&&Number.isFinite(v.arrival_lng)).slice(0,75)){
+    const site=window.L.circleMarker([v.arrival_lat,v.arrival_lng],{radius:6,weight:2,fillOpacity:.45}).addTo(map);
+    const label=document.createElement('div');label.textContent='Customer site: '+(v.contact_name||v.title)+' · '+v.visit_type+' · '+fmt(v.arrival_at);
+    site.bindPopup(label);marks.push([v.arrival_lat,v.arrival_lng]);
+   }
+   if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.3),{maxZoom:14});
   setTimeout(()=>map?.invalidateSize(),100);
  }
  function drawTeam(){
@@ -325,7 +343,8 @@
   if(ev.target.closest('#ft-new-form button[type=submit]'))return;
  }
  async function actionHandler(action,id){
-  if(action==='testgps'){await testGPS();return}
+  if(action==='followdone'){await rpc('gr_field_complete_followup',{p_id:id});notify('Follow-up marked done.');await reload();return}
+   if(action==='testgps'){await testGPS();return}
   if(action==='testbackend'){await testBackend();return}
   if(action==='checkin'){
    if(openSession)throw Error('Already checked in. Check out before starting a new shift.');
@@ -336,7 +355,7 @@
    const p=await locateForField('check-out');await rpc('gr_field_clock_out',{p_session:openSession.id,...p});stopTracking();
    notify('Field check-out time and GPS saved. Tracking stopped.');await reload();
   }else if(action==='arrive'){
-   const p=await locateForField('visit arrival');await rpc('gr_field_arrive',{p_visit:id,...p});notify('Customer/site arrival time and GPS recorded. Upload photo proof before completing.');await reload();
+   const p=await locateForField('visit arrival');await rpc('gr_field_arrive',{p_visit:id,...p});notify('Customer/site arrival GPS recorded. Check the photo requirement before closing.');await reload();
   }else if(action==='upload')await showUpload(id);
   else if(action==='complete')await showComplete(id);
   else if(action==='proof')await showProof(id);
@@ -366,19 +385,33 @@
  async function showComplete(id){
   const v=visits.find(x=>x.id===id&&x.assigned_to===user.id&&x.status==='on_site');
   if(!v)throw Error('An on-site assigned visit is required.');
-  if(!photos.some(x=>x.visit_id===v.id))throw Error('Upload at least one service/site photo before finishing the visit.');
-  const sales=(v.visit_type==='sales'||v.visit_type==='site')&&!!v.lead_id;
+  const policy=ruleFor(v.visit_type);
+  if(policy.photo_required&&!photos.some(x=>x.visit_id===v.id))throw Error('A GPS-stamped photo is required before completing this visit.');
+  const sales=v.visit_type==='sales'||v.visit_type==='site',linkedLead=sales&&!!v.lead_id;
   modal('Complete Visit · '+v.title,
-   '<p>Completion captures current GPS and server time. Enter the work performed or sales conversation. For a linked sales/site lead, update its Hot/Warm/Cold priority.</p>'+
-   '<form class="ft-form"><label class="wide">Service report / customer conversation *<textarea name="notes" minlength="10" maxlength="4000" required placeholder="Problem, action taken, customer response, follow-up needed"></textarea></label>'+
-   (sales?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
+   '<p>Fresh GPS and work notes are compulsory. Photos: '+(policy.photo_required?'required':'optional')+'. Record visit results and assign follow-up.</p>'+
+   '<form class="ft-form"><label class="wide">Visit notes / customer conversation *<textarea name="notes" minlength="'+Number(policy.min_notes)+'" maxlength="4000" required placeholder="Work completed, customer response and next action"></textarea></label>'+
+   (linkedLead?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
+   (sales?'<label>Sales result * <select name="outcome" required><option value="">Choose result</option><option value="converted">Converted to order</option><option value="follow_up">Follow-up needed</option><option value="pending">Decision pending</option><option value="not_interested">Not interested</option></select></label>':'')+
+   '<label>Follow-up assigned to (optional) <select name="followupTo"><option value="">No follow-up</option>'+followupTeam.map(t=>'<option value="'+e(t.id)+'">'+e(t.full_name)+'</option>').join('')+'</select></label>'+
+   '<label>Follow-up / next service date <input type="datetime-local" name="followupAt"></label>'+
+   '<label class="wide">Follow-up instructions <textarea name="followupNotes" maxlength="2000" placeholder="Work required at the next visit"></textarea></label>'+
    '<button class="ft-btn" type="submit">Save GPS Completion</button></form>',
    async fd=>{
-    const notes=String(fd.get('notes')||'').trim(),heat=sales?String(fd.get('heat')||''):null;
-    if(notes.length<10)throw Error('Add at least 10 characters about this visit');
-    if(sales&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
-    const p=await locateForField('visit completion');const next=await rpc('gr_field_finish_visit',{p_visit:v.id,p_notes:notes,p_heat:heat,...p});
-    notify('Visit completed with location, time, report and evidence.'+(next?' Next recurring service job scheduled automatically.':''));
+    const notes=String(fd.get('notes')||'').trim(),heat=linkedLead?String(fd.get('heat')||''):null,
+     outcome=sales?String(fd.get('outcome')||''):null,
+     followTo=String(fd.get('followupTo')||'')||null,followDate=String(fd.get('followupAt')||''),
+     followNote=String(fd.get('followupNotes')||'').trim();
+    if(notes.length<Number(policy.min_notes))throw Error('Add at least '+policy.min_notes+' characters in visit notes.');
+    if(linkedLead&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
+    if(sales&&!['converted','follow_up','pending','not_interested'].includes(outcome))throw Error('Choose sales result');
+    if(followTo&&(!followDate||followNote.length<5))throw Error('Follow-up needs a date and notes (minimum 5 characters).');
+    if(!followTo&&(followDate||followNote))throw Error('Choose a follow-up employee or clear follow-up details.');
+    const p=await locateForField('visit completion');
+    const next=await rpc('gr_field_finish_visit_v2',{p_visit:v.id,p_notes:notes,p_heat:heat,p_outcome:outcome,
+     p_followup_to:followTo,p_followup_at:followDate?new Date(followDate).toISOString():null,
+     p_followup_note:followTo?followNote:null,...p});
+    notify('Visit completed with current GPS, notes and next action.'+(next?' Next recurring service scheduled.':''));
    });
  }
  async function showProof(id){
