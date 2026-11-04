@@ -18,7 +18,7 @@
  const timeOnly=d=>new Date(d).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
 
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
- let db,user,profile,company='',tab='visits',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
+ let db,user,profile,company='',tab=(new URLSearchParams(location.search).get('view')==='monitor'?'monitor':'visits'),isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
  let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null,monitorDate=indiaDay(),monitorPerson='all';
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
  let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
@@ -139,7 +139,7 @@
   const ruleFor=kind=>visitRules[kind]||{photo_required:kind==='sales'||kind==='site',min_notes:10};
  const ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
  function sessionState(){return openSession?'<span class="ft-pill online">● Shift checked in</span>':'<span class="ft-pill offline">● Not checked in</span>'}
- function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Staff GPS Map & 30-Minute History',team:'Supervisor Access'}[tab]||'Field Tracker'}
+ function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Live Staff & GPS Map',team:'Supervisor Access'}[tab]||'Field Tracker'}
  function setupNav(){document.querySelector('#ft-nav [data-tab="shift"]').hidden=!myFieldCompanies.includes(company);document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
  async function bootstrap(){
   if(!window.supabase||!window.GREENRICH_PUBLIC_CONFIG)throw Error('Secure Supabase login library or public configuration is unavailable');
@@ -155,7 +155,7 @@
   company=ids.includes('grow-india')?'grow-india':ids[0];$('#ft-user').textContent=profile.full_name;
   $('#ft-company').innerHTML=ids.map(id=>'<option value="'+e(id)+'">'+e(companies[id])+'</option>').join('');
   $('#ft-company').value=company;
-  $('#ft-company').onchange=async ev=>{company=ev.target.value;tab='visits';await run(reload)};
+  $('#ft-company').onchange=async ev=>{company=ev.target.value;await run(reload)};
   $('#ft-refresh').onclick=()=>run(reload);
   $('#ft-nav').addEventListener('click',ev=>{const item=ev.target.closest('[data-tab]');if(!item)return;const target=item.dataset.tab;
    if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin)||(target==='shift'&&!myFieldCompanies.includes(company)))return;
@@ -206,6 +206,7 @@
    ]);
    team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;visitRules=allRules||{};followupTeam=allFollowupTeam||[];followups=allFollowups||[];myFieldCompanies=fieldCompanies||[];
     if(tab==='shift'&&!myFieldCompanies.includes(company))tab='visits';
+    if(tab==='monitor'&&!isSupervisor){tab='visits';notify('GPS monitoring is restricted to authorized Admins and supervisors.',true)};
    // Check across companies so a staff member cannot start a second shift.
    const wasOpen=openSession?.id;const shiftAcross=await q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1));
    openSession=shiftAcross[0]||null;
