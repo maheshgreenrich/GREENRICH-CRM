@@ -49,11 +49,11 @@ async function enter(){
    userId:user.id,admin:roleName()==='Admin',notify:toast,permission:act=>can('marketing',act),
    canLeads:can('leads','view'),canCustomers:can('customers','view')
   });
-  show('app');window.GreenRichFollowupAlarm?.start({db,userId:user.id,companyIds:window.GreenRichCompanies.allowed(),role:roleName()});window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
+  show('app');window.GreenRichFieldGPS?.start(db);window.GreenRichFollowupAlarm?.start({db,userId:user.id,companyIds:window.GreenRichCompanies.allowed(),role:roleName()});window.GreenRichSidebar?.init({userId:user.id});navigation();window.GreenRichBranding?.configure(db);
   // Attendance status is useful but should never block dashboard navigation or first paint.
   void attendanceQuick().catch(e=>{console.warn('Attendance switch could not initialize',e)});
   await render();
- }catch(e){window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login');toast(e.message)}
+ }catch(e){window.GreenRichFieldGPS?.stop();window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login');toast(e.message)}
 }
 const menuIcons={
  crm:'<path d="M3 3v18h18"/><path d="m7 15 4-4 3 2 5-7"/><circle cx="19" cy="6" r="1"/>',
@@ -112,8 +112,8 @@ async function attendanceQuick(){
  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date());
  const part=t=>parts.find(p=>p.type===t)?.value,day=part('year')+'-'+part('month')+'-'+part('day');
  const api=(url.endsWith('/')?url.slice(0,-1):url)+'/functions/v1/attendance-api';
- const send=async(path,method='GET')=>{
-  const r=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?'{}':undefined,cache:'no-store'});
+ const send=async(path,method='GET',body=null)=>{
+  const r=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?JSON.stringify(body||{}):undefined,cache:'no-store'});
   const payload=await r.json().catch(()=>({}));
   if(!r.ok)throw Error(payload?.error?.message||'Attendance service unavailable');
   return payload.data;
@@ -134,7 +134,8 @@ async function attendanceQuick(){
    const mode=canCheckIn?'in':'out';
    button.disabled=true;button.dataset.state='busy';actionText.textContent='Saving';
    try{
-    await send('/attendance/check-'+mode,'POST');
+    const gps=await window.GreenRichFieldGPS.attendanceBody(db);
+     await send('/attendance/check-'+mode,'POST',gps);
     toast(mode==='in'?'Check-in recorded':'Check-out recorded');
     await attendanceQuick();
     if(page==='attendance')window.GreenRichAttendance?.refreshOwn?.();
@@ -366,6 +367,7 @@ async function settings(c){
   openRoles:host=>permissionPage(host),
    openTags:host=>window.GreenRichCustomerTags.mount(host,{db,notify:toast}),
   openFormBuilder:host=>window.GreenRichFormBuilder.mount(host,{client:db,companyIds:window.GreenRichCompanies.allowed(),notify:toast}),
+   openFieldSettings:host=>window.GreenRichFieldSettings.mount(host,{db,companies:window.GreenRichCompanies.allowed(),notify:toast}),
   openInvoiceSettings:host=>window.GreenRichInvoices.settings(host,{db,notify:toast}),
   openCRM:(host,view,adminTools)=>crmWorkspace(host,view,adminTools),
    openDashboardAccess:host=>window.GreenRichExecutiveDashboard.preferences(host,{db,people,notify:toast}),
@@ -384,14 +386,14 @@ async function settings(c){
  });
 }
 function serviceInstallation(c){
- c.innerHTML='<nav aria-label="Service and Installation modules" class="gr-crm-tabs"><button type="button" class="active" aria-current="page">Field Tracker</button></nav><iframe id="grFieldTracker" title="Field Tracker" src="./field-tracker.html?embedded=1" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 180px);min-height:600px;border:0;border-radius:12px;margin-top:16px"></iframe>';
+ c.innerHTML='<iframe id="grFieldTracker" title="Service & Installation Visits" src="./field-tracker.html?embedded=1" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 140px);min-height:620px;border:0;border-radius:12px;margin:0"></iframe>';
 }
 async function operations(c){
  if(!window.GreenRichOperations)throw Error('Operations module is missing. Refresh GreenRich ONE.');
  await window.GreenRichOperations.mount(c,{client:db,companies:window.GreenRichCompanies.allowed(),selection:window.GreenRichCompanies.selected(user.id),role:roleName(),can});
 }
 async function placeholder(c){c.innerHTML='<div class="panel"><h2>'+labels[page]+'</h2><div class="notice">This ERP module is not yet connected to a secured server-side database. Sales & CRM features are available in this same workspace. Connected CRM records are shared across authorized browsers and devices.</div><p>Other connected CRM features are available from the GreenRich ONE sidebar.</p></div>'}
-$('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{window.GreenRichDashboardV2?.stop?.();localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{window.GreenRichDashboardV2?.stop?.();window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
+$('#setupForm').onsubmit=e=>{e.preventDefault();localStorage.setItem('gr-supabase-url',$('#url').value.trim());localStorage.setItem('gr-supabase-key',$('#key').value.trim());start()};$('#loginForm').onsubmit=async e=>{e.preventDefault();let r=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value});if(r.error)toast(r.error.message);else await enter()};$('#reset').onclick=async()=>{let email=$('#email').value;if(!email)return toast('Enter your email first');let r=await db.auth.resetPasswordForEmail(email);toast(r.error?.message||'If the account exists, check your email')};$('#reconnect').onclick=()=>{window.GreenRichDashboardV2?.stop?.();localStorage.removeItem('gr-supabase-url');localStorage.removeItem('gr-supabase-key');show('setup')};$('#logout').onclick=async()=>{window.GreenRichFieldGPS?.stop();window.GreenRichDashboardV2?.stop?.();window.GreenRichFollowupAlarm?.stop();document.querySelector('#grFieldTracker')?.remove();await db.auth.signOut();show('login')};document.addEventListener('click',e=>{const link=e.target.closest('a[href="roles.html"]');if(link){e.preventDefault();page='settings';settingsInitialTab='roles';navigation();void render()}});
 window.GreenRichShell={
  setPageWithoutRemount:target=>{
   if(!crmMap[target]||!canOpenPage(target))return;
