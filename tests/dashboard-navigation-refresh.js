@@ -8,8 +8,9 @@ new vm.Script(v2);new vm.Script(core);new vm.Script(shell);
 
 assert.ok(shell.includes("if(page!=='dashboard')window.GreenRichDashboardV2?.stop?.()"),
  'Navigating from Dashboard must cancel polling (including cached CRM navigation).');
-assert.ok(shell.includes("$('#logout').onclick=async()=>{window.GreenRichDashboardV2?.stop?.()"),
- 'Logging out must cancel dashboard refreshes');
+const logoutHandler=shell.split("$('#logout').onclick=async()=>{")[1]?.split("};")[0]||'';
+assert.ok(logoutHandler.includes('window.GreenRichDashboardV2?.stop'),
+ 'Logging out must cancel dashboard refreshes, regardless of the order in which GPS and dashboard polling are stopped');
 assert.ok(v2.includes('viewRoot=host.querySelector(\'.gr2\')'), 'Track dashboard view element, not persistent #content');
 assert.ok(v2.includes('token!==epoch||!isActive()'), 'Discard old in-flight responses');
 assert.ok(v2.includes('if(!isActive())return;'), 'Do not reschedule timer when navigation happened during initial load');
