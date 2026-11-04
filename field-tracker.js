@@ -222,8 +222,14 @@
  list.map(s=>'<tr><td><b>'+e(ownerName(s.user_id))+'</b></td><td>'+fmt(s.checkin_at)+'</td><td>'+coord(s.checkin_lat,s.checkin_lng)+'</td><td>'+fmt(s.checkout_at)+'</td><td>'+coord(s.checkout_lat,s.checkout_lng)+'</td><td>'+btn('GPS route','route',s.id,'ft-btn-ghost ft-btn-sm')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ft-empty">No field shift records yet.</div>'}
  function drawVisits(){
   const items=filterCompany().filter(v=>v.assigned_to===user.id).sort((a,b)=>(a.status==='completed')-(b.status==='completed')||new Date(a.due_at)-new Date(b.due_at));
-  return box('My Assigned Visits','<p>Record customer arrival GPS, finish with current GPS and work notes. Admin controls whether proof photos are required.</p>'+
-   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned yet. Use Schedule Visit to create your first visit.</div>'));
+  const assigned=followups.filter(f=>f.assigned_to===user.id&&f.status==='pending').sort((x,y)=>new Date(x.due_at)-new Date(y.due_at));
+  return box('My Assigned Visits','<p>Record arrival GPS, finish with current GPS and notes. Photos follow Admin settings.</p>'+
+   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned yet.</div>'))+
+   (assigned.length?box('My Upcoming Follow-ups',assigned.slice(0,40).map(f=>{
+     const v=visits.find(x=>x.id===f.visit_id);
+     return '<div class="ft-listitem"><b>'+e(v?.title||'Customer follow-up')+'</b><p>Assigned to you · '+fmt(f.due_at)+
+      '<br>'+e(f.notes)+(v?.contact_name?'<br>Customer: '+e(v.contact_name):'')+'</p></div>';
+    }).join('')):'');
  }
  function visitCard(v){
   const pp=photos.filter(p=>p.visit_id===v.id);
