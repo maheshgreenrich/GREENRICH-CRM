@@ -173,7 +173,7 @@ jobs:
       - name: Double-check the actual published Settings and GPS map files
         env:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
-          EXPECTED_BUILD: 20261104-dispatch-document-1
+          EXPECTED_BUILD: 20261104-dispatch-document-2
         run: |
           set -euo pipefail
           base="${PAGES_URL%/}"
@@ -183,7 +183,7 @@ jobs:
             if curl -fsSL --max-time 15 "$base/secure.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-secure.html &&
                curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
                curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
-               grep -q "20261104-dispatch-document-1" /tmp/gr-live-secure.html &&
+               grep -q "20261104-dispatch-document-2" /tmp/gr-live-secure.html &&
                curl -fsSL --max-time 15 "$base/greenrich-sales-ops.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-dispatch.js &&
                curl -fsSL --max-time 15 "$base/greenrich-document-designer.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-designer.js &&
                grep -q "Packing Slip PDF" /tmp/gr-live-dispatch.js &&
