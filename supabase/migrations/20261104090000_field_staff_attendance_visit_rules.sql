@@ -273,3 +273,35 @@ begin
 end $$;
 revoke all on function public.gr_field_complete_followup(uuid) from public,anon;
 grant execute on function public.gr_field_complete_followup(uuid) to authenticated;
+
+-- Only Admin-designated field employees may start a GPS shift or send periodic points.
+create or replace function public.gr_field_clock_in(p_company text,p_lat double precision,p_lng double precision,p_accuracy double precision)
+returns uuid language plpgsql security definer set search_path='' as $$
+declare v_id uuid;
+begin
+ if not public.gr_field_member(p_company) then raise exception 'Not assigned to this company';end if;
+ if not exists(select 1 from public.gr_field_staff_policies a where a.company_id=p_company and a.user_id=auth.uid() and a.enabled) then raise exception 'Admin has not enabled field GPS for this employee';end if;
+ if p_lat is null or p_lng is null or p_accuracy is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 or p_accuracy not between 0 and 3000
+ then raise exception 'Valid GPS location (accuracy within 3 km) required';end if;
+ if exists(select 1 from public.gr_field_sessions where user_id=auth.uid() and checkout_at is null)
+ then raise exception 'Check out of the existing field shift first';end if;
+ insert into public.gr_field_sessions(company_id,user_id,checkin_lat,checkin_lng,checkin_accuracy_m)
+ values(p_company,auth.uid(),p_lat,p_lng,p_accuracy) returning id into v_id;
+ insert into public.gr_field_points(session_id,company_id,user_id,lat,lng,accuracy_m)
+ values(v_id,p_company,auth.uid(),p_lat,p_lng,p_accuracy);
+ return v_id;
+end $$;
+create or replace function public.gr_field_record_point(p_session uuid,p_lat double precision,p_lng double precision,p_accuracy double precision)
+returns boolean language plpgsql security definer set search_path='' as $$
+declare v public.gr_field_sessions%rowtype;
+begin
+ select * into v from public.gr_field_sessions where id=p_session and user_id=auth.uid() and checkout_at is null;
+ if not found or not public.gr_field_member(v.company_id) then raise exception 'Active shift required';end if;
+ if not exists(select 1 from public.gr_field_staff_policies a where a.company_id=v.company_id and a.user_id=auth.uid() and a.enabled) then raise exception 'Field GPS access has been disabled by Admin';end if;
+ if p_lat is null or p_lng is null or p_accuracy is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 or p_accuracy not between 0 and 3000
+ then return false;end if;
+ if exists(select 1 from public.gr_field_points where session_id=p_session and recorded_at>now()-interval '45 seconds') then return false;end if;
+ insert into public.gr_field_points(session_id,company_id,user_id,lat,lng,accuracy_m)
+ values(p_session,v.company_id,auth.uid(),p_lat,p_lng,p_accuracy);
+ return true;
+end $$;
