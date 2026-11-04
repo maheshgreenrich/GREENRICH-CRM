@@ -113,10 +113,19 @@ async function attendanceQuick(){
  const part=t=>parts.find(p=>p.type===t)?.value,day=part('year')+'-'+part('month')+'-'+part('day');
  const api=(url.endsWith('/')?url.slice(0,-1):url)+'/functions/v1/attendance-api';
  const send=async(path,method='GET',body=null)=>{
-  const r=await fetch(api+path,{method,headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},body:method==='POST'?JSON.stringify(body||{}):undefined,cache:'no-store'});
-  const payload=await r.json().catch(()=>({}));
-  if(!r.ok)throw Error(payload?.error?.message||'Attendance service unavailable');
-  return payload.data;
+  // Avoid leaving the attendance button stuck on "Loading" when mobile internet stalls.
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),16000);
+  try{
+   const r=await fetch(api+path,{method,
+    headers:{...headers,...(method==='POST'?{'Content-Type':'application/json'}:{})},
+    body:method==='POST'?JSON.stringify(body||{}):undefined,cache:'no-store',signal:controller.signal});
+   const payload=await r.json().catch(()=>({}));
+   if(!r.ok)throw Error(payload?.error?.message||'Attendance service unavailable');
+   return payload.data;
+  }catch(error){
+   if(error?.name==='AbortError')throw Error('Attendance connection timed out. Tap Retry.');
+   throw error;
+  }finally{clearTimeout(timeout)}
  };
  try{
   const history=await send('/attendance/me?from='+day+'&to='+day+'&pageSize=1');
@@ -144,11 +153,22 @@ async function attendanceQuick(){
     toast(mode==='in'?'Check-in recorded':'Check-out recorded');
     await attendanceQuick();
     if(page==='attendance')window.GreenRichAttendance?.refreshOwn?.();
-   }catch(error){toast(error.message);await attendanceQuick()}
+   }catch(error){
+    toast(error.message);
+    await attendanceQuick();
+    const note=document.querySelector('#grClockInfo');
+    if(note)note.textContent=error.message;
+   }
   };
  }catch(error){
   if(!button.isConnected)return;
-  info.textContent='Unavailable';button.title=error.message;actionText.textContent='Offline';
+  info.textContent='Attendance unavailable · tap Retry';
+  button.title=error.message;
+  button.dataset.state='out';
+  button.setAttribute('aria-label','Retry loading attendance status');
+  button.disabled=false;
+  actionText.textContent='Retry';
+  button.onclick=()=>void attendanceQuick();
  }
 }
 let attendancePeople=[];
