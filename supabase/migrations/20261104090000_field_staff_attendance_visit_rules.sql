@@ -221,3 +221,42 @@ begin
 end $$;
 revoke all on function public.gr_field_finish_visit_v2(uuid,text,text,double precision,double precision,double precision,text,uuid,timestamptz,text) from public,anon;
 grant execute on function public.gr_field_finish_visit_v2(uuid,text,text,double precision,double precision,double precision,text,uuid,timestamptz,text) to authenticated;
+
+
+-- Every company employee can be assigned a follow-up, without exposing private profile fields.
+create or replace function public.gr_field_followup_directory(p_company text)
+returns table(id uuid,full_name text) language sql stable security definer set search_path='' as $$
+ select p.id,p.full_name from public.gr_profiles p
+ where public.gr_field_member(p_company) and p.active and p_company=any(p.company_ids)
+ order by p.full_name
+$$;
+revoke all on function public.gr_field_followup_directory(text) from public,anon;
+grant execute on function public.gr_field_followup_directory(text) to authenticated;
+
+-- Service and Installation are now distinct visit types.
+create or replace function public.gr_field_create_visit(
+ p_company text,p_type text,p_title text,p_contact text,p_phone text,p_address text,
+ p_assignee uuid,p_due timestamptz,p_customer uuid default null,p_lead text default null,
+ p_repeat_every integer default null,p_repeat_unit text default null,p_repeat_end date default null,
+ p_notes text default '')
+returns uuid language plpgsql security definer set search_path='' as $$
+declare v_id uuid;v_assignee uuid:=coalesce(p_assignee,auth.uid());
+begin
+ if not public.gr_field_can_assign(p_company,v_assignee) then raise exception 'Cannot assign a field visit to this employee';end if;
+ if p_type not in ('service','sales','site','installation') or length(btrim(coalesce(p_title,''))) not between 3 and 160
+  or p_due is null or p_due<now()-interval '24 hours'
+ then raise exception 'Valid visit type, title and scheduled date required';end if;
+ if (p_repeat_every is null) <> (p_repeat_unit is null) or
+ (p_repeat_every is not null and (p_type<>'service' or p_repeat_every not between 1 and 365 or p_repeat_unit not in ('days','weeks','months')))
+ then raise exception 'Repeat interval is allowed for service visits only';end if;
+ if p_customer is not null and not exists(select 1 from public.gr_crm_customers where id=p_customer)
+ then raise exception 'CRM customer does not exist';end if;
+ if p_lead is not null and not exists(select 1 from public.gr_lead_pipeline where company_id=p_company and lead_id=p_lead)
+ then raise exception 'Lead not found in selected company';end if;
+ insert into public.gr_field_visits(company_id,visit_type,title,contact_name,contact_phone,address,assigned_to,created_by,
+ due_at,customer_id,lead_id,recurrence_every,recurrence_unit,recurrence_end,notes)
+ values(p_company,p_type,btrim(p_title),left(coalesce(p_contact,''),160),left(coalesce(p_phone,''),30),
+  left(coalesce(p_address,''),650),v_assignee,auth.uid(),p_due,p_customer,p_lead,p_repeat_every,p_repeat_unit,
+  p_repeat_end,left(coalesce(p_notes,''),2000)) returning id into v_id;
+ return v_id;
+end $$;
