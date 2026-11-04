@@ -260,3 +260,16 @@ begin
   p_repeat_end,left(coalesce(p_notes,''),2000)) returning id into v_id;
  return v_id;
 end $$;
+
+-- Assigned employees can complete their own follow-up task; no direct client table writes.
+create or replace function public.gr_field_complete_followup(p_id uuid)
+returns void language plpgsql security definer set search_path='' as $$
+declare v_company text;
+begin
+ select company_id into v_company from public.gr_field_visit_followups
+ where id=p_id and assigned_to=auth.uid() and status='pending' for update;
+ if not found or not public.gr_field_member(v_company) then raise exception 'Assigned pending follow-up not found';end if;
+ update public.gr_field_visit_followups set status='done' where id=p_id;
+end $$;
+revoke all on function public.gr_field_complete_followup(uuid) from public,anon;
+grant execute on function public.gr_field_complete_followup(uuid) to authenticated;
