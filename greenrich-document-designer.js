@@ -9,7 +9,7 @@
   packing:[['logo','Company logo'],['companyContact','Seller contact'],['customer','Customer name'],['shippingAddress','Delivery address'],
    ['phone','Customer phone'],['email','Customer email'],['orderDate','Order date'],['invoiceNo','Invoice reference'],
    ['product','Products'],['sku','SKU'],['price','Order amount'],['courier','Courier'],['tracking','Tracking number'],
-   ['notes','Dispatch notes'],['receivedBy','Received by'],['signature','Packed by'],['custom','Custom detail rows']]
+   ['notes','Dispatch notes'],['cartons','Number of cartons'],['weight','Gross weight (kg)'],['dimensions','Package dimensions'],['packingDate','Packing date'],['packedBy','Packed by person'],['instructions','Handling instructions'],['receivedBy','Received by'],['signature','Packed by signature'],['custom','Custom detail rows']]
  };
  const defaultFor=type=>({
   title:type==='invoice'?'TAX INVOICE':'PACKING SLIP',subtitle:type==='invoice'?'':'Goods packed for delivery',
@@ -70,9 +70,13 @@
     val('orderDate','Order date',order.order_date)+val('invoiceNo','Invoice reference',order.invoice_number)+
     row('Packing status',order.status)+val('customer','Customer',order.customer_name)+
     val('phone','Phone',order.customer_mobile)+val('email','Email',order.customer_email)+
-    val('courier','Courier',order.courier_name)+val('tracking','Tracking / AWB',order.tracking_number)+'</section>'+
+    val('courier','Courier',order.courier_name)+val('tracking','Tracking / AWB',order.tracking_number)+
+    val('cartons','Number of cartons',order.carton_count||1)+val('weight','Gross weight (kg)',order.gross_weight_kg)+
+    val('dimensions','Package dimensions',order.package_dimensions)+val('packingDate','Packing date',order.packing_date)+
+    val('packedBy','Packed by',order.packed_by)+'</section>'+
    show(c,'shippingAddress','<section class="gr-doc-address"><h3>Deliver to</h3><p>'+esc(order.shipping_address||'Not provided')+'</p></section>')+
    table+show(c,'notes','<section class="gr-doc-address"><h3>Dispatch / packing notes</h3><p>'+esc(order.dispatch_note||'—')+'</p></section>')+
+   show(c,'instructions','<section class="gr-doc-address"><h3>Handling instructions</h3><p>'+esc(order.handling_instructions||'—')+'</p></section>')+
    extra(c)+'<div class="gr-doc-signatures">'+
    show(c,'signature','<div><strong>Packed / checked by</strong><span></span></div>')+
    show(c,'receivedBy','<div><strong>Received by</strong><span></span></div>')+'</div>'+
@@ -160,7 +164,7 @@
    const c=collect(),demo={company_id:co.value,order_id:'GR-ORDER-001',order_date:'2026-11-04',status:'Packed',
     invoice_number:'GRG/INV001',customer_name:'Sample Customer',customer_mobile:'+91 9876543210',
     customer_email:'customer@example.com',shipping_address:'Sample address, Tamil Nadu, India',
-    product_name:'GreenRich Product',sku:'GR-101',quantity:2,order_total:25000,courier_name:'DTDC',tracking_number:'AWB-101',dispatch_note:'Check item count'};
+    product_name:'GreenRich Product',sku:'GR-101',quantity:2,order_total:25000,courier_name:'DTDC',tracking_number:'AWB-101',dispatch_note:'Check item count',carton_count:2,gross_weight_kg:18.5,package_dimensions:'60 × 40 × 40 cm',packed_by:'GreenRich Team',packing_date:'2026-11-04',handling_instructions:'Keep upright'};
    const seller={legal_name:companies[co.value],address:'Tamil Nadu, India',email:'sales@company.example'};
    el('#gr-doc-preview').innerHTML=kind.value==='packing'?packingHtml(demo,seller,c):
     '<article class="gr-doc-paper gr-doc-invoice-example" style="'+styling(c)+'">'+heading(c,seller)+
