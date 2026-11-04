@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test:forms": "node tests/admin-form-builder.js && node tests/form-builder-dom.cjs && node tests/vendor-360.cjs && node tests/material-master.cjs && node tests/product-bom.cjs",
-    "test:field": "node tests/field-tracker-pilot.js && node tests/field-tracker-gps-permissions.js && node tests/field-tracking-attendance-rules.js && node tests/service-visit-photo-notes.js && node tests/field-location-access-map.cjs && node tests/field-location-access-ui-dom.cjs"
+    "test:field": "node tests/field-tracker-pilot.js && node tests/field-tracker-gps-permissions.js && node tests/field-tracking-attendance-rules.js && node tests/service-visit-photo-notes.js && node tests/field-location-access-map.cjs && node tests/field-location-access-ui-dom.cjs",
+    "test:dispatchdocs": "node tests/dispatch-packing-document-designer.cjs"
   },
   "devDependencies": {
     "jsdom": "30.1.3"
