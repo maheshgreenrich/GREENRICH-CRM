@@ -57,5 +57,5 @@
  }
  function onVisible(){if(document.visibilityState==='visible')void tick()}
  function stop(){if(timer)clearInterval(timer);timer=null;client=null;lastSave=0;document.removeEventListener('visibilitychange',onVisible)}
- window.GreenRichFieldGPS={attendanceBody,start,stop};
+ window.GreenRichFieldGPS={attendanceBody,requiresAttendanceGPS:async db=>(await enabledCompanies(db)).length>0,start,stop};
 })();
