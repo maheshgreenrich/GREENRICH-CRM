@@ -139,7 +139,7 @@
   const ruleFor=kind=>visitRules[kind]||{photo_required:kind==='sales'||kind==='site',min_notes:10};
  const ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
  function sessionState(){return openSession?'<span class="ft-pill online">● Shift checked in</span>':'<span class="ft-pill offline">● Not checked in</span>'}
- function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Live Team Tracking',team:'Supervisor Access'}[tab]||'Field Tracker'}
+ function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Staff GPS Map & 30-Minute History',team:'Supervisor Access'}[tab]||'Field Tracker'}
  function setupNav(){document.querySelector('#ft-nav [data-tab="shift"]').hidden=!myFieldCompanies.includes(company);document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
  async function bootstrap(){
   if(!window.supabase||!window.GREENRICH_PUBLIC_CONFIG)throw Error('Secure Supabase login library or public configuration is unavailable');
