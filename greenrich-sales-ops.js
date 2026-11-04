@@ -275,7 +275,7 @@
    form.elements.namedItem('packedBy').value=saved.packed_by||'';
    form.elements.namedItem('date').value=saved.packing_date||date();
    form.elements.namedItem('instructions').value=saved.handling_instructions||'';
-   for(const input of form.querySelectorAll('input,textarea'))input.disabled=!canDispatch;
+   for(const input of form.querySelectorAll('input,textarea'))input.readOnly=!canDispatch;
    let dirty=false;
    function payload(){
     const a=new FormData(form),cartons=Number(a.get('cartons')),weight=String(a.get('weight')||'').trim();
