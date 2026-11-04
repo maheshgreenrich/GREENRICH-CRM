@@ -344,7 +344,7 @@
   const form=d.querySelector('form');if(form&&submit)form.onsubmit=async ev=>{
    ev.preventDefault();const save=form.querySelector('[type=submit]');if(save)save.disabled=true;
    try{await submit(new FormData(form),form);d.close();await reload()}
-   catch(err){const error=d.querySelector('.ft-modal-error');error.textContent=err.message;error.hidden=false;error.scrollIntoView({block:'nearest'});notify(err.message,true)}finally{if(save)save.disabled=false}
+   catch(err){const error=d.querySelector('.ft-modal-error');if(error){error.textContent=err.message;error.hidden=false;error.scrollIntoView({block:'nearest'})}notify(err.message,true)}finally{if(save)save.disabled=false}
   };d.showModal();return d;
  }
  async function onClick(ev){
@@ -400,8 +400,9 @@
   if(!v)throw Error('Only the assigned employee can close an active visit. Select your assigned visit.');
   const policy=ruleFor(v.visit_type),existingPhotos=photos.filter(x=>x.visit_id===v.id).length;
   const photoNeeded=Boolean(policy.photo_required)&&existingPhotos===0;
+  let arrived=v.status==='on_site',photoAttachedThisDialog=false,arrivalSavedInDialog=false;
   const sales=v.visit_type==='sales'||v.visit_type==='site',linkedLead=sales&&!!v.lead_id;
-  modal('Close Visit · '+v.title,
+  const dialog=modal('Close Visit · '+v.title,
    '<p><b>Required:</b> Current GPS and visit notes. <b>Photos:</b> '+(policy.photo_required?'Required':'Optional')+
    '. Existing attachments: '+existingPhotos+'.'+(v.status==='on_site'?'':' Arrival GPS is recorded automatically before completion.')+'</p>'+
    '<form class="ft-form">'+
@@ -423,7 +424,7 @@
      followNote=String(fd.get('followupNotes')||'').trim(),file=fd.get('photo');
     const hasNewPhoto=file instanceof File&&file.size>0;
     if(notes.length<Number(policy.min_notes))throw Error('Add at least '+policy.min_notes+' characters in visit notes.');
-    if(policy.photo_required&&!existingPhotos&&!hasNewPhoto)throw Error('Attach a photo before closing this visit.');
+    if(policy.photo_required&&!existingPhotos&&!hasNewPhoto&&!photoAttachedThisDialog)throw Error('Attach a photo before closing this visit.');
     if(hasNewPhoto&&(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5242880))
      throw Error('Select a JPG, PNG or WebP photo smaller than 5 MB.');
     if(linkedLead&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority.');
@@ -433,17 +434,21 @@
     if(followDate&&(!Number.isFinite(new Date(followDate).getTime())||new Date(followDate).getTime()<Date.now()-60000))
      throw Error('Choose a valid future follow-up date.');
     // Obtain explicit location permission before changing any visit state.
-    const arrivalGPS=await locateForField(v.status==='on_site'?'visit completion':'visit arrival');
-    if(v.status!=='on_site'){
+    const arrivalGPS=await locateForField(arrived?'visit completion':'visit arrival');
+    if(!arrived){
      await rpc('gr_field_arrive',{p_visit:v.id,...arrivalGPS});
+     arrived=true;arrivalSavedInDialog=true;v.status='on_site';
     }
-    if(hasNewPhoto)await saveVisitPhoto(v,file,notes,arrivalGPS);
-    const closeGPS=v.status==='on_site'?arrivalGPS:await locateForField('visit completion');
+    if(hasNewPhoto&&!photoAttachedThisDialog){
+     await saveVisitPhoto(v,file,notes,arrivalGPS);photoAttachedThisDialog=true;
+    }
+    const closeGPS=arrivalGPS;
     const next=await rpc('gr_field_finish_visit_v2',{p_visit:v.id,p_notes:notes,p_heat:heat,p_outcome:outcome,
      p_followup_to:followTo,p_followup_at:followDate?new Date(followDate).toISOString():null,
      p_followup_note:followTo?followNote:null,...closeGPS});
-    notify('Visit closed. GPS, notes'+(hasNewPhoto?', photo':'')+' and follow-up saved.'+(next?' Next recurring service scheduled.':''));
+    notify('Visit closed. GPS, notes'+((hasNewPhoto||photoAttachedThisDialog)?', photo':'')+' and follow-up saved.'+(next?' Next recurring service scheduled.':''));
    });
+  dialog.addEventListener('close',()=>{if(arrivalSavedInDialog||photoAttachedThisDialog)void run(reload)});
  }
  async function showProof(id){
   const v=visits.find(x=>x.id===id);if(!v)throw Error('Visit inaccessible');
