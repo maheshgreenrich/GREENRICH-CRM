@@ -14,7 +14,7 @@ assert.ok(sales.includes("gr_field_followup_directory"),'Dispatch must load auth
 assert.ok(sales.includes("serviceLinks"),'Dispatch must read linked service visits');
 assert.ok(invoice.includes("window.GreenRichDocuments.invoiceHtml"),'Invoice preview and PDF must respect saved layout');
 assert.ok(invoice.includes('current.document_config='),'New issued invoices must freeze template settings');
-assert.ok(invoice.includes('savePaper:savePdf'),'Packing Slip reuses invoice's A4 PDF generation');
+assert.ok(invoice.includes('savePaper:savePdf'),"Packing slip reuses invoice A4 PDF generation");
 assert.ok(settings.includes("['documents','Document Designer']"),'Admin Settings must show independent document designer');
 assert.ok(shell.includes('gr-dispatch-service-choice')&&shell.includes('value="no" selected'),'No service is the default');
 assert.ok(shell.includes('greenrich-document-designer.js')&&shell.includes('greenrich-document-designer.css'),'Designer assets must be bundled');
