@@ -158,3 +158,30 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Double-check the actual published Settings and GPS map files
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_BUILD: 20261104-gps-access-release-1
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          echo "Checking deployed CRM assets at $base"
+          verified=0
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if curl -fsSL --max-time 15 "$base/secure.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-secure.html &&
+               curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
+               curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
+               grep -q "20261104-gps-access-release-1" /tmp/gr-live-secure.html &&
+               grep -q "Field Location Access" /tmp/gr-live-settings.js &&
+               grep -q "Live Staff & GPS" /tmp/gr-live-map.html; then
+              echo "VERIFIED: live CRM Settings and live GPS map contain the current release"
+              verified=1
+              break
+            fi
+            echo "Published files not yet consistent with new release (attempt $attempt/8)"
+            sleep 10
+          done
+          if [ "$verified" -ne 1 ]; then
+            echo "::error::Published CRM is stale or inaccessible; GPS Access Panel must not be marked deployed."
+            exit 1
+          fi
