@@ -227,7 +227,8 @@
  }
  function visitCard(v){
   const pp=photos.filter(p=>p.visit_id===v.id);
-  const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
+  const follow=followups.filter(f=>f.visit_id===v.id).map(f=>'<br><b>Next action:</b> '+e(followupTeam.find(t=>t.id===f.assigned_to)?.full_name||'Assigned staff')+' · '+fmt(f.due_at)+' · '+e(f.notes)).join('');
+   const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
   const actions=v.status==='planned'?
    btn('Arrived · GPS check-in','arrive',v.id,'ft-btn'):'';
   const extra=v.status==='on_site'?btn('Upload photo proof','upload',v.id,'ft-btn-soft')+
@@ -238,7 +239,7 @@
    (v.arrival_at?'<br><b>Arrived:</b> '+fmt(v.arrival_at)+' · '+coord(v.arrival_lat,v.arrival_lng):'')+
    (v.completed_at?'<br><b>Completed:</b> '+fmt(v.completed_at)+' · '+coord(v.completed_lat,v.completed_lng):'')+
    '<br><b>Proof:</b> '+pp.length+' photo(s)'+(v.recurrence_every?'<br><b>Repeat:</b> Every '+v.recurrence_every+' '+e(v.recurrence_unit):'')+'</p>'+
-   (v.completion_notes?'<p><b>Report:</b> '+e(v.completion_notes)+'</p>':'')+'</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
+   (v.completion_notes?'<p><b>Report:</b> '+e(v.completion_notes)+(v.sales_outcome?' · <b>Sales result:</b> '+e(v.sales_outcome.replaceAll('_',' ')):'')+follow+'</p>':'')+'</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
  }
  function drawNew(){
   return box('Schedule a service, sales or site visit',
@@ -268,7 +269,7 @@
     v.map(x=>'<tr><td><b>'+e(x.title)+'</b><br>'+e(ownerName(x.assigned_to))+'<br>'+e(x.contact_name||'')+'</td><td>'+pill(x.status)+'<br>'+e(x.visit_type)+'</td>'+
      '<td>'+fmt(x.due_at)+'</td><td>'+fmt(x.arrival_at)+'<br>'+coord(x.arrival_lat,x.arrival_lng)+'</td>'+
      '<td>'+fmt(x.completed_at)+'<br>'+coord(x.completed_lat,x.completed_lng)+'</td>'+
-     '<td>'+e(x.completion_notes||x.notes||'—')+(x.lead_heat?'<br><b>Lead: '+e(x.lead_heat)+'</b>':'')+'</td>'+
+     '<td>'+e(x.completion_notes||x.notes||'—')+(x.lead_heat?'<br><b>Lead: '+e(x.lead_heat)+'</b>':'')+(x.sales_outcome?'<br><b>Sales: '+e(x.sales_outcome.replaceAll('_',' '))+'</b>':'')+followups.filter(f=>f.visit_id===x.id).map(f=>'<br><b>Follow-up:</b> '+e(followupTeam.find(t=>t.id===f.assigned_to)?.full_name||'Assigned staff')+' · '+fmt(f.due_at)+' · '+e(f.notes)).join('')+'</td>'+
      '<td>'+btn('Photos ('+photos.filter(p=>p.visit_id===x.id).length+')','proof',x.id,'ft-btn-sm ft-btn-ghost')+'</td></tr>').join('')+
      '</tbody></table></div>':'<div class="ft-empty">No visit history available.</div>')+
   (isSupervisor?box('Recent Field Shift Logs',shiftTable(sessions.slice(0,70))):box('My Field Shift Logs',shiftTable(sessions.filter(x=>x.user_id===user.id).slice(0,50)))));
@@ -375,19 +376,33 @@
  async function showComplete(id){
   const v=visits.find(x=>x.id===id&&x.assigned_to===user.id&&x.status==='on_site');
   if(!v)throw Error('An on-site assigned visit is required.');
-  if(!photos.some(x=>x.visit_id===v.id))throw Error('Upload at least one service/site photo before finishing the visit.');
-  const sales=(v.visit_type==='sales'||v.visit_type==='site')&&!!v.lead_id;
+  const policy=ruleFor(v.visit_type);
+  if(policy.photo_required&&!photos.some(x=>x.visit_id===v.id))throw Error('A GPS-stamped photo is required before completing this visit.');
+  const sales=v.visit_type==='sales'||v.visit_type==='site',linkedLead=sales&&!!v.lead_id;
   modal('Complete Visit · '+v.title,
-   '<p>Completion captures current GPS and server time. Enter the work performed or sales conversation. For a linked sales/site lead, update its Hot/Warm/Cold priority.</p>'+
-   '<form class="ft-form"><label class="wide">Service report / customer conversation *<textarea name="notes" minlength="10" maxlength="4000" required placeholder="Problem, action taken, customer response, follow-up needed"></textarea></label>'+
-   (sales?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
+   '<p>Fresh GPS and work notes are compulsory. Photos: '+(policy.photo_required?'required':'optional')+'. Record visit results and assign follow-up.</p>'+
+   '<form class="ft-form"><label class="wide">Visit notes / customer conversation *<textarea name="notes" minlength="'+Number(policy.min_notes)+'" maxlength="4000" required placeholder="Work completed, customer response and next action"></textarea></label>'+
+   (linkedLead?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
+   (sales?'<label>Sales result * <select name="outcome" required><option value="">Choose result</option><option value="converted">Converted to order</option><option value="follow_up">Follow-up needed</option><option value="pending">Decision pending</option><option value="not_interested">Not interested</option></select></label>':'')+
+   '<label>Follow-up assigned to (optional) <select name="followupTo"><option value="">No follow-up</option>'+followupTeam.map(t=>'<option value="'+e(t.id)+'">'+e(t.full_name)+'</option>').join('')+'</select></label>'+
+   '<label>Follow-up / next service date <input type="datetime-local" name="followupAt"></label>'+
+   '<label class="wide">Follow-up instructions <textarea name="followupNotes" maxlength="2000" placeholder="Work required at the next visit"></textarea></label>'+
    '<button class="ft-btn" type="submit">Save GPS Completion</button></form>',
    async fd=>{
-    const notes=String(fd.get('notes')||'').trim(),heat=sales?String(fd.get('heat')||''):null;
-    if(notes.length<10)throw Error('Add at least 10 characters about this visit');
-    if(sales&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
-    const p=await locateForField('visit completion');const next=await rpc('gr_field_finish_visit',{p_visit:v.id,p_notes:notes,p_heat:heat,...p});
-    notify('Visit completed with location, time, report and evidence.'+(next?' Next recurring service job scheduled automatically.':''));
+    const notes=String(fd.get('notes')||'').trim(),heat=linkedLead?String(fd.get('heat')||''):null,
+     outcome=sales?String(fd.get('outcome')||''):null,
+     followTo=String(fd.get('followupTo')||'')||null,followDate=String(fd.get('followupAt')||''),
+     followNote=String(fd.get('followupNotes')||'').trim();
+    if(notes.length<Number(policy.min_notes))throw Error('Add at least '+policy.min_notes+' characters in visit notes.');
+    if(linkedLead&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
+    if(sales&&!['converted','follow_up','pending','not_interested'].includes(outcome))throw Error('Choose sales result');
+    if(followTo&&(!followDate||followNote.length<5))throw Error('Follow-up needs a date and notes (minimum 5 characters).');
+    if(!followTo&&(followDate||followNote))throw Error('Choose a follow-up employee or clear follow-up details.');
+    const p=await locateForField('visit completion');
+    const next=await rpc('gr_field_finish_visit_v2',{p_visit:v.id,p_notes:notes,p_heat:heat,p_outcome:outcome,
+     p_followup_to:followTo,p_followup_at:followDate?new Date(followDate).toISOString():null,
+     p_followup_note:followTo?followNote:null,...p});
+    notify('Visit completed with current GPS, notes and next action.'+(next?' Next recurring service scheduled.':''));
    });
  }
  async function showProof(id){
