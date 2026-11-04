@@ -36,6 +36,8 @@ jobs:
           node --check greenrich-field-settings.js
           node --check greenrich-field-gps.js
           node --check field-tracker.js
+      - name: Verify Dispatch packing slip, invoice design and service follow-up UI
+        run: npm run test:dispatchdocs
       - name: Check required app files
         continue-on-error: true # Legacy regression checks report failures, but do not keep the GPS Settings release offline.
         run: |
@@ -171,7 +173,7 @@ jobs:
       - name: Double-check the actual published Settings and GPS map files
         env:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
-          EXPECTED_BUILD: 20261104-gps-access-release-1
+          EXPECTED_BUILD: 20261104-dispatch-document-1
         run: |
           set -euo pipefail
           base="${PAGES_URL%/}"
@@ -181,10 +183,15 @@ jobs:
             if curl -fsSL --max-time 15 "$base/secure.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-secure.html &&
                curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
                curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
-               grep -q "20261104-gps-access-release-1" /tmp/gr-live-secure.html &&
+               grep -q "20261104-dispatch-document-1" /tmp/gr-live-secure.html &&
+               curl -fsSL --max-time 15 "$base/greenrich-sales-ops.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-dispatch.js &&
+               curl -fsSL --max-time 15 "$base/greenrich-document-designer.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-designer.js &&
+               grep -q "Packing Slip PDF" /tmp/gr-live-dispatch.js &&
+               grep -q "gr_dispatch_deliver_with_service" /tmp/gr-live-dispatch.js &&
+               grep -q "Document Designer" /tmp/gr-live-designer.js &&
                grep -q "Field Location Access" /tmp/gr-live-settings.js &&
                grep -q "Live Staff & GPS" /tmp/gr-live-map.html; then
-              echo "VERIFIED: live CRM Settings and live GPS map contain the current release"
+              echo "VERIFIED: live Dispatch, Packing Slip PDF, Document Designer and GPS Settings all match this release"
               verified=1
               break
             fi
