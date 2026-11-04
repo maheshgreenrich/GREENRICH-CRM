@@ -16,7 +16,7 @@
   ['invoice','Invoice'],['actions','Actions']
  ];
  const defaults=['date','order','company','customer','product','channel','qty','status','total','actions'];
- let root=null,db=null,adapter=null,allowed=[],canApprove=false,canDispatch=false,dispatchRows=[],loading=null,request=0,selectedDispatch=null;
+ let root=null,db=null,adapter=null,allowed=[],canApprove=false,canDispatch=false,dispatchRows=[],serviceLinks=[],loading=null,request=0,selectedDispatch=null;
  const q=id=>root?.querySelector(id);
  const actionMessage=msg=>adapter?.toast?.(msg);
  const validCompany=id=>allowed.includes(id);
@@ -28,6 +28,7 @@
  const companyName=s=>adapter.companyLabel(s._companyId);
  const orderKey=s=>(s._companyId||s.company_id)+'|'+s.id;
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
+ const serviceFor=order=>serviceLinks.find(x=>x.dispatch_id===order.id);
  const approvalStatus=s=>dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
  const filterPeriod=(period,from,to,day)=>{
   if(period==='all')return true;
@@ -147,9 +148,14 @@
  }
  async function refreshDispatch(){
   if(!db)throw Error('Signed-in access is required');
-  const seq=++request,read=await db.from('gr_dispatch_orders').select('*').in('company_id',allowed).order('approved_at',{ascending:false}).limit(1500);
+  const seq=++request;
+  const [read,linked]=await Promise.all([
+   db.from('gr_dispatch_orders').select('*').in('company_id',allowed).order('approved_at',{ascending:false}).limit(1500),
+   db.from('gr_dispatch_service_followups').select('dispatch_id,company_id,needs_service,visit_id,assigned_to,due_at').in('company_id',allowed).limit(1500)
+  ]);
   if(read.error)throw Error('Unable to read shared dispatch: '+read.error.message);
-  if(seq===request){dispatchRows=read.data||[];renderSales();renderDispatch()}
+  if(linked.error)throw Error('Unable to read dispatch follow-ups: '+linked.error.message);
+  if(seq===request){dispatchRows=read.data||[];serviceLinks=linked.data||[];renderSales();renderDispatch()}
   return dispatchRows;
  }
  const delayedRefresh=async()=>{if(loading)return loading;loading=refreshDispatch();try{return await loading}finally{loading=null}};
@@ -169,7 +175,7 @@
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
    '<td><div class="gr-order-actions">'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
-   (canDispatch?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')
+   '<button class="btn soft" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+   (canDispatch&&r.status!=='Delivered'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
    )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
@@ -310,6 +316,10 @@
    if(approve&&root.contains(approve)){void approveOrder(approve.dataset.approveOrder,approve.dataset.approveCompany,approve);return}
    const customerButton=event.target.closest('[data-customer-history]');
    if(customerButton&&root.contains(customerButton)){showCustomer(customerButton.dataset.customerHistory,customerButton.dataset.customerSale);return}
+   const packing=event.target.closest('[data-packing-slip]');
+   if(packing&&root.contains(packing)){void openPacking(packing.dataset.packingSlip);return}
+   const service=event.target.closest('[data-open-service]');
+   if(service&&root.contains(service)){window.GreenRichShell?.openPage?.('service');return}
    const edit=event.target.closest('[data-dispatch-edit]');
    if(edit&&root.contains(edit)){openDispatch(edit.dataset.dispatchEdit);return}
    const details=event.target.closest('[data-dispatch-details]');
