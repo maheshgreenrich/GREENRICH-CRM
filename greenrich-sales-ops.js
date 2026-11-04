@@ -238,30 +238,96 @@
   if(!order)return actionMessage('Dispatch order not found');
   if(!window.GreenRichDocuments?.packingHtml||!window.GreenRichInvoices?.savePaper)
    return actionMessage('Packing Slip PDF module has not loaded. Refresh CRM.');
-  const existing=root.querySelector('#gr-packing-dialog');if(existing)existing.remove();
+  root.querySelector('#gr-packing-dialog')?.remove();
   const modal=document.createElement('dialog');modal.id='gr-packing-dialog';modal.className='gr-packing-dialog';
   modal.innerHTML='<div class="gr-packing-tools"><div><h2>Packing Slip · '+esc(order.order_id)+'</h2><p>Customer: '+esc(order.customer_name||'—')+'</p></div>'+
    '<div class="gr-packing-actions"><button type="button" class="btn soft" data-pack-close>Close</button>'+
-   '<button type="button" class="btn primary" data-pack-download>Download Packing Slip PDF</button></div></div>'+
-   '<div class="gr-packing-preview"><div id="gr-packing-document">Preparing document…</div></div>';
+   (canDispatch?'<button type="button" class="btn soft" data-pack-save>Save packing details</button>':'')+
+   '<button type="button" class="btn primary" data-pack-download disabled>Download PDF</button></div></div>'+
+   '<section class="gr-packing-fields"><h3>Order packing details</h3><p>Fill these details for this dispatch order; they are included in the PDF.</p>'+
+   '<form id="gr-pack-form" class="gr-packing-edit-grid">'+
+   '<label>Number of cartons <input name="cartons" type="number" min="1" max="99999" required></label>'+
+   '<label>Gross weight (kg) <input name="weight" type="number" min="0" max="100000" step="0.001" placeholder="Optional"></label>'+
+   '<label>Package dimensions <input name="dimensions" maxlength="200" placeholder="e.g. 60 × 40 × 40 cm"></label>'+
+   '<label>Packed by <input name="packedBy" maxlength="160" placeholder="Employee name"></label>'+
+   '<label>Packing date <input name="date" type="date" required></label>'+
+   '<label class="wide">Handling instructions <textarea name="instructions" maxlength="2000" rows="2" placeholder="Handle with care / Keep upright"></textarea></label>'+
+   '</form><p id="gr-packing-status" role="status"></p></section>'+
+   '<div class="gr-packing-preview"><div id="gr-packing-document">Preparing packing slip…</div></div>';
   root.append(modal);modal.addEventListener('close',()=>modal.remove());
   modal.querySelector('[data-pack-close]').onclick=()=>modal.close();
   modal.showModal();
   try{
-   await Promise.all([window.GreenRichDocuments.load(db,[order.company_id]),window.GreenRichInvoices.load(db)]);
+   const [_,sellerLoad,details]=await Promise.all([
+    window.GreenRichDocuments.load(db,[order.company_id]),
+    window.GreenRichInvoices.load(db),
+    db.from('gr_dispatch_packing_details').select('*').eq('dispatch_id',id).maybeSingle()
+   ]);
+   if(details.error)throw Error('Cannot read packing details: '+details.error.message);
    if(!modal.isConnected)return;
-   const seller=window.GreenRichInvoices.currentProfile(order.company_id);
-   modal.querySelector('#gr-packing-document').innerHTML=window.GreenRichDocuments.packingHtml(order,seller);
-   modal.querySelector('[data-pack-download]').onclick=async event=>{
+   const seller=window.GreenRichInvoices.currentProfile(order.company_id),
+    form=modal.querySelector('#gr-pack-form'),status=modal.querySelector('#gr-packing-status'),
+    download=modal.querySelector('[data-pack-download]');
+   const saved=details.data||{};
+   form.elements.namedItem('cartons').value=saved.carton_count||1;
+   form.elements.namedItem('weight').value=saved.gross_weight_kg??'';
+   form.elements.namedItem('dimensions').value=saved.package_dimensions||'';
+   form.elements.namedItem('packedBy').value=saved.packed_by||'';
+   form.elements.namedItem('date').value=saved.packing_date||date();
+   form.elements.namedItem('instructions').value=saved.handling_instructions||'';
+   for(const input of form.querySelectorAll('input,textarea'))input.disabled=!canDispatch;
+   let dirty=false;
+   function payload(){
+    const a=new FormData(form),cartons=Number(a.get('cartons')),weight=String(a.get('weight')||'').trim();
+    if(!Number.isInteger(cartons)||cartons<1||cartons>99999)throw Error('Enter a valid carton count.');
+    if(weight&&(!Number.isFinite(Number(weight))||Number(weight)<0||Number(weight)>100000))throw Error('Invalid gross weight.');
+    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(a.get('date')||'')))throw Error('Choose a packing date.');
+    return {
+     carton_count:cartons,gross_weight_kg:weight?Number(weight):null,
+     package_dimensions:String(a.get('dimensions')||''),packed_by:String(a.get('packedBy')||''),
+     packing_date:String(a.get('date')),handling_instructions:String(a.get('instructions')||'')
+    };
+   }
+   function preview(){
+    try{
+     const values=payload();
+     modal.querySelector('#gr-packing-document').innerHTML=window.GreenRichDocuments.packingHtml({...order,...values},seller);
+     download.disabled=false;status.textContent=dirty?'Preview updated. Save to keep these packing details.':'Packing Slip ready for PDF.';
+    }catch(error){download.disabled=true;status.textContent=error.message}
+   }
+   async function persist(){
+    const values=payload();
+    const res=await db.rpc('gr_dispatch_save_packing',{
+     p_dispatch:id,p_cartons:values.carton_count,p_weight:values.gross_weight_kg,
+     p_dimensions:values.package_dimensions,p_packed_by:values.packed_by,
+     p_packing_date:values.packing_date,p_instructions:values.handling_instructions
+    });
+    if(res.error)throw Error(res.error.message);
+    dirty=false;status.textContent='Packing details saved to this dispatch order.';
+    return values;
+   }
+   form.addEventListener('input',()=>{dirty=true;preview()});
+   form.addEventListener('change',()=>{dirty=true;preview()});
+   modal.querySelector('[data-pack-save]')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try{await persist();actionMessage('Packing details saved')}
+    catch(error){status.textContent='Save failed: '+error.message;actionMessage(error.message)}
+    finally{button.disabled=false}
+   });
+   download.onclick=async event=>{
     const button=event.currentTarget;button.disabled=true;
     try{
-     await window.GreenRichInvoices.savePaper(modal.querySelector('#gr-packing-paper'),
-      'Packing-Slip-'+order.order_id);
+     if(canDispatch&&dirty)await persist();
+     await window.GreenRichInvoices.savePaper(modal.querySelector('#gr-packing-paper'),'Packing-Slip-'+order.order_id);
      actionMessage('Packing Slip PDF downloaded');
-    }catch(error){actionMessage('Packing Slip PDF failed: '+error.message)}
+    }catch(error){status.textContent='PDF error: '+error.message;actionMessage(error.message)}
     finally{button.disabled=false}
    };
-  }catch(error){modal.querySelector('#gr-packing-document').textContent='Packing slip unavailable: '+error.message;actionMessage(error.message)}
+   preview();
+  }catch(error){
+   modal.querySelector('#gr-packing-document').textContent='Packing slip unavailable: '+error.message;
+   actionMessage(error.message);
+  }
  }
  function updateServiceFields(){
   const form=q('#gr-dispatch-editor-form'),panel=q('#gr-dispatch-service-panel'),extra=q('#gr-dispatch-service-extra');
