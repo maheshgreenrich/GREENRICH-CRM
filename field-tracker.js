@@ -9,7 +9,7 @@
  const coord=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?'<a href="https://www.google.com/maps?q='+encodeURIComponent(a+','+b)+'" target="_blank" rel="noopener noreferrer" class="ft-link">View GPS location</a>':'—';
  const todayLocal=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)};
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
- let db,user,profile,company='',tab='visits',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],openSession=null;
+ let db,user,profile,company='',tab='visits',isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
  let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null;
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
  let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
@@ -131,7 +131,7 @@
  const ownerName=id=>team.find(t=>t.id===id)?.full_name||(id===user.id?profile.full_name:'Employee '+String(id||'').slice(0,8));
  function sessionState(){return openSession?'<span class="ft-pill online">● Shift checked in</span>':'<span class="ft-pill offline">● Not checked in</span>'}
  function nextTitle(){return {shift:'My Shift',visits:'My Visits',new:'Schedule Field Visit',history:'Visit & Location History',monitor:'Live Team Tracking',team:'Supervisor Access'}[tab]||'Field Tracker'}
- function setupNav(){document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
+ function setupNav(){document.querySelector('#ft-nav [data-tab="shift"]').hidden=!myFieldCompanies.includes(company);document.querySelectorAll('#ft-nav [data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#ft-monitor-link').hidden=!isSupervisor;$('#ft-team-link').hidden=!isAdmin;$('#ft-title').textContent=nextTitle();}
  async function bootstrap(){
   if(!window.supabase||!window.GREENRICH_PUBLIC_CONFIG)throw Error('Secure Supabase login library or public configuration is unavailable');
   const cfg=window.GREENRICH_PUBLIC_CONFIG;
@@ -149,7 +149,7 @@
   $('#ft-company').onchange=async ev=>{company=ev.target.value;tab='visits';await run(reload)};
   $('#ft-refresh').onclick=()=>run(reload);
   $('#ft-nav').addEventListener('click',ev=>{const item=ev.target.closest('[data-tab]');if(!item)return;const target=item.dataset.tab;
-   if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin))return;
+   if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin)||(target==='shift'&&!myFieldCompanies.includes(company)))return;
    tab=target;render();if(tab==='monitor')void run(()=>drawMap());});
   $('#ft-content').addEventListener('click',onClick);
   await reload();monitorTimer=setInterval(()=>{if(document.visibilityState==='visible'&&tab==='monitor'&&!refreshing)void run(reload)},30000);
@@ -159,7 +159,7 @@
   try{
    isSupervisor=await rpc('gr_field_supervisor',{p_company:company});
    isAdmin=await rpc('gr_field_is_admin',{p_company:company});
-   const [dir,allVisits,shift,allSessions,allPhotos,allPoints,allCustomers,allLeads,allSupervisors,allRules,allFollowupTeam,allFollowups]=await Promise.all([
+   const [dir,allVisits,shift,allSessions,allPhotos,allPoints,allCustomers,allLeads,allSupervisors,allRules,allFollowupTeam,allFollowups,fieldCompanies]=await Promise.all([
     rpc('gr_field_directory',{p_company:company}),
     q('gr_field_visits','*',x=>x.eq('company_id',company).order('due_at',{ascending:false}).limit(300)),
     q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1)),
@@ -171,9 +171,11 @@
     isAdmin?q('gr_field_supervisors','company_id,user_id',x=>x.eq('company_id',company)):Promise.resolve([]),
      rpc('gr_field_visit_rules_for_company',{p_company:company}),
      rpc('gr_field_followup_directory',{p_company:company}),
-     q('gr_field_visit_followups','id,company_id,visit_id,assigned_to,due_at,notes,status',x=>x.eq('company_id',company).order('due_at',{ascending:true}).limit(200))
+     q('gr_field_visit_followups','id,company_id,visit_id,assigned_to,due_at,notes,status',x=>x.eq('company_id',company).order('due_at',{ascending:true}).limit(200)),
+     rpc('gr_field_my_enabled_companies',{})
    ]);
-   team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;visitRules=allRules||{};followupTeam=allFollowupTeam||[];followups=allFollowups||[];
+   team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;visitRules=allRules||{};followupTeam=allFollowupTeam||[];followups=allFollowups||[];myFieldCompanies=fieldCompanies||[];
+    if(tab==='shift'&&!myFieldCompanies.includes(company))tab='visits';
    // Check across companies so a staff member cannot start a second shift.
    const wasOpen=openSession?.id;const shiftAcross=await q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1));
    openSession=shiftAcross[0]||null;
