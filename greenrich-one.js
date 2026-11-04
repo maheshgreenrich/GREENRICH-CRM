@@ -128,7 +128,12 @@ async function attendanceQuick(){
   button.setAttribute('aria-label',canCheckIn?'Check in for today':canCheckOut?'Check out for today':checkedOut?'Attendance completed for today':'Attendance already marked for today');
   button.disabled=!canCheckIn&&!canCheckOut;
   actionText.textContent=canCheckIn?'Check In':canCheckOut?'Check Out':checkedOut?'Completed':'Marked';
-  info.textContent=checkedOut?'Checked out':canCheckOut?'Checked in':record?'Recorded':'Not checked in';
+  let gpsHint=' · GPS status unavailable';
+  try{gpsHint=(await window.GreenRichFieldGPS.requiresAttendanceGPS(db))?' · GPS required':' · Time only'}
+  catch(error){console.warn('Could not verify employee GPS assignment',error.message)}
+  if(!button.isConnected)return;
+  info.textContent=(checkedOut?'Checked out':canCheckOut?'Checked in':record?'Recorded':'Not checked in')+gpsHint;
+  button.title=gpsHint.includes('required')?'GPS location is required for your attendance. Allow browser location access.':'Attendance date and time';
   button.onclick=async()=>{
    if(button.disabled)return;
    const mode=canCheckIn?'in':'out';
