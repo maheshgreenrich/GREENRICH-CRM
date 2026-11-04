@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Verify live customer forms
         run: npm ci --ignore-scripts && npm run test:forms
+      - name: Verify GPS access, attendance location, and daily staff map
+        run: npm run test:field
       - name: Check required app files
         run: |
           test -s index.html
