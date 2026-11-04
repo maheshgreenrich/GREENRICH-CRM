@@ -1,5 +1,5 @@
 'use strict';
-/* GreenRich opt-in, foreground-only staff GPS. Browser tabs may stop when hidden or locked. */
+/* GreenRich Admin-opt-in, 30-minute foreground GPS samples. Hidden or locked devices cannot be tracked reliably. */
 (()=>{
  let client=null,timer=null,busy=false,lastSave=0;
  async function enabledCompanies(db){
@@ -28,7 +28,7 @@
   return {companyId,...await locate()};
  }
  async function tick(){
-  if(!client||document.visibilityState!=='visible'||busy||Date.now()-lastSave<55000)return;
+  if(!client||document.visibilityState!=='visible'||busy||Date.now()-lastSave<29*60*1000)return;
   busy=true;
   try{
    const permitted=await enabledCompanies(client);
@@ -41,6 +41,8 @@
    const gps=await locate();
    const saved=await client.rpc('gr_field_record_point',{p_session:session.id,p_lat:gps.latitude,p_lng:gps.longitude,p_accuracy:gps.accuracy});
    if(saved.error)throw Error(saved.error.message);
+   // A second tab or the initial header check-in may already have saved this slot.
+   // Avoid repeatedly waking the GPS sensor for the same half-hour.
    lastSave=Date.now();
   }catch(err){console.info('Field GPS update skipped:',err.message)}
   finally{busy=false}
