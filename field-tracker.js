@@ -228,7 +228,7 @@
    (assigned.length?box('My Upcoming Follow-ups',assigned.slice(0,40).map(f=>{
      const v=visits.find(x=>x.id===f.visit_id);
      return '<div class="ft-listitem"><b>'+e(v?.title||'Customer follow-up')+'</b><p>Assigned to you · '+fmt(f.due_at)+
-      '<br>'+e(f.notes)+(v?.contact_name?'<br>Customer: '+e(v.contact_name):'')+'</p></div>';
+      '<br>'+e(f.notes)+(v?.contact_name?'<br>Customer: '+e(v.contact_name):'')+'</p>'+btn('Mark follow-up done','followdone',f.id,'ft-btn-sm ft-btn-ghost')+'</div>';
     }).join('')):'');
  }
  function visitCard(v){
@@ -341,7 +341,8 @@
   if(ev.target.closest('#ft-new-form button[type=submit]'))return;
  }
  async function actionHandler(action,id){
-  if(action==='testgps'){await testGPS();return}
+  if(action==='followdone'){await rpc('gr_field_complete_followup',{p_id:id});notify('Follow-up marked done.');await reload();return}
+   if(action==='testgps'){await testGPS();return}
   if(action==='testbackend'){await testBackend();return}
   if(action==='checkin'){
    if(openSession)throw Error('Already checked in. Check out before starting a new shift.');
