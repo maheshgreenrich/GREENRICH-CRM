@@ -14,7 +14,7 @@
   return get('year')+'-'+get('month')+'-'+get('day');
  };
  const staffColors=['#2563eb','#e11d48','#059669','#9333ea','#d97706','#0891b2','#be185d','#4f46e5','#0f766e','#ca8a04','#a21caf','#dc2626'];
- const staffColor=id=>{let n=0;for(const c of String(id||''))n=(n*31+c.charCodeAt(0))>>>0;return staffColors[n%staffColors.length]};
+ const staffColor=id=>{const ids=[...new Set([...team.map(x=>x.id),...points.map(x=>x.user_id)])].sort();const n=ids.indexOf(id);return n<staffColors.length&&n>=0?staffColors[n]:('hsl('+Math.round((Math.max(0,n)*137.508)%360)+' 72% 38%)')};
  const timeOnly=d=>new Date(d).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
 
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
@@ -164,13 +164,25 @@
   $('#ft-content').addEventListener('change',ev=>{
    if(ev.target.id==='ft-monitor-date'){
     const day=ev.target.value;
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(day)||day>indiaDay())return notify('Choose today or an earlier date.',true);
+    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day)||day>indiaDay())return notify('Choose today or an earlier date.',true);
     monitorDate=day;void run(reload);
    }else if(ev.target.id==='ft-monitor-person'){
     monitorPerson=ev.target.value;render();void run(drawMap);
    }
   });
   await reload();monitorTimer=setInterval(()=>{if(document.visibilityState==='visible'&&tab==='monitor'&&!refreshing)void run(reload)},30000);
+ }
+ async function monitorHistory(){
+  // Supabase Data API may limit one RPC page to 1,000 rows. Page through all
+  // half-hour samples so a full company/day is not silently cut off.
+  const result=[];
+  for(let offset=0;offset<20000;offset+=1000){
+   const page=await db.rpc('gr_field_monitor_day',{p_company:company,p_day:monitorDate}).range(offset,offset+999);
+   if(page.error)throw Error(page.error.message);
+   const batch=page.data||[];result.push(...batch);
+   if(batch.length<1000)break;
+  }
+  return result;
  }
  async function reload(){
   if(refreshing)return;refreshing=true;
@@ -183,7 +195,7 @@
     q('gr_field_sessions','*',x=>x.eq('user_id',user.id).is('checkout_at',null).limit(1)),
     q('gr_field_sessions','*',x=>x.eq('company_id',company).order('checkin_at',{ascending:false}).limit(300)),
     q('gr_field_photos','id,company_id,visit_id,uploaded_by,object_path,notes,lat,lng,accuracy_m,captured_at',x=>x.eq('company_id',company).order('captured_at',{ascending:false}).limit(250)),
-    isSupervisor&&tab==='monitor'?rpc('gr_field_monitor_day',{p_company:company,p_day:monitorDate}):Promise.resolve([]),
+    isSupervisor&&tab==='monitor'?monitorHistory():Promise.resolve([]),
     q('gr_crm_customers','id,name,mobile,address1,address2,city',x=>x.order('name').limit(200)),
     q('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,lead_heat,assigned_to',x=>x.eq('company_id',company).order('updated_at',{ascending:false}).limit(250)),
     isAdmin?q('gr_field_supervisors','company_id,user_id',x=>x.eq('company_id',company)):Promise.resolve([]),
@@ -378,7 +390,7 @@
     desc.textContent=ownerName(g.userId)+' · '+fmt(p.recorded_at)+' · Accuracy ±'+Math.round(p.accuracy_m)+' m';
     dot.bindPopup(desc);marks.push([p.lat,p.lng]);
    }
-   const p=g.last,initials=ownerName(g.userId).split(/\\s+/).slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
+   const p=g.last,initials=ownerName(g.userId).split(/\s+/).slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
    const pin=window.L.divIcon({className:'ft-staff-pin-wrap',html:'<div class="ft-staff-pin" style="--pin-color:'+g.color+'">'+e(initials||'●')+'</div>',iconSize:[40,48],iconAnchor:[20,46],popupAnchor:[0,-44]});
    const marker=window.L.marker([p.lat,p.lng],{icon:pin,zIndexOffset:1000}).addTo(map);
    const detail=document.createElement('div');
