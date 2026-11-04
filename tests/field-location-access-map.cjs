@@ -30,5 +30,8 @@ assert.ok(service.includes('Last known · not live')&&service.includes('monitorF
 assert.ok(service.includes("tab!=='monitor'||!isSupervisor"));
 assert.ok(mapSql.includes('public.gr_field_supervisor(p_company)')&&mapSql.includes('date_bin'));
 assert.ok(mapSql.includes("to authenticated")&&mapSql.includes('revoke all'));
-assert.ok(html.includes('Staff GPS Map & History'));
+assert.ok(html.includes('Live Staff & GPS'));
+assert.ok(admin.includes('Open Live Staff & GPS Map'));
+assert.ok(header.includes('#field-location-access')&&header.includes('#live-staff-gps'));
+assert.ok(header.includes('grFieldTracker')&&service.includes("get('view')==='monitor'"));
 console.log('PASS: Field Location Access, attendance GPS opt-in, 30-minute samples, secure supervisor daily coloured map and history.');
