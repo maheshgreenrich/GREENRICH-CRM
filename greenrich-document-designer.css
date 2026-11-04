@@ -71,3 +71,18 @@
 .gr-order-actions [data-packing-slip]{font-size:11.5px!important}
 @media(max-width:1030px){.gr-doc-designer{grid-template-columns:1fr}#gr-doc-preview{max-height:700px}}
 @media(max-width:700px){.gr-doc-form-grid,.gr-doc-flag-list{grid-template-columns:1fr}.gr-packing-preview{padding:8px}.gr-doc-preview-area{padding:8px}#gr-doc-preview .gr-doc-paper{transform:scale(.43);margin-bottom:-620px}}
+
+/* Editable packing details saved per dispatch order. */
+.gr-packing-fields{padding:15px 18px;background:#fff;border-bottom:1px solid #e0e7f1}
+.gr-packing-fields h3{font-size:15px;color:#1a3c72;margin:0 0 6px}
+.gr-packing-fields p{font-size:12px;color:#64748b;margin:0 0 10px}
+.gr-packing-edit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.gr-packing-edit-grid label{display:grid;gap:5px;font-size:12px;color:#3b5877}
+.gr-packing-edit-grid label.wide{grid-column:1/-1}
+.gr-packing-edit-grid input,.gr-packing-edit-grid textarea{min-height:39px;border:1px solid #d3e0ef;background:#fff;border-radius:7px;width:100%;font-size:12px;padding:9px}
+.gr-packing-edit-grid [readonly]{background:#f6f9fc}
+#gr-packing-status{margin:10px 0 0;font-size:12px;color:#41617f}
+.gr-packing-actions .btn{font-size:12px!important}
+#grCrmWorkspace .gr-order-actions .gr-packing-direct{display:inline-flex!important;align-items:center;justify-content:center;font-weight:700;white-space:normal;min-width:100px;padding:8px!important}
+@media(max-width:760px){.gr-packing-edit-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.gr-packing-edit-grid{grid-template-columns:1fr}.gr-packing-actions{width:100%;flex-wrap:wrap}}
