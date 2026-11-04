@@ -1,0 +1,73 @@
+/* GreenRich document designer, Packing Slip PDF preview and invoice appearance. */
+.gr-doc-paper{box-sizing:border-box;width:794px;min-height:1123px;max-width:none;background:#fff;color:#1c2941;padding:var(--gr-doc-padding,26px);font-family:var(--gr-doc-font,Arial),sans-serif;font-size:calc(12px * var(--gr-doc-scale,1));line-height:1.45;box-shadow:0 3px 16px #14234118}
+.gr-doc-paper *{box-sizing:border-box;font-family:inherit}
+.gr-doc-paper h1,.gr-doc-paper h2,.gr-doc-paper h3{color:var(--gr-doc-accent,#2255aa);margin:0}
+.gr-doc-paper p{color:#344b61;font-size:inherit;line-height:1.5}
+.gr-doc-brand{display:flex;align-items:center;gap:17px;padding-bottom:18px;border-bottom:3px solid var(--gr-doc-accent,#2255aa)}
+.gr-doc-brand strong{display:block;font-size:1.35em;color:#152747}
+.gr-doc-brand small{display:block;margin-top:5px;color:#506780;font-size:.9em}
+.gr-doc-logo{width:84px;max-height:74px;object-fit:contain}
+.gr-doc-header-message{margin:14px 0 0;text-align:center}
+.gr-doc-title{text-align:center;margin:22px 0 18px}
+.gr-doc-title h1{font-size:2em;letter-spacing:.07em}
+.gr-doc-title p{font-size:1em;margin-top:7px}
+.gr-doc-references{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #dae2ef;border-radius:8px;overflow:hidden}
+.gr-doc-data{padding:10px 13px;border-bottom:1px solid #e5eaf2;min-width:0}
+.gr-doc-data:nth-child(2n){border-left:1px solid #e5eaf2}
+.gr-doc-data span{display:block;font-size:.88em;color:#687e98;margin-bottom:4px}
+.gr-doc-data strong{display:block;font-size:.99em;color:#273b55;overflow-wrap:anywhere}
+.gr-doc-address{margin:18px 0;border:1px solid #dde5f1;padding:14px;border-radius:8px}
+.gr-doc-address h3{font-size:1em;margin-bottom:8px}
+.gr-doc-address p{margin:0}
+.gr-doc-lines{width:100%;border-collapse:collapse;margin:20px 0;table-layout:fixed}
+.gr-doc-paper .gr-doc-lines th,.gr-doc-paper .gr-doc-lines td{padding:10px 9px!important;border:1px solid #d5deec!important;font-size:.96em!important;text-align:left!important;background:#fff!important;color:#20334e!important;overflow-wrap:anywhere}
+.gr-doc-paper .gr-doc-lines th{background:#eef3fa!important;font-weight:700}
+.gr-doc-paper .gr-doc-lines .num{text-align:right!important}
+.gr-doc-custom-details{border:1px solid #e0e7f1;border-radius:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:18px 0 20px;overflow:hidden}
+.gr-doc-custom-details .gr-doc-data{border-bottom:1px solid #e0e7f1}
+.gr-doc-signatures{display:grid;grid-template-columns:1fr 1fr;gap:55px;margin-top:85px}
+.gr-doc-signatures strong{display:block;font-size:.9em}
+.gr-doc-signatures span{display:block;border-bottom:1px solid #7b8ca3;margin-top:53px}
+.gr-doc-footer{font-size:.9em!important;color:#637792!important;text-align:center;margin:42px 0 10px;white-space:pre-wrap}
+.gr-doc-hide{display:none!important}
+#grCrmWorkspace .gr-invoice-paper.gr-doc-custom{padding:var(--gr-doc-padding,26px)!important;font-size:calc(11px * var(--gr-doc-scale,1))!important}
+#grCrmWorkspace .gr-invoice-paper.gr-doc-custom,#grCrmWorkspace .gr-invoice-paper.gr-doc-custom *{font-family:var(--gr-doc-font,Arial),sans-serif!important}
+#grCrmWorkspace .gr-invoice-paper.gr-doc-custom .gr-invoice-heading{color:var(--gr-doc-accent)!important}
+.gr-doc-invoice-banner{display:flex;align-items:center;justify-content:center;gap:18px;margin:6px 0 13px;white-space:pre-wrap}
+.gr-doc-invoice-subtitle{text-align:center;margin:2px 0 12px;color:#516c8a}
+.gr-doc-invoice .gr-doc-custom-details{margin:0;border-radius:0}
+.gr-document-settings p{max-width:880px;font-size:13px}
+.gr-doc-settings-select{display:flex;gap:13px;flex-wrap:wrap;align-items:end;margin:17px 0}
+.gr-doc-settings-select label{flex:1 1 240px;max-width:450px}
+.gr-doc-designer{display:grid;grid-template-columns:minmax(330px,.94fr) minmax(340px,1.06fr);gap:22px;align-items:start}
+.gr-doc-edit{border:1px solid #e0e7f1;padding:17px;border-radius:12px;background:#fff}
+.gr-doc-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.gr-doc-form-grid label{font-size:12px;min-width:0}
+.gr-doc-form-grid textarea{min-height:68px}
+.gr-doc-edit h3{font-size:14px;margin:18px 0 10px;color:#254873}
+.gr-doc-flag-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gr-doc-flag-list label{display:flex;align-items:center;gap:7px;padding:8px;background:#f6f9fe;border:1px solid #e1e9f6;border-radius:8px;font-size:11.5px}
+.gr-doc-flag-list input{width:auto!important;flex:none}
+.gr-doc-custom-input{display:grid;margin-top:18px;gap:7px;font-size:12px}
+.gr-doc-custom-input textarea{min-height:110px}
+.gr-doc-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.gr-doc-actions .blue,.gr-doc-actions .secondary{width:auto!important}
+.gr-doc-preview-area{border:1px solid #dce5f1;border-radius:12px;padding:14px;min-width:0;background:#f3f6fa;overflow:hidden}
+.gr-doc-preview-area h3{font-size:14px;color:#284879;margin:0 0 12px}
+#gr-doc-preview{width:100%;overflow:auto;max-height:790px}
+#gr-doc-preview .gr-doc-paper{transform:scale(.63);transform-origin:top left;margin-bottom:-415px;box-shadow:0 2px 12px #2345}
+#gr-doc-preview .gr-doc-invoice-example h1{margin:20px 0;color:var(--gr-doc-accent);font-size:2em;text-align:center}
+.gr-packing-dialog{width:min(1040px,calc(100vw - 20px));max-height:96vh;overflow:auto;border:0;border-radius:14px;padding:0;background:#f4f7fc}
+.gr-packing-tools{position:sticky;z-index:4;top:0;background:#fff;border-bottom:1px solid #dde6f2;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.gr-packing-tools h2{margin:0;font-size:18px;color:#193968}
+.gr-packing-actions{display:flex;gap:8px}
+.gr-packing-preview{padding:17px;overflow:auto}
+.gr-packing-preview .gr-doc-paper{margin:auto}
+.gr-ops-dialog .gr-dispatch-service-fields{border:1px solid #cfdef3;background:#f6f9ff;border-radius:10px;padding:13px;margin:8px 0;display:grid;gap:10px}
+.gr-ops-dialog .gr-dispatch-service-fields p{margin:0;font-size:12px;color:#49668c}
+.gr-ops-dialog .gr-dispatch-service-fields[hidden]{display:none!important}
+.gr-ops-dialog .gr-dispatch-followup-option{margin:12px 0 0}
+.gr-ops-dialog .gr-dispatch-followup-option select{width:100%;max-width:100%}
+.gr-order-actions [data-packing-slip]{font-size:11.5px!important}
+@media(max-width:1030px){.gr-doc-designer{grid-template-columns:1fr}#gr-doc-preview{max-height:700px}}
+@media(max-width:700px){.gr-doc-form-grid,.gr-doc-flag-list{grid-template-columns:1fr}.gr-packing-preview{padding:8px}.gr-doc-preview-area{padding:8px}#gr-doc-preview .gr-doc-paper{transform:scale(.43);margin-bottom:-620px}}
