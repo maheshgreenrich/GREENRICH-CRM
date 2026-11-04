@@ -386,7 +386,7 @@ async function settings(c){
  });
 }
 function serviceInstallation(c){
- c.innerHTML='<iframe id="grFieldTracker" title="Service & Installation Visits" src="./field-tracker.html?embedded=1" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 140px);min-height:620px;border:0;border-radius:12px;margin:0"></iframe>';
+ c.innerHTML='<iframe id="grFieldTracker" title="Service & Installation Visits" src="./field-tracker.html?embedded=1&build=20261104-close-visit-photo-notes-2" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 140px);min-height:620px;border:0;border-radius:12px;margin:0"></iframe>';
 }
 async function operations(c){
  if(!window.GreenRichOperations)throw Error('Operations module is missing. Refresh GreenRich ONE.');
