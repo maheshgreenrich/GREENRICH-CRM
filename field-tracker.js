@@ -343,11 +343,11 @@
  function drawMonitor(){
   const groups=monitoredGroups(),total=groups.reduce((n,g)=>n+g.list.length,0);
   const fresh=groups.filter(g=>monitorFresh(g.last.recorded_at)).length;
-  const staffed=[...new Set((points||[]).map(p=>p.user_id))].sort((a,b)=>ownerName(a).localeCompare(ownerName(b)));
+  const staffed=[...new Set([...team.map(x=>x.id),...(points||[]).map(p=>p.user_id)])].sort((a,b)=>ownerName(a).localeCompare(ownerName(b)));
   const names=staffed.includes(monitorPerson)?staffed:monitorPerson==='all'?staffed:[monitorPerson,...staffed];
   const filter='<div class="ft-monitor-filters">'+
    '<label>Attendance date (IST)<input type="date" id="ft-monitor-date" max="'+indiaDay()+'" value="'+e(monitorDate)+'"></label>'+
-   '<label>Employee<select id="ft-monitor-person"><option value="all">All field employees</option>'+
+   '<label>Employee<select id="ft-monitor-person"><option value="all">All employees with GPS data</option>'+
    names.map(id=>'<option value="'+e(id)+'" '+(monitorPerson===id?'selected':'')+'>'+e(ownerName(id))+'</option>').join('')+
    '</select></label>'+btn('Show Today','monitorToday','','ft-btn-soft')+'</div>';
   const legend=groups.length?'<div class="ft-map-legend">'+groups.map(g=>'<span class="ft-legend-item"><i style="background:'+g.color+'"></i><b>'+e(ownerName(g.userId))+
