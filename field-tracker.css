@@ -42,3 +42,18 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .ft-visit .ft-actions [data-action="complete"]{font-weight:700;white-space:normal;min-width:175px}
 .ft-modal .ft-form [type="submit"]{width:100%;min-height:46px;font-weight:700}
 @media(max-width:680px){.ft-visit .ft-actions{width:100%;justify-content:stretch}.ft-visit .ft-actions .ft-btn{flex:1 1 170px}.ft-modal-inner{padding:16px}}
+
+/* Supervisor movement history: distinct employee colours and safe map freshness labels. */
+.ft-monitor-filters{display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:14px 16px;margin:0 0 16px;border:1px solid #dce5f2;background:#fff;border-radius:12px}
+.ft-monitor-filters label{display:grid;gap:6px;min-width:175px;font-size:12px;font-weight:700;color:#34516c}
+.ft-monitor-filters input,.ft-monitor-filters select{min-height:42px}
+.ft-map-legend{display:flex;gap:8px 18px;flex-wrap:wrap;margin:10px 0 15px}
+.ft-legend-item{display:inline-flex;gap:7px;align-items:center;color:#405775;font-size:12px}
+.ft-legend-item i,.ft-table-dot{display:inline-block;width:11px;height:11px;flex:0 0 11px;border-radius:100%;border:1px solid #fff;box-shadow:0 0 0 1px #b5c7de}
+.ft-table-dot{vertical-align:middle;margin-right:7px}
+.ft-staff-pin-wrap{border:0;background:transparent}
+.ft-staff-pin{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;box-sizing:border-box;border:3px solid #fff;border-radius:100%;background:var(--pin-color);color:#fff;font:800 13px/1 Inter,system-ui,sans-serif;box-shadow:0 2px 8px #0005}
+.ft-staff-pin:after{content:'';position:absolute;top:33px;left:12px;border:6px solid transparent;border-top-color:var(--pin-color)}
+.ft-map .leaflet-popup-content{font:500 12px/1.45 Inter,system-ui,sans-serif}
+.ft-map{min-height:420px}
+@media(max-width:640px){.ft-monitor-filters label{flex:1 1 135px;min-width:0}.ft-monitor-filters .ft-btn{flex:1 1 100%;justify-content:center}.ft-map{min-height:330px}}
