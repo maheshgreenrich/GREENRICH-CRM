@@ -1,6 +1,6 @@
 'use strict';
-(()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles'].includes(location.hash)?'settings':'dashboard'),company=null;
-let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles'})[location.hash]||'companies';
+(()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles','#field-location-access','#settings-field-access'].includes(location.hash)?'settings':location.hash==='#live-staff-gps'?'service':'dashboard'),company=null;
+let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles','#field-location-access':'fieldaccess','#settings-field-access':'fieldaccess'})[location.hash]||'fieldaccess';
 const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','dispatch','stock','marketing','operations','service','purchase','accounts','settings'];
 const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',service:'Service and Installation',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
 const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
@@ -365,7 +365,7 @@ async function permissionPage(c){
 async function settings(c){
  if(roleName()!=='Admin')throw Error('Administrator access only');
  if(!window.GreenRichCompanies?.mount)throw Error('Settings module is not loaded. Reload the page.');
- const initialTab=settingsInitialTab;settingsInitialTab='companies';
+ const initialTab=settingsInitialTab;settingsInitialTab='fieldaccess';
  await window.GreenRichCompanies.mount(c,{
   db,user,role:roleName(),notify:toast,initialTab,
   openUsers:host=>users(host),
@@ -392,7 +392,8 @@ async function settings(c){
  });
 }
 function serviceInstallation(c){
- c.innerHTML='<iframe id="grFieldTracker" title="Service & Installation Visits" src="./field-tracker.html?embedded=1&build=20261104-field-location-access-map-2" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 140px);min-height:620px;border:0;border-radius:12px;margin:0"></iframe>';
+ const gpsView=location.hash==='#live-staff-gps';
+ c.innerHTML='<iframe id="grFieldTracker" title="Service & Installation Visits" src="./field-tracker.html?embedded=1&build=20261104-gps-access-release-1'+(gpsView?'&view=monitor':'')+'" allow="geolocation; camera" style="display:block;width:100%;height:calc(100dvh - 140px);min-height:620px;border:0;border-radius:12px;margin:0"></iframe>';
 }
 async function operations(c){
  if(!window.GreenRichOperations)throw Error('Operations module is missing. Refresh GreenRich ONE.');
