@@ -174,8 +174,8 @@
    '<td>'+esc(new Date(r.approved_at).toLocaleDateString('en-IN'))+'</td>'+
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
-   '<td><div class="gr-order-actions">'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
-   '<button class="btn soft" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+   (canDispatch&&r.status!=='Delivered'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
+   '<td><div class="gr-order-actions"><button class="btn soft gr-packing-direct" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
+   (canDispatch&&r.status!=='Delivered'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
    )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
