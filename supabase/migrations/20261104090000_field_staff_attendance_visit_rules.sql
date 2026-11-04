@@ -95,7 +95,7 @@ begin
  if not public.gr_field_member(p_company) then raise exception 'Company access required';end if;
  return (select coalesce(jsonb_object_agg(t, jsonb_build_object('photo_required',coalesce(r.photo_required,t in ('sales','site')),
       'min_notes',coalesce(r.min_notes,10))), '{}'::jsonb)
- from unnest(array['sales','service','site','installation']::text[]) t
+ from unnest(array['sales','service','site','installation']::text[]) as kinds(t)
  left join public.gr_field_visit_rules r on r.company_id=p_company and r.visit_type=t);
 end $$;
 create or replace function public.gr_field_my_enabled_companies()
