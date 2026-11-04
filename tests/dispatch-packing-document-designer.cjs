@@ -12,6 +12,10 @@ assert.ok(sales.includes("service_followup==='yes'"),'Only explicit Yes schedule
 assert.ok(sales.includes("window.GreenRichShell?.openPage?.('service')"),'Dispatch should open Service & Installation');
 assert.ok(sales.includes("gr_field_followup_directory"),'Dispatch must load authorized service employees');
 assert.ok(sales.includes("serviceLinks"),'Dispatch must read linked service visits');
+assert.ok(sales.includes('gr_dispatch_save_packing'),'Per-order packing fields must save securely');
+assert.ok(sales.includes('gr_dispatch_packing_details'),'Packing details must reload on PDF preview');
+assert.ok(sales.includes('name="cartons"')&&sales.includes('name="weight"')&&sales.includes('name="packedBy"'));
+assert.ok(sales.includes('name="instructions"')&&sales.includes('name="date"'));
 assert.ok(invoice.includes("window.GreenRichDocuments.invoiceHtml"),'Invoice preview and PDF must respect saved layout');
 assert.ok(invoice.includes('current.document_config='),'New issued invoices must freeze template settings');
 assert.ok(invoice.includes('savePaper:savePdf'),"Packing slip reuses invoice A4 PDF generation");
@@ -24,6 +28,9 @@ assert.ok(sql.includes('enable row level security'),'Both new tables must have R
 assert.ok(sql.includes('if p_service is null then p_service:=false'),'Default must be no service');
 assert.ok(sql.includes("d.status not in ('Shipped','Delivered')"),'No premature delivery');
 assert.ok(sql.includes('Service decision already recorded'),'Retry must not duplicate service visits');
+const packingSql=read('supabase/migrations/20261104103000_dispatch_packing_order_specific_fields.sql');
+for(const token of ['gr_dispatch_packing_details','gr_dispatch_save_packing','enable row level security','gr_dispatch_allowed','p_cartons','p_weight'])
+ assert.ok(packingSql.includes(token),'Per-order secure packing storage missing '+token);
 const dom=new JSDOM('<main id="root"></main>',{url:'https://example.org/secure.html',runScripts:'outside-only'});
 const w=dom.window;
 w.eval(read('greenrich-document-designer.js'));
@@ -34,6 +41,10 @@ const pack=api.packingHtml(minimal,{legal_name:'GreenRich Grow India Pvt Ltd'});
 assert.ok(pack.includes('PACKING SLIP')&&pack.includes('ORD-101'));
 assert.ok(pack.includes('Test &amp; Client')&&!pack.includes('Composter <tag>'),'Customer and product must be escaped');
 assert.ok(!pack.includes('₹15,000'),'Default packing slip must not expose order value');
+const detailsPack=api.packingHtml({...minimal,carton_count:3,gross_weight_kg:25.5,packed_by:'Dispatch Staff',
+ handling_instructions:'Keep upright',packing_date:'2026-11-04'},{legal_name:'GreenRich'});
+assert.ok(detailsPack.includes('25.5')&&detailsPack.includes('Keep upright')&&detailsPack.includes('Dispatch Staff'));
+assert.ok(detailsPack.includes('Number of cartons'));
 const exposed=api.normalize('packing',{visible:{price:true},title:'Custom Pack'});
 const priced=api.packingHtml(minimal,{legal_name:'GreenRich'},exposed);
 assert.ok(priced.includes('Custom Pack')&&priced.includes('₹15,000'));
