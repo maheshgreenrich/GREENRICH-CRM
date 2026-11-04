@@ -16,7 +16,8 @@ window.GreenRichAttendance=(function(){
  async function request(path,method='GET',body=null,download=false){
   const session=(await db.auth.getSession()).data.session;
   if(!session)throw Error('Sign in again to continue.');
-  const r=await fetch(apiRoot+path,{method,headers:{Authorization:'Bearer '+session.access_token,apikey:apiKey,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  if(method==='POST'&&(path==='/attendance/check-in'||path==='/attendance/check-out'))body=await window.GreenRichFieldGPS.attendanceBody(db);
+   const r=await fetch(apiRoot+path,{method,headers:{Authorization:'Bearer '+session.access_token,apikey:apiKey,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});
   if(download){if(!r.ok){const b=await r.json().catch(()=>null);throw Error(b?.error?.message||'Download failed ('+r.status+')')}return r}
   const b=await r.json().catch(()=>null);
   if(!r.ok)throw Error(b?.error?.message||'Attendance server rejected this request ('+r.status+')');
