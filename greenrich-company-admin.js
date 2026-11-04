@@ -31,8 +31,8 @@
   if(ctx.role!=='Admin')throw Error('Only Admin may manage company settings');
   currentUser=ctx.user.id;
   if(!latest.length)await configure({userId:ctx.user.id,companyIds:access,db:ctx.db});
-  let currentTab=['companies','branding','users','roles','tags','sheets','sources','invoices','channels','reports','dashboard','whatsapp','forms','field','fieldaccess'].includes(ctx.initialTab)?ctx.initialTab:'fieldaccess';
-  const tabs=[['fieldaccess','Field Location Access'],['field','Visit Completion Rules'],['companies','Company Profiles'],['branding','Workspace Logo'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['forms','Form Builder'],['sheets','Google Sheet Leads'],['sources','Lead Sources'],['invoices','Invoice Settings'],['dashboard','Dashboard Access'],['whatsapp','WhatsApp Integration'],['channels','Sales Channels'],['reports','Import & Export']];
+  let currentTab=['companies','branding','users','roles','tags','sheets','sources','invoices','channels','reports','dashboard','whatsapp','forms','field','fieldaccess','documents'].includes(ctx.initialTab)?ctx.initialTab:'fieldaccess';
+  const tabs=[['fieldaccess','Field Location Access'],['field','Visit Completion Rules'],['companies','Company Profiles'],['branding','Workspace Logo'],['users','User Management'],['roles','User Roles'],['tags','Customer Tags'],['forms','Form Builder'],['sheets','Google Sheet Leads'],['sources','Lead Sources'],['invoices','Invoice Settings'],['documents','Document Designer'],['dashboard','Dashboard Access'],['whatsapp','WhatsApp Integration'],['channels','Sales Channels'],['reports','Import & Export']];
   root.innerHTML='<div id="gr-company-admin"><div class="panel"><div class="gr-gps-settings-hero"><div><h2>Settings</h2><p>Manage employee permissions and field GPS tracking. Use <b>Field Location Access</b> to choose exactly which employees share their location at header attendance Check In.</p></div><a class="gr-gps-direct-link" href="./secure.html?grBuild=20261104-gps-access-release-1#live-staff-gps">Open Live Staff & GPS Map</a></div><div class="gr-settings-tabs" role="navigation" aria-label="Administrator settings">'+tabs.map(([v,label])=>'<button type="button" data-settings-tab="'+v+'" class="secondary">'+label+'</button>').join('')+'</div><p class="gr-settings-version">GreenRich ONE GPS Access update · 04 Nov 2026</p></div><div id="gr-company-settings-content"></div></div>';
   const host=root.querySelector('#gr-company-settings-content'),notice=ctx.notify;
   async function showCompanyCards(){
@@ -70,6 +70,7 @@
    if(tab==='dashboard'){host.innerHTML='<div class="panel">Loading dashboard access...</div>';try{await ctx.openDashboardAccess(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(tab==='whatsapp'){host.innerHTML='<div class="panel">Loading WhatsApp settings...</div>';try{await ctx.openWhatsAppSettings(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
     if(tab==='invoices'){host.innerHTML='<div class="panel">Loading invoice settings...</div>';try{await ctx.openInvoiceSettings(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
+   if(tab==='documents'){host.innerHTML='<div class="panel">Loading Invoice & Packing Slip Designer...</div>';try{await ctx.openDocumentDesigner(host)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}return}
    if(!['channels','reports'].includes(tab))return;
    host.innerHTML='<div class="panel">Opening Admin tools...</div>';try{await ctx.openCRM(host,tab,true)}catch(e){host.innerHTML='<div class="notice">'+escape(e.message)+'</div>'}
   }
