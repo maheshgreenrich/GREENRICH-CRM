@@ -224,9 +224,14 @@
  list.map(s=>'<tr><td><b>'+e(ownerName(s.user_id))+'</b></td><td>'+fmt(s.checkin_at)+'</td><td>'+coord(s.checkin_lat,s.checkin_lng)+'</td><td>'+fmt(s.checkout_at)+'</td><td>'+coord(s.checkout_lat,s.checkout_lng)+'</td><td>'+btn('GPS route','route',s.id,'ft-btn-ghost ft-btn-sm')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ft-empty">No field shift records yet.</div>'}
  function drawVisits(){
   const items=filterCompany().filter(v=>v.assigned_to===user.id).sort((a,b)=>(a.status==='completed')-(b.status==='completed')||new Date(a.due_at)-new Date(b.due_at));
+  const others=isSupervisor?filterCompany().filter(v=>v.assigned_to!==user.id&&v.status!=='cancelled')
+   .sort((a,b)=>(a.status==='completed')-(b.status==='completed')||new Date(a.due_at)-new Date(b.due_at)):[];
   const assigned=followups.filter(f=>f.assigned_to===user.id&&f.status==='pending').sort((x,y)=>new Date(x.due_at)-new Date(y.due_at));
-  return box('My Assigned Visits','<p>Record arrival GPS, finish with current GPS and notes. Photos follow Admin settings.</p>'+
-   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned yet.</div>'))+
+  return box('My Assigned Visits','<p><b>Close Visit · Photo & Notes</b> opens the completion form for planned and arrived visits. Current GPS and visit notes are required; photos follow Admin settings. You do not need a separate field-shift check-in to close a visit.</p>'+
+   (items.length?items.slice(0,80).map(v=>visitCard(v)).join(''):'<div class="ft-empty">No visits assigned to you in this company. Select Schedule Visit to create one, or ask a supervisor to assign an existing visit.</div>'))+
+   (others.length?box('Other Team Visits · Supervisor View',
+     '<p>These visits belong to other employees. Only the assigned employee can upload evidence or close the visit. You can view their visit status and saved proof here.</p>'+
+      others.slice(0,100).map(v=>visitCard(v)).join('')):'')+
    (assigned.length?box('My Upcoming Follow-ups',assigned.slice(0,40).map(f=>{
      const v=visits.find(x=>x.id===f.visit_id);
      return '<div class="ft-listitem"><b>'+e(v?.title||'Customer follow-up')+'</b><p>Assigned to you · '+fmt(f.due_at)+
@@ -236,18 +241,23 @@
  function visitCard(v){
   const pp=photos.filter(p=>p.visit_id===v.id);
   const follow=followups.filter(f=>f.visit_id===v.id).map(f=>'<br><b>Next action:</b> '+e(followupTeam.find(t=>t.id===f.assigned_to)?.full_name||'Assigned staff')+' · '+fmt(f.due_at)+' · '+e(f.notes)).join('');
-   const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
-  const actions=v.status==='planned'?
-   btn('Arrived · GPS check-in','arrive',v.id,'ft-btn'):'';
-  const extra=v.status==='on_site'?btn('Upload photo proof','upload',v.id,'ft-btn-soft')+
-   btn('Complete visit','complete',v.id,'ft-btn'):v.status==='completed'?btn('View proof','proof',v.id):'';
+  const heat=v.lead_heat?'<span class="ft-heat '+e(v.lead_heat.toLowerCase())+'">Lead '+e(v.lead_heat)+'</span>':'';
+  const mine=v.assigned_to===user.id,canClose=mine&&['planned','traveling','on_site'].includes(v.status);
+  const actions=canClose?
+    (v.status==='on_site'?'':btn('Mark Arrived · GPS','arrive',v.id,'ft-btn-soft'))+
+    btn('Close Visit · Photo & Notes','complete',v.id,'ft-btn')+
+    (v.status==='on_site'?btn('Add Another Photo','upload',v.id,'ft-btn-soft'):''):'';
+  const extra=(v.status==='completed'||pp.length)?btn('View Photos & Notes','proof',v.id,'ft-btn-ghost'):'';
   return '<div class="ft-listitem"><div class="ft-visit"><div><div class="ft-row">'+pill(v.status)+'<span class="ft-pill">'+e(v.visit_type.toUpperCase())+'</span>'+heat+'</div>'+
    '<h3 style="margin-top:10px">'+e(v.title)+'</h3><p><b>Customer:</b> '+e(v.contact_name||'—')+
+   ' &nbsp; <b>Assigned to:</b> '+e(ownerName(v.assigned_to))+
    ' &nbsp; <b>Scheduled:</b> '+fmt(v.due_at)+'<br><b>Address:</b> '+e(v.address||'—')+
    (v.arrival_at?'<br><b>Arrived:</b> '+fmt(v.arrival_at)+' · '+coord(v.arrival_lat,v.arrival_lng):'')+
    (v.completed_at?'<br><b>Completed:</b> '+fmt(v.completed_at)+' · '+coord(v.completed_lat,v.completed_lng):'')+
-   '<br><b>Proof:</b> '+pp.length+' photo(s)'+(v.recurrence_every?'<br><b>Repeat:</b> Every '+v.recurrence_every+' '+e(v.recurrence_unit):'')+'</p>'+
-   (v.completion_notes?'<p><b>Report:</b> '+e(v.completion_notes)+(v.sales_outcome?' · <b>Sales result:</b> '+e(v.sales_outcome.replaceAll('_',' ')):'')+follow+'</p>':'')+'</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
+   '<br><b>Attached photos:</b> '+pp.length+(v.recurrence_every?'<br><b>Repeat:</b> Every '+v.recurrence_every+' '+e(v.recurrence_unit):'')+'</p>'+
+   (v.completion_notes?'<p><b>Visit report:</b> '+e(v.completion_notes)+(v.sales_outcome?' · <b>Sales result:</b> '+e(v.sales_outcome.replaceAll('_',' ')):'')+follow+'</p>':'')+
+   (!mine&&v.status!=='completed'?'<p class="ft-note">Only '+e(ownerName(v.assigned_to))+' can close this visit.</p>':'')+
+   '</div><div class="ft-actions">'+actions+extra+'</div></div></div>';
  }
  function drawNew(){
   return box('Schedule a service, sales or site visit',
@@ -329,12 +339,12 @@
    '<p><b>Additional supervisors currently granted:</b> '+(supervisors.length?supervisors.map(s=>e(ownerName(s.user_id))).join(', '):'None')+'</p>');
  }
  function modal(title,body,submit){
-  const d=document.createElement('dialog');d.className='ft-modal';d.innerHTML='<div class="ft-modal-inner"><div class="ft-row ft-between"><h2>'+e(title)+'</h2><button class="ft-btn ft-btn-ghost ft-btn-sm" data-close type="button">✕ Close</button></div>'+body+'</div>';
+  const d=document.createElement('dialog');d.className='ft-modal';d.innerHTML='<div class="ft-modal-inner"><div class="ft-row ft-between"><h2>'+e(title)+'</h2><button class="ft-btn ft-btn-ghost ft-btn-sm" data-close type="button">✕ Close</button></div><p class="ft-modal-error" role="alert" hidden></p>'+body+'</div>';
   document.body.appendChild(d);d.querySelector('[data-close]').onclick=()=>d.close();d.onclose=()=>d.remove();
   const form=d.querySelector('form');if(form&&submit)form.onsubmit=async ev=>{
    ev.preventDefault();const save=form.querySelector('[type=submit]');if(save)save.disabled=true;
    try{await submit(new FormData(form),form);d.close();await reload()}
-   catch(err){notify(err.message,true)}finally{if(save)save.disabled=false}
+   catch(err){const error=d.querySelector('.ft-modal-error');error.textContent=err.message;error.hidden=false;error.scrollIntoView({block:'nearest'});notify(err.message,true)}finally{if(save)save.disabled=false}
   };d.showModal();return d;
  }
  async function onClick(ev){
@@ -361,57 +371,78 @@
   else if(action==='proof')await showProof(id);
   else if(action==='route')await showRoute(id);
  }
+ async function saveVisitPhoto(v,file,notes,gps){
+  if(!(file instanceof File)||!file.size||file.size>5242880||!['image/jpeg','image/png','image/webp'].includes(file.type))
+   throw Error('Choose a JPG, PNG or WebP photo under 5 MB.');
+  if(String(notes||'').trim().length<5)throw Error('Add at least 5 characters describing the photo.');
+  const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+  const path=v.company_id+'/'+v.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;
+  const put=await db.storage.from('gr-field-visit-proofs').upload(path,file,{contentType:file.type,upsert:false});
+  if(put.error)throw Error('Photo upload failed: '+put.error.message);
+  try{await rpc('gr_field_add_photo',{p_visit:v.id,p_path:path,p_note:String(notes).trim().slice(0,1000),...gps})}
+  catch(err){throw Error('Photo was uploaded but evidence registration failed: '+err.message+'. Ask Admin to reconcile before retrying.')}
+ }
  async function showUpload(id){
   const v=visits.find(x=>x.id===id&&x.assigned_to===user.id&&x.status==='on_site');
-  if(!v)throw Error('Only the assigned technician on site may upload visit proof.');
-  modal('Photo proof · '+v.title,'<p>Take or select one JPEG, PNG or WebP image (max 5 MB). GPS, server timestamp, staff name and notes are saved with this proof.</p>'+
-   '<form class="ft-form"><label>Photo from camera or gallery *<input type="file" name="photo" required accept="image/jpeg,image/png,image/webp" capture="environment"></label>'+
-   '<label class="wide">Photo notes / what this proves *<textarea name="notes" minlength="5" required placeholder="Equipment condition, installed item, demonstration or customer visit evidence"></textarea></label>'+
-   '<button class="ft-btn" type="submit">Upload Private GPS Photo</button></form>',
-   async(fd)=>{
-    const file=fd.get('photo'),notes=String(fd.get('notes')||'').trim();
-    if(!(file instanceof File)||!file.size||file.size>5242880||!['image/jpeg','image/png','image/webp'].includes(file.type))
-     throw Error('Select JPG, PNG or WebP under 5 MB');
-    if(notes.length<5)throw Error('Photo notes are required');
-    const p=await locateForField('photo proof'),ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
-    const path=v.company_id+'/'+v.id+'/'+user.id+'/'+crypto.randomUUID()+'.'+ext;
-    const put=await db.storage.from('gr-field-visit-proofs').upload(path,file,{contentType:file.type,upsert:false});
-    if(put.error)throw Error('Photo upload failed: '+put.error.message);
-    try{await rpc('gr_field_add_photo',{p_visit:v.id,p_path:path,p_note:notes,...p})}
-    catch(err){throw Error('Photo uploaded but evidence registration failed: '+err.message+' (ask Admin to reconcile; do not keep retrying uploads)')}
-    notify('GPS-stamped service/sales visit photo and notes saved privately.');
+  if(!v)throw Error('Only the assigned employee on site can add evidence photos.');
+  modal('Add a Photo · '+v.title,'<p>Take or select one image (JPG, PNG or WebP, maximum 5 MB). The photo will be attached privately to this visit with GPS and time.</p>'+
+   '<form class="ft-form"><label class="wide">Photo from camera or gallery *<input type="file" name="photo" required accept="image/jpeg,image/png,image/webp" capture="environment"></label>'+
+   '<label class="wide">Photo description *<textarea name="notes" minlength="5" required placeholder="What does this photo show?"></textarea></label>'+
+   '<button class="ft-btn" type="submit">Attach Photo</button></form>',
+   async fd=>{
+    const p=await locateForField('photo proof');
+    await saveVisitPhoto(v,fd.get('photo'),String(fd.get('notes')||''),p);
+    notify('Photo attached to visit with GPS.');
    });
  }
  async function showComplete(id){
-  const v=visits.find(x=>x.id===id&&x.assigned_to===user.id&&x.status==='on_site');
-  if(!v)throw Error('An on-site assigned visit is required.');
-  const policy=ruleFor(v.visit_type);
-  if(policy.photo_required&&!photos.some(x=>x.visit_id===v.id))throw Error('A GPS-stamped photo is required before completing this visit.');
+  const v=visits.find(x=>x.id===id&&x.assigned_to===user.id&&['planned','traveling','on_site'].includes(x.status));
+  if(!v)throw Error('Only the assigned employee can close an active visit. Select your assigned visit.');
+  const policy=ruleFor(v.visit_type),existingPhotos=photos.filter(x=>x.visit_id===v.id).length;
+  const photoNeeded=Boolean(policy.photo_required)&&existingPhotos===0;
   const sales=v.visit_type==='sales'||v.visit_type==='site',linkedLead=sales&&!!v.lead_id;
-  modal('Complete Visit · '+v.title,
-   '<p>Fresh GPS and work notes are compulsory. Photos: '+(policy.photo_required?'required':'optional')+'. Record visit results and assign follow-up.</p>'+
-   '<form class="ft-form"><label class="wide">Visit notes / customer conversation *<textarea name="notes" minlength="'+Number(policy.min_notes)+'" maxlength="4000" required placeholder="Work completed, customer response and next action"></textarea></label>'+
+  modal('Close Visit · '+v.title,
+   '<p><b>Required:</b> Current GPS and visit notes. <b>Photos:</b> '+(policy.photo_required?'Required':'Optional')+
+   '. Existing attachments: '+existingPhotos+'.'+(v.status==='on_site'?'':' Arrival GPS is recorded automatically before completion.')+'</p>'+
+   '<form class="ft-form">'+
+   '<label class="wide">Visit report / service notes *<textarea name="notes" minlength="'+Number(policy.min_notes)+'" maxlength="4000" required placeholder="Work completed, equipment condition, customer response, result and next action"></textarea></label>'+
+   '<label class="wide">Attach site photo '+(photoNeeded?'*':'(optional)')+
+   '<input type="file" name="photo" '+(photoNeeded?'required ':'')+'accept="image/jpeg,image/png,image/webp" capture="environment">'+
+   '<small>Camera or gallery · JPG, PNG, WebP · max 5 MB. Photos are saved privately with GPS.</small></label>'+
    (linkedLead?'<label>Lead priority <select name="heat" required><option value="">Choose</option><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></select></label>':'')+
    (sales?'<label>Sales result * <select name="outcome" required><option value="">Choose result</option><option value="converted">Converted to order</option><option value="follow_up">Follow-up needed</option><option value="pending">Decision pending</option><option value="not_interested">Not interested</option></select></label>':'')+
-   '<label>Follow-up assigned to (optional) <select name="followupTo"><option value="">No follow-up</option>'+followupTeam.map(t=>'<option value="'+e(t.id)+'">'+e(t.full_name)+'</option>').join('')+'</select></label>'+
-   '<label>Follow-up / next service date <input type="datetime-local" name="followupAt"></label>'+
-   '<label class="wide">Follow-up instructions <textarea name="followupNotes" maxlength="2000" placeholder="Work required at the next visit"></textarea></label>'+
-   '<button class="ft-btn" type="submit">Save GPS Completion</button></form>',
+   '<label>Assign next follow-up to (optional) <select name="followupTo"><option value="">No follow-up</option>'+followupTeam.map(t=>'<option value="'+e(t.id)+'">'+e(t.full_name)+'</option>').join('')+'</select></label>'+
+   '<label>Next service / follow-up date <input type="datetime-local" name="followupAt"></label>'+
+   '<label class="wide">Next visit instructions <textarea name="followupNotes" maxlength="2000" placeholder="Pending issue, service task or customer follow-up"></textarea></label>'+
+   '<div class="wide ft-closure-guide">GPS permission must be enabled on this device. The visit stays open if required notes, photo, or GPS is missing.</div>'+
+   '<button class="ft-btn" type="submit">Save Notes, Photo & Close Visit</button></form>',
    async fd=>{
     const notes=String(fd.get('notes')||'').trim(),heat=linkedLead?String(fd.get('heat')||''):null,
      outcome=sales?String(fd.get('outcome')||''):null,
      followTo=String(fd.get('followupTo')||'')||null,followDate=String(fd.get('followupAt')||''),
-     followNote=String(fd.get('followupNotes')||'').trim();
+     followNote=String(fd.get('followupNotes')||'').trim(),file=fd.get('photo');
+    const hasNewPhoto=file instanceof File&&file.size>0;
     if(notes.length<Number(policy.min_notes))throw Error('Add at least '+policy.min_notes+' characters in visit notes.');
-    if(linkedLead&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority');
-    if(sales&&!['converted','follow_up','pending','not_interested'].includes(outcome))throw Error('Choose sales result');
-    if(followTo&&(!followDate||followNote.length<5))throw Error('Follow-up needs a date and notes (minimum 5 characters).');
-    if(!followTo&&(followDate||followNote))throw Error('Choose a follow-up employee or clear follow-up details.');
-    const p=await locateForField('visit completion');
+    if(policy.photo_required&&!existingPhotos&&!hasNewPhoto)throw Error('Attach a photo before closing this visit.');
+    if(hasNewPhoto&&(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5242880))
+     throw Error('Select a JPG, PNG or WebP photo smaller than 5 MB.');
+    if(linkedLead&&!['Hot','Warm','Cold'].includes(heat))throw Error('Choose lead priority.');
+    if(sales&&!['converted','follow_up','pending','not_interested'].includes(outcome))throw Error('Choose a sales result.');
+    if(followTo&&(!followDate||followNote.length<5))throw Error('Select a next visit date and add notes (minimum 5 characters).');
+    if(!followTo&&(followDate||followNote))throw Error('Assign an employee for follow-up or clear the extra fields.');
+    if(followDate&&(!Number.isFinite(new Date(followDate).getTime())||new Date(followDate).getTime()<Date.now()-60000))
+     throw Error('Choose a valid future follow-up date.');
+    // Obtain explicit location permission before changing any visit state.
+    const arrivalGPS=await locateForField(v.status==='on_site'?'visit completion':'visit arrival');
+    if(v.status!=='on_site'){
+     await rpc('gr_field_arrive',{p_visit:v.id,...arrivalGPS});
+    }
+    if(hasNewPhoto)await saveVisitPhoto(v,file,notes,arrivalGPS);
+    const closeGPS=v.status==='on_site'?arrivalGPS:await locateForField('visit completion');
     const next=await rpc('gr_field_finish_visit_v2',{p_visit:v.id,p_notes:notes,p_heat:heat,p_outcome:outcome,
      p_followup_to:followTo,p_followup_at:followDate?new Date(followDate).toISOString():null,
-     p_followup_note:followTo?followNote:null,...p});
-    notify('Visit completed with current GPS, notes and next action.'+(next?' Next recurring service scheduled.':''));
+     p_followup_note:followTo?followNote:null,...closeGPS});
+    notify('Visit closed. GPS, notes'+(hasNewPhoto?', photo':'')+' and follow-up saved.'+(next?' Next recurring service scheduled.':''));
    });
  }
  async function showProof(id){
