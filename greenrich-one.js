@@ -320,8 +320,11 @@ async function users(c){
  });
  c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;
-  if(!confirm('Send a password reset email to '+p.email+'?'))return;
-  try{const out=await employeeAction({action:'reset',userId:p.id});toast(out.message)}catch(e){toast(e.message)}
+  if(!confirm('Set a new password for '+p.email+' in Supabase Auth?'))return;
+  const password=prompt('New temporary password: minimum 12 characters, upper/lowercase, number and symbol');
+  if(password===null)return;
+  if(password.length<12||password.length>128||!/[A-Z]/.test(password)||!/[a-z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))return toast('Password does not meet security requirements');
+  try{const out=await employeeAction({action:'reset',userId:p.id,password});toast(out.message)}catch(e){toast(e.message)}
  });
  c.querySelectorAll('[data-emp-toggle]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empToggle);if(!p||p.id===user.id)return;
