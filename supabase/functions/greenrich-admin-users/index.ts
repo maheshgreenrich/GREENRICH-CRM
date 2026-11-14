@@ -36,7 +36,7 @@ Deno.serve(async req=>{
    const items=ids.map(x=>String(x));
    return items.every(x=>allowed.includes(x))&&new Set(items).size===items.length?items:null;
   };
-  if(['create','edit','delete'].includes(action)&&!superAdmin)return response({error:'Only an Admin can manage employee accounts'},403);
+  if(['create','edit','delete','reset'].includes(action)&&!superAdmin)return response({error:'Only an Admin can manage employee accounts'},403);
   if(action==='deleteRole'){
    if(!superAdmin)return response({error:'Only the built-in Admin can delete roles'},403);
    const roleId=String(body.roleId||'');
@@ -94,32 +94,23 @@ Deno.serve(async req=>{
    return response({message:active?'Account enabled':'Account disabled'});
   }
   if(action==='delete'){
-   if(id===user.id)return response({error:'You cannot delete your own account'},403);
-   // Do not change or remove Attendance or audit records. Block deletion if linked history exists.
-   const refs=[
-    ['gr_attendance','user_id'],['gr_attendance','marked_by'],
-    ['grm_attendance','user_id'],['grm_attendance','marked_by'],
-    ['grm_corrections','user_id'],['grm_corrections','reviewed_by'],
-    ['grm_leaves','user_id'],['grm_leaves','reviewed_by'],
-    ['grm_audit_logs','actor_id'],['gr_profiles','manager_id']
-   ];
-   for(const [table,column] of refs){
-    const result=await admin.from(table).select(column,{count:'exact',head:true}).eq(column,id);
-    if(result.error)return response({error:'Unable to verify account history. Delete cancelled: '+result.error.message},409);
-    if(result.count)return response({error:'This employee has linked attendance, approval or staff history and cannot be permanently deleted. Use Deactivate to preserve records.'},409);
-   }
-   const deleted=await admin.auth.admin.deleteUser(id);
-   if(deleted.error)return response({error:'Account deletion failed: '+deleted.error.message},409);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'DELETE',old_value:{username:target.username}});
-   return response({message:'Employee login and profile permanently deleted'});
+   if(!superAdmin)return response({error:'Admin required'},403);
+   if(id===user.id)return response({error:'Cannot deactivate yourself'},403);
+   const changed=await admin.from('gr_profiles').update({active:false}).eq('id',id);
+   if(changed.error)return response({error:'Deactivation failed'},409);
+   const banned=await admin.auth.admin.updateUserById(id,{ban_duration:'876000h'});
+   if(banned.error)return response({error:'Profile inactive but auth ban failed; manual review required'},500);
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'DEACTIVATE',new_value:{active:false}});
+   return response({message:'Employee deactivated; CRM history retained'});
   }
   if(action==='reset'){
-   const {data:account,error:accountError}=await admin.auth.admin.getUserById(id);
-   if(accountError||!account?.user?.email)return response({error:'Email unavailable'},400);
-   const reset=await admin.auth.resetPasswordForEmail(account.user.email,{redirectTo:'https://maheshgreenrich.github.io/GREENRICH-CRM/secure.html'});
-   if(reset.error)return response({error:reset.error.message},400);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'PASSWORD_RESET_REQUEST'});
-   return response({message:'Password reset email requested'});
+   if(!superAdmin)return response({error:'Admin required'},403);
+   const password=typeof body.password==='string'?body.password:'';
+   if(password.length<12||password.length>128||!/[A-Z]/.test(password)||!/[a-z]/.test(password)||!/[0-9]/.test(password)||!/[^A-Za-z0-9]/.test(password))return response({error:'Password requires 12-128 characters, upper/lowercase, number, symbol'},400);
+   const changed=await admin.auth.admin.updateUserById(id,{password});
+   if(changed.error)return response({error:'Password update failed'},400);
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'PASSWORD_RESET_BY_ADMIN'});
+   return response({message:'Password updated by Admin'});
   }
   return response({error:'Unsupported action'},400);
  }catch(error){return response({error:String(error?.message||error)},500)}
