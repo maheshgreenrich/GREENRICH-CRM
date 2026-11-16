@@ -214,7 +214,7 @@ async function transportStatus(db:any,company:string){
  const {data:gmail}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
  const chosen=config?.transport||'gmail';
  const gmailReady=gmail?.status==='connected';
- const externalReady=!!config&&(config.status==='configured'||config.status==='verified');
+ const externalReady=!!config&&config.status==='verified';
  const active=chosen==='gmail'?gmailReady:externalReady;
  return {
   transport:chosen,
@@ -322,7 +322,7 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
  const config=await transportConfig(db,company);
  const transport=config?.transport||'gmail';
  if(transport==='smtp'){
-  if(!config?.encrypted_smtp_password||!['configured','verified'].includes(config.status))throw Error('Company SMTP is not configured');
+  if(!config?.encrypted_smtp_password||config.status!=='verified')throw Error('Test and verify company SMTP in Settings before sending');
   validateSmtpHost(config.smtp_host);
   const smtp=smtpClient(config,await decrypt(config.encrypted_smtp_password));
   try{
@@ -335,7 +335,7 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
   }finally{smtp.close()}
  }
  if(transport==='resend'){
-  if(!config?.encrypted_resend_api_key||!['configured','verified'].includes(config.status))throw Error('Company email API is not configured');
+  if(!config?.encrypted_resend_api_key||config.status!=='verified')throw Error('Test company email API and domain in Settings before sending');
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{
    Authorization:'Bearer '+await decrypt(config.encrypted_resend_api_key),
    'Content-Type':'application/json'
