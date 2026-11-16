@@ -16,7 +16,12 @@
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
  const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot · API unverified':'Unverified');
- const templateOptions=(c,connectionId='')=>templates(c).filter(t=>t.category==='marketing'&&(!connectionId||t.connection_id===connectionId)).map(t=>[t.id,t.name+' · '+t.language+' · '+(t.provider_approval==='approved'&&t.provider_source==='verified_provider'?'Verified via Meta':t.provider_approval==='approved'&&t.provider_source==='admin_confirmed'?'Admin-confirmed':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · not verified':t.provider_preview?.status==='APPROVED'?'Meta approved reported · body missing':'Approval not confirmed')]);
+ const validMarketingTemplate=t=>t.category==='marketing'&&t.provider_approval==='approved'&&
+   ['verified_provider','admin_confirmed'].includes(t.provider_source)&&
+   !!String(t.body||'').trim()&&Array.isArray(t.provider_preview?.components)&&t.provider_preview.components.some(c=>String(c.type).toUpperCase()==='BODY');
+ const templateOptions=(c,connectionId='')=>templates(c).filter(t=>
+   validMarketingTemplate(t)&&(!connectionId||t.connection_id===connectionId))
+   .map(t=>[t.id,t.name+' · '+t.language+' · Ready']);
  function templateRequirements(t){
   const comps=Array.isArray(t?.provider_preview?.components)?t.provider_preview.components:[];
   const body=comps.find(x=>String(x.type).toUpperCase()==='BODY');
@@ -48,11 +53,15 @@
   const id=form.elements.template_id?.value;
   const template=rows.templates.find(t=>t.id===id);
   if(!template){region.innerHTML='<p class="grwc-muted">Choose a template to see its required message variables, media and buttons.</p>';return}
+  if(!validMarketingTemplate(template)){
+   region.innerHTML='<div class="grwc-notice"><b>Template not ready.</b> CRM has only a name/reference, not the approved full content. Use Sync Approved Templates; no repeat approval is needed.</div>';
+   const button=form.querySelector('[data-send-campaign]');if(button)button.disabled=true;return;
+  }
   const spec=templateRequirements(template);
   const stored=campaignParamValues[id]||{};
   const hints=[];
   if(template.provider_source!=='verified_provider')
-   hints.push('This template is Admin-confirmed only. Check the exact Meta-approved name, language, ID, and button types in SocialBerries before sending.');
+   hints.push('This older template was manually confirmed. Automatic sync of its exact approved components is recommended before use.');
   if(spec.format==='IMAGE')hints.push('IMAGE header required. Choose a file above; a stored image preview is not sufficient unless its media is attached.');
   if(spec.body?.text)hints.push('BODY template variables: '+[...String(spec.body.text).matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]).join(', ')+'. Numeric 1–3 / named client fields are mapped from each contact.');
   region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
@@ -177,7 +186,8 @@
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
-   '<p class="grwc-muted grwc-span">Only approved templates with complete message content and opted-in contacts can be sent. A screenshot reference must first be synced once in Settings → WhatsApp Integration.</p>'+
+   '<p class="grwc-muted grwc-span">Templates sync automatically from your company Meta account after one-time connection. Incomplete references are hidden from sending; no repeat Meta approval or JSON typing is needed.</p>'+
+   '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh approved templates</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
  function campaignReports(){
@@ -309,7 +319,14 @@
    }
    // Campaign name is created automatically.
   }
-  if(form)drawTemplateRequirements(form);
+  if(form){
+   drawTemplateRequirements(form);
+   const status=form.querySelector('[data-marketing-sync-status]');
+   const currentConn=form.elements.connection_id?.value;
+   const total=rows.templates.filter(t=>t.connection_id===currentConn&&t.category==='marketing').length;
+   const ready=rows.templates.filter(t=>t.connection_id===currentConn&&validMarketingTemplate(t)).length;
+   if(status)status.textContent=ready+' ready · '+(total-ready)+' references awaiting automatic sync.';
+  }
  }
  const input=(label,key,value='',type='text')=>'<label>'+esc(label)+'<input name="'+esc(key)+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const note=(label,key,v='')=>'<label class="grwc-span">'+esc(label)+'<textarea name="'+esc(key)+'" rows="3">'+esc(v)+'</textarea></label>';
@@ -426,7 +443,7 @@
    '<details class="grwc-span"><summary>Advanced · Manual template recovery</summary><p class="grwc-muted">Normally no JSON import is needed.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
    '<button type="button" data-import-provider-template>Import template JSON</button></details>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting verification')+(t.category==='marketing'&&t.provider_source!=='verified_provider'?' <button type="button" data-verify-meta-template="'+esc(t.id)+'">Verify with Meta</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting automatic sync')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-sync-approved-templates>Refresh approved templates</button></div></div>'+
@@ -1017,11 +1034,40 @@
   current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;campaignParamValues={};
   startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
-  try{await fetchAll();marketingDraw()}
-  catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
+  try{
+   await fetchAll();marketingDraw();
+   // Attempt a read-only sync once per company/session on entering Marketing.
+   // Missing Meta credentials are reported in the UI only when user requests refresh.
+   const last=window.GreenRichWaMarketingLastSync||{};
+   for(const c of app.companies){
+    const conn=rows.connections.find(x=>x.company_id===c&&x.provider==='socialberries'&&x.enabled);
+    if(!app.admin||!conn||Date.now()-(last[c]||0)<30*60*1000)continue;
+    last[c]=Date.now();
+    window.GreenRichWaMarketingLastSync=last;
+    void secureSend('sync_approved_templates',{connection_id:conn.id}).then(async result=>{
+     if(result?.configured&&root?.isConnected){
+      await fetchAll();marketingDraw();
+     }
+    }).catch(()=>{});
+   }
+  }catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
   element.onclick=async e=>{
    const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
+   if(e.target.closest('[data-marketing-sync-templates]')){
+    const form=element.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id?.value;
+    const conn=campaignConnection(connectionId);
+    if(!conn)return alert('Choose your company WhatsApp sender first.','warning');
+    const button=e.target.closest('[data-marketing-sync-templates]');button.disabled=true;
+    try{
+     const out=await secureSend('sync_approved_templates',{connection_id:conn.id});
+     if(!out.configured)return alert('Automatic templates need one-time connection to this company Meta WABA. Ask your SocialBerries/Meta administrator for WABA ID and WhatsApp management access; do not re-approve templates or enter JSON.','warning');
+     await fetchAll();marketingDraw();
+     alert('Approved templates synced: '+out.imported+' added, '+out.updated+' updated. No message sent.','success');
+    }catch(error){alert('Template synchronization failed: '+error.message,'error')}
+    finally{if(button.isConnected)button.disabled=false}
+    return;
+   }
    if(e.target.closest('[data-open-settings]')){alert('Admin → Settings → WhatsApp Integration.','info');return}
    if(e.target.closest('[data-refresh-crm]')){try{await fetchAll();marketingDraw();alert('Latest GreenRich template references and CRM data loaded. SocialBerries automatic template API is not connected.','success')}catch(error){alert(error.message,'error')}return}
    if(e.target.closest('[data-create-service]')){serviceDialog();return}
