@@ -11,7 +11,7 @@
   if(dialog?.isConnected)dialog.remove();
   dialog=document.createElement('dialog');dialog.className='gr-contact-email-modal';
   dialog.innerHTML='<form method="dialog" id="grce-form"><div class="grce-top"><h2>Compose Email in CRM</h2><button type="button" data-grce-close aria-label="Close">✕</button></div>'+
-   '<p class="grce-hint">Customer / Lead: '+esc(name||email)+' · From official company Gmail</p>'+
+   '<p class="grce-hint">Customer / Lead: '+esc(name||email)+' · From official company email</p>'+
    '<div class="grce-connect" id="grce-status">Checking Gmail connection…</div>'+
    '<label>To<input name="to" type="email" readonly value="'+esc(email)+'"></label>'+
    '<label>Subject<input name="subject" required maxlength="200" value="'+esc(subject)+'" placeholder="Email subject"></label>'+
