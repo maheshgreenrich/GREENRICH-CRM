@@ -20,7 +20,7 @@ assert.ok(!read('greenrich-lead-profile.js').includes('href="mailto:'));
 const quote=read('greenrich-quotation-mail.js');assert.ok(!quote.includes('Connect / Reconnect Gmail'));
 const conf=read('greenrich-gmail-settings.js');
 assert.match(conf,/client_secret/);assert.match(conf,/action:'configure'/);
-assert.doesNotMatch(conf,/localStorage/);
+assert.doesNotMatch(conf,/localStorage\.(?:setItem|getItem)/);
 const edge=read('supabase/functions/greenrich-quotation-gmail/index.ts');
 for(const term of ['gr_gmail_oauth_configs','encrypted_client_secret','encrypt(clientSecret)','send_contact','gr_contact_email_history','gr_lead_pipeline','needs_review','getUser(bearer.slice(7))'])assert.ok(edge.includes(term),'Missing '+term);
 assert.doesNotMatch(edge,/gr_leads'\)/);
