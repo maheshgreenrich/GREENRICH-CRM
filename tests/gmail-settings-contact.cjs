@@ -14,7 +14,7 @@ assert.match(cp,/data-gr360/);assert.match(cp,/onEmail\?\./);
 assert.match(cp,/kind==='whatsapp'\?'__BLANK__'/);
 assert.match(cp,/message&&message!=='__BLANK__'/);
 assert.match(read('greenrich-crm-inline.js'),/GreenRichContactEmail/);
-assert.match(read('greenrich-lead-profile.js'),/GreenRichContactEmail\.open/);
+assert.match(read('greenrich-lead-profile.js'),/GreenRichContactEmail\?\.open/);
 assert.match(read('greenrich-lead-pipeline.js'),/action==='email'/);
 assert.ok(!read('greenrich-lead-profile.js').includes('href="mailto:'));
 const quote=read('greenrich-quotation-mail.js');assert.ok(!quote.includes('Connect / Reconnect Gmail'));
