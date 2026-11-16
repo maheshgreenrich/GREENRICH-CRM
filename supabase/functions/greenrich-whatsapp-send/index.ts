@@ -148,7 +148,7 @@ Deno.serve(async request=>{
   const raw=await request.text();if(raw.length>70000)return res(413,{ok:false,error:"Request too large"});
   const input=JSON.parse(raw),action=val(input.action,40),connectionId=val(input.connection_id,40);
   if(!validId(connectionId))return res(400,{ok:false,error:"Select saved WhatsApp provider"});
-  const r=await userDb.from("gr_wa_connections").select("id,company_id,slot,provider").eq("id",connectionId).maybeSingle();
+  const r=await userDb.from("gr_wa_connections").select("id,company_id,slot,provider,setup_state,enabled,sender_phone").eq("id",connectionId).maybeSingle();
   if(r.error||!r.data||r.data.provider!=="socialberries")return res(404,{ok:false,error:"SocialBerries provider not found"});
   const company=r.data.company_id;
   const adminAuth=await userDb.rpc("gr_wa_admin",{p_company:company});
@@ -157,6 +157,48 @@ Deno.serve(async request=>{
   const db=createClient(env("SUPABASE_URL"),apiKey(true),{auth:{autoRefreshToken:false,persistSession:false}});
   // Read-only preflight: do not create campaigns while setup is incomplete.
   // Report *all* blockers together so the user does not discover them one by one.
+  // Read-only diagnostics: never attempts a send and never reveals provider credentials.
+  if(action==="diagnose_connection"){
+   const cfg=creds(company,r.data.slot),p=prefixes[company+":"+r.data.slot];
+   const credsReady=!!cfg,enabled=env("SB_ENABLE_MARKETING_SEND")==="true";
+   const [allTemplates,consents,failures]=await Promise.all([
+    db.from("gr_wa_templates").select("id,category,provider_approval,provider_source,provider_preview")
+     .eq("company_id",company).eq("connection_id",connectionId).limit(100),
+    db.from("gr_wa_contacts").select("id,consent_status,consent_source,consent_at,opt_out_at")
+     .eq("company_id",company).limit(1000),
+    db.from("gr_wa_messages").select("provider_error_code,provider_error_message,created_at,delivery_status")
+     .eq("company_id",company).eq("connection_id",connectionId).eq("delivery_status","failed")
+     .order("created_at",{ascending:false}).limit(5)
+   ]);
+   if(allTemplates.error||consents.error||failures.error)
+    return res(500,{ok:false,error:"Could not load WhatsApp diagnostics"});
+   const approved=(allTemplates.data||[]).filter((t:any)=>t.category==="marketing"&&
+    t.provider_approval==="approved"&&t.provider_source==="verified_provider"&&
+    Array.isArray(t.provider_preview?.components)).length;
+   const adminConfirmed=(allTemplates.data||[]).filter((t:any)=>t.category==="marketing"&&
+    t.provider_approval==="approved"&&t.provider_source==="admin_confirmed").length;
+   const consentCount=(consents.data||[]).filter((x:any)=>x.consent_status==="opted_in"&&
+    x.consent_source&&x.consent_at&&!x.opt_out_at).length;
+   const blockers=[
+    ...(!credsReady?["Missing or invalid SocialBerries API host / Basic credentials in Supabase Secrets"]:[]),
+    ...(r.data.setup_state==="not_configured"||r.data.enabled!==true?["Provider is not marked connected / enabled in CRM Settings"]:[]),
+    ...(!String(r.data.sender_phone||"").trim()?["No registered sender phone recorded for this provider"]:[]),
+    ...(!approved?["No approved MARKETING template verified directly against Meta for this sender"]:[]),
+    ...(!consentCount?["No recorded and documented WhatsApp marketing opt-in contacts"]:[]),
+    ...(!enabled?["SB_ENABLE_MARKETING_SEND is not true; intentionally disabled until verified provider test"]:[])
+   ];
+   return res(200,{ok:true,company_id:company,provider:"socialberries",slot:r.data.slot,
+    credentials_present:credsReady,provider_enabled:r.data.enabled===true,
+    connection_state:r.data.setup_state||"not_configured",sender_recorded:!!String(r.data.sender_phone||"").trim(),
+    verified_templates:approved,admin_confirmed_templates:adminConfirmed,
+    opted_in_contacts:consentCount,sending_enabled:enabled,ready:!blockers.length,blockers,
+    recent_failures:(failures.data||[]).map((x:any)=>({
+      code:val(x.provider_error_code,90)||"UNSPECIFIED",
+      reason:safeProviderReason(x.provider_error_message)||"Reason not captured for older attempt",
+      date:x.created_at
+    })),
+    next_step:"Run Test Connection (read-only) to authenticate against SocialBerries; then verify provider template and a consented internal test number. No message was sent."});
+  }
   if(action==="preflight_marketing"){
    const templateId=val(input.template_id,40),idList=input.crm_ids;
    if(!validId(templateId)||!Array.isArray(idList)||idList.length<1||idList.length>500||

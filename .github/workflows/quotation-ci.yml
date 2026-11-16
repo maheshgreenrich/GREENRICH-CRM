@@ -28,6 +28,9 @@ on:
       - 'greenrich-inventory.*'
       - 'tests/inventory-wms-bom.cjs'
       - 'supabase/migrations/20261116213000_inventory_wms_foundation.sql'
+      - 'greenrich-whatsapp-crm-workflows.js'
+      - 'supabase/functions/greenrich-whatsapp-send/index.ts'
+      - 'tests/whatsapp-send-diagnostics.cjs'
       - 'secure.html'
       - 'tests/quotation-workspace.cjs'
       - 'supabase/migrations/20261116110000_quotations_pdf_workspace.sql'
@@ -58,4 +61,6 @@ jobs:
           node tests/rich-contact-email.cjs
           node tests/email-editor-history.cjs
           node tests/inventory-wms-bom.cjs
+          node --check greenrich-whatsapp-crm-workflows.js
+          node tests/whatsapp-send-diagnostics.cjs
           node --check greenrich-inventory.js

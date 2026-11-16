@@ -350,7 +350,7 @@
     const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
     return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
       '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
-      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
+      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-diagnose-provider="'+esc(p.id)+'">Check Sending Setup</button> <button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
       '</div>';
    }).join('')+'</div>'+
    '<div class="grwc-steps"><b>Connection instructions — SocialBerries</b><ol>'+
@@ -392,6 +392,8 @@
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
    const edit=e.target.closest('[data-edit-provider]'),add=e.target.closest('[data-new-inbound]'),sheet=e.target.closest('[data-save-sheet]');
+   const diagnose=e.target.closest('[data-diagnose-provider]');
+   if(diagnose)return await diagnoseProvider(diagnose.dataset.diagnoseProvider);
    const check=e.target.closest('[data-test-provider]'),batches=e.target.closest('[data-batches-provider]'),messages=e.target.closest('[data-messages-provider]');
    if(check)return await checkProvider(check.dataset.testProvider,'test');
    if(batches)return await checkProvider(batches.dataset.batchesProvider,'batches');
@@ -484,6 +486,37 @@
    connection=r.data;rows.connections=[...(rows.connections||[]),connection];
   }
   openMessageHistory(connection.id,customer.mobile||customer.mobile2);
+ }
+ async function diagnoseProvider(id){
+  const conn=rows.connections.find(c=>c.id===id&&app.companies.includes(c.company_id));
+  if(!conn)return alert('Select your saved WhatsApp provider first.','warning');
+  try{
+   const info=await secureSend('diagnose_connection',{connection_id:id});
+   const d=document.createElement('dialog');d.className='grwc-dialog';
+   const status=(value,successLabel='Ready',failureLabel='Needs setup')=>
+    '<span class="grwc-chip">'+(value?esc(successLabel):esc(failureLabel))+'</span>';
+   d.innerHTML='<div class="grwc-dialog-head"><h3>WhatsApp Sending Diagnosis</h3><button type="button" data-close>×</button></div>'+
+    '<div class="grwc-dialog-fields">'+
+    '<p class="grwc-muted grwc-span">Company: '+esc(name(conn.company_id))+
+    ' · Tool '+esc(info.slot)+' · Read-only check (no message sent).</p>'+
+    '<div class="grwc-feature">API credentials in Supabase: '+status(info.credentials_present,'Present','Missing')+'</div>'+
+    '<div class="grwc-feature">Provider configured in CRM: '+status(info.provider_enabled,'Enabled','Not enabled')+'</div>'+
+    '<div class="grwc-feature">Registered sender: '+status(info.sender_recorded,'Recorded','Missing')+'</div>'+
+    '<div class="grwc-feature">Meta-verified marketing templates: <b>'+esc(info.verified_templates||0)+'</b></div>'+
+    '<div class="grwc-feature">Admin-confirmed only (not independently verified): <b>'+esc(info.admin_confirmed_templates||0)+'</b></div>'+
+    '<div class="grwc-feature">Documented marketing opt-ins: <b>'+esc(info.opted_in_contacts||0)+'</b></div>'+
+    '<div class="grwc-feature">Server marketing-send switch: '+status(info.sending_enabled,'Enabled','Disabled')+'</div>'+
+    '<div class="grwc-feature grwc-span"><b>Setup blockers</b><ol>'+
+      (info.blockers?.length?info.blockers.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No local configuration blockers. Provider authentication and a real internal test are still required.</li>')+
+    '</ol></div>'+
+    '<div class="grwc-feature grwc-span"><b>Latest recorded send failures</b><ul>'+
+      (info.recent_failures?.length?info.recent_failures.map(x=>'<li>'+esc(x.code)+' — '+esc(x.reason)+' ('+esc(new Date(x.date).toLocaleDateString('en-IN'))+')</li>').join(''):
+       '<li>No failed attempts stored for this provider.</li>')+
+    '</ul></div><p class="grwc-muted grwc-span">'+esc(info.next_step)+'</p></div>'+
+    '<div class="grwc-dialog-foot"><button type="button" data-close>Close</button></div>';
+   document.body.append(d);d.onclose=()=>d.remove();
+   d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.close());d.showModal();
+  }catch(e){alert('Could not diagnose WhatsApp connection: '+e.message,'error')}
  }
  async function checkProvider(id,action){
    const provider=rows.connections.find(x=>x.id===id);
