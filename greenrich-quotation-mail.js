@@ -33,12 +33,12 @@
  }
  function render(){
   if(!host)return;
-  const connected=info?.connection?.status==='connected'&&info?.configured,quote=ctx.quotation;
+  const connected=!!info?.ready,quote=ctx.quotation;
   const quoteId=quote?.id,customer=ctx.customer;
   const own=history.filter(r=>r.quotation_id===quoteId);
   host.innerHTML='<div class="grmail"><div class="grmail-header"><div><h2>Quotation Email & History</h2><p>Company: '+esc(ctx.companyName||ctx.company)+' · Private PDF archive and company-wide sending history</p></div><button data-mail="refresh">Refresh history</button></div>'+
    '<div class="grmail-status"><div><strong>Official sender</strong><div>'+esc(info?.connection?.sender_email||'No Gmail account connected')+'</div><small>'+esc(info?.connection?.status||'disconnected')+'</small></div><div>'+
-   (!info?.configured?'<span class="grmail-alert">Google OAuth backend secrets have not been configured by Admin.</span>':connected?'<span class="grmail-success">Gmail connected</span>':'<span class="grmail-alert">Gmail is not connected. Sending disabled.</span>')+'</div></div>'+
+   (!info?.configured&&info?.transport==='gmail'?'<span class="grmail-alert">Google OAuth backend secrets have not been configured by Admin.</span>':connected?'<span class="grmail-success">Gmail connected</span>':'<span class="grmail-alert">Gmail is not connected. Sending disabled.</span>')+'</div></div>'+
    '<p class="grmail-setup-link">Gmail accounts, OAuth credentials and company email templates are managed in <b>Settings → Gmail Connectivity</b>.</p>'+ 
    '<div class="grmail-layout"><section class="grmail-compose"><h3>Send quotation PDF</h3>'+
    (!quoteId?'<p class="grmail-alert">Save your quotation in the Quotations tab first, then open Email & History.</p>':'<div class="grmail-quote">Quotation '+esc(quote.quotation_no)+' · '+esc(customer?.name||'Customer')+'</div>')+
@@ -49,7 +49,7 @@
    '<label>Subject<input name="subject" required maxlength="200" value="'+esc(defaultSub())+'"></label>'+
    '<label>Message<textarea name="body" required rows="8">'+esc(defaultBody())+'</textarea></label>'+
    '<div class="grmail-attachment"> <strong>Quotation PDF</strong><small>Generated from the saved quotation and attached automatically. The exact sent PDF is stored privately.</small></div>'+
-   '<div class="grmail-actions"><button type="button" data-mail="preview">Preview quotation</button><button type="submit" class="grmail-send" '+(!quoteId||!connected||busy||!ctx.canSend?'disabled':'')+'>'+(busy?'Sending…':'Send quotation via Gmail')+'</button></div></form></section>'+
+   '<div class="grmail-actions"><button type="button" data-mail="preview">Preview quotation</button><button type="submit" class="grmail-send" '+(!quoteId||!connected||busy||!ctx.canSend?'disabled':'')+'>'+(busy?'Sending…':'Send quotation by company email')+'</button></div></form></section>'+
    '<section class="grmail-logs"><h3>Quotation send history</h3><div class="grmail-scroll">'+(own.length?own.map(rowHtml).join(''):'<p>No email send history for this quotation yet.</p>')+'</div></section></div>'+
    '<section class="grmail-all"><h3>Company quotation email history</h3><p>Recent company activity; includes all authorised employees and products.</p><div class="grmail-scroll">'+(history.length?history.map(rowHtml).join(''):'<p>No quotation emails have been sent yet.</p>')+'</div></section>'+
 
@@ -67,7 +67,7 @@
  async function send(event){
   event.preventDefault();if(busy)return;
   if(!ctx.quotation?.id)throw Error('Save the quotation before sending');
-  if(!info?.configured||info.connection?.status!=='connected')throw Error('Company Gmail is not connected');
+  if(!info?.ready)throw Error('Company email sender is not connected');
   if(!ctx.canSend)throw Error('You do not have quotation sending permission');
   const form=event.target,f=new FormData(form),to=String(f.get('to')||'').trim(),cc=String(f.get('cc')||'').trim(),
     subject=String(f.get('subject')||'').trim(),body=String(f.get('body')||'').trim();
@@ -78,7 +78,7 @@
    const pdf=await window.GreenRichPDFWorkbench.exportForEmail(source);
    const response=await rpc({action:'send',quotation_id:ctx.quotation.id,request_key:crypto.randomUUID(),
      to:[to],cc:cc.split(/[;,]/).map(x=>x.trim()).filter(Boolean),subject,body,pdf_base64:pdf});
-   notice('Gmail accepted the quotation email. Sent PDF and history saved.');
+   notice('Email provider accepted quotation. Sent PDF and history saved.');
    await refresh();render();
    return response;
   }finally{busy=false;render()}
