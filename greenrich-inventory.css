@@ -31,3 +31,5 @@
 .gr-inventory [data-inventory-notice][data-error=true]{background:#fff1ed;color:#9e3d2e}
 .gr-inventory [hidden]{display:none!important}
 @media(max-width:700px){.gr-inv-head{display:block}.gr-inv-head label{display:block;margin-top:10px}.gr-inventory [data-inventory-content]{padding:10px}}
+
+.gr-inventory-return{display:inline-flex;margin:4px 0 12px;padding:10px 14px;color:#2057a6;background:white;border:1px solid #c4d5eb;border-radius:8px;cursor:pointer;font-weight:650}
