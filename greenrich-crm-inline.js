@@ -45,15 +45,23 @@ const cleanPhone=v=>{const x=String(v||'').replace(/\D/g,'');return x.length>10?
 const consumesStock=s=>Boolean(s)&&!['Cancelled','Returned'].includes(s.status);
  // Stock delta for an active order. Cancel/return/delete releases it once.
  function adjustStockForSale(copy,old,next){
+  // Preserve historical allocations: old records consumed their full quantity.
   const previous=old&&consumesStock(old)?copy.products.find(p=>p.id===old.product_id):null;
   const current=next&&consumesStock(next)?copy.products.find(p=>p.id===next.product_id):null;
-  if(previous&&(!Number.isInteger(Number(previous.stock))||!Number.isInteger(Number(old.qty))||Number(old.qty)<1))throw Error('Existing order stock invalid; ask Admin to review.');
-  if(current&&(!Number.isInteger(Number(current.stock))||!Number.isInteger(Number(next.qty))||Number(next.qty)<1))throw Error('Invalid stock or quantity.');
-  const restore=previous?Number(old.qty):0;
-  const available=current?Number(current.stock)+(previous?.id===current.id?restore:0):0;
-  if(current&&available<Number(next.qty))throw Error('Insufficient stock for '+current.name+'. Available: '+available+', requested: '+next.qty);
-  if(previous)previous.stock=Number(previous.stock)+restore;
-  if(current)current.stock=Number(current.stock)-Number(next.qty);
+  const oldAllocated=previous?Number(old.stock_allocated_qty??old.qty):0;
+  if(previous&&(!Number.isFinite(oldAllocated)||oldAllocated<0))throw Error('Existing order allocation invalid; ask Admin to review.');
+  if(current&&(!Number.isFinite(Number(current.stock))||!Number.isInteger(Number(next.qty))||Number(next.qty)<1))throw Error('Invalid stock or quantity.');
+  if(previous)previous.stock=Number(previous.stock)+oldAllocated;
+  if(current){
+   const available=Math.max(0,Number(current.stock));
+   const allocated=Math.min(available,Number(next.qty));
+   current.stock=available-allocated;
+   next.stock_allocated_qty=allocated;
+   next.stock_shortage=Math.max(0,Number(next.qty)-allocated);
+   next.stock_status=next.stock_shortage?'Low Stock':'Available';
+  }else if(next){
+   next.stock_allocated_qty=0;next.stock_shortage=0;next.stock_status='Not applicable';
+  }
  }
 
 function validateCustomer(store,person,ignore,configured=false){
@@ -677,14 +685,14 @@ function openEditor(k,id=''){
    $('#f-unit_price').value=p?p.price:'';
    $('#f-tax_rate').value=p?p.tax:'';
    $('#f-inclusive').value=p?String(p.inclusive):'true';
-   $('#gr-stock-preview').textContent=p?'Available stock: '+Number(p.stock||0)+' units':'Select a product to check stock';
+   $('#gr-stock-preview').textContent=p?('Available stock: '+Number(p.stock||0)+' units'+(Number($('#f-qty').value||0)>Number(p.stock||0)?' · Low Stock — shortage '+(Number($('#f-qty').value||0)-Number(p.stock||0))+' units. Sales order can still be saved.':'')):'Select a product to check stock';
    pricePreview();
   };
   const stockNote=el('div',{id:'gr-stock-preview',class:'gr-stock-preview wide'});
   $('#f-product_id').closest('label').after(stockNote);
   $('#f-company_id').addEventListener('change',switchCompany);
   $('#f-product_id').addEventListener('change',autoProductPricing);
-  ['qty','unit_price','shipping_charge','shipping_gst_rate'].forEach(x=>$('#f-'+x).addEventListener('input',pricePreview));
+  ['qty','unit_price','shipping_charge','shipping_gst_rate'].forEach(x=>$('#f-'+x).addEventListener('input',()=>{pricePreview();if(x==='qty'){const p=editorData().products.find(v=>v.id===$('#f-product_id').value);$('#gr-stock-preview').textContent=p?('Available stock: '+Number(p.stock||0)+' units'+(Number($('#f-qty').value||0)>Number(p.stock||0)?' · Low Stock — shortage '+(Number($('#f-qty').value||0)-Number(p.stock||0))+' units. Sales order can still be saved.':'')):'Select a product to check stock';}}));
   if(existing){
    const selectedDb=editorData();
    fillSelect($('#f-channel_id'),selectedDb.channels,'Select channel');
@@ -772,7 +780,7 @@ async function saveEditor(event){
   if(old&&window.GreenRichSalesOps?.isApproved?.(targetId,old.id))return toast('Approved orders are locked; contact the dispatch team for delivery updates.');
   const status=row.status||old?.status||'Pending';
   if(!['Completed','Pending','Cancelled','Returned'].includes(status))return toast('Select a valid order status');
-  try{adjustStockForSale(copy,old,{product_id:row.product_id,qty:row.qty,status})}
+  try{adjustStockForSale(copy,old,Object.assign(row,{status}))}
   catch(error){return toast(error.message,'error')}
   const calc=getCalc(row.qty,row.unit_price,row.tax_rate,row.inclusive);
   if(fresh){
