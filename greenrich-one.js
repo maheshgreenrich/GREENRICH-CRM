@@ -408,7 +408,8 @@ async function settings(c){
    openBranding:host=>window.GreenRichBranding.mount(host,{client:db,notify:toast}),
    openSources:host=>window.GreenRichSources.mount(host,{db,notify:toast}),
    openSheetIntegrations:host=>window.GreenRichSheetManager.mount(host,{db,companyIds:window.GreenRichCompanies.allowed(),notify:toast}),
-    openWhatsAppSettings:host=>window.GreenRichWhatsAppWorkflows.mountSettings(host,{
+    openGmailSettings:host=>window.GreenRichGmailSettings.mount(host,{db,companies:window.GreenRichCompanies.allowed(),companyNames:Object.fromEntries(window.GreenRichCompanies.list().map(c=>[c.id,c.name])),notify:toast}),
+   openWhatsAppSettings:host=>window.GreenRichWhatsAppWorkflows.mountSettings(host,{
      db,companies:window.GreenRichCompanies.allowed(),selectedCompany:window.GreenRichCompanies.selected(user.id),
      userId:user.id,admin:true,permission:action=>can('marketing',action),
      canLeads:can('leads','view'),canCustomers:can('customers','view'),notify:toast
