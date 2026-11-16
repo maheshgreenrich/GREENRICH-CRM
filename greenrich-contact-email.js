@@ -55,7 +55,7 @@
    '<div class="grce-actions"><span id="grce-count" aria-live="polite">0 characters</span>'+
    '<button type="button" data-close>Cancel</button><button type="submit" class="grce-primary" id="grce-send" disabled>Send Email</button></div>'+
    '</form>';
-  document.body.append(dialog);dialog.showModal();dialog.onclose=()=>dialog.remove();
+  document.body.append(dialog);dialog.showModal();dialog.onclose=()=>{attached.forEach(f=>{if(f.grPreview)URL.revokeObjectURL(f.grPreview)});dialog.remove()};
   const $=selector=>dialog.querySelector(selector);
   const form=$('#grce-form'),status=$('#grce-status'),button=$('#grce-send'),editor=$('#grce-editor');
   const feedback=(msg,type)=>{status.textContent=msg;notify?.(msg,type)};
@@ -234,7 +234,7 @@
      archive_pdf_id:$('#grce-archive').value||null,sender_account_id:selectedSender||null
     }});
     if(error||data?.error)throw Error(data?.error||error?.message||'Email sending failed');
-    feedback('Message accepted by the company email provider.','success');dialog.close();
+    feedback('Message accepted by the company email provider. Delivery is not yet confirmed.','success');window.dispatchEvent(new CustomEvent('gr:contact-email-sent',{detail:{company:currentCompany,contactId,contactType}}));dialog.close();
    }catch(error){
     feedback(error.message,'error');
     button.textContent='Send Email';
