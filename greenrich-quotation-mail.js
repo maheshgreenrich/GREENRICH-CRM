@@ -62,7 +62,7 @@
    '<small>'+esc(r.recipients?.join(', ')||'')+' · '+esc(r.sender_email)+' · '+esc(date(r.sent_at||r.attempted_at))+'</small>'+
    '<small>Sent by user '+esc(r.sent_by)+' · Products: '+esc(productIds.join(', ')||'No SKU linked')+'</small>'+
    '<div class="grmail-actions">'+(r.pdf_path?'<button data-mail="pdf-link" data-id="'+esc(r.id)+'">View archived PDF</button>':'')+
-   (r.gmail_message_id?'<span>Gmail ID: '+esc(r.gmail_message_id)+'</span>':'')+'</div></article>';
+   (r.provider_message_id||r.gmail_message_id?'<span>'+esc((r.transport||'gmail').toUpperCase())+' message ID: '+esc(r.provider_message_id||r.gmail_message_id)+'</span>':'')+'</div></article>';
  }
  async function send(event){
   event.preventDefault();if(busy)return;
