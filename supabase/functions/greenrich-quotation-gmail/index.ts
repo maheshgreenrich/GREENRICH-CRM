@@ -607,7 +607,8 @@ Deno.serve(async req=>{
    const {data:record}=await db.from('gr_contact_email_history').select('attachment_manifest').eq('id',id).eq('company_id',company).maybeSingle();
    const attachment=Array.isArray(record?.attachment_manifest)?record.attachment_manifest[index]:null;
    if(!attachment?.path||!String(attachment.path).startsWith(company+'/'+id+'/'))throw Error('Archived attachment not available');
-   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90);
+   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90,
+    payload.download?{download:plain(attachment.name,110)||'attachment'}:{});
    if(error)throw error;
    return json({url:data.signedUrl});
   }
