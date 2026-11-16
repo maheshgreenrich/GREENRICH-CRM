@@ -4,6 +4,7 @@
 // Never place OAuth credentials or service keys in public GitHub Pages files.
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import nodemailer from 'npm:nodemailer@7.0.10';
+import sanitizeHtml from 'npm:sanitize-html@2.17.0';
 
 const ORIGIN = 'https://maheshgreenrich.github.io';
 const HOME = ORIGIN + '/GREENRICH-CRM/secure.html';
@@ -104,6 +105,16 @@ async function callback(req:Request){
   const sender=await info.json();
   if(!info.ok||!sender.email_verified||!validEmail(sender.email))throw Error('Verified Gmail address unavailable');
   const encrypted=await encrypt(token.refresh_token);
+  if(state.sender_account_id){
+   const existing=await db.from('gr_gmail_sender_accounts').select('id,company_id').eq('company_id',state.company_id).eq('sender_email',sender.email).maybeSingle();
+   if(existing.error)throw existing.error;
+   const record={company_id:state.company_id,sender_email:sender.email,encrypted_refresh_token:encrypted,
+    status:'connected',connected_at:new Date().toISOString(),connected_by:state.initiated_by,updated_at:new Date().toISOString()};
+   const saved=await db.from('gr_gmail_sender_accounts').upsert(
+    {...record,id:existing.data?.id||state.sender_account_id},{onConflict:'id'});
+   if(saved.error)throw saved.error;
+   return callbackRedirect('connected');
+  }
   const one=await db.from('gr_gmail_private_tokens').upsert({company_id:state.company_id,encrypted_refresh_token:encrypted,updated_at:new Date().toISOString()});
   if(one.error)throw one.error;
   const two=await db.from('gr_gmail_connections').upsert({
@@ -114,12 +125,13 @@ async function callback(req:Request){
   return callbackRedirect('connected');
  }catch(error){console.error('Gmail OAuth callback failed',String(error));return callbackRedirect('failed')}
 }
-async function createAuthorizeUrl(db:any,profile:any,company:string){
+async function createAuthorizeUrl(db:any,profile:any,company:string,addAccount=false){
  await allowed(db,profile,company,'admin');
  const creds=await oauthCredentials(db,company);
  const state=random(),verifier=random(),challenge=b64url(await digest(bytes(verifier)));
  const {error}=await db.from('gr_gmail_oauth_states').insert({
   nonce:state,company_id:company,initiated_by:profile.id,code_verifier:verifier,
+  sender_account_id:addAccount?uuid():null,
   expires_at:new Date(Date.now()+10*60*1000).toISOString()
  });
  if(error)throw error;
@@ -131,9 +143,11 @@ async function createAuthorizeUrl(db:any,profile:any,company:string){
  }))target.searchParams.set(k,v);
  return target.toString();
 }
-async function getAccessToken(db:any,company:string){
+async function getAccessToken(db:any,company:string,senderAccountId='primary'){
  const creds=await oauthCredentials(db,company);
- const {data:token,error}=await db.from('gr_gmail_private_tokens').select('encrypted_refresh_token').eq('company_id',company).maybeSingle();
+ const {data:token,error}=senderAccountId&&senderAccountId!=='primary'
+  ?await db.from('gr_gmail_sender_accounts').select('encrypted_refresh_token').eq('company_id',company).eq('id',senderAccountId).eq('status','connected').maybeSingle()
+  :await db.from('gr_gmail_private_tokens').select('encrypted_refresh_token').eq('company_id',company).maybeSingle();
  if(error||!token)throw Error('Company Gmail is not connected');
  const refresh=await decrypt(token.encrypted_refresh_token);
  const response=await fetch('https://oauth2.googleapis.com/token',{
@@ -144,6 +158,19 @@ async function getAccessToken(db:any,company:string){
  const result=await response.json();
  if(!response.ok||!result.access_token)throw Error('Gmail authorization expired. Ask Admin to reconnect');
  return result.access_token as string;
+}
+async function gmailSenders(db:any,company:string){
+ const {data:legacy}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ const {data:extras,error}=await db.from('gr_gmail_sender_accounts').select('id,sender_email,status,connected_at').eq('company_id',company).order('connected_at');
+ if(error)throw error;
+ return [...(legacy?.status==='connected'?[{id:'primary',sender_email:legacy.sender_email,status:'connected',primary:true}]:[]),
+  ...(extras||[]).map((a:any)=>({id:a.id,sender_email:a.sender_email,status:a.status,primary:false}))];
+}
+async function selectedGmail(db:any,company:string,accountId:string){
+ const options=await gmailSenders(db,company);
+ const chosen=options.find((a:any)=>a.id===accountId&&a.status==='connected');
+ if(!chosen)throw Error('Selected Gmail sender is not connected to this company');
+ return chosen;
 }
 async function configureOAuth(db:any,profile:any,company:string,payload:any){
  await allowed(db,profile,company,'admin');requireSetup();
@@ -444,6 +471,16 @@ Deno.serve(async req=>{
   if(action==='test_transport')return json(await testTransport(db,profile,company));
   if(action==='send_contact')return json(await sendContact(db,profile,payload));
   if(action==='connect')return json({authorize_url:await createAuthorizeUrl(db,profile,company)});
+  if(action==='connect_account')return json({authorize_url:await createAuthorizeUrl(db,profile,company,true)});
+  if(action==='disconnect_account'){
+   await allowed(db,profile,company,'admin');
+   const id=plain(payload.account_id,60);
+   if(id==='primary')throw Error('Use Disconnect Gmail for the primary sender');
+   if(!/^[0-9a-f-]{36}$/i.test(id))throw Error('Invalid Gmail account');
+   const {error}=await db.from('gr_gmail_sender_accounts').delete().eq('id',id).eq('company_id',company);
+   if(error)throw error;
+   return json({disconnected:true});
+  }
   if(action==='disconnect'){
    await allowed(db,profile,company,'admin');
    await db.from('gr_gmail_private_tokens').delete().eq('company_id',company);
@@ -454,7 +491,7 @@ Deno.serve(async req=>{
   if(action==='status'){
    await allowed(db,profile,company,'view');
    const {data}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
-   return json({...await oauthStatus(db,company),...await transportStatus(db,company)});
+   return json({...await oauthStatus(db,company),...await transportStatus(db,company),gmail_accounts:await gmailSenders(db,company)});
   }
   if(action==='pdf_url'){
    await allowed(db,profile,company,'view');
