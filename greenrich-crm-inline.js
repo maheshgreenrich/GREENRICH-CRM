@@ -51,9 +51,14 @@ const consumesStock=s=>Boolean(s)&&!['Cancelled','Returned'].includes(s.status);
   if(current&&(!Number.isInteger(Number(current.stock))||!Number.isInteger(Number(next.qty))||Number(next.qty)<1))throw Error('Invalid stock or quantity.');
   const restore=previous?Number(old.qty):0;
   const available=current?Number(current.stock)+(previous?.id===current.id?restore:0):0;
-  if(current&&available<Number(next.qty))throw Error('Insufficient stock for '+current.name+'. Available: '+available+', requested: '+next.qty);
+  // Sales orders can be booked without full stock; never drive on-hand below zero.
+  // A backorder remains pending and must not be treated as dispatched stock.
   if(previous)previous.stock=Number(previous.stock)+restore;
-  if(current)current.stock=Number(current.stock)-Number(next.qty);
+  if(current)current.stock=Math.max(0,available-Number(next.qty));
+  if(next&&current){
+   next.stock_shortage=Math.max(0,Number(next.qty)-available);
+   next.stock_status=next.stock_shortage?'Pending Stock':'Ready for Dispatch';
+  }
  }
 
 function validateCustomer(store,person,ignore,configured=false){
