@@ -31,6 +31,7 @@ on:
       - 'greenrich-whatsapp-crm-workflows.js'
       - 'supabase/functions/greenrich-whatsapp-send/index.ts'
       - 'tests/whatsapp-send-diagnostics.cjs'
+      - 'tests/whatsapp-template-payload.cjs'
       - 'secure.html'
       - 'tests/quotation-workspace.cjs'
       - 'supabase/migrations/20261116110000_quotations_pdf_workspace.sql'
@@ -63,4 +64,5 @@ jobs:
           node tests/inventory-wms-bom.cjs
           node --check greenrich-whatsapp-crm-workflows.js
           node tests/whatsapp-send-diagnostics.cjs
+          node tests/whatsapp-template-payload.cjs
           node --check greenrich-inventory.js

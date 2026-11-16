@@ -91,8 +91,10 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]):Promise<S
   const response=await fetch(u,{method:"POST",redirect:"error",signal:ctl.signal,
    headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),"Content-Type":"application/json","Accept":"application/json"},
    body:JSON.stringify({type:"template",template:template.name,language:template.language,template_id:template.provider_template_id,
-    category:"MARKETING",preview_template:{id:template.provider_template_id,language:template.language,name:template.name,
-     status:"APPROVED",category:"MARKETING"},components:parts})});
+    category:"MARKETING",
+    // Preserve the full approved template snapshot, including HEADER / BODY / BUTTONS.
+    // Earlier we sent only identity metadata and omitted the approved components.
+    preview_template:template.provider_preview,components:parts})});
   const raw=await response.text();
   if(raw.length>120000)return {id:null,code:"RESPONSE_TOO_LARGE",reason:"SocialBerries returned an unexpectedly large response.",uncertain:true};
   let doc:any=null;try{doc=JSON.parse(raw)}catch{
@@ -158,6 +160,30 @@ Deno.serve(async request=>{
   // Read-only preflight: do not create campaigns while setup is incomplete.
   // Report *all* blockers together so the user does not discover them one by one.
   // Read-only diagnostics: never attempts a send and never reveals provider credentials.
+  // Explicit admin action: authenticate with a READ-ONLY provider request,
+  // then mark the saved company connection verified. Never sends messages.
+  if(action==="verify_provider_connection"){
+   const cfg=creds(company,r.data.slot);
+   if(!cfg)return res(422,{ok:false,error:"SocialBerries HTTPS URL / Basic credentials are missing in Supabase Secrets"});
+   if(!/^\+91[6-9][0-9]{9}$/.test(String(r.data.sender_phone||"")))
+    return res(422,{ok:false,error:"Save the registered +91 business sender number before verifying"});
+   let response:Response;
+   try{
+    response=await fetch(cfg.base+"/api/"+cfg.version+"/users/?page=1",{
+     method:"GET",redirect:"error",signal:AbortSignal.timeout(12000),
+     headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),Accept:"application/json"}
+    });
+   }catch{return res(502,{ok:false,error:"Could not authenticate against SocialBerries. No settings changed."})}
+   if(!response.ok)return res(422,{ok:false,error:"SocialBerries rejected connection verification (HTTP "+response.status+"). No settings changed."});
+   let data:any;
+   try{data=await response.json()}catch{return res(502,{ok:false,error:"SocialBerries returned invalid authentication response"})}
+   if(data?.error===true||data?.success===false)
+    return res(422,{ok:false,error:"SocialBerries reported failed authentication. No settings changed."});
+   const saved=await db.from("gr_wa_connections")
+    .update({enabled:true,setup_state:"verified"}).eq("id",connectionId).eq("company_id",company);
+   if(saved.error)return res(500,{ok:false,error:"Provider authentication passed but CRM setup status could not be saved"});
+   return res(200,{ok:true,provider_verified:true,message:"SocialBerries API authenticated; company provider marked enabled. This is NOT Meta template or message-delivery verification. No message was sent."});
+  }
   if(action==="diagnose_connection"){
    const cfg=creds(company,r.data.slot),p=prefixes[company+":"+r.data.slot];
    const credsReady=!!cfg,enabled=env("SB_ENABLE_MARKETING_SEND")==="true";
@@ -210,6 +236,7 @@ Deno.serve(async request=>{
    const t=found.data;
    const cfg=creds(company,r.data.slot),blockers:string[]=[];
    if(!cfg)blockers.push("SocialBerries API credentials are missing in Supabase Secrets");
+   if(r.data.enabled!==true||r.data.setup_state!=="verified")blockers.push("Verify and enable the company SocialBerries connection in Settings (read-only API check)");
    if(!t||t.category!=="marketing"||t.provider_approval!=="approved"||
     !["admin_confirmed","verified_provider"].includes(t.provider_source)||
     !Array.isArray(t.provider_preview?.components)||!t.body)
@@ -344,6 +371,7 @@ Deno.serve(async request=>{
    ||!["verified_provider","admin_confirmed"].includes(t.provider_source))blockers.push("Confirm a full approved MARKETING template");
   if(["paused","archived"].includes(campaign.status))blockers.push("Campaign is paused or archived");
   if(env("SB_ENABLE_MARKETING_SEND")!=="true")blockers.push("Activate SB_ENABLE_MARKETING_SEND=true after provider testing");
+  if(r.data.enabled!==true||r.data.setup_state!=="verified")blockers.push("Verify and enable this SocialBerries provider in Settings before submitting campaign messages");
   let group:any;try{group=await audience(db,campaign,company)}
   catch(e){return res(422,{ok:false,error:e instanceof Error?e.message:"Recipient validation failed"})}
   if(!group.eligible.length)blockers.push("No recipients have recorded company-specific WhatsApp marketing opt-in");

@@ -350,7 +350,7 @@
     const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
     return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
       '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
-      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-diagnose-provider="'+esc(p.id)+'">Check Sending Setup</button> <button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
+      (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-diagnose-provider="'+esc(p.id)+'">Check Sending Setup</button> <button type="button" data-verify-provider="'+esc(p.id)+'">Verify & Enable Provider</button> <button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
       '</div>';
    }).join('')+'</div>'+
    '<div class="grwc-steps"><b>Connection instructions — SocialBerries</b><ol>'+
@@ -359,6 +359,8 @@
    '<li>Supabase → Edge Functions → Secrets: enter server-side <b>BASE_URL</b>, <b>BASIC_USERNAME</b>, <b>BASIC_PASSWORD</b> for this company/provider. Use an HTTPS API host, not the documentation URL. Set API_VERSION (default v1). Never enter credentials in CRM or GitHub.</li>'+
    '<li>Environment variable prefix for tool 1: <code>'+esc(c==='grow-india'?'SB_GROW_INDIA_SLOT1':'SB_ENVIRO_SOLUTIONS_SLOT1')+'</code> (tool 2 uses SLOT2). Example: <code>..._BASE_URL</code>.</li>'+
    '<li>Press <b>Test Connection</b> after configuration. It calls only <code>GET /api/v1/users/?page=1</code>. No WhatsApp message is sent.</li>'+
+   '<li>After a successful read-only test, use <b>Verify &amp; Enable Provider</b>. This verifies the saved company sender connection without sending a message. You must separately verify your exact approved MARKETING template.</li>'+
+   '<li><b>Bulk API documentation:</b> <code>POST /api/v1/whatsapp/messages/bulk/</code> requires multipart form fields and an uploaded CSV when using the file audience. The current CRM campaign sender uses the separate individual-message endpoint. Do not use the bulk code example as proof that an individual message succeeded. A bulk response with <code>status: pending</code> means queued, not delivered.</li>'+
    '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
@@ -392,6 +394,8 @@
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
    const edit=e.target.closest('[data-edit-provider]'),add=e.target.closest('[data-new-inbound]'),sheet=e.target.closest('[data-save-sheet]');
+   const verifyProvider=e.target.closest('[data-verify-provider]');
+   if(verifyProvider)return await enableVerifiedProvider(verifyProvider.dataset.verifyProvider,container);
    const diagnose=e.target.closest('[data-diagnose-provider]');
    if(diagnose)return await diagnoseProvider(diagnose.dataset.diagnoseProvider);
    const check=e.target.closest('[data-test-provider]'),batches=e.target.closest('[data-batches-provider]'),messages=e.target.closest('[data-messages-provider]');
@@ -486,6 +490,20 @@
    connection=r.data;rows.connections=[...(rows.connections||[]),connection];
   }
   openMessageHistory(connection.id,customer.mobile||customer.mobile2);
+ }
+ async function enableVerifiedProvider(id,container){
+  const record=rows.connections.find(x=>x.id===id&&app.companies.includes(x.company_id));
+  if(!record)return alert('Save the SocialBerries provider details first.','warning');
+  if(!window.confirm('Check SocialBerries API authentication and mark this company sender as verified? This does NOT send any WhatsApp messages or approve templates.'))return;
+  try{
+   const result=await secureSend('verify_provider_connection',{connection_id:id});
+   if(!result.provider_verified)throw Error(result.message||'Provider verification was not confirmed');
+   alert('SocialBerries API authenticated and provider enabled. Meta-approved marketing template and opted-in recipients must still be verified. No message was sent.','success');
+   await fetchAll();
+   if(container?.isConnected)settingsDraw(container);
+  }catch(error){
+   alert('SocialBerries verification failed: '+error.message,'error');
+  }
  }
  async function diagnoseProvider(id){
   const conn=rows.connections.find(c=>c.id===id&&app.companies.includes(c.company_id));
