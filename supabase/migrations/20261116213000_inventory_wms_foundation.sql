@@ -106,50 +106,7 @@ begin
  else
   raise exception 'Inventory item not found in this company and product stage';
  end if;
- if not (p_input->>'quantity' ~ '^[0-9]{1,10}(\.[0-9]{1,6})?
- v_qty=(p_input->>'quantity')::numeric(18,6);
- if v_qty<=0 then raise exception 'Quantity must exceed zero';end if;
- if p_action='verified_count' then
-  if not public.gr_ops_allowed(p_company,'material','approve') then raise exception 'Admin/stock approval required';end if;
-  v_to=(p_input->>'to_location')::uuid;
-  select * into v_location from public.gr_inventory_locations where id=v_to and company_id=p_company and active;
-  if not found or v_location.kind not in ('warehouse','marketplace') then raise exception 'Verified counts need a physical warehouse';end if;
-  -- Count sets the quantity to an observed physical count, never a silent aggregate-stock change.
-  insert into public.gr_inventory_location_balances(company_id,location_id,item_kind,item_id,uom,quantity)
-  values(p_company,v_to,v_kind,v_item,v_uom,0)
-  on conflict(company_id,location_id,item_kind,item_id) do nothing;
-  select quantity into v_before from public.gr_inventory_location_balances
-   where company_id=p_company and location_id=v_to and item_kind=v_kind and item_id=v_item and uom=v_uom for update;
-  if v_before is null then raise exception 'Stock unit cannot change; use matching UOM';end if;
-  update public.gr_inventory_location_balances set quantity=v_qty,updated_at=now()
-    where company_id=p_company and location_id=v_to and item_kind=v_kind and item_id=v_item;
- elsif p_action='transfer' then
-  v_from=(p_input->>'from_location')::uuid;v_to=(p_input->>'to_location')::uuid;
-  if v_from=v_to then raise exception 'Source and destination must differ';end if;
-  if not exists(select 1 from public.gr_inventory_locations where id=v_from and company_id=p_company and active)
-   or not exists(select 1 from public.gr_inventory_locations where id=v_to and company_id=p_company and active)
-   then raise exception 'Locations must belong to the selected company';end if;
-  select quantity into v_before from public.gr_inventory_location_balances
-   where company_id=p_company and location_id=v_from and item_kind=v_kind and item_id=v_item and uom=v_uom for update;
-  if v_before is null or v_before<v_qty then raise exception 'Insufficient verified stock at source warehouse';end if;
-  insert into public.gr_inventory_location_balances(company_id,location_id,item_kind,item_id,uom,quantity)
-   values(p_company,v_to,v_kind,v_item,v_uom,0)
-   on conflict(company_id,location_id,item_kind,item_id) do nothing;
-  if not exists(select 1 from public.gr_inventory_location_balances where company_id=p_company and location_id=v_to and item_kind=v_kind and item_id=v_item and uom=v_uom)
-   then raise exception 'Destination UOM mismatch';end if;
-  update public.gr_inventory_location_balances set quantity=quantity-v_qty,updated_at=now()
-   where company_id=p_company and location_id=v_from and item_kind=v_kind and item_id=v_item;
-  update public.gr_inventory_location_balances set quantity=quantity+v_qty,updated_at=now()
-   where company_id=p_company and location_id=v_to and item_kind=v_kind and item_id=v_item;
- else raise exception 'Unsupported stock movement';end if;
- insert into public.gr_inventory_location_movements(request_id,company_id,item_kind,item_id,item_code,uom,quantity,action,from_location,to_location,reference,notes,actor)
- values(p_request,p_company,v_kind,v_item,v_code,v_uom,v_qty,p_action,v_from,v_to,
- left(coalesce(p_input->>'reference',''),100),left(coalesce(p_input->>'notes',''),500),v_actor);
- return jsonb_build_object('message',case when p_action='transfer' then 'Location transfer posted' else 'Verified physical count recorded' end);
-end;$$;
-revoke all on function public.gr_inventory_location_action(text,text,jsonb,uuid) from public,anon;
-grant execute on function public.gr_inventory_location_action(text,text,jsonb,uuid) to authenticated;
-) then raise exception 'Invalid quantity';end if;
+ if coalesce(p_input->>'quantity','') !~ '^[0-9]{1,10}(\.[0-9]{1,6})?$' then raise exception 'Invalid quantity';end if;
  v_qty=(p_input->>'quantity')::numeric(18,6);
  if v_qty<=0 then raise exception 'Quantity must exceed zero';end if;
  if p_action='verified_count' then
