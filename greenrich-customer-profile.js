@@ -198,7 +198,7 @@
     if(!window.GreenRichWhatsAppWorkflows?.openCustomerRule)return window.alert('WhatsApp service settings did not load. Refresh CRM.');
     void window.GreenRichWhatsAppWorkflows.openCustomerRule({customer:c});return;
    }
-   if(kind==='whatsapp'||kind==='email'||kind==='share'){openMessage(kind==='email'?'email':'whatsapp',kind==='whatsapp'?'__BLANK__':shareText(kind==='share'?'details':'intro'));return}
+   if(kind==='whatsapp'||kind==='email'||kind==='share'){openMessage(kind==='email'?'email':'whatsapp',kind==='whatsapp'?'__BLANK__':kind==='email'?'':shareText('details'));return}
    if(kind==='copy'){const summary=payloadInfo(c,model);if(navigator.clipboard?.writeText){navigator.clipboard.writeText(summary).then(()=>{button.textContent='Copied ✓'}).catch(()=>window.prompt('Copy customer information',summary))}else window.prompt('Copy customer information',summary);return}
    if(kind.startsWith('invoice')){
     const sale=model.purchases.find(s=>((s._companyId||s.company_id||'')+'|'+s.id)===ref);
