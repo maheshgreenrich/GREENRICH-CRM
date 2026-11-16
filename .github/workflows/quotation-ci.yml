@@ -1,0 +1,26 @@
+name: Quotation and PDF workspace checks
+on:
+  pull_request:
+    paths:
+      - 'greenrich-quotations.*'
+      - 'greenrich-pdf-workbench.js'
+      - 'greenrich-one.js'
+      - 'secure.html'
+      - 'tests/quotation-workspace.cjs'
+      - 'supabase/migrations/20261116110000_quotations_pdf_workspace.sql'
+      - '.github/workflows/quotation-ci.yml'
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify quotation and PDF modules
+        run: |
+          node --check greenrich-one.js
+          node --check greenrich-quotations.js
+          node --check greenrich-pdf-workbench.js
+          node tests/quotation-workspace.cjs

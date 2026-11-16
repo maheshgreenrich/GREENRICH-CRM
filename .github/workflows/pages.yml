@@ -38,6 +38,11 @@ jobs:
           node --check field-tracker.js
       - name: Verify Dispatch packing slip, invoice design and service follow-up UI
         run: npm run test:dispatchdocs
+      - name: Verify quotation and PDF workspace before publishing
+        run: |
+          node tests/quotation-workspace.cjs
+          node --check greenrich-quotations.js
+          node --check greenrich-pdf-workbench.js
       - name: Check required app files
         continue-on-error: true # Legacy regression checks report failures, but do not keep the GPS Settings release offline.
         run: |
