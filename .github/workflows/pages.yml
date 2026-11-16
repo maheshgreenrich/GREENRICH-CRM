@@ -41,6 +41,8 @@ jobs:
       - name: Verify quotation and PDF workspace before publishing
         run: |
           node tests/quotation-workspace.cjs
+          node tests/quotation-visual-builder.cjs
+          node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js
           node --check greenrich-pdf-workbench.js
       - name: Check required app files
