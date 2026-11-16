@@ -9,7 +9,7 @@
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],requisitions:[],prodBalances:[],focus:null,filter:'',busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],requisitions:[],prodBalances:[],focus:null,filter:'',busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
@@ -33,7 +33,7 @@
    rows('gr_inventory_locations'),
    rows('gr_inventory_location_balances'),
    rows('gr_inventory_location_movements','*',q=>q.order('posted_at',{ascending:false}).limit(200)),
-   rows('gr_production_documents','*',q=>q.eq('kind','po')),
+   rows('gr_production_documents','*',q=>q.in('kind',['po','job'])),
    rows('gr_production_balances')
   ]);
   const list=[];
@@ -48,12 +48,12 @@
     material:p,original:'ops',overlap});
   }
   S.items=list;S.bom=materials.filter(x=>x.kind==='bom');S.requisitions=materials.filter(x=>x.kind==='requisition');S.locations=locations;
-  S.balances=balances;S.movements=movements;S.pos=docs;S.prodBalances=aggregates;
+  S.balances=balances;S.movements=movements;S.pos=docs.filter(x=>x.kind==='po');S.jobWork=docs.filter(x=>x.kind==='job');S.prodBalances=aggregates;
  }
  const getLocBalance=item=>S.balances.filter(b=>b.company_id===item.company_id&&b.item_kind===item.stage&&b.item_id===item.id)
    .reduce((sum,b)=>sum+Number(b.quantity||0),0);
  function layout(){
-  const tabs=[['catalog','Product & Material Master'],['warehouses','Warehouse Stock'],['bom','Multi-level BOM'],['purchasing','Purchase Shortages'],['activity','Stock Movement Audit']];
+  const tabs=[['catalog','Product & Material Master'],['warehouses','Warehouse Stock'],['vendors','Vendor / Job Work Stock'],['bom','Multi-level BOM'],['purchasing','Purchase Shortages'],['activity','Stock Movement Audit']];
   S.root.innerHTML='<div class="gr-inventory"><header class="gr-inv-head"><div><small>GREENRICH ONE · INVENTORY</small><h2>Inventory & Material Control</h2><p>Saleable · Purchasable · Raw material · Intermediate · Semi-finished · Final goods</p></div>'+
    '<label>Company<select data-inv-company><option value="all"'+(S.scope==='all'?' selected':'')+'>All assigned companies</option>'+companyOptions()+'</select></label></header>'+
    '<p class="gr-inv-warning">Location stock is based on verified physical counts and transfers. Existing CRM saleable stock and production balances are shown separately until reconciled; locations are NOT auto-filled from aggregate stock.</p>'+
@@ -68,7 +68,7 @@
  function draw(){
   const box=S.root.querySelector('[data-inventory-content]');if(!box)return;
   if(S.focus){box.innerHTML=detail(S.focus);bind();return;}
-  box.innerHTML=S.tab==='catalog'?catalog():S.tab==='warehouses'?warehouse():
+  box.innerHTML=S.tab==='catalog'?catalog():S.tab==='warehouses'?warehouse():S.tab==='vendors'?vendorStock():
    S.tab==='bom'?bom():S.tab==='purchasing'?purchase():audit();
   bind();
  }
@@ -119,6 +119,20 @@
     const i=items.find(x=>x.company_id===b.company_id&&x.id===b.item_id&&x.stage===b.item_kind);
     return '<tr><td>'+esc(locName(b.location_id))+'</td><td>'+esc(i?.code||b.item_id)+' · '+esc(b.item_kind)+'</td><td>'+fmt(b.quantity)+'</td><td>'+esc(b.uom)+'</td></tr>'}))+
    (canEdit?form:'<p>Warehouse movements require stock edit permission.</p>');
+ }
+ function vendorStock(){
+  const rows=S.jobWork.filter(inScope),open=rows.filter(d=>Number(d.payload.remaining)>0);
+  const atVendor=open.reduce((m,d)=>{const p=d.payload||{},key=[d.company_id,p.vendor?.name,p.material?.uom].join('|');m[key]=(m[key]||0)+Number(p.remaining||0);return m},{});
+  return '<h3>Material at job-work vendors</h3>'+
+   '<p>Existing production STN / job-work ledger is the source of these figures. <b>Outstanding at vendor = issued − used − wastage − returned</b>. Each job is reconciled before closure.</p>'+
+   '<div class="gr-inv-stats"><article><small>Job-work orders</small><strong>'+rows.length+'</strong></article><article><small>Outstanding STNs</small><strong>'+open.length+'</strong></article><article><small>Vendors with material</small><strong>'+Object.keys(atVendor).length+'</strong></article></div>'+
+   table(['STN / Job reference','Vendor','Raw material','Issued','Used','Wastage','Returned','Outstanding','Status'],rows.map(d=>{
+    const p=d.payload||{};return '<tr><td>'+esc(d.number)+'</td><td>'+esc(p.vendor?.name||'—')+'</td><td>'+esc(p.material?.name||p.material_id||'—')+
+    '</td><td>'+fmt(p.issued)+' '+esc(p.material?.uom||'')+'</td><td>'+fmt(p.used)+'</td><td>'+fmt(p.waste)+'</td><td>'+fmt(p.returned)+'</td><td><strong>'+fmt(p.remaining)+'</strong></td><td>'+esc(d.status)+'</td></tr>'}))+
+   '<h4>Vendor-wise outstanding balances</h4>'+table(['Company','Vendor','Outstanding','Unit'],Object.entries(atVendor).map(([key,value])=>{
+    const [company,vendor,uom]=key.split('|');return '<tr><td>'+esc(companyName(company))+'</td><td>'+esc(vendor)+'</td><td>'+fmt(value)+'</td><td>'+esc(uom)+'</td></tr>'}))+
+   '<button data-inv-operations>Open vendor issue, usage, wastage, returns & QC</button>'+
+   '<p class="gr-inv-warning">Job-work material is not saleable warehouse stock. Issued and consumed quantities are linked to vendor STN, not invented as warehouse transfers.</p>';
  }
  function bom(){
   const mapped=S.bom.filter(inScope),all=S.items.filter(inScope);
