@@ -216,7 +216,7 @@ async function render(){
    await window.GreenRichInventory.mount(c,{
     db,companies:manager.allowed(),scope:manager.selected(user.id),companyName:id=>manager.list().find(x=>x.id===id)?.name||id,
     can:(module,action='view')=>roleName()==='Admin'||can(module,action),
-    openLegacy:async()=>{c.replaceChildren();await crmWorkspace(c,'products');},
+    openLegacy:async()=>{c.replaceChildren();const back=document.createElement('button');back.type='button';back.textContent='← Back to Inventory';back.className='gr-inventory-return';back.onclick=()=>{crmCache=null;void render()};c.append(back);await crmWorkspace(c,'products');},
     openOperations:()=>{page='operations';navigation();void render();}
    });
   }
