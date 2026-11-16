@@ -47,6 +47,8 @@ jobs:
           node tests/email-editor-history.cjs
           node tests/inventory-wms-bom.cjs
           node --check greenrich-inventory.js
+          node --check greenrich-whatsapp-crm-workflows.js
+          node tests/whatsapp-send-diagnostics.cjs
           node tests/quotation-visual-builder.cjs
           node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js
