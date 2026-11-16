@@ -25,9 +25,8 @@
   const tags=text=>[...String(text||'').matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1].trim().toLowerCase());
   const fields=[];
   if(String(header?.format).toUpperCase()==='TEXT')for(const tag of tags(header.text))fields.push({key:'header:'+tag,label:'Header '+tag});
-  for(const tag of tags(body?.text)){
-   if(!['clientname','clientemail','clientmobile','1','2','3'].includes(tag))
-    fields.push({key:'body:'+tag,label:'Body variable '+tag});
+  for(const tag of [...new Set(tags(body?.text))]){
+   fields.push({key:'body:'+tag,label:'Message variable '+tag,tag});
   }
   if(!Array.isArray(buttons))return {fields,unsupported:['Invalid approved button definitions'],format:''};
   buttons.forEach((b,i)=>{
@@ -59,8 +58,16 @@
   region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
    (hints.length?'<p class="grwc-notice">'+hints.map(esc).join(' ')+'</p>':'')+
    (spec.unsupported.length?'<p class="grwc-notice">'+spec.unsupported.map(esc).join(' · ')+'</p>':'')+
-   '<div class="grwc-grid">'+spec.fields.map(f=>'<label>'+esc(f.label)+
-      '<input type="text" name="wa_parameter" data-wa-field="'+esc(f.key)+'" required maxlength="200" value="'+esc(stored[f.key]||'')+'" placeholder="Required for approved template"></label>').join('')+'</div>'+
+   '<div class="grwc-grid">'+spec.fields.map(f=>{
+      const selected=stored[f.key]||(f.tag==='1'||f.tag==='clientname'?'@crm:name':f.tag==='2'||f.tag==='clientemail'?'@crm:email':f.tag==='3'||f.tag==='clientmobile'?'@crm:mobile':'');
+      if(!f.tag)return '<label>'+esc(f.label)+'<input type="text" name="wa_parameter" data-wa-field="'+esc(f.key)+'" required maxlength="200" value="'+esc(selected)+'" placeholder="Required for approved template"></label>';
+      const preset=['@crm:name','@crm:mobile','@crm:email'];
+      const mode=preset.includes(selected)?selected:'custom';
+      return '<label>'+esc(f.label)+'<select data-wa-field="'+esc(f.key)+'">'+
+       [['@crm:name','Customer name'],['@crm:mobile','Customer mobile'],['@crm:email','Customer email'],['custom','Enter my own text / order number']].map(([v,label])=>
+        '<option value="'+esc(v)+'" '+(v===mode?'selected':'')+'>'+esc(label)+'</option>').join('')+'</select>'+
+       '<input data-wa-custom="'+esc(f.key)+'" maxlength="200" placeholder="Type the value" value="'+esc(mode==='custom'?selected:'')+'" '+(mode==='custom'?'required':'hidden')+'></label>';
+     }).join('')+'</div>'+
    (!spec.fields.length?'<p class="grwc-muted">No additional custom text or button values are required by the saved template JSON.</p>':'');
   const button=form.querySelector('[data-send-campaign]');
   if(button)button.disabled=!!spec.unsupported.length;
@@ -1073,10 +1080,16 @@
     if(status)status.textContent=campaignImage?'Selected for sending: '+campaignImage.name:'No image selected';
     return;
    }
-   if(form&&e.target.dataset?.waField){
+   if(form&&(e.target.dataset?.waField||e.target.dataset?.waCustom)){
+    const key=e.target.dataset.waField||e.target.dataset.waCustom;
     const id=form.elements.template_id.value;
     if(!campaignParamValues[id])campaignParamValues[id]={};
-    campaignParamValues[id][e.target.dataset.waField]=String(e.target.value||'');
+    const select=[...form.querySelectorAll('select[data-wa-field]')].find(x=>x.dataset.waField===key);
+    const input=[...form.querySelectorAll('[data-wa-custom]')].find(x=>x.dataset.waCustom===key);
+    if(select){
+     if(input){input.hidden=select.value!=='custom';input.required=select.value==='custom'}
+     campaignParamValues[id][key]=select.value==='custom'?String(input?.value||''):select.value;
+    }else campaignParamValues[id][key]=String(e.target.value||'');
     return;
    }
    if(form&&e.target.name==='template_id'){
@@ -1155,7 +1168,8 @@
    const templateFields={};
    for(const entry of spec.fields){
     const control=[...e.target.querySelectorAll('[data-wa-field]')].find(x=>x.dataset.waField===entry.key);
-    const value=String(control?.value||'').trim();
+    const custom=[...e.target.querySelectorAll('[data-wa-custom]')].find(x=>x.dataset.waCustom===entry.key);
+    const value=String(control?.value==='custom'?custom?.value:control?.value||'').trim();
     if(!value)return alert('Complete required template field: '+entry.label,'warning');
     templateFields[entry.key]=value;
    }
