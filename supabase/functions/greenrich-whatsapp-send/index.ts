@@ -301,6 +301,13 @@ Deno.serve(async request=>{
     blockers.push("No selected recipients have documented WhatsApp marketing opt-in for this sender company");
    // Invalid, duplicate and other-company contacts are skipped; eligible contacts may still send.
    const withImage=input.has_image===true;
+   if(input.template_fields&&(
+      typeof input.template_fields!=="object"||Array.isArray(input.template_fields)||
+      Object.keys(input.template_fields).length>25||
+      Object.entries(input.template_fields).some(([key,value])=>
+       !/^(header|body|coupon|url):[a-z0-9_]{1,50}$/i.test(key)||
+       typeof value!=="string"||value.length>200)
+     ))blockers.push("Template parameters contain invalid field names or values");
    if(t?.provider_preview?.components){
     const header=t.provider_preview.components.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
     const isImage=String(header?.format).toUpperCase()==="IMAGE";
@@ -429,6 +436,8 @@ Deno.serve(async request=>{
   if(!group.eligible.length)blockers.push("No recipients have recorded company-specific WhatsApp marketing opt-in");
   let image="";
   if(campaign.attachment_path){
+   if(!["image/png","image/jpeg"].includes(campaign.attachment_mime))
+    blockers.push("IMAGE header must use JPEG or PNG. Upload an approved JPEG/PNG image, not WebP.");
    if(!campaign.attachment_path.startsWith(company+"/"+campaign.id+"/"))blockers.push("Invalid image association");
    else{
     const result=await db.storage.from("gr-wa-campaign-images").createSignedUrl(campaign.attachment_path,86400);
