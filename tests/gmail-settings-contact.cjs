@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const read=p=>fs.readFileSync(path.resolve(__dirname,'..',p),'utf8');
+for(const file of ['greenrich-gmail-settings.js','greenrich-contact-email.js','greenrich-company-admin.js','greenrich-one.js','greenrich-customer-profile.js','greenrich-crm-inline.js','greenrich-lead-profile.js','greenrich-lead-pipeline.js','greenrich-quotation-mail.js','greenrich-quotations.js']){
+ assert.doesNotThrow(()=>new vm.Script(read(file),{filename:file}),file);
+}
+const settings=read('greenrich-company-admin.js'),one=read('greenrich-one.js'),mail=read('greenrich-contact-email.js');
+assert.match(settings,/Gmail Connectivity/);assert.match(settings,/ctx.openGmailSettings/);
+assert.match(one,/GreenRichGmailSettings\.mount/);
+assert.match(mail,/action:'send_contact'/);assert.match(mail,/crypto\.randomUUID\(\)/);
+assert.match(mail,/Company Gmail not connected/);
+const cp=read('greenrich-customer-profile.js');
+assert.match(cp,/data-gr360/);assert.match(cp,/onEmail\?\./);
+assert.match(cp,/kind==='whatsapp'\?'__BLANK__'/);
+assert.match(cp,/message&&message!=='__BLANK__'/);
+assert.match(read('greenrich-crm-inline.js'),/GreenRichContactEmail/);
+assert.match(read('greenrich-lead-profile.js'),/GreenRichContactEmail\.open/);
+assert.match(read('greenrich-lead-pipeline.js'),/action==='email'/);
+assert.ok(!read('greenrich-lead-profile.js').includes('href="mailto:'));
+const quote=read('greenrich-quotation-mail.js');assert.ok(!quote.includes('Connect / Reconnect Gmail'));
+const conf=read('greenrich-gmail-settings.js');
+assert.match(conf,/client_secret/);assert.match(conf,/action:'configure'/);
+assert.doesNotMatch(conf,/localStorage/);
+const edge=read('supabase/functions/greenrich-quotation-gmail/index.ts');
+for(const term of ['gr_gmail_oauth_configs','encrypted_client_secret','encrypt(clientSecret)','send_contact','gr_contact_email_history','gr_lead_pipeline','needs_review','getUser(bearer.slice(7))'])assert.ok(edge.includes(term),'Missing '+term);
+assert.doesNotMatch(edge,/gr_leads'\)/);
+const sql=read('supabase/migrations/20261116183000_gmail_settings_contact_email.sql');
+for(const term of ['gr_gmail_oauth_configs enable row level security','gr_contact_email_history enable row level security','revoke all on public.gr_gmail_oauth_configs'])assert.ok(sql.includes(term));
+const html=read('secure.html');for(const term of ['greenrich-gmail-settings.js','greenrich-contact-email.js','greenrich-gmail-settings.css','greenrich-contact-email.css'])assert.ok(html.includes(term));
+console.log('PASS: Gmail Settings isolation, secure contact composer, Customer/Lead 360, blank WhatsApp and backend audit checks.');
