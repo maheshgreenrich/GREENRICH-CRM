@@ -36,10 +36,11 @@
    '<button data-format="insertOrderedList" type="button" title="Numbered list">1. List</button>'+
    '<button data-format="justifyLeft" type="button" title="Align left">⇤</button>'+
    '<button data-format="justifyCenter" type="button" title="Center align">≡</button>'+
-   '<button data-format="justifyRight" type="button" title="Align right">⇥</button>'+
+   '<button data-format="justifyRight" type="button" title="Align right">⇥</button><button data-format="indent" type="button" title="Increase indent">→|</button><button data-format="outdent" type="button" title="Decrease indent">|←</button><button data-format="formatBlock" data-value="blockquote" type="button" title="Block quote">❞</button>'+
+   '<select id="grce-font-family" aria-label="Font family"><option value="">Font</option><option value="Arial">Sans Serif</option><option value="Georgia">Serif</option><option value="Courier New">Monospace</option><option value="Verdana">Verdana</option><option value="Tahoma">Tahoma</option></select>'+ 
    '<select id="grce-font" aria-label="Font size">'+
    '<option value="">Text size</option><option value="2">Small</option><option value="3">Normal</option><option value="4">Large</option><option value="5">Heading</option></select>'+
-   '<label class="grce-color" title="Text colour">A<input id="grce-color" type="color" value="#253750" aria-label="Text colour"></label>'+
+   '<label class="grce-color" title="Text colour">A<input id="grce-color" type="color" value="#253750" aria-label="Text colour"></label><label class="grce-color" title="Text highlight">▣<input id="grce-highlight" type="color" value="#fff2a8" aria-label="Highlight colour"></label>'+
    '<button id="grce-link" type="button" title="Insert hyperlink">🔗</button>'+
    '<button id="grce-emoji-toggle" type="button" title="Emoji picker">☺</button><button type="button" id="grce-image" title="Insert image">▣ Image</button><input type="file" id="grce-inline-file" accept="image/png,image/jpeg,image/webp" hidden>'+
    '<button data-format="removeFormat" type="button" title="Clear formatting">T×</button>'+
@@ -132,13 +133,17 @@
   editor.addEventListener('focusout',rememberSelection);
   dialog.querySelectorAll('[data-format]').forEach(b=>{
    b.onmousedown=e=>e.preventDefault();
-   b.onclick=()=>command(b.dataset.format);
+   b.onclick=()=>command(b.dataset.format,b.dataset.value||null);
   });
+  $('#grce-font-family').addEventListener('pointerdown',rememberSelection);
+  $('#grce-font-family').onchange=e=>{if(e.target.value)command('fontName',e.target.value);e.target.value=''};
   $('#grce-font').addEventListener('pointerdown',rememberSelection);
   $('#grce-font').onchange=e=>{command('fontSize',e.target.value);e.target.value=''};
   $('#grce-color').addEventListener('pointerdown',rememberSelection);
   $('#grce-color').oninput=e=>command('foreColor',e.target.value);
   $('#grce-color').onchange=e=>command('foreColor',e.target.value);
+  $('#grce-highlight').addEventListener('pointerdown',rememberSelection);
+  $('#grce-highlight').onchange=e=>command('hiliteColor',e.target.value);
   const insertLink=()=>{
    rememberSelection();
    const target=window.prompt('Enter link: https://example.com or mailto:name@example.com');
