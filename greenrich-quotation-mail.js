@@ -5,7 +5,7 @@
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const date=x=>x?new Date(x).toLocaleString('en-IN'):'—';
  const money=x=>'₹'+Number(x||0).toLocaleString('en-IN',{maximumFractionDigits:2});
- let host,ctx,history=[],templates=[],info=null,mailTemplate='',busy=false;
+ let host,ctx,history=[],templates=[],info=null,mailTemplate='',busy=false,staff={};
  const notice=(msg,type)=>ctx.notify?.(msg,type);
  const sel=x=>host.querySelector(x);
  const query=async(builder)=>{const {data,error}=await builder;if(error)throw Error(error.message);return data||[]};
@@ -25,6 +25,11 @@
    query(ctx.db.from('gr_quotation_email_history').select('*').eq('company_id',ctx.company).order('attempted_at',{ascending:false}).limit(250))
   ]);
   info=connections;templates=items;history=logs;
+  const ids=[...new Set(logs.map(x=>x.sent_by).filter(Boolean))];
+  if(ids.length){
+   const users=await ctx.db.from('gr_profiles').select('id,full_name').in('id',ids);
+   if(!users.error)staff=Object.fromEntries((users.data||[]).map(x=>[x.id,x.full_name]));
+  }
  }
  function render(){
   if(!host)return;
