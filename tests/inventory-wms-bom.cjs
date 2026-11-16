@@ -22,7 +22,7 @@ for(const token of ['gr_inventory_locations','gr_inventory_location_balances','g
 assert.ok(sql.includes('No direct browser write permissions'),'Production and CRM balances must not be directly editable');
 const dom=new JSDOM('<html><body><div id="root"></div></body></html>',{url:'https://maheshgreenrich.github.io/GREENRICH-CRM/secure.html'});
 const mocks={
- gr_crm_records:[{company_id:'grow-india',record_id:'product-a',payload:{sku:'FG-001',name:'MGB 100',stock:8}}],
+ gr_crm_records:[{company_id:'grow-india',record_id:'product-a',kind:'products',payload:{sku:'FG-001',name:'MGB 100',stock:8}}],
  gr_ops_records:[
  {company_id:'grow-india',record_id:'rm1',kind:'material',payload:{code:'RM-001',name:'SS sheet',type:'RM',uom:'kg',reorder_level:20}},
  {company_id:'grow-india',record_id:'im1',kind:'material',payload:{code:'IM-001',name:'Hinge plate',type:'IM',uom:'nos'}},
