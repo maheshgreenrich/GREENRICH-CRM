@@ -57,6 +57,6 @@ const db={functions:{invoke:async()=>({data:{
  assert.ok(modal.querySelectorAll('[data-format]').length>=9,'Rich editing toolbar');
  assert.equal(modal.querySelector('[name="to"]').readOnly,false,'To field is editable');
  assert.ok(!modal.querySelector('#grce-send').disabled,'Sending enabled when company sender is connected');
- assert.ok(read('secure.html').includes('greenrich-contact-email.js?v=20261116-rich-multi-email-1'));
+ assert.ok(read('secure.html').includes('greenrich-contact-email.js?v=20261116-email-editor-history-2'));
  console.log('PASS: two Gmail senders, company dropdown, rich editor, To/CC/BCC, file attachments, private archive and server security');
 })().catch(e=>{console.error(e);process.exitCode=1});

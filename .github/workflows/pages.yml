@@ -44,6 +44,7 @@ jobs:
           node tests/gmail-settings-contact.cjs
           node tests/multimail-settings.cjs
           node tests/rich-contact-email.cjs
+          node tests/email-editor-history.cjs
           node tests/quotation-visual-builder.cjs
           node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js

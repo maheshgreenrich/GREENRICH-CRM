@@ -36,16 +36,17 @@
    '<button data-format="insertOrderedList" type="button" title="Numbered list">1. List</button>'+
    '<button data-format="justifyLeft" type="button" title="Align left">⇤</button>'+
    '<button data-format="justifyCenter" type="button" title="Center align">≡</button>'+
-   '<button data-format="justifyRight" type="button" title="Align right">⇥</button>'+
+   '<button data-format="justifyRight" type="button" title="Align right">⇥</button><button data-format="indent" type="button" title="Increase indent">→|</button><button data-format="outdent" type="button" title="Decrease indent">|←</button><button data-format="formatBlock" data-value="blockquote" type="button" title="Block quote">❞</button>'+
+   '<select id="grce-font-family" aria-label="Font family"><option value="">Font</option><option value="Arial">Sans Serif</option><option value="Georgia">Serif</option><option value="Courier New">Monospace</option><option value="Verdana">Verdana</option><option value="Tahoma">Tahoma</option></select>'+ 
    '<select id="grce-font" aria-label="Font size">'+
    '<option value="">Text size</option><option value="2">Small</option><option value="3">Normal</option><option value="4">Large</option><option value="5">Heading</option></select>'+
-   '<label class="grce-color" title="Text colour">A<input id="grce-color" type="color" value="#253750" aria-label="Text colour"></label>'+
+   '<label class="grce-color" title="Text colour">A<input id="grce-color" type="color" value="#253750" aria-label="Text colour"></label><label class="grce-color" title="Text highlight">▣<input id="grce-highlight" type="color" value="#fff2a8" aria-label="Highlight colour"></label>'+
    '<button id="grce-link" type="button" title="Insert hyperlink">🔗</button>'+
-   '<button id="grce-emoji-toggle" type="button" title="Emoji">☺</button>'+
+   '<button id="grce-emoji-toggle" type="button" title="Emoji picker">☺</button><button type="button" id="grce-image" title="Insert image">▣ Image</button><input type="file" id="grce-inline-file" accept="image/png,image/jpeg,image/webp" hidden>'+
    '<button data-format="removeFormat" type="button" title="Clear formatting">T×</button>'+
    '<button data-format="undo" type="button" title="Undo">↶</button>'+
    '<button data-format="redo" type="button" title="Redo">↷</button></div>'+
-   '<div id="grce-emojis" class="grce-emojis" hidden>'+['😊','👍','🙏','🌱','♻️','✅','📎','📄','📦','📞','💚','🎉','🙂','✨'].map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>'+
+   '<div id="grce-emojis" class="grce-emojis" hidden><emoji-picker id="grce-full-emoji" class="light" hidden></emoji-picker><div id="grce-emoji-fallback" class="grce-emoji-grid">'+["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😍","🥰","😘","😗","😙","😚","😋","😛","😜","🤪","🤨","🧐","🤓","😎","🥳","🤩","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🫡","🤭","🫢","🤫","🤥","😶","🫥","😐","😑","😬","🙄","😯","😮","😲","🥱","😴","🤤","😪","😵","🤐","🤢","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👻","💀","☠️","👽","🤖","💩","🎃","😺","😸","😹","😻","😼","😽","🙀","😿","😾","👋","🤚","🖐️","✋","🖖","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","👇","☝️","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤲","🤝","🙏","✍️","💪","👀","👁️","👄","🧠","🫀","🫁","❤️","🩷","🧡","💛","💚","💙","🩵","💜","🤎","🖤","🩶","🤍","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💯","💢","💥","💫","💦","💨","💤","💬","💭","💌","💋","🌱","🌿","☘️","🍀","🌳","🌲","🌴","🌵","🌾","🌺","🌸","🌼","🌻","🌹","🥀","🪻","🌷","🍁","🍂","🍃","🍄","🪴","🌎","🌍","🌏","🌈","☀️","🌤️","⛅","☁️","🌧️","⛈️","❄️","☃️","🔥","💧","🌊","⚡","✨","⭐","🌟","🌙","🌕","🎉","🎊","🎈","🎁","🎀","🎂","🍰","☕","🍵","🥤","🍎","🍌","🥭","🍋","🥦","🥕","🌽","🥔","🥥","🥜","🍯","🍪","🍕","🍔","🍟","🍫","🍬","📄","📑","📃","📋","📎","🖇️","📁","📂","🗂️","📝","✏️","🖊️","📚","📖","📕","📰","📧","📨","📩","📤","📥","📬","📦","📫","📪","📭","💻","🖥️","📱","☎️","📞","📷","📸","🖼️","🗓️","📅","📊","📈","📉","📍","📌","🔗","🔒","🔓","🔑","⚙️","🛠️","💡","💰","💳","🧾","✅","☑️","✔️","❌","❎","⚠️","❗","❓","‼️","⁉️","⭕","🚫","🔴","🟠","🟡","🟢","🔵","🟣","⚫","⚪","🟤","🔺","🔻","⬆️","⬇️","➡️","⬅️","🔁","🔄","🔀","➕","➖","✖️","➗","♻️","🌐","🏠","🏢","🏭","🏥","🏫","🚚","🚗","🚀","🛒","📣","🎯","🏆","🥇","💎","🕒","⌛","⏰","🔔"].map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div></div>'+
    '<div id="grce-editor" class="grce-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Email message" data-placeholder="Write your email…">'+(body?esc(body).replace(/\n/g,'<br>'):'')+'</div>'+
    '<div class="grce-attach-head"><strong>Attachments</strong><span>PDF · Word · Excel · Images · TXT (max 6 MB total)</span></div>'+
    '<div class="grce-attach-buttons"><label class="grce-file-button">📎 Attach files<input id="grce-file" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.docx,.xlsx"></label>'+
@@ -55,7 +56,7 @@
    '<div class="grce-actions"><span id="grce-count" aria-live="polite">0 characters</span>'+
    '<button type="button" data-close>Cancel</button><button type="submit" class="grce-primary" id="grce-send" disabled>Send Email</button></div>'+
    '</form>';
-  document.body.append(dialog);dialog.showModal();dialog.onclose=()=>dialog.remove();
+  document.body.append(dialog);dialog.showModal();dialog.onclose=()=>{attached.forEach(f=>{if(f.grPreview)URL.revokeObjectURL(f.grPreview)});dialog.remove()};
   const $=selector=>dialog.querySelector(selector);
   const form=$('#grce-form'),status=$('#grce-status'),button=$('#grce-send'),editor=$('#grce-editor');
   const feedback=(msg,type)=>{status.textContent=msg;notify?.(msg,type)};
@@ -111,25 +112,98 @@
   $('#grce-company').onchange=()=>{currentCompany=$('#grce-company').value;void refreshConnection();void loadArchive()};
   $('#grce-from').onchange=selectSender;
   editor.oninput=updateCount;
-  // Preserve contenteditable selection when toolbar commands are clicked.
-  dialog.querySelectorAll('[data-format]').forEach(b=>b.onmousedown=event=>event.preventDefault());
-  dialog.querySelectorAll('[data-format]').forEach(b=>b.onclick=()=>{
-   editor.focus();document.execCommand(b.dataset.format,false,null);updateCount();
-  });
-  $('#grce-font').onchange=e=>{editor.focus();document.execCommand('fontSize',false,e.target.value);e.target.value=''};
-  $('#grce-color').onchange=e=>{editor.focus();document.execCommand('foreColor',false,e.target.value)};
-  $('#grce-link').onclick=()=>{
-   const target=window.prompt('Paste an HTTPS or mailto link');
-   if(!target||!/^(https?:\/\/|mailto:)/i.test(target))return;
-   editor.focus();document.execCommand('createLink',false,target);
+  // Save and restore selections across toolbar, colour picker, link dialog and emoji picker.
+  let savedRange=null;
+  const rememberSelection=()=>{
+   const sel=window.getSelection?.();
+   if(sel?.rangeCount&&editor.contains(sel.anchorNode))savedRange=sel.getRangeAt(0).cloneRange();
   };
-  $('#grce-emoji-toggle').onclick=()=>{$('#grce-emojis').hidden=!$('#grce-emojis').hidden};
-  dialog.querySelectorAll('[data-emoji]').forEach(b=>b.onclick=()=>{
-   editor.focus();document.execCommand('insertText',false,b.dataset.emoji);updateCount();
+  const restoreSelection=()=>{
+   editor.focus();
+   const sel=window.getSelection?.();
+   if(sel&&savedRange){sel.removeAllRanges();sel.addRange(savedRange)}
+  };
+  const command=(name,value=null)=>{
+   restoreSelection();
+   document.execCommand(name,false,value);
+   rememberSelection();updateCount();
+  };
+  editor.addEventListener('mouseup',rememberSelection);
+  editor.addEventListener('keyup',rememberSelection);
+  editor.addEventListener('focusout',rememberSelection);
+  dialog.querySelectorAll('[data-format]').forEach(b=>{
+   b.onmousedown=e=>e.preventDefault();
+   b.onclick=()=>command(b.dataset.format,b.dataset.value||null);
   });
+  $('#grce-font-family').addEventListener('pointerdown',rememberSelection);
+  $('#grce-font-family').onchange=e=>{if(e.target.value)command('fontName',e.target.value);e.target.value=''};
+  $('#grce-font').addEventListener('pointerdown',rememberSelection);
+  $('#grce-font').onchange=e=>{command('fontSize',e.target.value);e.target.value=''};
+  $('#grce-color').addEventListener('pointerdown',rememberSelection);
+  $('#grce-color').oninput=e=>command('foreColor',e.target.value);
+  $('#grce-color').onchange=e=>command('foreColor',e.target.value);
+  $('#grce-highlight').addEventListener('pointerdown',rememberSelection);
+  $('#grce-highlight').onchange=e=>command('hiliteColor',e.target.value);
+  const insertLink=()=>{
+   rememberSelection();
+   const target=window.prompt('Enter link: https://example.com or mailto:name@example.com');
+   if(!target)return;
+   if(!/^(https?:\/\/|mailto:)[^\s<>]+$/i.test(target)){
+    feedback('Enter an HTTPS or mailto link','error');return;
+   }
+   restoreSelection();
+   const sel=window.getSelection?.();
+   if(sel&&!sel.isCollapsed)document.execCommand('createLink',false,target);
+   else document.execCommand('insertHTML',false,'<a href="'+esc(target)+'">'+esc(target)+'</a>');
+   rememberSelection();updateCount();
+  };
+  $('#grce-link').onmousedown=rememberSelection;
+  $('#grce-link').onclick=insertLink;
+  const fullEmoji=$('#grce-full-emoji'),emojiFallback=$('#grce-emoji-fallback');
+  if(window.customElements?.get('emoji-picker')){
+   fullEmoji.hidden=false;emojiFallback.hidden=true;
+  }
+  window.customElements?.whenDefined('emoji-picker').then(()=>{
+   if(!dialog?.isConnected)return;
+   fullEmoji.hidden=false;emojiFallback.hidden=true;
+  }).catch(()=>{});
+  fullEmoji.addEventListener('emoji-click',event=>{
+   const glyph=event.detail?.unicode||event.detail?.emoji?.unicode;
+   if(glyph)command('insertText',glyph);
+  });
+  $('#grce-emoji-toggle').onmousedown=rememberSelection;
+  $('#grce-emoji-toggle').onclick=()=>{
+   rememberSelection();$('#grce-emojis').hidden=!$('#grce-emojis').hidden;
+  };
+  dialog.querySelectorAll('[data-emoji]').forEach(b=>{
+   b.onmousedown=e=>e.preventDefault();
+   b.onclick=()=>command('insertText',b.dataset.emoji);
+  });
+  $('#grce-image').onmousedown=rememberSelection;
+  $('#grce-image').onclick=()=>{$('#grce-inline-file').click()};
+  $('#grce-inline-file').onchange=e=>{
+   const file=e.target.files?.[0];e.target.value='';
+   if(!file)return;
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2000000){
+    feedback('Inline image must be PNG, JPEG or WebP under 2 MB','error');return;
+   }
+   if(attached.length>=4||attached.reduce((n,x)=>n+x.size,0)+file.size>6000000){
+    feedback('Maximum 4 attachments / 6 MB total','error');return;
+   }
+   const cid='grinline-'+crypto.randomUUID()+'@greenrich';
+   file.grCid=cid;
+   file.grPreview=URL.createObjectURL(file);
+   attached.push(file);
+   command('insertHTML','<img src="'+esc(file.grPreview)+'" data-gr-cid="'+esc(cid)+'" alt="'+esc(file.name)+'" style="max-width:100%;height:auto">');
+   fileDisplay();
+  };
   const fileDisplay=()=>{
    $('#grce-files').innerHTML=attached.map((f,i)=>'<div class="grce-file"><span>📄 '+esc(f.name)+' · '+size(f.size)+'</span><button type="button" data-remove="'+i+'" aria-label="Remove file">✕</button></div>').join('');
-   dialog.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{attached.splice(Number(b.dataset.remove),1);fileDisplay()});
+   dialog.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{
+    const [gone]=attached.splice(Number(b.dataset.remove),1);
+    if(gone?.grPreview){editor.querySelectorAll('img[data-gr-cid]').forEach(img=>{if(img.dataset.grCid===gone.grCid)img.remove()});URL.revokeObjectURL(gone.grPreview)}
+    fileDisplay();
+   });
   };
   $('#grce-file').onchange=e=>{
    const incoming=[...e.target.files];e.target.value='';
@@ -146,13 +220,19 @@
   const encode=async file=>{
    const buffer=new Uint8Array(await file.arrayBuffer()),chunks=[];
    for(let i=0;i<buffer.length;i+=8192)chunks.push(String.fromCharCode(...buffer.subarray(i,i+8192)));
-   return {name:file.name,type:file.type,base64:btoa(chunks.join(''))};
+   return {name:file.name,type:file.type,base64:btoa(chunks.join('')),cid:file.grCid||null};
   };
   form.onsubmit=async event=>{
    event.preventDefault();if(sending||button.disabled)return;
    const fd=new FormData(form),to=split(fd.get('to')),cc=split(fd.get('cc')),bcc=split(fd.get('bcc'));
    const subject=String(fd.get('subject')||'').trim();
-   const plain=String(editor.innerText??editor.textContent??'').trim(),html=editor.innerHTML;
+   const plain=String(editor.innerText??editor.textContent??'').trim();
+   const htmlRoot=editor.cloneNode(true);
+   htmlRoot.querySelectorAll('img[data-gr-cid]').forEach(img=>{
+    if(!attached.some(file=>file.grCid===img.dataset.grCid))img.remove();
+    else{img.setAttribute('src','cid:'+img.dataset.grCid);img.removeAttribute('data-gr-cid')}
+   });
+   const html=htmlRoot.innerHTML;
    if(!to.some(x=>x.toLowerCase()===email.toLowerCase())){
     feedback('The contact’s registered email must remain in To.','error');return;
    }
@@ -171,7 +251,7 @@
      archive_pdf_id:$('#grce-archive').value||null,sender_account_id:selectedSender||null
     }});
     if(error||data?.error)throw Error(data?.error||error?.message||'Email sending failed');
-    feedback('Message accepted by the company email provider.','success');dialog.close();
+    feedback('Message accepted by the company email provider. Delivery is not yet confirmed.','success');window.dispatchEvent(new CustomEvent('gr:contact-email-sent',{detail:{company:currentCompany,contactId,contactType}}));dialog.close();
    }catch(error){
     feedback(error.message,'error');
     button.textContent='Send Email';

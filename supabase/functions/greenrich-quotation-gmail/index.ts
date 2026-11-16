@@ -204,11 +204,12 @@ function safeRichHtml(html:unknown){
  if(typeof html!=='string')return '';
  if(html.length>35000)throw Error('Email body exceeds maximum size');
  const clean=sanitizeHtml(html,{
-  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','font','h1','h2','h3','hr'],
-  allowedAttributes:{a:['href','title','target'],font:['color','size','face'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
-  allowedSchemes:['https','http','mailto'],allowedSchemesAppliedToAttributes:['href'],
-  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/],
-    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/]}}
+  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','font','h1','h2','h3','hr','img'],
+  allowedAttributes:{a:['href','title','target'],img:['src','alt','style','width','height'],font:['color','size','face'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
+  allowedSchemes:['https','http','mailto'],allowedSchemesByTag:{img:['cid']},allowedSchemesAppliedToAttributes:['href','src'],
+  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/,/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/,/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/],
+    'font-family':[/^(Arial|Georgia|Verdana|Tahoma|Courier New)(,\s*sans-serif)?$/],'max-width':[/^100%$/],'height':[/^auto$/]}}
  });
  return clean.trim();
 }
@@ -228,7 +229,10 @@ async function incomingAttachments(db:any,company:string,payload:any,kind:string
   if(!data.length||data.length>4_194_304)throw Error('Each attachment must be under 4 MB');
   total+=data.length;if(total>6_000_000)throw Error('Total attachments must be below 6 MB');
   // File type and filename are checked; no attachment is executed or publicly served.
-  result.push({filename:name,content:data,contentType:type});
+  const cid=plain(file?.cid,110);
+  if(cid&&(!/^grinline-[0-9a-f-]{36}@greenrich$/i.test(cid)||!type.startsWith('image/')))throw Error('Invalid inline image reference');
+  if(cid&&result.some(a=>a.cid===cid))throw Error('Duplicate inline image reference');
+  result.push({filename:name,content:data,contentType:type,...(cid?{cid}:{} )});
  }
  const archiveId=plain(payload.archive_pdf_id,60);
  if(archiveId){
@@ -277,8 +281,12 @@ async function sendContact(db:any,profile:any,payload:any){
  const senderEmail=selection?.sender_email||transport.connection.sender_email;
  if(!senderEmail)throw Error('A company sender address must be connected');
  const attachments=await incomingAttachments(db,company,payload,kind,id);
+ // Only images explicitly provided in this email may be referenced from HTML.
+ const used=new Set([...html.matchAll(/<img\b[^>]*src=["']cid:([^"']+)["']/gi)].map(x=>x[1]));
+ if([...used].some(cid=>!attachments.some(a=>a.cid===cid)))throw Error('Inline image is not attached');
+ if(/<img\b/i.test(html)&&!used.size)throw Error('Inline image must reference an uploaded file');
  if(attachments.length>5)throw Error('Too many attachments');
- const auditFiles=attachments.map(a=>({name:a.filename,type:a.contentType,bytes:a.content.length}));
+ const auditFiles=attachments.map(a=>({name:a.filename,type:a.contentType,bytes:a.content.length,cid:a.cid||null}));
  const logged=await db.from('gr_contact_email_history').insert({
   company_id:company,request_key:key,recipient, to_recipients:to,cc,bcc,subject,body,html_body:html||null,
   attachment_manifest:auditFiles,contact_type:kind,contact_id:id,
@@ -295,7 +303,7 @@ async function sendContact(db:any,profile:any,payload:any){
    const upload=await db.storage.from('gr-mail-attachments').upload(destination,item.content,{
     upsert:false,contentType:item.contentType});
    if(upload.error)throw Error('Could not archive email attachment; message was NOT sent');
-   manifest.push({name:item.filename,type:item.contentType,bytes:item.content.length,path:destination});
+   manifest.push({name:item.filename,type:item.contentType,bytes:item.content.length,path:destination,cid:item.cid||null});
   }
   if(manifest.length){
    const upd=await db.from('gr_contact_email_history').update({attachment_manifest:manifest}).eq('id',rowId);
@@ -600,7 +608,8 @@ Deno.serve(async req=>{
    const {data:record}=await db.from('gr_contact_email_history').select('attachment_manifest').eq('id',id).eq('company_id',company).maybeSingle();
    const attachment=Array.isArray(record?.attachment_manifest)?record.attachment_manifest[index]:null;
    if(!attachment?.path||!String(attachment.path).startsWith(company+'/'+id+'/'))throw Error('Archived attachment not available');
-   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90);
+   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90,
+    payload.download?{download:plain(attachment.name,110)||'attachment'}:{});
    if(error)throw error;
    return json({url:data.signedUrl});
   }
