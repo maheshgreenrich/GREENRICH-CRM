@@ -25,7 +25,7 @@ const validEmail=(s:string)=>/^[^\s@<>,"\r\n]+@[^\s@<>,"\r\n]+\.[^\s@<>,"\r\n]+$
 const parseEmail=(v:unknown)=>Array.isArray(v)?v.map(x=>plain(x,254)):String(v||'').split(/[;,]/).map(x=>x.trim()).filter(Boolean);
 const statusMsg=(x:any)=>x?.message||x?.error_description||x?.error||'External service error';
 const fail=(message:string,status=400)=>json({error:message},status);
-const requireSetup=()=>{if(!secret('GR_GMAIL_CLIENT_ID')||!secret('GR_GMAIL_CLIENT_SECRET')||!secret('GR_GMAIL_TOKEN_KEY_B64')||!url||!serviceKey)throw Error('Admin setup required: Google OAuth secrets are not configured in Supabase')};
+const requireSetup=()=>{if(!secret('GR_GMAIL_TOKEN_KEY_B64')||!url||!serviceKey)throw Error('Admin setup required: Gmail encryption key is not configured in Supabase')};
 const aesKey=async()=>{
  const input=unb64(secret('GR_GMAIL_TOKEN_KEY_B64'));
  if(input.length!==32)throw Error('GR_GMAIL_TOKEN_KEY_B64 must be a 32-byte AES key');
@@ -51,7 +51,7 @@ async function actor(req:Request){
  if(pe||!profile?.active)throw Error('Active employee profile required');
  return {db,profile,user:data.user};
 }
-async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'view'){
+async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'view'|'send_customer'|'send_lead'){
  if(!profile.company_ids?.includes(company))throw Error('Company access denied');
  if(action==='admin'){
   const {data}=await db.rpc('gr_field_is_admin',{p_company:company});
@@ -62,8 +62,8 @@ async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'
  }
  const {data:role}=await db.from('gr_roles').select('name').eq('id',profile.role_id).single();
  if(role?.name==='Admin')return;
- const modules=action==='view'?['sales','orders']:['sales','orders'];
- const actions=action==='send'?['create','edit']:['view'];
+ const modules=action==='view'?['sales','orders','customers','leads']:action==='send_customer'?['customers']:action==='send_lead'?['leads']:['sales','orders'];
+ const actions=action==='send'||action.startsWith('send_')?['create','edit']:['view'];
  const {data:grants}=await db.from('gr_role_permissions').select('allowed').eq('role_id',profile.role_id).in('module',modules).in('action',actions).eq('allowed',true).limit(1);
  if(!grants?.length)throw Error('Your role cannot '+(action==='send'?'send quotations':'view quotation documents'));
 }
@@ -71,6 +71,18 @@ const callbackRedirect=(result:string)=>{
  const target=new URL(HOME);target.searchParams.set('gmail_connect',result);
  return Response.redirect(target.toString(),302);
 };
+async function oauthCredentials(db:any,company:string){
+ requireSetup();
+ const {data,error}=await db.from('gr_gmail_oauth_configs').select('client_id,encrypted_client_secret').eq('company_id',company).maybeSingle();
+ if(error)throw error;
+ if(data?.client_id&&data?.encrypted_client_secret)return {id:data.client_id,secret:await decrypt(data.encrypted_client_secret)};
+ if(secret('GR_GMAIL_CLIENT_ID')&&secret('GR_GMAIL_CLIENT_SECRET'))return {id:secret('GR_GMAIL_CLIENT_ID'),secret:secret('GR_GMAIL_CLIENT_SECRET')};
+ throw Error('Google OAuth Client ID and Client Secret are not configured for this company');
+}
+async function oauthStatus(db:any,company:string){
+ const {data}=await db.from('gr_gmail_oauth_configs').select('client_id').eq('company_id',company).maybeSingle();
+ return {configured:Boolean(secret('GR_GMAIL_TOKEN_KEY_B64')&&(data?.client_id||(secret('GR_GMAIL_CLIENT_ID')&&secret('GR_GMAIL_CLIENT_SECRET')))),client_id:data?.client_id||''};
+}
 async function callback(req:Request){
  const u=new URL(req.url),nonce=u.searchParams.get('state')||'',code=u.searchParams.get('code')||'';
  if(!/^[a-zA-Z0-9_-]{30,100}$/.test(nonce))return callbackRedirect('invalid_state');
@@ -79,9 +91,9 @@ async function callback(req:Request){
  if(se||!state||Date.parse(state.expires_at)<Date.now())return callbackRedirect('state_expired');
  if(!code||u.searchParams.has('error'))return callbackRedirect('not_authorized');
  try{
-  requireSetup();
+  const creds=await oauthCredentials(db,state.company_id);
   const payload=new URLSearchParams({
-   code,client_id:secret('GR_GMAIL_CLIENT_ID'),client_secret:secret('GR_GMAIL_CLIENT_SECRET'),
+   code,client_id:creds.id,client_secret:creds.secret,
    redirect_uri:googleRedirect(),grant_type:'authorization_code',code_verifier:state.code_verifier
   });
   const exchange=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:payload});
@@ -102,7 +114,8 @@ async function callback(req:Request){
  }catch(error){console.error('Gmail OAuth callback failed',String(error));return callbackRedirect('failed')}
 }
 async function createAuthorizeUrl(db:any,profile:any,company:string){
- requireSetup();await allowed(db,profile,company,'admin');
+ await allowed(db,profile,company,'admin');
+ const creds=await oauthCredentials(db,company);
  const state=random(),verifier=random(),challenge=b64url(await digest(bytes(verifier)));
  const {error}=await db.from('gr_gmail_oauth_states').insert({
   nonce:state,company_id:company,initiated_by:profile.id,code_verifier:verifier,
@@ -111,25 +124,91 @@ async function createAuthorizeUrl(db:any,profile:any,company:string){
  if(error)throw error;
  const target=new URL('https://accounts.google.com/o/oauth2/v2/auth');
  for(const [k,v] of Object.entries({
-  client_id:secret('GR_GMAIL_CLIENT_ID'),redirect_uri:googleRedirect(),response_type:'code',
+  client_id:creds.id,redirect_uri:googleRedirect(),response_type:'code',
   scope:'openid email https://www.googleapis.com/auth/gmail.send',
   access_type:'offline',prompt:'consent',state,code_challenge:challenge,code_challenge_method:'S256'
  }))target.searchParams.set(k,v);
  return target.toString();
 }
 async function getAccessToken(db:any,company:string){
- requireSetup();
+ const creds=await oauthCredentials(db,company);
  const {data:token,error}=await db.from('gr_gmail_private_tokens').select('encrypted_refresh_token').eq('company_id',company).maybeSingle();
  if(error||!token)throw Error('Company Gmail is not connected');
  const refresh=await decrypt(token.encrypted_refresh_token);
  const response=await fetch('https://oauth2.googleapis.com/token',{
   method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-  body:new URLSearchParams({client_id:secret('GR_GMAIL_CLIENT_ID'),client_secret:secret('GR_GMAIL_CLIENT_SECRET'),
+  body:new URLSearchParams({client_id:creds.id,client_secret:creds.secret,
    refresh_token:refresh,grant_type:'refresh_token'})
  });
  const result=await response.json();
  if(!response.ok||!result.access_token)throw Error('Gmail authorization expired. Ask Admin to reconnect');
  return result.access_token as string;
+}
+async function configureOAuth(db:any,profile:any,company:string,payload:any){
+ await allowed(db,profile,company,'admin');requireSetup();
+ const id=plain(payload.client_id,350),clientSecret=plain(payload.client_secret,800);
+ if(!id.endsWith('.apps.googleusercontent.com')||!clientSecret||clientSecret.length<8)throw Error('Enter a valid Google OAuth Web Client ID and Client Secret');
+ const encrypted=await encrypt(clientSecret);
+ const {error}=await db.from('gr_gmail_oauth_configs').upsert({
+  company_id:company,client_id:id,encrypted_client_secret:encrypted,updated_by:profile.id,updated_at:new Date().toISOString()
+ });
+ if(error)throw error;
+ await db.from('gr_gmail_private_tokens').delete().eq('company_id',company);
+ await db.from('gr_gmail_connections').update({status:'needs_reconnect',updated_at:new Date().toISOString()}).eq('company_id',company);
+ return {configured:true,client_id:id,status:'needs_reconnect'};
+}
+function contactMime(from:string,to:string,subject:string,body:string){
+ const lines=['From: '+header(from),'To: '+header(to),
+ 'Subject: =?UTF-8?B?'+b64(bytes(subject))+'?=',
+ 'MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8',
+ 'Content-Transfer-Encoding: base64','',b64(bytes(body)),''];
+ return b64url(bytes(lines.join('\r\n')));
+}
+async function sendContact(db:any,profile:any,payload:any){
+ const company=plain(payload.company_id,50);
+ const kind=plain(payload.contact_type,15),id=plain(payload.contact_id,100);
+ if(!['customer','lead'].includes(kind)||!id)throw Error('Customer or lead reference required');
+ await allowed(db,profile,company,kind==='customer'?'send_customer':'send_lead');
+ const recipient=plain(payload.to,254),subject=plain(payload.subject,200),body=plain(payload.body,10000),key=plain(payload.request_key,60);
+ if(!validEmail(recipient)||!subject||!body||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject, body and request ID required');
+ if(kind==='customer'){
+  const {data}=await db.from('gr_crm_customers').select('id,email').eq('id',id).maybeSingle();
+  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked customer email');
+ }else{
+  const {data}=await db.from('gr_lead_pipeline').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
+  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked lead email');
+ }
+ const {data:connection}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ if(connection?.status!=='connected')throw Error('Company Gmail is not connected');
+ const logged=await db.from('gr_contact_email_history').insert({
+  company_id:company,request_key:key,recipient,subject,body,contact_type:kind,contact_id:id,
+  sender_email:connection.sender_email,sent_by:profile.id
+ }).select('id').single();
+ if(logged.error){if(logged.error.code==='23505')throw Error('This send has already been requested; check history');throw logged.error}
+ const rowId=logged.data.id;
+ try{
+  const token=await getAccessToken(db,company);
+  const sent=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+   method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+   body:JSON.stringify({raw:contactMime(connection.sender_email,recipient,subject,body)})
+  });
+  const result=await sent.json().catch(()=>({}));
+  if(!sent.ok){
+   await db.from('gr_contact_email_history').update({status:'failed',failure_reason:'Gmail rejected the request (HTTP '+sent.status+')'}).eq('id',rowId);
+   throw Error('Gmail rejected email (HTTP '+sent.status+')');
+  }
+  const saved=await db.from('gr_contact_email_history').update({
+   status:'sent',gmail_message_id:result.id||null,sent_at:new Date().toISOString()
+  }).eq('id',rowId);
+  if(saved.error)throw Error('Gmail accepted email but history failed to update; do not resend');
+  return {status:'sent',history_id:rowId,gmail_message_id:result.id};
+ }catch(error){
+  const {data:entry}=await db.from('gr_contact_email_history').select('status').eq('id',rowId).single();
+  if(entry?.status==='sending')await db.from('gr_contact_email_history').update({
+   status:'needs_review',failure_reason:'Unknown Gmail outcome; check Sent before retrying'
+  }).eq('id',rowId);
+  throw error;
+ }
 }
 const header=(value:string)=>value.replace(/[\r\n]/g,' ').replace(/[^\x20-\x7e]/g,' ').slice(0,450);
 function mime(from:string,to:string[],cc:string[],subject:string,body:string,pdf:Uint8Array,name:string){
@@ -221,6 +300,8 @@ Deno.serve(async req=>{
   const {db,profile}=await actor(req);
   const payload=await req.json(),action=plain(payload.action,50),company=plain(payload.company_id,50);
   if(!company)return fail('Select company');
+  if(action==='configure')return json(await configureOAuth(db,profile,company,payload));
+  if(action==='send_contact')return json(await sendContact(db,profile,payload));
   if(action==='connect')return json({authorize_url:await createAuthorizeUrl(db,profile,company)});
   if(action==='disconnect'){
    await allowed(db,profile,company,'admin');
@@ -232,8 +313,7 @@ Deno.serve(async req=>{
   if(action==='status'){
    await allowed(db,profile,company,'view');
    const {data}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
-   return json({configured:Boolean(secret('GR_GMAIL_CLIENT_ID')&&secret('GR_GMAIL_CLIENT_SECRET')&&secret('GR_GMAIL_TOKEN_KEY_B64')),
-    connection:data||{status:'disconnected',sender_email:''}});
+   return json({...await oauthStatus(db,company),connection:data||{status:'disconnected',sender_email:''}});
   }
   if(action==='pdf_url'){
    await allowed(db,profile,company,'view');

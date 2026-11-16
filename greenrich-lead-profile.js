@@ -54,7 +54,7 @@ window.GreenRichLeadProfile=(function(){
    const digits=phone.replace(/\D/g,'');
    const links=[
     phone.length>=10?'<a href="tel:'+esc(phone)+'">Call</a>':'',
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email||'')?'<a href="mailto:'+esc(lead.email)+'">Email</a>':'',
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email||'')?'<button type="button" data-grlp-email>Email</button>':'',
     digits.length>=10&&digits.length<=15?'<a target="_blank" rel="noopener noreferrer" href="https://wa.me/'+digits+'">WhatsApp</a>':''
    ].join('');
    const dup=lead.import_duplicate_type&&lead.import_duplicate_type!=='none'?
@@ -70,7 +70,7 @@ window.GreenRichLeadProfile=(function(){
        (quick?'<button type="button" data-full>Full page view</button>':'')+
        '<button type="button" data-close>'+(inline?'← Back to Customers':'Close')+'</button></div></div>'+heroStats+
       '<div class="grid"><section class="panel"><h3>Customer & Lead Information</h3>'+
-       kv('Name',p.name||lead.contact||lead.title)+kv('Mobile',lead.mobile)+kv('Email',lead.email)+
+       kv('Name',p.name||lead.contact||lead.title)+kv('Mobile',lead.mobile)+(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email||'')?'<div class="kv"><span>Email</span><button type="button" data-grlp-email>'+esc(lead.email)+'</button></div>':kv('Email',lead.email))+
        kv('City',p.city)+kv('Address',p.address1||p.address)+kv('Product enquiry',productDisplay)+
        kv('Source',lead.source)+kv('Brand',p.brand)+kv('Tags',(lead.tag_ids||[]).map(id=>tagMap.get(id)||id).join(', '))+
        kv('Created',date(lead.created_at))+kv('Linked customer',cust?.name||'Not linked')+
@@ -112,6 +112,10 @@ window.GreenRichLeadProfile=(function(){
       chooser.close();linker.textContent='Customer linked — refresh to view';linker.disabled=true;
      };chooser.showModal();
    };
+   d.querySelectorAll('[data-grlp-email]').forEach(emailButton=>emailButton.onclick=()=>void window.GreenRichContactEmail?.open({
+    db,company,contactType:'lead',contactId:leadId,
+    name:p.name||lead.contact||lead.title,email:lead.email,notify:message=>window.alert(message)
+   }).catch(error=>window.alert(error.message)));
    const full=d.querySelector('[data-full]');
    if(full)full.onclick=()=>{close();window.GreenRichCRM?.switchPage?.('customers');
      window.GreenRichShell?.setPageWithoutRemount?.('customers');

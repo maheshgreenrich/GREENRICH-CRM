@@ -4,6 +4,14 @@ on:
     paths:
       - 'greenrich-quotations.*'
       - 'greenrich-quotation-mail.*'
+      - 'greenrich-gmail-settings.*'
+      - 'greenrich-contact-email.*'
+      - 'greenrich-customer-profile.js'
+      - 'greenrich-lead-profile.js'
+      - 'greenrich-lead-pipeline.js'
+      - 'greenrich-company-admin.js'
+      - 'tests/gmail-settings-contact.cjs'
+      - 'supabase/migrations/20261116183000_gmail_settings_contact_email.sql'
       - 'greenrich-quotation-history.js'
       - 'greenrich-crm-inline.js'
       - 'supabase/functions/greenrich-quotation-gmail/index.ts'
@@ -34,3 +42,4 @@ jobs:
           node --check greenrich-quotation-history.js
           node --check greenrich-crm-inline.js
           node tests/quotation-gmail.cjs
+          node tests/gmail-settings-contact.cjs

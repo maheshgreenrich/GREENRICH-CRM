@@ -131,7 +131,7 @@
    '" data-company="'+escape(l.company_id)+'">'+escape(caption||l.contact||l.title)+'</button>';
  const contactButtons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
   return (digits.length>=10?'<a title="Call" href="tel:'+escape(m)+'">☎ Call</a>':'')+
-   (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<a title="Email" href="mailto:'+escape(l.email)+'">✉ Email</a>':'')+
+   (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'')?'<button type="button" data-gl-action="email" data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">✉ Email</button>':'')+
    (digits.length>=10&&digits.length<=15?'<a title="WhatsApp" rel="noopener noreferrer" target="_blank" href="https://wa.me/'+digits+'">WhatsApp</a>':'');
  };
  const icons={
@@ -150,7 +150,7 @@
  const contactIcons=l=>{const m=String(l.mobile||'').replace(/[^+0-9]/g,''),digits=m.replace(/\D/g,'');
   const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(l.email||'');
   return (digits.length>=10?'<a class="gl-action-icon" title="Call" aria-label="Call" href="tel:'+escape(m)+'">'+symbol('call')+'</a>':'')+
-   (email?'<a class="gl-action-icon" title="Email" aria-label="Email" href="mailto:'+escape(l.email)+'">'+symbol('email')+'</a>':'')+
+   (email?'<button type="button" class="gl-action-icon" title="Email" aria-label="Email" data-gl-action="email" data-id="'+escape(l.lead_id)+'" data-company="'+escape(l.company_id)+'">'+symbol('email')+'</button>':'')+
    (digits.length>=10&&digits.length<=15?'<a class="gl-action-icon" target="_blank" rel="noopener noreferrer" title="WhatsApp" aria-label="WhatsApp" href="https://wa.me/'+digits+'">'+symbol('whatsapp')+'</a>':'');
  };
  const companyText=(ctx,id)=>ctx.companyNames?.[id]||id;
@@ -406,6 +406,13 @@
     }catch(error){close();notify(ctx,'Could not open lead profile: '+error.message)}
     return;
    }
+  if(action==='email'){
+   if(!l)return;
+   await window.GreenRichContactEmail.open({db:ctx.db,company:l.company_id,
+    contactType:'lead',contactId:l.lead_id,name:l.contact||l.title,email:l.email,
+    notify:message=>notify(ctx,message)});
+   return;
+  }
   if(action==='move'){move(ctx,l);return}
   if(action==='order'){
    

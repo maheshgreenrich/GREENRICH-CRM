@@ -36,10 +36,10 @@
   const connected=info?.connection?.status==='connected'&&info?.configured,quote=ctx.quotation;
   const quoteId=quote?.id,customer=ctx.customer;
   const own=history.filter(r=>r.quotation_id===quoteId);
-  host.innerHTML='<div class="grmail"><div class="grmail-header"><div><h2>Company Gmail & Quotation Emails</h2><p>Company: '+esc(ctx.companyName||ctx.company)+' · Private PDF archive and company-wide sending history</p></div><button data-mail="refresh">Refresh history</button></div>'+
+  host.innerHTML='<div class="grmail"><div class="grmail-header"><div><h2>Quotation Email & History</h2><p>Company: '+esc(ctx.companyName||ctx.company)+' · Private PDF archive and company-wide sending history</p></div><button data-mail="refresh">Refresh history</button></div>'+
    '<div class="grmail-status"><div><strong>Official sender</strong><div>'+esc(info?.connection?.sender_email||'No Gmail account connected')+'</div><small>'+esc(info?.connection?.status||'disconnected')+'</small></div><div>'+
    (!info?.configured?'<span class="grmail-alert">Google OAuth backend secrets have not been configured by Admin.</span>':connected?'<span class="grmail-success">Gmail connected</span>':'<span class="grmail-alert">Gmail is not connected. Sending disabled.</span>')+'</div></div>'+
-   (ctx.admin?'<div class="grmail-admin"><div><h3>Company Gmail connection — Admin</h3><p>Connect only this company’s authorised Gmail account through Google. Never enter Gmail passwords in the CRM.</p></div><div class="grmail-actions"><button data-mail="connect"'+(!info?.configured?' disabled':'')+'>Connect / Reconnect Gmail</button><button data-mail="disconnect"'+(!connected?' disabled':'')+'>Disconnect</button></div></div>':'')+
+   '<p class="grmail-setup-link">Gmail accounts, OAuth credentials and company email templates are managed in <b>Settings → Gmail Connectivity</b>.</p>'+ 
    '<div class="grmail-layout"><section class="grmail-compose"><h3>Send quotation PDF</h3>'+
    (!quoteId?'<p class="grmail-alert">Save your quotation in the Quotations tab first, then open Email & History.</p>':'<div class="grmail-quote">Quotation '+esc(quote.quotation_no)+' · '+esc(customer?.name||'Customer')+'</div>')+
    '<form id="grmail-form"><label>From<input value="'+esc(info?.connection?.sender_email||'Not connected')+'" disabled></label>'+
@@ -52,7 +52,7 @@
    '<div class="grmail-actions"><button type="button" data-mail="preview">Preview quotation</button><button type="submit" class="grmail-send" '+(!quoteId||!connected||busy||!ctx.canSend?'disabled':'')+'>'+(busy?'Sending…':'Send quotation via Gmail')+'</button></div></form></section>'+
    '<section class="grmail-logs"><h3>Quotation send history</h3><div class="grmail-scroll">'+(own.length?own.map(rowHtml).join(''):'<p>No email send history for this quotation yet.</p>')+'</div></section></div>'+
    '<section class="grmail-all"><h3>Company quotation email history</h3><p>Recent company activity; includes all authorised employees and products.</p><div class="grmail-scroll">'+(history.length?history.map(rowHtml).join(''):'<p>No quotation emails have been sent yet.</p>')+'</div></section>'+
-   (ctx.admin?'<section class="grmail-templates"><h3>Company email templates — Admin</h3><div class="grmail-template-list">'+templates.map(t=>'<button data-mail="edit-template" data-id="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div><form id="grmail-template-form"><input type="hidden" name="id"><label>Template name<input name="name" required maxlength="120" placeholder="Commercial proposal introduction"></label><label>Subject<input name="subject" required maxlength="200"></label><label>Body<textarea name="body" rows="5" required></textarea></label><button type="submit">Save email template</button></form></section>':'')+
+
    '</div>';
  }
  function rowHtml(r){

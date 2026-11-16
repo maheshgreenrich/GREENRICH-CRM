@@ -505,7 +505,14 @@ function renderCustomerProfile(){
   onBack:customerProfileBack,
   onEdit:id=>{if(id)window.GreenRichContacts?.openForm('customer',id)},
   onInvoice:(id,owner)=>void openSaleInvoice(id,owner),
-  onRefresh:()=>renderCustomerProfile()
+  onRefresh:()=>renderCustomerProfile(),
+  onEmail:({email,subject='',body=''})=>{
+   const company=activeCompany==='all'?(source?source._companyId||source.company_id:permittedCompanies[0]):activeCompany;
+   void window.GreenRichContactEmail?.open({
+    db:pipelineConfig.client,company,contactType:'customer',contactId:customer.id,
+    name:customer.name,email,subject,body,notify:toast
+   }).catch(error=>toast(error.message,'error'));
+  }
  });
  if(customer?.id&&pipelineConfig.client&&window.GreenRichQuotationHistory?.customer)
   void window.GreenRichQuotationHistory.customer(area,{
