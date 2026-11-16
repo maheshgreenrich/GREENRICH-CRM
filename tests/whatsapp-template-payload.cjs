@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const backend=fs.readFileSync(path.join(__dirname,'../supabase/functions/greenrich-whatsapp-send/index.ts'),'utf8');
+const send=backend.slice(backend.indexOf('async function send('),backend.indexOf('Deno.serve('));
+assert.ok(send.includes('preview_template:template.provider_preview'),'Send the full provider-approved template including components');
+assert.ok(!send.includes('preview_template:{id:template.provider_template_id'),'Incomplete preview must not be emitted');
+assert.ok(send.includes('components:parts'),'Personalized recipient parameters must still be passed');
+assert.ok(send.includes('new URL(cfg.base+"/api/"+cfg.version+"/whatsapp/messages/")'),'Individual sends use their documented endpoint, not bulk');
+assert.ok(send.includes('const explicitError=doc?.error===true'),'Rejections remain differentiated');
+assert.ok(send.includes('if(!providerId)'),'Accepted response must include provider ID');
+const doc=fs.readFileSync(path.join(__dirname,'../docs/socialberries-api-setup-20261031.md'),'utf8');
+assert.ok(doc.includes('POST /api/v1/whatsapp/messages/bulk/'),'Documented bulk endpoint retained');
+console.log('PASS: complete template payload is forwarded with individual send, verified error semantics, no speculative bulk CSV posting');
