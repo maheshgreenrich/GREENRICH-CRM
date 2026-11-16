@@ -42,6 +42,7 @@ jobs:
         run: |
           node tests/quotation-workspace.cjs
           node tests/gmail-settings-contact.cjs
+          node tests/multimail-settings.cjs
           node tests/quotation-visual-builder.cjs
           node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js

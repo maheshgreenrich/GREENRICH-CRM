@@ -3,10 +3,11 @@
 // Every other operation verifies the Supabase user access token and company permission.
 // Never place OAuth credentials or service keys in public GitHub Pages files.
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
+import nodemailer from 'npm:nodemailer@7.0.10';
 
 const ORIGIN = 'https://maheshgreenrich.github.io';
 const HOME = ORIGIN + '/GREENRICH-CRM/secure.html';
-const cors = {'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Headers':'authorization,apikey,content-type','Access-Control-Allow-Methods':'POST,OPTIONS','Vary':'Origin'};
+const cors = {'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info,x-supabase-client-platform,x-supabase-client-platform-version,x-supabase-client-runtime,x-supabase-client-runtime-version','Access-Control-Allow-Methods':'POST,OPTIONS','Vary':'Origin'};
 const json = (data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors,'Content-Type':'application/json'}});
 const secret = (key:string)=>Deno.env.get(key)||'';
 const url = secret('SUPABASE_URL');
@@ -178,38 +179,188 @@ async function sendContact(db:any,profile:any,payload:any){
   const {data}=await db.from('gr_lead_pipeline').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
   if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked lead email');
  }
- const {data:connection}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
- if(connection?.status!=='connected')throw Error('Company Gmail is not connected');
+ const transport=await transportStatus(db,company);
+ if(!transport.ready)throw Error('Company email sender is not connected. Configure it in Settings.');
  const logged=await db.from('gr_contact_email_history').insert({
   company_id:company,request_key:key,recipient,subject,body,contact_type:kind,contact_id:id,
-  sender_email:connection.sender_email,sent_by:profile.id
+  sender_email:transport.connection.sender_email,transport:transport.transport,sent_by:profile.id
  }).select('id').single();
  if(logged.error){if(logged.error.code==='23505')throw Error('This send has already been requested; check history');throw logged.error}
  const rowId=logged.data.id;
  try{
-  const token=await getAccessToken(db,company);
-  const sent=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
-   method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
-   body:JSON.stringify({raw:contactMime(connection.sender_email,recipient,subject,body)})
-  });
-  const result=await sent.json().catch(()=>({}));
-  if(!sent.ok){
-   await db.from('gr_contact_email_history').update({status:'failed',failure_reason:'Gmail rejected the request (HTTP '+sent.status+')'}).eq('id',rowId);
-   throw Error('Gmail rejected email (HTTP '+sent.status+')');
-  }
+  const result=await deliverMail(db,company,[recipient],[],subject,body);
   const saved=await db.from('gr_contact_email_history').update({
-   status:'sent',gmail_message_id:result.id||null,sent_at:new Date().toISOString()
+   status:'sent',transport:result.transport,provider_message_id:result.id||null,gmail_message_id:result.transport==='gmail'?result.id||null:null,sent_at:new Date().toISOString()
   }).eq('id',rowId);
-  if(saved.error)throw Error('Gmail accepted email but history failed to update; do not resend');
+  if(saved.error)throw Error('Email provider accepted the message, but history update failed; do not resend');
   return {status:'sent',history_id:rowId,gmail_message_id:result.id};
  }catch(error){
   const {data:entry}=await db.from('gr_contact_email_history').select('status').eq('id',rowId).single();
   if(entry?.status==='sending')await db.from('gr_contact_email_history').update({
-   status:'needs_review',failure_reason:'Unknown Gmail outcome; check Sent before retrying'
+   status:'needs_review',failure_reason:'Uncertain provider outcome; check sender account before retrying'
   }).eq('id',rowId);
   throw error;
  }
 }
+
+/** Non-Gmail mail transport; credentials remain only in server-owned rows. */
+async function transportConfig(db:any,company:string){
+ const {data,error}=await db.from('gr_mail_transport_configs').select('*').eq('company_id',company).maybeSingle();
+ if(error)throw error;
+ return data;
+}
+async function transportStatus(db:any,company:string){
+ const config=await transportConfig(db,company);
+ const {data:gmail}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
+ const chosen=config?.transport||'gmail';
+ const gmailReady=gmail?.status==='connected';
+ const externalReady=!!config&&config.status==='verified';
+ const active=chosen==='gmail'?gmailReady:externalReady;
+ return {
+  transport:chosen,
+  ready:active,
+  connection:chosen==='gmail'
+   ?gmail||{status:'disconnected',sender_email:''}
+   :{status:active?'connected':'disconnected',sender_email:config?.sender_email||'',connected_at:config?.verified_at||null},
+  gmail_connection:gmail||{status:'disconnected',sender_email:''},
+  smtp:{
+   host:config?.smtp_host||'',port:config?.smtp_port||465,user:config?.smtp_user||'',
+   sender_email:config?.sender_email||'',sender_name:config?.sender_name||'',
+   status:chosen==='smtp'?config?.status||'not_configured':'not_configured',
+   password_saved:!!config?.encrypted_smtp_password
+  },
+  resend:{
+   sender_email:config?.sender_email||'',sender_name:config?.sender_name||'',
+   domain:config?.resend_domain||'',api_key_saved:!!config?.encrypted_resend_api_key,
+   status:chosen==='resend'?config?.status||'not_configured':'not_configured'
+  }
+ };
+}
+function validateSmtpHost(host:string){
+ const name=host.trim().toLowerCase();
+ // Disallow internal URLs/IP literals and private-address SSRF through SMTP.
+ if(!/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(name)||
+   name.endsWith('.local')||name.endsWith('.internal')||name.endsWith('.localhost'))
+  throw Error('Use the public SMTP hostname supplied by your email provider, such as mail.example.com');
+ return name;
+}
+async function configureTransport(db:any,profile:any,company:string,payload:any){
+ await allowed(db,profile,company,'admin');
+ const transport=plain(payload.transport,15);
+ if(!['gmail','smtp','resend'].includes(transport))throw Error('Choose Gmail, Webmail SMTP, or Email API');
+ const previous=await transportConfig(db,company);
+ const config:any={company_id:company,transport,updated_by:profile.id,updated_at:new Date().toISOString(),status:'not_configured',verified_at:null};
+ if(transport==='smtp'){
+  requireSetup();
+  const host=validateSmtpHost(plain(payload.smtp_host,253));
+  const port=Number(payload.smtp_port);
+  if(![465,2525,2587].includes(port))throw Error('Use SMTP TLS port 465, or a provider-supported alternate port 2525/2587. Ports 25/587 are blocked.');
+  const user=plain(payload.smtp_user,254),sender=plain(payload.sender_email,254),name=plain(payload.sender_name,100);
+  if(!user||!validEmail(sender))throw Error('SMTP username and valid From email address required');
+  const password=String(payload.smtp_password||'');
+  let encrypted=previous?.encrypted_smtp_password;
+  if(password){
+   if(password.length>1000)throw Error('SMTP password is too long');
+   encrypted=await encrypt(password);
+  }
+  if(!encrypted)throw Error('Enter the SMTP mailbox password or app password');
+  Object.assign(config,{smtp_host:host,smtp_port:port,smtp_user:user,sender_email:sender,sender_name:name,
+   encrypted_smtp_password:encrypted,status:'configured'});
+ }else if(transport==='resend'){
+  requireSetup();
+  const from=plain(payload.sender_email,254),name=plain(payload.sender_name,100),domain=plain(payload.resend_domain,150).toLowerCase();
+  if(!validEmail(from)||!domain||!from.toLowerCase().endsWith('@'+domain))
+   throw Error('Choose a sender address on your verified API sending domain');
+  const key=String(payload.resend_api_key||'');
+  let encrypted=previous?.encrypted_resend_api_key;
+  if(key){if(!/^re_[A-Za-z0-9_-]{10,}$/.test(key))throw Error('Invalid email API key');encrypted=await encrypt(key)}
+  if(!encrypted)throw Error('Enter your email provider API key');
+  Object.assign(config,{resend_domain:domain,sender_email:from,sender_name:name,
+   encrypted_resend_api_key:encrypted,status:'configured'});
+ }else{
+  const {data:gmail}=await db.from('gr_gmail_connections').select('status').eq('company_id',company).maybeSingle();
+  config.status=gmail?.status==='connected'?'verified':'not_configured';
+ }
+ const {error}=await db.from('gr_mail_transport_configs').upsert(config,{onConflict:'company_id'});
+ if(error)throw error;
+ return {saved:true,transport,status:config.status};
+}
+function smtpClient(config:any,password:string){
+ return nodemailer.createTransport({
+  host:config.smtp_host,port:config.smtp_port,secure:config.smtp_port===465,
+  requireTLS:config.smtp_port!==465,
+  auth:{user:config.smtp_user,pass:password},
+  tls:{rejectUnauthorized:true,servername:config.smtp_host},
+  connectionTimeout:13000,greetingTimeout:12000,socketTimeout:15000,
+  pool:false,disableFileAccess:true,disableUrlAccess:true
+ });
+}
+async function testTransport(db:any,profile:any,company:string){
+ await allowed(db,profile,company,'admin');
+ const config=await transportConfig(db,company);
+ if(!config||config.transport==='gmail')throw Error('For Gmail, use Google Connect / Reconnect instead of SMTP test');
+ if(config.transport==='smtp'){
+  validateSmtpHost(config.smtp_host);
+  const smtp=smtpClient(config,await decrypt(config.encrypted_smtp_password));
+  try{await smtp.verify()}catch(error){throw Error('SMTP connection failed. Check SSL port, hostname and mailbox/app password. '+String(error).slice(0,140))}
+  finally{smtp.close()}
+  const {error}=await db.from('gr_mail_transport_configs').update({status:'verified',verified_at:new Date().toISOString()}).eq('company_id',company);
+  if(error)throw error;
+  return {tested:true,transport:'smtp',message:'SMTP login and TLS connection verified. No email was sent.'};
+ }
+ const response=await fetch('https://api.resend.com/domains',{
+  headers:{Authorization:'Bearer '+await decrypt(config.encrypted_resend_api_key)}
+ });
+ if(!response.ok)throw Error('Email API key verification failed (HTTP '+response.status+'). Check your API key and verified domain.');
+ const domains=await response.json();
+ const found=Array.isArray(domains.data)&&domains.data.some((item:any)=>String(item.name).toLowerCase()===config.resend_domain&&item.status==='verified');
+ if(!found)throw Error('Email API domain is not verified. Verify your DNS records with the provider first.');
+ await db.from('gr_mail_transport_configs').update({status:'verified',verified_at:new Date().toISOString()}).eq('company_id',company);
+ return {tested:true,transport:'resend',message:'API key and verified domain confirmed. No email was sent.'};
+}
+async function deliverMail(db:any,company:string,to:string[],cc:string[],subject:string,body:string,pdf?:Uint8Array,pdfName?:string){
+ const config=await transportConfig(db,company);
+ const transport=config?.transport||'gmail';
+ if(transport==='smtp'){
+  if(!config?.encrypted_smtp_password||config.status!=='verified')throw Error('Test and verify company SMTP in Settings before sending');
+  validateSmtpHost(config.smtp_host);
+  const smtp=smtpClient(config,await decrypt(config.encrypted_smtp_password));
+  try{
+   const info=await smtp.sendMail({
+    from:{name:config.sender_name||'',address:config.sender_email},
+    to,cc,subject,text:body,
+    ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:pdf,contentType:'application/pdf'}]}:{})
+   });
+   return {id:info.messageId||null,threadId:null,transport:'smtp'};
+  }finally{smtp.close()}
+ }
+ if(transport==='resend'){
+  if(!config?.encrypted_resend_api_key||config.status!=='verified')throw Error('Test company email API and domain in Settings before sending');
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{
+   Authorization:'Bearer '+await decrypt(config.encrypted_resend_api_key),
+   'Content-Type':'application/json'
+  },body:JSON.stringify({
+   from:(config.sender_name?config.sender_name.replace(/[<>\r\n]/g,'')+' <'+config.sender_email+'>':config.sender_email),
+   to,cc,subject,text:body,
+   ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:b64(pdf)}]}:{})
+  })});
+  const out=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error('Email API rejected send (HTTP '+response.status+'): '+plain(out.message,140));
+  return {id:out.id||null,threadId:null,transport:'resend'};
+ }
+ const {data:gmail}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ if(gmail?.status!=='connected')throw Error('Gmail is not connected. Configure it in Settings.');
+ const token=await getAccessToken(db,company);
+ const raw=pdf?mime(gmail.sender_email,to,cc,subject,body,pdf,pdfName||'Quotation.pdf'):
+ contactMime(gmail.sender_email,to[0],subject,body);
+ const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
+  method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({raw})
+ });
+ const out=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error('Gmail rejected send (HTTP '+response.status+'). Reconnect or review permissions.');
+ return {id:out.id||null,threadId:out.threadId||null,transport:'gmail'};
+}
+
 const header=(value:string)=>value.replace(/[\r\n]/g,' ').replace(/[^\x20-\x7e]/g,' ').slice(0,450);
 function mime(from:string,to:string[],cc:string[],subject:string,body:string,pdf:Uint8Array,name:string){
  const boundary='GRQ_'+random(),encodedSub='=?UTF-8?B?'+b64(bytes(subject))+'?=';
@@ -237,8 +388,8 @@ async function send(db:any,profile:any,data:any){
  if(!subject||!message)throw Error('Email subject and message are required');
  const {data:quote,error:qe}=await db.from('gr_quotations').select('id,company_id,customer_id,quotation_no,payload').eq('id',qid).eq('company_id',company).maybeSingle();
  if(qe||!quote)throw Error('Quotation not found in this company');
- const {data:conn}=await db.from('gr_gmail_connections').select('status,sender_email').eq('company_id',company).maybeSingle();
- if(conn?.status!=='connected')throw Error('Company Gmail is not connected. Ask Admin to connect Gmail first');
+ const transport=await transportStatus(db,company);
+ if(!transport.ready)throw Error('Company email sender is not connected. Configure it in Settings.');
  // validate PDF bytes before creating audit row. Browser sends base64 of finalized quotation PDF.
  const raw=plain(data.pdf_base64,14_000_000);
  if(!raw||raw.length>11_000_000||!/^[A-Za-z0-9+/=]+$/.test(raw))throw Error('Valid quotation PDF required (maximum 8 MB)');
@@ -248,7 +399,7 @@ async function send(db:any,profile:any,data:any){
  const productIds=(quote.payload?.lines||[]).map((l:any)=>String(l.product_id||'')).filter(Boolean).slice(0,50);
  const first=await db.from('gr_quotation_email_history').insert({
   company_id:company,quotation_id:qid,customer_id:quote.customer_id,request_key:requestKey,
-  sender_email:conn.sender_email,recipients:to,cc,subject,body:message,product_ids:productIds,
+  sender_email:transport.connection.sender_email,transport:transport.transport,recipients:to,cc,subject,body:message,product_ids:productIds,
   pdf_sha256:checksum,pdf_bytes:pdf.length,status:'sending',sent_by:profile.id
  }).select('id').single();
  if(first.error){
@@ -263,25 +414,13 @@ async function send(db:any,profile:any,data:any){
  }
  await db.from('gr_quotation_email_history').update({pdf_path:path}).eq('id',rowId);
  try{
-  const accessToken=await getAccessToken(db,company);
-  const body=mime(conn.sender_email,to,cc,subject,message,pdf,quote.quotation_no+'.pdf');
-  const sent=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
-   method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},
-   body:JSON.stringify({raw:body})
-  });
-  const response=await sent.json().catch(()=>({}));
-  if(!sent.ok){
-   await db.from('gr_quotation_email_history').update({
-    status:'failed',failure_reason:'Gmail rejected the request: HTTP '+sent.status
-   }).eq('id',rowId);
-   throw Error('Gmail send rejected (HTTP '+sent.status+'). Check account permissions');
-  }
+  const response=await deliverMail(db,company,to,cc,subject,message,pdf,quote.quotation_no+'.pdf');
   // Gmail accepted the message. If DB update fails the audit stays "sending" for admin reconciliation.
   const upd=await db.from('gr_quotation_email_history').update({
-   status:'sent',gmail_message_id:response.id||null,gmail_thread_id:response.threadId||null,
+   status:'sent',transport:response.transport,provider_message_id:response.id||null,gmail_message_id:response.transport==='gmail'?response.id||null:null,gmail_thread_id:response.threadId||null,
    sent_at:new Date().toISOString(),failure_reason:null
   }).eq('id',rowId);
-  if(upd.error)throw Error('Gmail accepted the email, but audit finalization failed. Do not resend; ask Admin to reconcile');
+  if(upd.error)throw Error('Email provider accepted the email, but audit finalization failed. Do not resend; ask Admin to reconcile');
   return {history_id:rowId,status:'sent',gmail_message_id:response.id};
  }catch(error){
   // A network error may mean Google accepted the email: never blindly retry it.
@@ -301,6 +440,8 @@ Deno.serve(async req=>{
   const payload=await req.json(),action=plain(payload.action,50),company=plain(payload.company_id,50);
   if(!company)return fail('Select company');
   if(action==='configure')return json(await configureOAuth(db,profile,company,payload));
+  if(action==='configure_transport')return json(await configureTransport(db,profile,company,payload));
+  if(action==='test_transport')return json(await testTransport(db,profile,company));
   if(action==='send_contact')return json(await sendContact(db,profile,payload));
   if(action==='connect')return json({authorize_url:await createAuthorizeUrl(db,profile,company)});
   if(action==='disconnect'){
@@ -313,7 +454,7 @@ Deno.serve(async req=>{
   if(action==='status'){
    await allowed(db,profile,company,'view');
    const {data}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
-   return json({...await oauthStatus(db,company),connection:data||{status:'disconnected',sender_email:''}});
+   return json({...await oauthStatus(db,company),...await transportStatus(db,company)});
   }
   if(action==='pdf_url'){
    await allowed(db,profile,company,'view');

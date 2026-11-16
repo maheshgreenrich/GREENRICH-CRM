@@ -5,6 +5,8 @@ on:
       - 'greenrich-quotations.*'
       - 'greenrich-quotation-mail.*'
       - 'greenrich-gmail-settings.*'
+      - 'tests/multimail-settings.cjs'
+      - 'supabase/migrations/20261116193000_mail_transport_configs.sql'
       - 'greenrich-contact-email.*'
       - 'greenrich-customer-profile.js'
       - 'greenrich-lead-profile.js'
@@ -43,3 +45,4 @@ jobs:
           node --check greenrich-crm-inline.js
           node tests/quotation-gmail.cjs
           node tests/gmail-settings-contact.cjs
+          node tests/multimail-settings.cjs
