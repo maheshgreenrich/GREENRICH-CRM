@@ -111,7 +111,7 @@
    c.mobile2?'Alternative phone: '+c.mobile2:'','Email: '+(c.email||'—'),'Address: '+(address||'Not recorded'),
    c.gstin?'GSTIN: '+c.gstin:'','Total orders: '+model.orderIds.length,'Total sales: '+rupees(model.total)].filter(Boolean).join('\n');
  };
- function render(element,{customer,sales,leads,tasks,dispatch,tags,companyLabel,sourceSale,onBack,onEdit,onInvoice,onRefresh}){
+ function render(element,{customer,sales,leads,tasks,dispatch,tags,companyLabel,sourceSale,onBack,onEdit,onInvoice,onRefresh,onEmail}){
   if(!customer&&!sourceSale)throw Error('Customer is not found.');
   current={customer:customer||{id:'',name:sourceSale?.customer_name||'Unlinked customer'},sourceSale};
   actions={onBack,onEdit,onInvoice,onRefresh,companyLabel};
@@ -170,14 +170,16 @@
    if(channel==='whatsapp'){
     const phone=phoneValue(c.mobile)||phoneValue(c.mobile2);
     if(!phone)return window.alert('This customer has no valid WhatsApp number.');
-    window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener,noreferrer');
+    window.open('https://wa.me/'+phone+(message&&message!=='__BLANK__'?'?text='+encodeURIComponent(message):''),'_blank','noopener,noreferrer');
    }else{
     if(!text(c.email))return window.alert('Customer email is not recorded.');
     const subject=message.includes('invoice')?'GreenRich invoice details':message.includes('shipment')?'GreenRich delivery update':message.includes('quotation')?'GreenRich quotation summary':'GreenRich customer communication';
-    window.location.href='mailto:'+encodeURIComponent(c.email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(message);
+    onEmail?.({email:c.email,subject,body:message});
    }
   }
   element.onclick=event=>{
+   const mailLink=event.target.closest('a[href^="mailto:"]');
+   if(mailLink){event.preventDefault();onEmail?.({email:c.email});return}
    const button=event.target.closest('[data-gr360]');if(!button)return;
    const [kind,...parts]=button.dataset.gr360.split(':'),ref=parts.join(':');
    if(kind==='back'){actions.onBack?.();return}
@@ -196,7 +198,7 @@
     if(!window.GreenRichWhatsAppWorkflows?.openCustomerRule)return window.alert('WhatsApp service settings did not load. Refresh CRM.');
     void window.GreenRichWhatsAppWorkflows.openCustomerRule({customer:c});return;
    }
-   if(kind==='whatsapp'||kind==='email'||kind==='share'){openMessage(kind==='email'?'email':'whatsapp',shareText(kind==='share'?'details':'intro'));return}
+   if(kind==='whatsapp'||kind==='email'||kind==='share'){openMessage(kind==='email'?'email':'whatsapp',kind==='whatsapp'?'__BLANK__':shareText(kind==='share'?'details':'intro'));return}
    if(kind==='copy'){const summary=payloadInfo(c,model);if(navigator.clipboard?.writeText){navigator.clipboard.writeText(summary).then(()=>{button.textContent='Copied ✓'}).catch(()=>window.prompt('Copy customer information',summary))}else window.prompt('Copy customer information',summary);return}
    if(kind.startsWith('invoice')){
     const sale=model.purchases.find(s=>((s._companyId||s.company_id||'')+'|'+s.id)===ref);
