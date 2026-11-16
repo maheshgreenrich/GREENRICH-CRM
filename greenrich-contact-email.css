@@ -1,1 +1,43 @@
 .gr-contact-email-modal{width:min(680px,94vw);max-width:none;border:1px solid #d8e3ef;border-radius:15px;padding:23px;max-height:90vh;overflow:auto;color:#21344c}.gr-contact-email-modal::backdrop{background:#0d1d37aa}.grce-top{display:flex;align-items:center;justify-content:space-between}.grce-top h2{font-size:20px;margin:0}.grce-top button{border:0;background:none;font-size:20px;cursor:pointer}.gr-contact-email-modal label{display:block;font-weight:650;margin-top:14px}.gr-contact-email-modal input,.gr-contact-email-modal textarea{font:inherit;display:block;width:100%;margin-top:6px;padding:10px;border:1px solid #ccd9e5;border-radius:8px}.grce-hint{color:#64758d}.grce-connect{padding:12px;border:1px solid #d7e3ef;border-radius:8px;background:#f5f8fc}.grce-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:18px}.grce-actions button{padding:10px 15px;border-radius:8px;border:1px solid #ccd9e5;cursor:pointer}.grce-actions button[type=submit]{background:#245bb6;color:#fff}.grce-actions button:disabled{opacity:.5;cursor:not-allowed}
+/* Rich customer/lead email composer */
+.gr-contact-email-modal.grce-rich{width:min(1000px,96vw);max-height:95vh;padding:0;border-radius:17px;overflow:hidden;box-shadow:0 14px 60px #14243c4a}
+.grce-rich .grce-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;padding:19px 25px 11px;border-bottom:1px solid #e3eaf3}
+.grce-rich .grce-heading h2{font-size:21px;margin:0;color:#1a3456}
+.grce-rich .grce-heading p{margin:3px 0 0;color:#698098}
+.grce-rich .grce-heading .grce-icon{border:0;background:#fff;font-size:20px;padding:3px 8px;cursor:pointer}
+.grce-rich #grce-form{overflow:auto;max-height:calc(95vh - 90px);padding:10px 25px 20px}
+.grce-rich .grce-line{display:flex;align-items:center;gap:12px;border-bottom:1px solid #e4eaf2;padding:7px 0}
+.grce-rich .grce-line label{width:74px;flex:0 0 74px;font-size:12px;color:#697f98;font-weight:700;margin:0}
+.grce-rich .grce-line input,.grce-rich .grce-line select{border:0;border-radius:0;box-shadow:none;margin:0;width:100%;font-size:14px;padding:8px 5px;background:transparent}
+.grce-rich .grce-line input:focus,.grce-rich .grce-line select:focus{outline:2px solid #b6d2f6;border-radius:5px}
+.grce-rich .grce-toolbar{display:flex;align-items:center;gap:3px;flex-wrap:wrap;padding:11px 0 6px;margin-top:4px;border-bottom:1px solid #d9e4ee}
+.grce-rich .grce-toolbar button{font-size:13px;min-width:32px;min-height:31px;border:1px solid transparent;background:#fff;padding:5px 7px;border-radius:5px;cursor:pointer;color:#203855}
+.grce-rich .grce-toolbar button:hover,.grce-rich .grce-toolbar button:focus-visible{background:#eaf2ff;border-color:#c3d6f2}
+.grce-rich .grce-toolbar select{max-width:115px;width:auto;font-size:12px;padding:5px}
+.grce-rich .grce-toolbar .grce-color{display:flex;align-items:center;gap:4px;margin:0;padding:0 5px;font-weight:700}
+.grce-rich .grce-toolbar input[type=color]{width:24px;height:24px;padding:0;border:0;cursor:pointer;margin:0}
+.grce-rich .grce-toolbar .grce-sep{height:23px;border-left:1px solid #d5deea;margin:0 4px}
+.grce-rich .grce-emojis{display:flex;gap:5px;flex-wrap:wrap;padding:8px;background:#f6f9fd;border-radius:8px}
+.grce-rich .grce-emojis[hidden]{display:none}
+.grce-rich .grce-emojis button{border:0;background:transparent;font-size:19px;padding:4px 6px;cursor:pointer}
+.grce-rich .grce-editor{min-height:185px;max-height:360px;overflow:auto;white-space:pre-wrap;outline:none;font:14px/1.6 Arial,sans-serif;border:1px solid #d4deeb;border-radius:10px;padding:15px;margin:13px 0;background:#fff;color:#1e3046}
+.grce-rich .grce-editor:focus{border-color:#699be3;box-shadow:0 0 0 2px #dceaff}
+.grce-rich .grce-editor:empty:before{content:attr(data-placeholder);color:#8998aa}
+.grce-rich .grce-editor ul,.grce-rich .grce-editor ol{padding-left:25px}
+.grce-rich .grce-attach-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0}
+.grce-rich .grce-attach-head span{font-size:11px;color:#667d93}
+.grce-rich .grce-attach-buttons{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.grce-rich .grce-attach-buttons>label{margin:0;color:#2557a5}
+.grce-rich .grce-file-button{display:inline-flex;align-items:center;position:relative;cursor:pointer;background:#eef4ff;border:1px solid #bfd3ec;border-radius:8px;padding:9px 12px;font-size:12px}
+.grce-rich .grce-file-button input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.grce-rich .grce-attach-buttons select{max-width:360px;width:100%;font-size:12px;margin:4px 0}
+.grce-rich .grce-files{margin:9px 0}
+.grce-rich .grce-file{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f4f7fb;border:1px solid #dce6ef;border-radius:7px;padding:5px 9px;margin-top:5px}
+.grce-rich .grce-file button{border:0;background:none;cursor:pointer;color:#af3844}
+.grce-rich .grce-connect{margin-top:10px;padding:10px;font-size:12px;color:#446487}
+.grce-rich .grce-actions{position:sticky;bottom:-20px;background:#fff;align-items:center;padding:13px 0 0;border-top:1px solid #e1e8f0;gap:11px}
+.grce-rich .grce-actions #grce-count{margin-right:auto;color:#7a8da1;font-size:11px}
+.grce-rich .grce-actions button{min-height:37px}
+.grce-rich .grce-actions .grce-primary{background:#235bb5;border-color:#235bb5;color:#fff}
+.grce-rich .grce-actions .grce-primary:disabled{background:#9cb7db;border-color:#9cb7db;cursor:not-allowed}
+@media(max-width:650px){.gr-contact-email-modal.grce-rich{width:98vw}.grce-rich #grce-form{padding:10px 12px}.grce-rich .grce-line label{flex:0 0 56px;width:56px}.grce-rich .grce-toolbar{gap:1px}.grce-rich .grce-heading{padding:14px 13px 10px}}
