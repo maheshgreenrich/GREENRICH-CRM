@@ -6,9 +6,9 @@ for(const p of ['greenrich-quotation-mail.js','greenrich-quotation-history.js','
  assert.doesNotThrow(()=>new vm.Script(source(p),{filename:p}),p+' must parse');
 }
 const edge=source('supabase/functions/greenrich-quotation-gmail/index.ts');
-for(const token of ['getUser(bearer.slice(7))','gr_profiles','company_ids','gr_gmail_private_tokens','AES-GCM','code_verifier','state.code_verifier','gr_quotation_email_history','gr-quotation-pdfs','request_key','pdf_sha256','gmail.googleapis.com/gmail/v1/users/me/messages/send','needs_review','pdf_url','grant_type:\\'refresh_token\\''])
+for(const token of ['getUser(bearer.slice(7))','gr_profiles','company_ids','gr_gmail_private_tokens','AES-GCM','code_verifier','state.code_verifier','gr_quotation_email_history','gr-quotation-pdfs','request_key','pdf_sha256','gmail.googleapis.com/gmail/v1/users/me/messages/send','needs_review','pdf_url',"grant_type:'refresh_token'"])
  assert.ok(edge.includes(token),'Missing secure backend contract '+token);
-assert.ok(!edge.includes('Access-Control-Allow-Origin\\':\\'*'),'Wildcard CORS forbidden');
+assert.ok(!edge.includes("'Access-Control-Allow-Origin':'*'"),'Wildcard CORS forbidden');
 assert.match(edge,/if\(action==='connect'\)/);
 assert.match(edge,/if\(action==='send'\)/);
 assert.match(edge,/if\(action==='disconnect'\)/);
