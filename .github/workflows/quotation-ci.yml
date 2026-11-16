@@ -37,6 +37,7 @@ on:
       - 'tests/socialberries-bulk-batch-sync.cjs'
       - 'tests/whatsapp-dynamic-template-params.cjs'
       - 'tests/whatsapp-auto-template-sync.cjs'
+      - 'tests/whatsapp-no-repeat-verification.cjs'
       - 'secure.html'
       - 'tests/quotation-workspace.cjs'
       - 'supabase/migrations/20261116110000_quotations_pdf_workspace.sql'
@@ -73,4 +74,5 @@ jobs:
           node tests/socialberries-bulk-batch-sync.cjs
           node tests/whatsapp-dynamic-template-params.cjs
           node tests/whatsapp-auto-template-sync.cjs
+          node tests/whatsapp-no-repeat-verification.cjs
           node --check greenrich-inventory.js
