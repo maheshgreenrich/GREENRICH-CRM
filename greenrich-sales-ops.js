@@ -119,7 +119,7 @@
    case 'product':return '<strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small>';
    case 'channel':return '<span class="pill">'+esc(channelName(s))+'</span>';
    case 'qty':return num(s.qty);
-   case 'status':return '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>';
+   case 'status':return '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+(Number(s.stock_shortage)>0?'<small style="display:block;color:#b45309;font-weight:700">⚠ Low Stock · '+num(s.stock_shortage)+' units short</small>':'');
    case 'taxable':return money(s.taxable);
    case 'tax':return money(s.tax_amount);
    case 'shipping':return money(s.shipping_charge);
