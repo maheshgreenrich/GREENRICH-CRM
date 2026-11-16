@@ -25,9 +25,8 @@
   const tags=text=>[...String(text||'').matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1].trim().toLowerCase());
   const fields=[];
   if(String(header?.format).toUpperCase()==='TEXT')for(const tag of tags(header.text))fields.push({key:'header:'+tag,label:'Header '+tag});
-  for(const tag of tags(body?.text)){
-   if(!['clientname','clientemail','clientmobile','1','2','3'].includes(tag))
-    fields.push({key:'body:'+tag,label:'Body variable '+tag});
+  for(const tag of [...new Set(tags(body?.text))]){
+   fields.push({key:'body:'+tag,label:'Message variable '+tag,tag});
   }
   if(!Array.isArray(buttons))return {fields,unsupported:['Invalid approved button definitions'],format:''};
   buttons.forEach((b,i)=>{
@@ -59,8 +58,16 @@
   region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
    (hints.length?'<p class="grwc-notice">'+hints.map(esc).join(' ')+'</p>':'')+
    (spec.unsupported.length?'<p class="grwc-notice">'+spec.unsupported.map(esc).join(' · ')+'</p>':'')+
-   '<div class="grwc-grid">'+spec.fields.map(f=>'<label>'+esc(f.label)+
-      '<input type="text" name="wa_parameter" data-wa-field="'+esc(f.key)+'" required maxlength="200" value="'+esc(stored[f.key]||'')+'" placeholder="Required for approved template"></label>').join('')+'</div>'+
+   '<div class="grwc-grid">'+spec.fields.map(f=>{
+      const selected=stored[f.key]||(f.tag==='1'||f.tag==='clientname'?'@crm:name':f.tag==='2'||f.tag==='clientemail'?'@crm:email':f.tag==='3'||f.tag==='clientmobile'?'@crm:mobile':'');
+      if(!f.tag)return '<label>'+esc(f.label)+'<input type="text" name="wa_parameter" data-wa-field="'+esc(f.key)+'" required maxlength="200" value="'+esc(selected)+'" placeholder="Required for approved template"></label>';
+      const preset=['@crm:name','@crm:mobile','@crm:email'];
+      const mode=preset.includes(selected)?selected:'custom';
+      return '<label>'+esc(f.label)+'<select data-wa-field="'+esc(f.key)+'">'+
+       [['@crm:name','Customer name'],['@crm:mobile','Customer mobile'],['@crm:email','Customer email'],['custom','Enter my own text / order number']].map(([v,label])=>
+        '<option value="'+esc(v)+'" '+(v===mode?'selected':'')+'>'+esc(label)+'</option>').join('')+'</select>'+
+       '<input data-wa-custom="'+esc(f.key)+'" maxlength="200" placeholder="Type the value" value="'+esc(mode==='custom'?selected:'')+'" '+(mode==='custom'?'required':'hidden')+'></label>';
+     }).join('')+'</div>'+
    (!spec.fields.length?'<p class="grwc-muted">No additional custom text or button values are required by the saved template JSON.</p>':'');
   const button=form.querySelector('[data-send-campaign]');
   if(button)button.disabled=!!spec.unsupported.length;
@@ -413,15 +420,16 @@
    '<li><b>Bulk API documentation:</b> <code>POST /api/v1/whatsapp/messages/bulk/</code> requires multipart form fields and an uploaded CSV when using the file audience. The current CRM campaign sender uses the separate individual-message endpoint. Do not use the bulk code example as proof that an individual message succeeded. A bulk response with <code>status: pending</code> means queued, not delivered.</li>'+
    '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
-   '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Do not recreate your approved templates in the CRM. Template names should be fetched from the provider API when connected.')+
-   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Template content and approval verification are separate. Importing JSON saves message content but not a verified approval. Verify through your authorized Meta WABA or compare the JSON with the approved SocialBerries template and confirm it below.</p>'+
-   '<button type="button" disabled title="No Get Templates API was included in the supplied documentation">Auto-sync Templates (provider endpoint needed)</button> '+
+   '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Approved templates and their message fields can sync automatically once the company Meta WABA is connected. No JSON editing is needed.')+
+   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Use Sync Approved Templates to retrieve full approved message content directly from the connected company Meta WABA. Existing approved templates remain available; no repeat approval is necessary.</p>'+
+   '<button type="button" data-sync-approved-templates>Sync Approved Templates</button> '+
+   '<details class="grwc-span"><summary>Advanced · Manual template recovery</summary><p class="grwc-muted">Normally no JSON import is needed.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
-   '<button type="button" data-import-provider-template>Import Existing Template JSON (one or multiple)</button>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting verification')+(t.category==='marketing'?' <button type="button" data-verify-meta-template="'+esc(t.id)+'">Verify with Meta</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':empty('No template references added. Copy an approved template preview JSON from SocialBerries and import it above.'))+'</section>'+
+   '<button type="button" data-import-provider-template>Import template JSON</button></details>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting verification')+(t.category==='marketing'&&t.provider_source!=='verified_provider'?' <button type="button" data-verify-meta-template="'+esc(t.id)+'">Verify with Meta</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
-    '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-settings-confirm-template>Confirm existing approved template</button></div></div>'+
+    '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-sync-approved-templates>Refresh approved templates</button></div></div>'+
     '<p class="grwc-muted">CRM contacts and Meta leads are not automatically opted in. Record genuine permission once for the correct sending company; future campaigns reuse it.</p></section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
@@ -455,6 +463,7 @@
    const sync=e.target.closest('[data-sync-provider-leads]'),importLead=e.target.closest('[data-import-provider-lead]');
    if(sync)return await syncProviderLeads(sync.dataset.syncProviderLeads,container);
    if(importLead)return importStagedLead(importLead.dataset.importProviderLead,container);
+   if(e.target.closest('[data-sync-approved-templates]'))return await syncApprovedTemplates(c,container);
    const verify=e.target.closest('[data-verify-meta-template]');if(verify)return verifyMetaTemplate(c,verify.dataset.verifyMetaTemplate,container);
    if(e.target.closest('[data-settings-optin]'))return settingsConsent(c,container);
    if(e.target.closest('[data-settings-confirm-template]'))return settingsTemplateApproval(c,container);
@@ -770,6 +779,28 @@
     ' If SocialBerries manages your Meta WABA, request the full approved template JSON and use Confirm existing approved template below.','warning');
   }
  }
+ async function syncApprovedTemplates(company,container,{quiet=false}={}){
+  const connection=rows.connections.find(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries'&&x.slot===1)||
+   rows.connections.find(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
+  if(!connection){if(!quiet)alert('Save the company WhatsApp sender in Settings first.','warning');return}
+  const button=container?.querySelector('[data-sync-approved-templates]');
+  if(button)button.disabled=true;
+  try{
+   const result=await secureSend('sync_approved_templates',{connection_id:connection.id});
+   if(!result.configured){
+    if(!quiet)alert('One-time setup required: Ask your Meta / SocialBerries administrator to connect this company WABA ID and WhatsApp template management token to Supabase Secrets. CRM will then sync all approved templates automatically, with no JSON required.','warning');
+    return result;
+   }
+   await fetchAll();
+   if(container?.isConnected)settingsDraw(container);
+   if(!quiet)alert('Approved templates synced from Meta. New: '+result.imported+
+    ', updated: '+result.updated+'. Full header, body and buttons were imported. You will not need to approve them again.','success');
+   return result;
+  }catch(error){
+   if(!quiet)alert('Template sync failed: '+error.message+'. Existing approved templates were not removed.','error');
+   return null;
+  }finally{if(button?.isConnected)button.disabled=false}
+ }
  function settingsTemplateApproval(company,container){
   const list=rows.templates.filter(x=>x.company_id===company&&x.category==='marketing');
   if(!list.length)return alert('Import your existing approved marketing template under Templates first.','warning');
@@ -1049,10 +1080,16 @@
     if(status)status.textContent=campaignImage?'Selected for sending: '+campaignImage.name:'No image selected';
     return;
    }
-   if(form&&e.target.dataset?.waField){
+   if(form&&(e.target.dataset?.waField||e.target.dataset?.waCustom)){
+    const key=e.target.dataset.waField||e.target.dataset.waCustom;
     const id=form.elements.template_id.value;
     if(!campaignParamValues[id])campaignParamValues[id]={};
-    campaignParamValues[id][e.target.dataset.waField]=String(e.target.value||'');
+    const select=[...form.querySelectorAll('select[data-wa-field]')].find(x=>x.dataset.waField===key);
+    const input=[...form.querySelectorAll('[data-wa-custom]')].find(x=>x.dataset.waCustom===key);
+    if(select){
+     if(input){input.hidden=select.value!=='custom';input.required=select.value==='custom'}
+     campaignParamValues[id][key]=select.value==='custom'?String(input?.value||''):select.value;
+    }else campaignParamValues[id][key]=String(e.target.value||'');
     return;
    }
    if(form&&e.target.name==='template_id'){
@@ -1131,7 +1168,8 @@
    const templateFields={};
    for(const entry of spec.fields){
     const control=[...e.target.querySelectorAll('[data-wa-field]')].find(x=>x.dataset.waField===entry.key);
-    const value=String(control?.value||'').trim();
+    const custom=[...e.target.querySelectorAll('[data-wa-custom]')].find(x=>x.dataset.waCustom===entry.key);
+    const value=String(control?.value==='custom'?custom?.value:control?.value||'').trim();
     if(!value)return alert('Complete required template field: '+entry.label,'warning');
     templateFields[entry.key]=value;
    }
@@ -1197,7 +1235,16 @@
    ?ctx.selectedCompany
    :(ctx.companies.includes('grow-india')?'grow-india':ctx.companies[0]);
   element.innerHTML='<p>Loading WhatsApp integration settings…</p>';
-  try{await fetchAll();settingsDraw(element)}catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
+  try{
+   await fetchAll();settingsDraw(element);
+   // One read-only catalog sync on Settings entry; no WhatsApp message is sent.
+   const last=window.GreenRichWaLastSync||{};
+   const currentCompany=scope;
+   if(app.admin&&Date.now()-(last[currentCompany]||0)>30*60*1000){
+    last[currentCompany]=Date.now();window.GreenRichWaLastSync=last;
+    void syncApprovedTemplates(currentCompany,element,{quiet:true});
+   }
+  }catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
  }
  const configure=ctx=>{app=ctx};
  window.GreenRichWhatsAppWorkflows={configure,mountMarketing,mountSettings,welcomeOptions,saveLeadWelcome,openCustomerRule,openCustomerHistory};

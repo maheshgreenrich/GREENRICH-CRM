@@ -108,7 +108,10 @@ function components(template:any,person:Person,image:string,fields:Record<string
   "1":person.name,"2":person.email,"3":person.phone};
  const tags=spec.variables(spec.body.text);
  if(tags.length)out.push({type:"body",parameters:tags.map((tag:string)=>{
-  const text=Object.hasOwn(fixed,tag)?String(fixed[tag]||"").trim():value("body:"+tag);
+  const configured=String(fields?.["body:"+tag]||"").trim();
+  const mapped:Record<string,string>={"@crm:name":person.name,"@crm:mobile":person.phone,"@crm:email":person.email};
+  const text=configured?(Object.hasOwn(mapped,configured)?mapped[configured]:value("body:"+tag)):
+   Object.hasOwn(fixed,tag)?String(fixed[tag]||"").trim():value("body:"+tag);
   if(!text)throw Error("Missing CRM contact field for template placeholder "+tag);
   return {type:"text",text};
  })});
@@ -349,6 +352,81 @@ Deno.serve(async request=>{
   }
   // Verify an existing template against Meta Graph API with an admin-only server
   // credential. This reads the actual WABA template, not a screenshot claim.
+  // Approved-template catalog sync is read-only on Meta and scoped to this
+  // company's WABA. No JSON input or repeated manual template attestation.
+  if(action==="sync_approved_templates"){
+   const prefix=prefixes[company+":"+r.data.slot];
+   const waba=env(prefix+"_META_WABA_ID"),token=env(prefix+"_META_ACCESS_TOKEN");
+   const version=env(prefix+"_META_GRAPH_VERSION")||"v23.0";
+   if(!/^[0-9]{5,25}$/.test(waba)||!token||!/^v[0-9]{1,2}\.[0-9]{1,2}$/.test(version))
+    return res(200,{ok:true,configured:false,imported:0,updated:0,
+     message:"One-time Meta WABA ID and management token setup is required in Supabase Secrets. SocialBerries has not supplied a verified template listing API. No JSON copy/paste is required after this setup."});
+   const apiBase="https://graph.facebook.com/"+version+"/"+waba+"/message_templates";
+   let next:string|null=apiBase+"?fields=id,name,language,status,category,components&limit=100";
+   const items:any[]=[],seen=new Set<string>();
+   for(let page=0;page<4&&next;page++){
+    let response:Response;
+    try{response=await fetch(next,{method:"GET",redirect:"error",signal:AbortSignal.timeout(15000),
+     headers:{Authorization:"Bearer "+token,Accept:"application/json"}})}
+    catch{return res(502,{ok:false,error:"Cannot reach Meta template API. Existing CRM templates were not changed."})}
+    if(!response.ok)return res(422,{ok:false,error:response.status===401||response.status===403?
+      "Meta token does not have approved template access to this WABA":
+      "Meta template list returned HTTP "+response.status});
+    const raw=await response.text();
+    if(raw.length>750000)return res(502,{ok:false,error:"Meta template response exceeded safe size"});
+    let data:any;try{data=JSON.parse(raw)}catch{return res(502,{ok:false,error:"Invalid Meta template list response"})}
+    if(!Array.isArray(data?.data))return res(422,{ok:false,error:"Meta did not return a template list"});
+    for(const t of data.data){
+     if(t?.status!=="APPROVED"||!["MARKETING","UTILITY"].includes(String(t.category||"").toUpperCase())||
+      !/^[0-9]{5,25}$/.test(String(t.id||""))||
+      !/^[a-z][a-z0-9_]{0,150}$/.test(String(t.name||""))||
+      !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(String(t.language||""))||
+      !Array.isArray(t.components)||!t.components.some((x:any)=>x.type==="BODY"&&typeof x.text==="string"))
+      continue;
+     const key=t.id+":"+t.language;if(seen.has(key))continue;seen.add(key);
+     items.push(t);
+    }
+    const nextUrl=data?.paging?.next;
+    if(nextUrl){
+     try{const parsed=new URL(nextUrl);
+      // Never forward the privileged Meta token to arbitrary next-page URLs.
+      if(parsed.protocol!=="https:"||parsed.hostname!=="graph.facebook.com")
+       throw Error("unexpected pagination host");
+      next=parsed.toString();
+     }catch{return res(502,{ok:false,error:"Meta returned an untrusted pagination URL; no template records changed"})}
+    }else next=null;
+   }
+   if(next)return res(422,{ok:false,error:"Template catalog exceeds the supported 400-item sync limit; no records changed"});
+   const old=await db.from("gr_wa_templates").select("id,name,language,provider_template_id")
+    .eq("company_id",company).eq("connection_id",connectionId).limit(1000);
+   if(old.error)return res(500,{ok:false,error:"Could not reconcile existing CRM templates"});
+   let imported=0,updated=0;
+   for(const t of items){
+    const exact=(old.data||[]).find((x:any)=>x.provider_template_id===String(t.id));
+    const duplicate=(old.data||[]).find((x:any)=>x.name===t.name&&x.language===t.language&&x.id!==exact?.id);
+    if(duplicate)continue; // never remap a named template silently
+    const preview={id:String(t.id),name:t.name,language:t.language,
+     status:"APPROVED",category:String(t.category).toUpperCase(),components:t.components};
+    const body=t.components.find((x:any)=>x.type==="BODY")?.text||"";
+    const payload={name:t.name,language:t.language,category:String(t.category).toLowerCase(),
+     body,provider_template_id:String(t.id),provider_preview:preview,provider_approval:"approved",
+     provider_source:"verified_provider"};
+    if(exact){
+     const save=await db.from("gr_wa_templates").update(payload).eq("id",exact.id)
+      .eq("company_id",company).eq("connection_id",connectionId);
+     if(save.error)return res(500,{ok:false,error:"Template sync partially completed; check CRM template catalog"});
+     updated++;
+    }else{
+     const save=await db.from("gr_wa_templates").insert({...payload,
+      company_id:company,connection_id:connectionId,created_by:session.data.user.id});
+     if(save.error)return res(500,{ok:false,error:"Template sync partially completed; check CRM template catalog"});
+     imported++;
+    }
+   }
+   return res(200,{ok:true,configured:true,imported,updated,
+    total_approved:items.length,source:"Meta WABA",
+    message:"Synced directly approved templates and their full components for this company. No messages sent, no manual JSON confirmation needed."});
+  }
   if(action==="sync_meta_template"){
    const id=val(input.template_id,40);
    if(!validId(id))return res(400,{ok:false,error:"Choose a saved marketing template"});
