@@ -33,7 +33,7 @@ const mocks={
  gr_inventory_location_balances:[{company_id:'grow-india',location_id:'location-0',item_kind:'RM',item_id:'rm1',quantity:50,uom:'kg'}],
  gr_inventory_location_movements:[],gr_production_documents:[
  {company_id:'grow-india',id:'job-1',kind:'job',number:'STN-1',status:'Part received',payload:{
-  vendor:{name:'Sivaji Enterprises'},material:{name:'SS Sheet',uom:'kg'},issued:50,used:10,waste:2,returned:0,remaining:40}}],
+  vendor:{name:'Sivaji Enterprises'},material:{name:'SS Sheet',uom:'kg'},issued:50,used:8,waste:2,returned:0,remaining:40}}],
  gr_production_balances:[{company_id:'grow-india',material_id:'rm1',quantity:50}]
 };
 function query(table){
