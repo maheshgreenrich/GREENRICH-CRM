@@ -207,8 +207,9 @@ function safeRichHtml(html:unknown){
   allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','font','h1','h2','h3','hr','img'],
   allowedAttributes:{a:['href','title','target'],img:['src','alt','style','width','height'],font:['color','size','face'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
   allowedSchemes:['https','http','mailto'],allowedSchemesByTag:{img:['cid']},allowedSchemesAppliedToAttributes:['href','src'],
-  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/],
-    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/],'max-width':[/^100%$/],'height':[/^auto$/]}}
+  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/,/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/,/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/],
+    'font-family':[/^(Arial|Georgia|Verdana|Tahoma|Courier New)(,\s*sans-serif)?$/],'max-width':[/^100%$/],'height':[/^auto$/]}}
  });
  return clean.trim();
 }
