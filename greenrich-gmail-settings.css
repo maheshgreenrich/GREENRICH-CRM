@@ -1,1 +1,9 @@
 .grgmail-settings{max-width:1050px}.grgmail-settings label{display:block;margin:15px 0;font-weight:650}.grgmail-settings input,.grgmail-settings select{display:block;width:100%;margin-top:6px;padding:11px;border:1px solid #cbd5e1;border-radius:9px;color:#20324b;background:#fff}.grgmail-settings form,.grgmail-setup,.grgmail-connection{border:1px solid #d8e2ed;border-radius:11px;padding:17px;margin-top:15px}.grgmail-settings h3{margin:3px 0 13px}.grgmail-uri{display:flex;gap:10px;flex-wrap:wrap;align-items:center;overflow-wrap:anywhere}.grgmail-settings button{padding:10px 14px;border:1px solid #b9cde5;background:#fff;border-radius:8px;color:#2457a0;cursor:pointer}.grgmail-controls{display:flex;gap:12px;margin-top:18px}.grgmail-controls button:first-child{background:#2457a0;color:white}.grgmail-settings button:disabled{opacity:.5;cursor:not-allowed}
+.grgmail-settings{max-width:1150px}.grgmail-settings>label{max-width:600px}
+.grgmail-guide{border:1px solid #d9e5ef;background:#f9fbff;border-radius:12px;padding:18px;margin:18px 0}
+.grgmail-guide ol{padding-left:24px;line-height:1.75}.grgmail-guide li{margin:7px 0}
+.grgmail-guide a{color:#225db9}.grgmail-note{font-size:12px;color:#5d738d}
+.grgmail-guide code,.grgmail-uri code{word-break:break-all;overflow-wrap:anywhere}
+.grgmail-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:13px}
+.grgmail-actions button{min-height:42px}
+.grgmail-settings .grmail-alert{margin:12px 0;display:block}
