@@ -143,9 +143,16 @@ Deno.serve(async request=>{
   async function persistBatches(records:any[]){
    if(!records.length)return;
    const db=serverDb();
-   // Do not reset message_statistics when syncing list summary.
-   const {error}=await db.from("gr_wa_bulk_batches").upsert(records,
-    {onConflict:"company_id,connection_id,provider_batch_id"});
+   // Summary sync must preserve richer detail stats already saved for each batch.
+   const {data:existing,error:lookupError}=await db.from("gr_wa_bulk_batches")
+    .select("provider_batch_id,message_statistics")
+    .eq("company_id",connection.company_id).eq("connection_id",connection.id)
+    .in("provider_batch_id",records.map(x=>x.provider_batch_id));
+   if(lookupError)throw Error("Could not reconcile saved campaign statistics");
+   const detailById=new Map((existing||[]).map((x:any)=>[x.provider_batch_id,x.message_statistics]));
+   const {error}=await db.from("gr_wa_bulk_batches").upsert(records.map(x=>({
+    ...x,message_statistics:detailById.get(x.provider_batch_id)||null
+   })),{onConflict:"company_id,connection_id,provider_batch_id"});
    if(error)throw Error("Could not save SocialBerries campaign summaries");
   }
   if(action==="batch_history"){
