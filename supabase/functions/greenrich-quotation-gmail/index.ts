@@ -190,7 +190,7 @@ async function sendContact(db:any,profile:any,payload:any){
  try{
   const result=await deliverMail(db,company,[recipient],[],subject,body);
   const saved=await db.from('gr_contact_email_history').update({
-   status:'sent',transport:result.transport,gmail_message_id:result.id||null,sent_at:new Date().toISOString()
+   status:'sent',transport:result.transport,provider_message_id:result.id||null,gmail_message_id:result.transport==='gmail'?result.id||null:null,sent_at:new Date().toISOString()
   }).eq('id',rowId);
   if(saved.error)throw Error('Email provider accepted the message, but history update failed; do not resend');
   return {status:'sent',history_id:rowId,gmail_message_id:result.id};
@@ -417,7 +417,7 @@ async function send(db:any,profile:any,data:any){
   const response=await deliverMail(db,company,to,cc,subject,message,pdf,quote.quotation_no+'.pdf');
   // Gmail accepted the message. If DB update fails the audit stays "sending" for admin reconciliation.
   const upd=await db.from('gr_quotation_email_history').update({
-   status:'sent',transport:response.transport,gmail_message_id:response.id||null,gmail_thread_id:response.threadId||null,
+   status:'sent',transport:response.transport,provider_message_id:response.id||null,gmail_message_id:response.transport==='gmail'?response.id||null:null,gmail_thread_id:response.threadId||null,
    sent_at:new Date().toISOString(),failure_reason:null
   }).eq('id',rowId);
   if(upd.error)throw Error('Email provider accepted the email, but audit finalization failed. Do not resend; ask Admin to reconcile');
