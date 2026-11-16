@@ -10,4 +10,13 @@ assert.ok(send.includes('const explicitError=doc?.error===true'),'Rejections rem
 assert.ok(send.includes('if(!providerId)'),'Accepted response must include provider ID');
 const doc=fs.readFileSync(path.join(__dirname,'../docs/socialberries-api-setup-20261031.md'),'utf8');
 assert.ok(doc.includes('POST /api/v1/whatsapp/messages/bulk/'),'Documented bulk endpoint retained');
-console.log('PASS: complete template payload is forwarded with individual send, verified error semantics, no speculative bulk CSV posting');
+const verified=backend.slice(backend.indexOf('if(action==="verify_provider_connection")'),backend.indexOf('if(action==="diagnose_connection")'));
+assert.ok(verified.includes('/users/?page=1'),'Verify against authenticated provider read-only user-list endpoint');
+assert.ok(verified.includes('enabled:true,setup_state:"verified"'),'Persist verified provider connection only after GET succeeds');
+assert.ok(verified.includes('No message was sent'),'Connection verification never submits a campaign');
+assert.ok(!verified.includes('/whatsapp/messages/'),'Connection verification must not send messages');
+assert.ok(backend.includes('Verify and enable this SocialBerries provider in Settings before submitting campaign messages'),'Block campaign while provider unverified');
+const ui=fs.readFileSync(path.join(__dirname,'../greenrich-whatsapp-crm-workflows.js'),'utf8');
+assert.ok(ui.includes('Verify & Enable Provider'),'Provider verification action must be accessible');
+assert.ok(ui.includes("secureSend('verify_provider_connection'"),'UI triggers explicit provider verification');
+console.log('PASS: full approved template forwarded, verified provider setup is admin-initiated, no unsafe bulk CSV or test messaging');
