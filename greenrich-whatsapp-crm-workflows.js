@@ -146,7 +146,7 @@
     return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(state)+(last?'<div class="grwc-muted">Reason: '+esc(reason)+'</div>':'')+'</td><td>'+(allAttempted?'<small>Already attempted · do not automatically retry</small>':'<button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button>')+'</td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
    '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
-   (app.admin?'<button type="button" data-provider-report>View SocialBerries native bulk statistics</button>':'')+
+   (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">Provider batch data is synchronised read-only; campaign processing status is not message delivery. Use one company at a time.</p>':'')+
    '</section>';
  }
  function welcomeView(){
@@ -537,44 +537,101 @@
   }catch(e){alert('Could not diagnose WhatsApp connection: '+e.message,'error')}
  }
  async function checkProvider(id,action){
-   const provider=rows.connections.find(x=>x.id===id);
-   if(!provider)return alert('Save provider details first.','warning');
+  const provider=rows.connections.find(x=>x.id===id&&app.companies.includes(x.company_id));
+  if(!provider)return alert('Save provider details first.','warning');
+  if(action==='test'){
    try{
-    const result=await app.db.functions.invoke('greenrich-socialberries',{body:{connection_id:id,action}});
-    if(result.error)throw Error(result.error.message||'Could not contact secure gateway');
-    const data=result.data||{};
-    if(!data.ok){
-      const missing=Array.isArray(data.missing)?' Missing: '+data.missing.join(', '):'';
-      alert((data.message||data.error||'Provider check failed')+missing,'warning');return;
-    }
-    if(action==='test')return alert('SocialBerries read-only API authentication succeeded. User count: '+(data.users_count??'not returned')+'. Marketing sending additionally requires a confirmed approved template, customer opt-ins and server activation.','success');
-    const d=document.createElement('dialog');d.className='grwc-dialog';
-    d.innerHTML='<div class="grwc-dialog-head"><h3>SocialBerries campaign reports</h3><button type="button" data-close>×</button></div>'+
-      '<div class="grwc-dialog-fields"><p class="grwc-muted grwc-span">'+esc(data.count||0)+' provider batches · Page '+esc(data.page||1)+'. Provider batches are not automatically linked to GreenRich CRM campaign drafts.</p>'+
-      '<div class="grwc-tablewrap grwc-span"><table><thead><tr><th>Campaign</th><th>Status</th><th>Recipients</th><th>Details</th></tr></thead><tbody>'+
-      (data.batches||[]).map(b=>'<tr><td>'+esc(b.name||'—')+'</td><td>'+esc(b.status||'—')+'</td><td>'+esc(b.total_clients_count??'—')+'</td><td><button type="button" data-batch-stats="'+esc(b.id)+'">Read status</button></td></tr>').join('')+
-      '</tbody></table></div><div class="grwc-feature grwc-span" id="grwc-batch-detail">Select a batch to view sent, delivered, read and failed counts. Replies are not measured by this endpoint.</div></div>'+
-      '<div class="grwc-dialog-foot"><button type="button" data-close>Close</button></div>';
-    document.body.append(d);
-    d.onclose=()=>d.remove();
-    d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.close());
-    d.onclick=async ev=>{
-     const b=ev.target.closest('[data-batch-stats]');if(!b)return;
-     const box=d.querySelector('#grwc-batch-detail');
-     box.textContent='Loading provider batch statistics…';
-     try{
-      const r=await app.db.functions.invoke('greenrich-socialberries',{
-       body:{connection_id:id,action:'batch_detail',batch_id:b.dataset.batchStats}});
-      if(r.error||!r.data?.ok)throw Error(r.error?.message||r.data?.message||'Provider report unavailable');
-      const p=r.data,stats=p.statistics||{};
-      box.innerHTML='<b>'+esc(p.name)+'</b><p>Provider status: '+esc(p.status)+'</p>'+
-       '<div class="grwc-grid">'+['total_messages','pending','sent','delivered','read','failed'].map(key=>
-         '<div class="grwc-feature"><small>'+esc(key.replace('_',' '))+'</small><b>'+esc(stats[key]??'—')+'</b></div>').join('')+'</div>'+
-       '<p class="grwc-muted">READ status is not guaranteed to mean a person opened the message. Responded / Not responded are unavailable until inbound events are connected.</p>';
-     }catch(error){box.textContent='Could not load batch detail: '+error.message}
-    };
-    d.showModal();
-   }catch(err){alert('Connection test failed: '+err.message,'error')}
+    const info=await app.db.functions.invoke('greenrich-socialberries',{body:{connection_id:id,action:'test'}});
+    if(info.error||!info.data?.ok)throw Error(info.data?.message||info.error?.message||'Provider test failed');
+    return alert('SocialBerries API authentication succeeded (read-only). User count: '+(info.data.users_count??'not returned')+'.','success');
+   }catch(e){return alert('Connection test failed: '+e.message,'error')}
+  }
+  const d=document.createElement('dialog');d.className='grwc-dialog grwc-bulk-dialog';
+  d.innerHTML='<div class="grwc-dialog-head"><h3>SocialBerries Bulk Campaign Tracking</h3><button type="button" data-close>×</button></div>'+
+    '<div class="grwc-dialog-fields"><p class="grwc-notice grwc-span">Read-only provider sync for '+esc(name(provider.company_id))+'. No WhatsApp messages are sent. <b>Completed = campaign processing</b>, not delivered.</p>'+
+    '<div class="grwc-span" data-provider-batch-summary>Loading bulk campaigns…</div>'+
+    '<div class="grwc-tablewrap grwc-span"><table><thead><tr><th>Campaign / Provider ID</th><th>Processing</th><th>Recipients</th><th>Processed</th><th>Linked CRM</th><th>Details</th></tr></thead><tbody data-provider-batch-rows></tbody></table></div>'+
+    '<div class="grwc-feature grwc-span" id="grwc-batch-detail">Choose a campaign to see provider message statistics, not just processing status.</div></div>'+
+    '<div class="grwc-dialog-foot"><button type="button" data-provider-prev disabled>Previous</button>'+
+    '<button type="button" data-provider-next disabled>Next</button>'+
+    '<button type="button" data-provider-live>Sync live page</button>'+
+    '<button type="button" data-provider-saved>Saved history</button>'+
+    '<button type="button" data-close>Close</button></div>';
+  document.body.append(d);d.onclose=()=>d.remove();
+  d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.close());
+  const summary=d.querySelector('[data-provider-batch-summary]'),tbody=d.querySelector('[data-provider-batch-rows]');
+  const prev=d.querySelector('[data-provider-prev]'),next=d.querySelector('[data-provider-next]');
+  const detail=d.querySelector('#grwc-batch-detail');
+  let page=1,mode=action==='saved'?'batch_history':'batches',loading=false;
+  const call=async(a,args={})=>{
+   const result=await app.db.functions.invoke('greenrich-socialberries',{body:{connection_id:id,action:a,...args}});
+   if(result.error||!result.data?.ok){
+    let message=result.data?.message||result.data?.error||result.error?.message||'Provider request failed';
+    if(result.error?.context?.json)try{
+     const x=await result.error.context.json();message=x.message||x.error||message;
+    }catch{}
+    throw Error(message);
+   }
+   return result.data;
+  };
+  const load=async(requestedPage=1,requestedMode=mode)=>{
+   if(loading)return;
+   loading=true;prev.disabled=true;next.disabled=true;
+   summary.textContent='Loading '+(requestedMode==='batches'?'live SocialBerries batches':'saved CRM batch history')+'…';
+   try{
+    const response=await call(requestedMode,{page:requestedPage});
+    if(!d.isConnected)return;
+    page=requestedPage;mode=requestedMode;
+    const batches=response.batches||[],count=Number(response.count)||0;
+    const pageSize=mode==='batches'?10:20;
+    summary.textContent=(mode==='batches'?'Live provider sync':'Saved in CRM')+
+     ' · '+count+' total · Page '+page+' · '+batches.length+' shown. No messages sent.';
+    tbody.innerHTML=batches.length?batches.map(b=>{
+      const bid=b.id||b.provider_batch_id,ref=b.crm_campaign_id||'—';
+      return '<tr><td><strong>'+esc(b.name||'Unnamed campaign')+'</strong>'+
+       '<small>'+esc(bid)+'</small></td>'+
+       '<td>'+esc(b.status||'unknown')+'</td>'+
+       '<td>'+esc(b.total_clients_count??'—')+'</td>'+
+       '<td>'+esc(b.completed_clients_count??'—')+'</td>'+
+       '<td>'+esc(ref)+'</td>'+
+       '<td><button type="button" data-batch-stats="'+esc(bid)+'">View & Sync</button></td></tr>';
+     }).join(''):'<tr><td colspan="6">No bulk campaign results on this page.</td></tr>';
+    prev.disabled=page<=1;
+    next.disabled=mode==='batches'?(!response.has_more):page*pageSize>=count;
+    detail.textContent='Choose View & Sync to show individual batch message counts. Batch processing status is different from delivery.';
+   }catch(err){summary.textContent='Could not sync provider batches: '+err.message;tbody.innerHTML='';detail.textContent='No messages sent. Check provider connection and the Batch List endpoint.'}
+   finally{loading=false}
+  };
+  prev.onclick=()=>void load(page-1);
+  next.onclick=()=>void load(page+1);
+  d.querySelector('[data-provider-live]').onclick=()=>void load(1,'batches');
+  d.querySelector('[data-provider-saved]').onclick=()=>void load(1,'batch_history');
+  d.onclick=async ev=>{
+   const button=ev.target.closest('[data-batch-stats]');if(!button||loading)return;
+   button.disabled=true;detail.textContent='Reading provider batch detail and saving statistics…';
+   try{
+    const data=await call('batch_detail',{batch_id:button.dataset.batchStats});
+    if(!d.isConnected)return;
+    const stats=data.statistics||{},order=[
+      ['Total',stats.total_messages],['Pending',stats.pending],['Sent',stats.sent],
+      ['Delivered',stats.delivered],['Read',stats.read],['Failed',stats.failed]];
+    const rates=[['Success rate',stats.success_rate],['Failure rate',stats.failure_rate],
+      ['Effective success',stats.effective_success_rate],['Effective failure',stats.effective_failure_rate],
+      ['Recovery retry',stats.recovery_retry_succeeded],['Recovery reengage',stats.recovery_reengage_succeeded]];
+    detail.innerHTML='<b>'+esc(data.name||'Provider batch')+'</b> · '+esc(data.status||'unknown')+
+      '<p class="grwc-muted">Provider ID: '+esc(data.id||'—')+' · Sender ID: '+esc(data.phone_number_id||'—')+
+      ' · Recipients: '+esc(data.total_clients_count??'—')+' · Processed: '+esc(data.completed_clients_count??'—')+'</p>'+
+      '<div class="grwc-grid grwc-kpis">'+order.map(([title,n])=>
+       '<div class="grwc-feature"><small>'+esc(title)+'</small><h3>'+esc(n??'—')+'</h3></div>').join('')+'</div>'+
+      '<div class="grwc-grid">'+rates.map(([title,n])=>
+       '<div class="grwc-feature"><small>'+esc(title)+'</small><strong>'+esc(n??'—')+
+        (title.toLowerCase().includes('rate')||title.toLowerCase().includes('success')&&title!=='Recovery retry'&&title!=='Recovery reengage'?'%':'')+
+        '</strong></div>').join('')+'</div>'+
+      '<p class="grwc-muted">Status and statistics saved to private CRM provider-batch history. Processing completed does not mean delivered. Recipient-specific history and replies are unavailable from this summary API.</p>';
+   }catch(e){detail.textContent='Could not read batch detail: '+e.message}
+   finally{button.disabled=false}
+  };
+  d.showModal();void load(1,mode);
  }
  async function syncProviderLeads(connectionId,container){
   const p=rows.connections.find(x=>x.id===connectionId&&x.provider.toLowerCase()==='socialberries');
@@ -908,6 +965,13 @@
     const conn=rows.connections.find(c=>c.company_id===x.company_id&&c.provider.toLowerCase()==='socialberries');
     if(!conn)return alert('SocialBerries provider is not configured for this company.','warning');
     return openMessageHistory(conn.id,x.mobile);
+   }
+   if(e.target.closest('[data-provider-history]')){
+    if(!app.admin)return alert('Admin permission required for provider history.','warning');
+    if(scope==='all')return alert('Select one company to view its saved SocialBerries batch history.','warning');
+    const conn=rows.connections.find(c=>c.company_id===scope&&c.provider.toLowerCase()==='socialberries');
+    if(!conn)return alert('SocialBerries provider not configured for this company.','warning');
+    return await checkProvider(conn.id,'saved');
    }
    if(e.target.closest('[data-provider-report]')){
     if(!app.admin)return alert('Admin permission required for provider reporting.','warning');

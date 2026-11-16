@@ -112,18 +112,91 @@ Deno.serve(async request=>{
      message:"Authenticated read-only API connection succeeded",users_count:Number.isFinite(count)?count:null});
    }catch{return response(request,200,{ok:false,configured:true,message:"API host unreachable or provider response is invalid. Check the base URL and credentials."})}
   }
+  // Service-role access is server-only, gated above by signed-in company Admin.
+  function serverDb(){
+   const key=env("SUPABASE_SERVICE_ROLE_KEY");
+   if(!key)throw Error("Server batch history storage unavailable");
+   return createClient(url,key,{auth:{autoRefreshToken:false,persistSession:false}});
+  }
+  function finiteCount(x:unknown){const n=Number(x);return Number.isFinite(n)&&n>=0?Math.floor(n):0}
+  function providerRow(v:any){
+   const id=String(v?.id||"");
+   if(!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)||id.length!==36)return null;
+   const stamp=(value:unknown)=>{
+    if(!value)return null;
+    const date=new Date(String(value));return Number.isFinite(date.getTime())?date.toISOString():null;
+   };
+   return {
+    company_id:connection.company_id,connection_id:connection.id,provider_batch_id:id,
+    name:String(v.name||"").slice(0,160),
+    phone_number_id:String(v.phone_number_id||"").slice(0,90),
+    total_clients_count:finiteCount(v.total_clients_count),
+    total_batches_count:finiteCount(v.total_batches_count),
+    completed_clients_count:finiteCount(v.completed_clients_count),
+    mmlite:v.mmlite===true,
+    status:String(v.status||"unknown").slice(0,50),
+    provider_created_at:stamp(v.created_on),
+    provider_updated_at:stamp(v.last_updated_on),
+    synced_at:new Date().toISOString()
+   };
+  }
+  async function persistBatches(records:any[]){
+   if(!records.length)return;
+   const db=serverDb();
+   // Summary sync must preserve richer detail stats already saved for each batch.
+   const {data:existing,error:lookupError}=await db.from("gr_wa_bulk_batches")
+    .select("provider_batch_id,message_statistics")
+    .eq("company_id",connection.company_id).eq("connection_id",connection.id)
+    .in("provider_batch_id",records.map(x=>x.provider_batch_id));
+   if(lookupError)throw Error("Could not reconcile saved campaign statistics");
+   const detailById=new Map((existing||[]).map((x:any)=>[x.provider_batch_id,x.message_statistics]));
+   const {error}=await db.from("gr_wa_bulk_batches").upsert(records.map(x=>({
+    ...x,message_statistics:detailById.get(x.provider_batch_id)||null
+   })),{onConflict:"company_id,connection_id,provider_batch_id"});
+   if(error)throw Error("Could not save SocialBerries campaign summaries");
+  }
+  if(action==="batch_history"){
+   try{
+    const page=Math.max(1,Math.min(500,Math.trunc(Number(body.page)||1))),size=20;
+    const {data,error,count}=await serverDb().from("gr_wa_bulk_batches")
+     .select("provider_batch_id,name,phone_number_id,status,total_clients_count,total_batches_count,completed_clients_count,mmlite,provider_created_at,provider_updated_at,message_statistics,synced_at",
+      {count:"exact"}).eq("company_id",connection.company_id).eq("connection_id",connection.id)
+     .order("synced_at",{ascending:false}).range((page-1)*size,page*size-1);
+    if(error)throw error;
+    return response(request,200,{ok:true,page,count:count||0,batches:data||[],cached:true});
+   }catch{return response(request,200,{ok:false,message:"Could not read saved SocialBerries batch history"})}
+  }
   if(action==="batches"){
    const page=Math.max(1,Math.min(1000,Math.trunc(Number(body.page)||1)));
    try{
-    const out=await providerRead(cfg,"whatsapp/messages/bulk_batches/",{page:String(page),limit:"10",status:""});
-    if(!out.ok)return response(request,200,{ok:false,configured:true,code:"HTTP_"+out.status});
+    // Do not follow provider 'next' links: documentation examples contain localhost URLs.
+    // Always use the configured public HTTPS API host and explicit page number.
+    const out=await providerRead(cfg,"whatsapp/messages/bulk_batches/",{page:String(page),limit:"10"});
+    if(!out.ok)return response(request,200,{ok:false,configured:true,code:"HTTP_"+out.status,
+     message:"SocialBerries batch list returned HTTP "+out.status});
     const data=out.data||{};
-    const batches=Array.isArray(data.results)?data.results.slice(0,10).map((b:Record<string,unknown>)=>({
-     id:b.id,name:b.name,status:b.status,total_clients_count:b.total_clients_count,
-     completed_clients_count:b.completed_clients_count,created_on:b.created_on
-    })):[];
-    return response(request,200,{ok:true,configured:true,count:Number(data.count)||0,page,batches});
-   }catch{return response(request,200,{ok:false,configured:true,message:"Could not retrieve provider campaigns"})}
+    if(!Array.isArray(data.results))return response(request,200,{ok:false,
+     message:"Unrecognized SocialBerries bulk batch list; no records saved"});
+    const records=data.results.slice(0,10).map(providerRow).filter(Boolean);
+    await persistBatches(records);
+    // Match existing CRM campaigns only by exact provider_batch_id and company;
+    // NEVER infer that a provider batch belongs to a contact based on batch name.
+    const batchIds=records.map(x=>x.provider_batch_id);
+    const links=batchIds.length?await serverDb().from("gr_wa_campaigns")
+      .select("id,provider_batch_id").eq("company_id",connection.company_id)
+      .eq("connection_id",connection.id).in("provider_batch_id",batchIds):{data:[],error:null};
+    if(links.error)throw Error("Could not look up CRM campaign references");
+    const linkById=new Map((links.data||[]).map((r:any)=>[r.provider_batch_id,r.id]));
+    return response(request,200,{ok:true,configured:true,count:finiteCount(data.count),page,
+      has_more:!!data.next||page*10<finiteCount(data.count),
+      batches:records.map(x=>({id:x.provider_batch_id,name:x.name,status:x.status,
+       total_clients_count:x.total_clients_count,total_batches_count:x.total_batches_count,
+       completed_clients_count:x.completed_clients_count,phone_number_id:x.phone_number_id,
+       created_on:x.provider_created_at,last_updated_on:x.provider_updated_at,
+       crm_campaign_id:linkById.get(x.provider_batch_id)||null})),
+      saved:records.length,message:"Provider campaign summaries synced. No messages sent."});
+   }catch{return response(request,200,{ok:false,configured:true,
+     message:"Could not retrieve or save provider campaign list. Verify the documented list endpoint and server storage."})}
   }
   if(action==="batch_detail"){
    const id=String(body.batch_id||"").trim();
@@ -132,20 +205,38 @@ Deno.serve(async request=>{
    try{
     const out=await providerRead(cfg,"whatsapp/messages/bulk_batches/"+id+"/",{});
     if(!out.ok)return response(request,200,{ok:false,message:"Provider batch detail returned HTTP "+out.status});
-    const d=out.data||{},raw=d.message_statistics||{};
+    const d=out.data||{};
+    if(String(d.id)!==id)return response(request,200,{ok:false,message:"Provider returned an unexpected batch ID"});
+    const b=providerRow(d);
+    if(!b)return response(request,200,{ok:false,message:"Unrecognized SocialBerries batch detail"});
+    const raw=d.message_statistics||{};
     const toCount=(x:unknown)=>{const value=Number(x);return Number.isFinite(value)&&value>=0?Math.floor(value):null};
-    return response(request,200,{ok:true,
-      id:String(d.id||id),name:String(d.name||"").slice(0,160),status:String(d.status||"unknown").slice(0,40),
-      total_clients_count:toCount(d.total_clients_count),
-      statistics:{
-        total_messages:toCount(raw.total_messages),pending:toCount(raw.pending),
-        sent:toCount(raw.sent),delivered:toCount(raw.delivered),
-        read:toCount(raw.read),failed:toCount(raw.failed)
-      },
-      responded:null,not_responded:null,
-      note:"Read indicates provider WhatsApp read status. Reply information is not provided by this batch statistics API."
-    });
-   }catch{return response(request,200,{ok:false,message:"Could not read provider campaign statistics"})}
+    const toRate=(x:unknown)=>{const n=Number(x);return Number.isFinite(n)&&n>=0&&n<=100?Number(n.toFixed(2)):null};
+    const stats={
+     total_messages:toCount(raw.total_messages),pending:toCount(raw.pending),
+     sent:toCount(raw.sent),delivered:toCount(raw.delivered),
+     read:toCount(raw.read),failed:toCount(raw.failed),
+     success_rate:toRate(raw.success_rate),failure_rate:toRate(raw.failure_rate),
+     effective_success_rate:toRate(raw.effective_success_rate),
+     effective_failure_rate:toRate(raw.effective_failure_rate),
+     recovery_in_retry:toCount(raw.recovery_in_retry),
+     recovery_retry_succeeded:toCount(raw.recovery_retry_succeeded),
+     recovery_reengage_succeeded:toCount(raw.recovery_reengage_succeeded),
+     recovery_rate:toRate(raw.recovery_rate)
+    };
+    const {error}=await serverDb().from("gr_wa_bulk_batches").upsert({
+     ...b,message_statistics:stats
+    },{onConflict:"company_id,connection_id,provider_batch_id"});
+    if(error)throw Error("Could not save batch statistics");
+    return response(request,200,{ok:true,id,name:b.name,status:b.status,
+     phone_number_id:b.phone_number_id,
+     total_clients_count:b.total_clients_count,total_batches_count:b.total_batches_count,
+     completed_clients_count:b.completed_clients_count,statistics:stats,
+     responded:null,not_responded:null,
+     updated_at:b.provider_updated_at,
+     message:"Provider batch detail synced. No messages sent.",
+     note:"Completed is campaign processing, NOT WhatsApp delivery. This API does not expose contact-level delivery or replies."});
+   }catch{return response(request,200,{ok:false,message:"Could not retrieve or save provider batch statistics. Verify the batch detail URL with SocialBerries."})}
   }
   if(action==="sync_leads"){
    // Read provider's documented GET Leads endpoint, stage only the whitelisted

@@ -32,6 +32,9 @@ on:
       - 'supabase/functions/greenrich-whatsapp-send/index.ts'
       - 'tests/whatsapp-send-diagnostics.cjs'
       - 'tests/whatsapp-template-payload.cjs'
+      - 'supabase/functions/greenrich-socialberries/index.ts'
+      - 'supabase/migrations/20261116234500_wa_bulk_batch_snapshots.sql'
+      - 'tests/socialberries-bulk-batch-sync.cjs'
       - 'secure.html'
       - 'tests/quotation-workspace.cjs'
       - 'supabase/migrations/20261116110000_quotations_pdf_workspace.sql'
@@ -65,4 +68,5 @@ jobs:
           node --check greenrich-whatsapp-crm-workflows.js
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
+          node tests/socialberries-bulk-batch-sync.cjs
           node --check greenrich-inventory.js
