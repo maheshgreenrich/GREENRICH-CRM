@@ -173,15 +173,20 @@
    if(attached.length>=4||attached.reduce((n,x)=>n+x.size,0)+file.size>6000000){
     feedback('Maximum 4 attachments / 6 MB total','error');return;
    }
-   const index=attached.length;
+   const cid='grinline-'+crypto.randomUUID()+'@greenrich';
+   file.grCid=cid;
+   file.grPreview=URL.createObjectURL(file);
    attached.push(file);
-   const cid='grinline-'+index+'@greenrich';
-   command('insertHTML','<img src="cid:'+cid+'" alt="'+esc(file.name)+'" style="max-width:100%;height:auto">');
+   command('insertHTML','<img src="'+esc(file.grPreview)+'" data-gr-cid="'+esc(cid)+'" alt="'+esc(file.name)+'" style="max-width:100%;height:auto">');
    fileDisplay();
   };
   const fileDisplay=()=>{
    $('#grce-files').innerHTML=attached.map((f,i)=>'<div class="grce-file"><span>📄 '+esc(f.name)+' · '+size(f.size)+'</span><button type="button" data-remove="'+i+'" aria-label="Remove file">✕</button></div>').join('');
-   dialog.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{attached.splice(Number(b.dataset.remove),1);fileDisplay()});
+   dialog.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{
+    const [gone]=attached.splice(Number(b.dataset.remove),1);
+    if(gone?.grPreview){editor.querySelectorAll('img[data-gr-cid]').forEach(img=>{if(img.dataset.grCid===gone.grCid)img.remove()});URL.revokeObjectURL(gone.grPreview)}
+    fileDisplay();
+   });
   };
   $('#grce-file').onchange=e=>{
    const incoming=[...e.target.files];e.target.value='';
@@ -198,13 +203,19 @@
   const encode=async file=>{
    const buffer=new Uint8Array(await file.arrayBuffer()),chunks=[];
    for(let i=0;i<buffer.length;i+=8192)chunks.push(String.fromCharCode(...buffer.subarray(i,i+8192)));
-   return {name:file.name,type:file.type,base64:btoa(chunks.join(''))};
+   return {name:file.name,type:file.type,base64:btoa(chunks.join('')),cid:file.grCid||null};
   };
   form.onsubmit=async event=>{
    event.preventDefault();if(sending||button.disabled)return;
    const fd=new FormData(form),to=split(fd.get('to')),cc=split(fd.get('cc')),bcc=split(fd.get('bcc'));
    const subject=String(fd.get('subject')||'').trim();
-   const plain=String(editor.innerText??editor.textContent??'').trim(),html=editor.innerHTML;
+   const plain=String(editor.innerText??editor.textContent??'').trim();
+   const htmlRoot=editor.cloneNode(true);
+   htmlRoot.querySelectorAll('img[data-gr-cid]').forEach(img=>{
+    if(!attached.some(file=>file.grCid===img.dataset.grCid))img.remove();
+    else{img.setAttribute('src','cid:'+img.dataset.grCid);img.removeAttribute('data-gr-cid')}
+   });
+   const html=htmlRoot.innerHTML;
    if(!to.some(x=>x.toLowerCase()===email.toLowerCase())){
     feedback('The contact’s registered email must remain in To.','error');return;
    }
