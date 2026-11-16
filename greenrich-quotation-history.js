@@ -34,9 +34,9 @@
    '<button type="button" class="grce-history-expand" data-grqh-contact="'+esc(x.id)+'">View email & attachments</button>'+
    '<div class="grce-history-detail" data-grqh-detail="'+esc(x.id)+'" hidden></div></article>';
  };
- const getSigned=async(db,company,id,index)=>{
+ const getSigned=async(db,company,id,index,download=false)=>{
   const {data,error}=await db.functions.invoke('greenrich-quotation-gmail',{
-   body:{action:'contact_attachment_url',company_id:company,history_id:id,attachment_index:index}
+   body:{action:'contact_attachment_url',company_id:company,history_id:id,attachment_index:index,download}
   });
   if(error||data?.error||!data?.url)throw Error(data?.error||error?.message||'Could not access archived attachment');
   return data.url;
@@ -94,8 +94,18 @@
      label.textContent='📎 '+(item.name||'Attachment')+' · '+Math.round((item.bytes||0)/1024)+' KB';
      const view=document.createElement('button');view.type='button';view.textContent='Preview';
      const download=document.createElement('button');download.type='button';download.textContent='Download';
-     view.onclick=()=>void getSigned(db,record.company_id,record.id,i).then(url=>window.open(url,'_blank','noopener')).catch(e=>notify?.(e.message,'error'));
-     download.onclick=()=>void getSigned(db,record.company_id,record.id,i).then(url=>{
+     view.onclick=()=>void getSigned(db,record.company_id,record.id,i).then(url=>{
+      const type=String(item.type||'');
+      if(type==='application/pdf'||type.startsWith('image/')){
+       let frame=row.querySelector('.grce-attachment-preview');
+       if(frame){frame.remove();return}
+       frame=document.createElement('iframe');frame.className='grce-attachment-preview';
+       frame.title='Preview '+(item.name||'attachment');
+       frame.setAttribute('sandbox','');frame.setAttribute('referrerpolicy','no-referrer');
+       frame.src=url;row.append(frame);
+      }else window.open(url,'_blank','noopener');
+     }).catch(e=>notify?.(e.message,'error'));
+     download.onclick=()=>void getSigned(db,record.company_id,record.id,i,true).then(url=>{
       const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.download=item.name||'attachment';a.click();
      }).catch(e=>notify?.(e.message,'error'));
      row.append(label,view,download);files.append(row);
