@@ -507,6 +507,10 @@ function renderCustomerProfile(){
   onInvoice:(id,owner)=>void openSaleInvoice(id,owner),
   onRefresh:()=>renderCustomerProfile()
  });
+ if(customer?.id&&pipelineConfig.client&&window.GreenRichQuotationHistory?.customer)
+  void window.GreenRichQuotationHistory.customer(area,{
+   db:pipelineConfig.client,customerId:customer.id,companyIds:permittedCompanies,notify:toast
+  });
  if(customer?.id&&window.GreenRichLeadPipeline?.renderCustomerTimeline)
   void window.GreenRichLeadPipeline.renderCustomerTimeline(area,pipelineConfig.client,customer.id,permittedCompanies,
    id=>id===pipelineConfig.userId?'Me':'Sales employee').catch(error=>console.warn('Lead history unavailable',error));
@@ -530,7 +534,7 @@ function renderTables(){
  q=$('#tasks-search').value.toLowerCase();const taskFilter=$('#task-filter').value;
  $('#tasks-table').innerHTML=scopeRows('tasks').filter(t=>(taskFilter==='all'||(taskFilter==='done')===(t.status==='Done'))&&[t.title,t.contact,t.owner,companyLabel(t._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>(a.due||'').localeCompare(b.due||'')).map(t=>'<tr><td>'+esc(t.due)+'</td><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.notes)+'</small></td><td>'+esc(t.contact)+'<small>'+esc(companyLabel(t._companyId))+'</small></td><td>'+esc(t.owner)+'</td><td><span class="pill '+(t.status==='Done'?'good':'warn')+'">'+esc(t.status)+'</span></td><td>'+act('tasks',t.id)+'</td></tr>').join('')||empty(6);
  q=$('#products-search').value.toLowerCase();
- $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(window.GreenRichProductBOM.status(p)==='Active'?'good':'warn')+'">'+window.GreenRichProductBOM.status(p)+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button></td></tr>').join('')||empty(10);
+ $('#products-table').innerHTML=scopeRows('products').filter(p=>[p.name,p.sku,p.brand,companyLabel(p._companyId)].some(v=>String(v||'').toLowerCase().includes(q))).map(p=>'<tr><td>'+esc(p.sku)+'</td><td><strong>'+esc(p.name)+'</strong></td><td>'+esc(companyLabel(p._companyId))+'</td><td>'+esc(p.brand)+'</td><td>'+fmt(p.price)+'</td><td>'+esc(p.tax)+'%</td><td><strong>'+esc(Number.isInteger(Number(p.stock))?p.stock:'Not set')+'</strong></td><td>'+(p.inclusive?'Inclusive':'Exclusive')+'</td><td><span class="pill '+(window.GreenRichProductBOM.status(p)==='Active'?'good':'warn')+'">'+window.GreenRichProductBOM.status(p)+'</span></td><td>'+act('products',p.id)+'<button class="action-button" type="button" data-stock-update="'+esc(p.id)+'">Update Stock</button><button class="action-button" type="button" data-quotation-product-history="'+esc(p.id)+'" data-quotation-company="'+esc(p._companyId)+'">Quotation History</button></td></tr>').join('')||empty(10);
  $('#channels-table').innerHTML=scopeRows('channels').map(c=>'<tr><td><strong>'+esc(c.name)+'</strong><small>'+esc(companyLabel(c._companyId))+'</small></td><td>'+esc(c.type)+'</td><td><span class="pill '+(c.active?'good':'warn')+'">'+(c.active?'Active':'Inactive')+'</span></td><td>'+scopeRows('sales').filter(s=>s.channel_id===c.id&&s._companyId===c._companyId).length+'</td><td>'+act('channels',c.id)+'</td></tr>').join('')||empty(5);
 }
 function render(){
@@ -1005,6 +1009,15 @@ function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>n
  $('#close-product-orders').onclick=()=>$('#product-orders-dialog').close();
  $('#close-channel-orders').onclick=()=>$('#channel-orders-dialog').close();
  root.addEventListener('click',event=>{
+  const history=event.target.closest('[data-quotation-product-history]');
+  if(history&&root.contains(history)&&window.GreenRichQuotationHistory?.product){
+   const co=history.dataset.quotationCompany,id=history.dataset.quotationProductHistory;
+   const product=scopeRows('products').find(p=>p.id===id&&p._companyId===co);
+   if(product)void window.GreenRichQuotationHistory.product({
+    db:pipelineConfig.client,companyId:co,productId:id,productName:product.name,notify:toast
+   });
+   return;
+  }
   const button=event.target.closest('[data-product-drill]');
   if(button&&root.contains(button))showProductOrders(button.dataset.productDrill);
   const channel=event.target.closest('[data-channel-drill]');

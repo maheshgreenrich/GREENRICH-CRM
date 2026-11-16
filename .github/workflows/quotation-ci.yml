@@ -3,6 +3,12 @@ on:
   pull_request:
     paths:
       - 'greenrich-quotations.*'
+      - 'greenrich-quotation-mail.*'
+      - 'greenrich-quotation-history.js'
+      - 'greenrich-crm-inline.js'
+      - 'supabase/functions/greenrich-quotation-gmail/index.ts'
+      - 'supabase/migrations/20261116170000_company_gmail_quotation_send.sql'
+      - 'tests/quotation-gmail.cjs'
       - 'greenrich-pdf-workbench.js'
       - 'greenrich-one.js'
       - 'secure.html'
@@ -24,3 +30,7 @@ jobs:
           node --check greenrich-quotations.js
           node --check greenrich-pdf-workbench.js
           node tests/quotation-workspace.cjs
+          node --check greenrich-quotation-mail.js
+          node --check greenrich-quotation-history.js
+          node --check greenrich-crm-inline.js
+          node tests/quotation-gmail.cjs

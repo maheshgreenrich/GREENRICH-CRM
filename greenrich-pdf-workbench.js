@@ -15,15 +15,15 @@
   const frame=host?.querySelector('#grq-pdf-frame');if(frame)frame.src=objectUrl;
   const status=host?.querySelector('#grq-pdf-status');if(status)status.textContent=name;
  }
- async function fromHtml(){
-  if(!html)throw Error('No quotation to export');
+ async function fromHtml(documentSource=html,quiet=false){
+  if(!documentSource)throw Error('No quotation to export');
   await Promise.all([pdfLib(),screenshotLib()]);
   const iframe=document.createElement('iframe');
   iframe.title='Temporary quotation renderer';
   iframe.style.cssText='position:fixed;left:-20000px;top:0;width:794px;height:1200px;border:0;pointer-events:none';
   document.body.append(iframe);
   try{
-   await new Promise(resolve=>{iframe.onload=resolve;iframe.srcdoc=html});
+   await new Promise(resolve=>{iframe.onload=resolve;iframe.srcdoc=documentSource});
    await iframe.contentDocument.fonts?.ready;
    await Promise.all([...iframe.contentDocument.images].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
    const pages=[...iframe.contentDocument.querySelectorAll('.grqd-export-page')];
@@ -40,8 +40,9 @@
      page.drawImage(img,{x:0,y:pageH-renderedH,width:pageW,height:renderedH});
     }
    }
-   updatePdf(new Blob([await pdf.save()],{type:'application/pdf'}),filename.replace(/\.pdf$/i,'')+'.pdf');
-   tell('Quotation PDF created and ready to download');
+   const result=new Blob([await pdf.save()],{type:'application/pdf'});
+   if(!quiet){updatePdf(result,filename.replace(/\.pdf$/i,'')+'.pdf');tell('Quotation PDF created and ready to download');}
+   return result;
   }finally{iframe.remove()}
  }
  async function update(kind){
@@ -74,5 +75,11 @@
   host.onclick=e=>{const action=e.target.closest('[data-pdf]')?.dataset.pdf;if(!action)return;void(async()=>{if(action==='generate')await fromHtml();else if(action==='download')download();else await update(action)})().catch(err=>tell(err.message,'error'))};
   host.querySelector('#grq-pdf-file').onchange=e=>{const file=e.target.files[0];if(!file)return;if(file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))return tell('Choose a PDF file','error');updatePdf(file,file.name)};
  }
- window.GreenRichPDFWorkbench={mount};
+ async function exportForEmail(documentSource){
+  const result=await fromHtml(documentSource,true);
+  const raw=new Uint8Array(await result.arrayBuffer());
+  let parts='';for(let i=0;i<raw.length;i+=8192)parts+=String.fromCharCode(...raw.subarray(i,i+8192));
+  return btoa(parts);
+ }
+ window.GreenRichPDFWorkbench={mount,exportForEmail};
 })();

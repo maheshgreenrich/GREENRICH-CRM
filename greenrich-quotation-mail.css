@@ -1,0 +1,37 @@
+/* GreenRich official Gmail quotation sender & archive */
+.grmail{display:grid;gap:18px;font:13px/1.55 Inter,Arial,sans-serif;color:#213650}
+.grmail *{box-sizing:border-box}
+.grmail h2{margin:0;font-size:20px}.grmail h3{margin:0 0 12px;font-size:16px}
+.grmail p{margin:4px 0 12px;color:#6c7c91}
+.grmail-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.grmail-status,.grmail-admin,.grmail-compose,.grmail-logs,.grmail-all,.grmail-templates{background:#fff;border:1px solid #dce4ef;border-radius:12px;padding:18px}
+.grmail-status,.grmail-admin{display:flex;justify-content:space-between;align-items:center;gap:18px}
+.grmail-status strong{display:block}
+.grmail-status small{color:#738098}
+.grmail-alert{display:inline-block;background:#fff0ed;border:1px solid #f4b9ae;color:#af4239;border-radius:7px;padding:9px 12px;font-weight:650}
+.grmail-success{display:inline-block;background:#e7f6ec;border:1px solid #a2d4af;color:#21683a;border-radius:7px;padding:9px 12px;font-weight:650}
+.grmail-layout{display:grid;grid-template-columns:minmax(370px,1fr) minmax(330px,.9fr);gap:16px;align-items:start}
+.grmail label{display:block;font-weight:650;margin:12px 0 5px}
+.grmail input,.grmail textarea,.grmail select{display:block;width:100%;min-width:0;padding:10px;border:1px solid #cbd7e5;border-radius:8px;color:#263b59;font:inherit;background:#fff}
+.grmail input:disabled{background:#f1f4f7}
+.grmail button{background:#fff;color:#2254a9;border:1px solid #cad8ea;border-radius:8px;padding:9px 12px;font-weight:650;cursor:pointer}
+.grmail button:disabled{opacity:.45;cursor:not-allowed}
+.grmail button.grmail-send{background:#2356b6;border-color:#2356b6;color:#fff}
+.grmail-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.grmail-attachment{background:#eff5fb;padding:12px;border-radius:9px;margin:15px 0}
+.grmail-attachment small{display:block;color:#65798f;margin-top:5px}
+.grmail-quote{background:#edf4ff;padding:9px;border-radius:7px;font-weight:700}
+.grmail-history{border-bottom:1px solid #e1e9f1;padding:12px 0}
+.grmail-history>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.grmail-history strong{font-size:13px}
+.grmail-history small{display:block;color:#65788c;word-break:break-word;margin:4px 0}
+.grmail-history .grmail-actions{margin-top:7px}
+.grmail-pill{font-size:11px;font-weight:750;border-radius:12px;background:#f2f4f6;padding:4px 8px;white-space:nowrap}
+.grmail-pill[data-status=sent]{background:#e5f6eb;color:#267346}
+.grmail-pill[data-status=failed],.grmail-pill[data-status=needs_review]{background:#fff0e9;color:#a65320}
+.grmail-scroll{max-height:520px;overflow-y:auto}
+.grmail-templates form{max-width:850px}
+.grmail-template-list{display:flex;gap:8px;flex-wrap:wrap}
+.grmail-templates button{margin-top:7px}
+@media(max-width:1050px){.grmail-layout{display:block}.grmail-logs{margin-top:15px}}
+@media(max-width:650px){.grmail-status,.grmail-admin,.grmail-header{display:block}.grmail-actions{margin-top:9px}}
