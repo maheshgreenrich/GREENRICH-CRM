@@ -17,6 +17,7 @@ revoke all on public.gr_gmail_sender_accounts from public,anon,authenticated;
 
 alter table public.gr_gmail_oauth_states add column if not exists sender_account_id uuid;
 
+alter table public.gr_contact_email_history add column if not exists to_recipients text[] not null default '{}'::text[];
 alter table public.gr_contact_email_history add column if not exists cc text[] not null default '{}'::text[];
 alter table public.gr_contact_email_history add column if not exists bcc text[] not null default '{}'::text[];
 alter table public.gr_contact_email_history add column if not exists html_body text;
