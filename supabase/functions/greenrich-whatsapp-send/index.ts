@@ -91,8 +91,10 @@ async function send(cfg:any,recipient:Person,template:any,parts:any[]):Promise<S
   const response=await fetch(u,{method:"POST",redirect:"error",signal:ctl.signal,
    headers:{Authorization:"Basic "+btoa(cfg.user+":"+cfg.pass),"Content-Type":"application/json","Accept":"application/json"},
    body:JSON.stringify({type:"template",template:template.name,language:template.language,template_id:template.provider_template_id,
-    category:"MARKETING",preview_template:{id:template.provider_template_id,language:template.language,name:template.name,
-     status:"APPROVED",category:"MARKETING"},components:parts})});
+    category:"MARKETING",
+    // Preserve the full approved template snapshot, including HEADER / BODY / BUTTONS.
+    // Earlier we sent only identity metadata and omitted the approved components.
+    preview_template:template.provider_preview,components:parts})});
   const raw=await response.text();
   if(raw.length>120000)return {id:null,code:"RESPONSE_TOO_LARGE",reason:"SocialBerries returned an unexpectedly large response.",uncertain:true};
   let doc:any=null;try{doc=JSON.parse(raw)}catch{
