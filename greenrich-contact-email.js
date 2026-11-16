@@ -111,22 +111,74 @@
   $('#grce-company').onchange=()=>{currentCompany=$('#grce-company').value;void refreshConnection();void loadArchive()};
   $('#grce-from').onchange=selectSender;
   editor.oninput=updateCount;
-  // Preserve contenteditable selection when toolbar commands are clicked.
-  dialog.querySelectorAll('[data-format]').forEach(b=>b.onmousedown=event=>event.preventDefault());
-  dialog.querySelectorAll('[data-format]').forEach(b=>b.onclick=()=>{
-   editor.focus();document.execCommand(b.dataset.format,false,null);updateCount();
-  });
-  $('#grce-font').onchange=e=>{editor.focus();document.execCommand('fontSize',false,e.target.value);e.target.value=''};
-  $('#grce-color').onchange=e=>{editor.focus();document.execCommand('foreColor',false,e.target.value)};
-  $('#grce-link').onclick=()=>{
-   const target=window.prompt('Paste an HTTPS or mailto link');
-   if(!target||!/^(https?:\/\/|mailto:)/i.test(target))return;
-   editor.focus();document.execCommand('createLink',false,target);
+  // Save and restore selections across toolbar, colour picker, link dialog and emoji picker.
+  let savedRange=null;
+  const rememberSelection=()=>{
+   const sel=window.getSelection?.();
+   if(sel?.rangeCount&&editor.contains(sel.anchorNode))savedRange=sel.getRangeAt(0).cloneRange();
   };
-  $('#grce-emoji-toggle').onclick=()=>{$('#grce-emojis').hidden=!$('#grce-emojis').hidden};
-  dialog.querySelectorAll('[data-emoji]').forEach(b=>b.onclick=()=>{
-   editor.focus();document.execCommand('insertText',false,b.dataset.emoji);updateCount();
+  const restoreSelection=()=>{
+   editor.focus();
+   const sel=window.getSelection?.();
+   if(sel&&savedRange){sel.removeAllRanges();sel.addRange(savedRange)}
+  };
+  const command=(name,value=null)=>{
+   restoreSelection();
+   document.execCommand(name,false,value);
+   rememberSelection();updateCount();
+  };
+  editor.addEventListener('mouseup',rememberSelection);
+  editor.addEventListener('keyup',rememberSelection);
+  editor.addEventListener('focusout',rememberSelection);
+  dialog.querySelectorAll('[data-format]').forEach(b=>{
+   b.onmousedown=e=>e.preventDefault();
+   b.onclick=()=>command(b.dataset.format);
   });
+  $('#grce-font').addEventListener('pointerdown',rememberSelection);
+  $('#grce-font').onchange=e=>{command('fontSize',e.target.value);e.target.value=''};
+  $('#grce-color').addEventListener('pointerdown',rememberSelection);
+  $('#grce-color').oninput=e=>command('foreColor',e.target.value);
+  $('#grce-color').onchange=e=>command('foreColor',e.target.value);
+  const insertLink=()=>{
+   rememberSelection();
+   const target=window.prompt('Enter link: https://example.com or mailto:name@example.com');
+   if(!target)return;
+   if(!/^(https?:\/\/|mailto:)[^\s<>]+$/i.test(target)){
+    feedback('Enter an HTTPS or mailto link','error');return;
+   }
+   restoreSelection();
+   const sel=window.getSelection?.();
+   if(sel&&!sel.isCollapsed)document.execCommand('createLink',false,target);
+   else document.execCommand('insertHTML',false,'<a href="'+esc(target)+'">'+esc(target)+'</a>');
+   rememberSelection();updateCount();
+  };
+  $('#grce-link').onmousedown=rememberSelection;
+  $('#grce-link').onclick=insertLink;
+  $('#grce-emoji-toggle').onmousedown=rememberSelection;
+  $('#grce-emoji-toggle').onclick=()=>{
+   rememberSelection();$('#grce-emojis').hidden=!$('#grce-emojis').hidden;
+  };
+  dialog.querySelectorAll('[data-emoji]').forEach(b=>{
+   b.onmousedown=e=>e.preventDefault();
+   b.onclick=()=>command('insertText',b.dataset.emoji);
+  });
+  $('#grce-image').onmousedown=rememberSelection;
+  $('#grce-image').onclick=()=>{$('#grce-inline-file').click()};
+  $('#grce-inline-file').onchange=e=>{
+   const file=e.target.files?.[0];e.target.value='';
+   if(!file)return;
+   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>2000000){
+    feedback('Inline image must be PNG, JPEG or WebP under 2 MB','error');return;
+   }
+   if(attached.length>=4||attached.reduce((n,x)=>n+x.size,0)+file.size>6000000){
+    feedback('Maximum 4 attachments / 6 MB total','error');return;
+   }
+   const index=attached.length;
+   attached.push(file);
+   const cid='grinline-'+index+'@greenrich';
+   command('insertHTML','<img src="cid:'+cid+'" alt="'+esc(file.name)+'" style="max-width:100%;height:auto">');
+   fileDisplay();
+  };
   const fileDisplay=()=>{
    $('#grce-files').innerHTML=attached.map((f,i)=>'<div class="grce-file"><span>📄 '+esc(f.name)+' · '+size(f.size)+'</span><button type="button" data-remove="'+i+'" aria-label="Remove file">✕</button></div>').join('');
    dialog.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{attached.splice(Number(b.dataset.remove),1);fileDisplay()});
