@@ -431,9 +431,12 @@ async function testTransport(db:any,profile:any,company:string){
  await db.from('gr_mail_transport_configs').update({status:'verified',verified_at:new Date().toISOString()}).eq('company_id',company);
  return {tested:true,transport:'resend',message:'API key and verified domain confirmed. No email was sent.'};
 }
-async function deliverMail(db:any,company:string,to:string[],cc:string[],subject:string,body:string,pdf?:Uint8Array,pdfName?:string){
+async function deliverMail(db:any,company:string,to:string[],cc:string[],subject:string,body:string,
+ pdf?:Uint8Array,pdfName?:string,
+ opts:{html?:string,bcc?:string[],attachments?:any[],gmail_account_id?:string}={}){
  const config=await transportConfig(db,company);
- const transport=config?.transport||'gmail';
+ const transport=opts.gmail_account_id?'gmail':config?.transport||'gmail';
+ const sendAttachments=[...(opts.attachments||[]),...(pdf?[{filename:pdfName||'Quotation.pdf',content:pdf,contentType:'application/pdf'}]:[])];
  if(transport==='smtp'){
   if(!config?.encrypted_smtp_password||config.status!=='verified')throw Error('Test and verify company SMTP in Settings before sending');
   validateSmtpHost(config.smtp_host);
@@ -441,8 +444,8 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
   try{
    const info=await smtp.sendMail({
     from:{name:config.sender_name||'',address:config.sender_email},
-    to,cc,subject,text:body,
-    ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:pdf,contentType:'application/pdf'}]}:{})
+    to,cc,bcc:opts.bcc||[],subject,text:body,html:opts.html||undefined,
+    attachments:sendAttachments
    });
    return {id:info.messageId||null,threadId:null,transport:'smtp'};
   }finally{smtp.close()}
@@ -454,18 +457,25 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
    'Content-Type':'application/json'
   },body:JSON.stringify({
    from:(config.sender_name?config.sender_name.replace(/[<>\r\n]/g,'')+' <'+config.sender_email+'>':config.sender_email),
-   to,cc,subject,text:body,
-   ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:b64(pdf)}]}:{})
+   to,cc,bcc:opts.bcc||[],subject,text:body,html:opts.html||undefined,
+   ...(sendAttachments.length?{attachments:sendAttachments.map((a:any)=>({filename:a.filename,content:b64(a.content)}))}:{})
   })});
   const out=await response.json().catch(()=>({}));
   if(!response.ok)throw Error('Email API rejected send (HTTP '+response.status+'): '+plain(out.message,140));
   return {id:out.id||null,threadId:null,transport:'resend'};
  }
- const {data:gmail}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
- if(gmail?.status!=='connected')throw Error('Gmail is not connected. Configure it in Settings.');
- const token=await getAccessToken(db,company);
- const raw=pdf?mime(gmail.sender_email,to,cc,subject,body,pdf,pdfName||'Quotation.pdf'):
- contactMime(gmail.sender_email,to[0],subject,body);
+ const account=opts.gmail_account_id?await selectedGmail(db,company,opts.gmail_account_id):null;
+ const {data:gmail}=account?{data:account}:await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ if(gmail?.status!=='connected')throw Error('Selected Gmail is not connected. Configure it in Settings.');
+ const token=await getAccessToken(db,company,account?.id||'primary');
+ // NodeMailer stream transport generates standards-compliant multipart MIME for
+ // HTML, BCC and arbitrary validated attachments; Gmail API receives raw MIME.
+ const builder=nodemailer.createTransport({streamTransport:true,buffer:true});
+ const mail=await builder.sendMail({
+  from:gmail.sender_email,to,cc,bcc:opts.bcc||[],subject,text:body,
+  html:opts.html||undefined,attachments:sendAttachments
+ });
+ const raw=b64url(new Uint8Array(mail.message));
  const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
   method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({raw})
  });
