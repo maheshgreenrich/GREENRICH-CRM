@@ -31,4 +31,4 @@ alter table public.gr_contact_email_history enable row level security;
 revoke all on public.gr_contact_email_history from public,anon,authenticated;
 grant select on public.gr_contact_email_history to authenticated;
 create policy gr_contact_email_history_read on public.gr_contact_email_history for select to authenticated
- using(public.gr_crm_can(company_id,'sales','view'));
+ using(public.gr_crm_can(company_id,'sales','view') or public.gr_crm_can(company_id,'customers','view') or public.gr_crm_can(company_id,'leads','view'));
