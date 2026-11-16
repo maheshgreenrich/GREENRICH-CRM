@@ -175,7 +175,7 @@ async function sendContact(db:any,profile:any,payload:any){
   const {data}=await db.from('gr_crm_customers').select('id,email').eq('id',id).maybeSingle();
   if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked customer email');
  }else{
-  const {data}=await db.from('gr_leads').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
+  const {data}=await db.from('gr_lead_pipeline').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
   if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked lead email');
  }
  const {data:connection}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
