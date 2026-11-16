@@ -20,6 +20,5 @@ alter table public.gr_mail_transport_configs enable row level security;
 revoke all on public.gr_mail_transport_configs from public,anon,authenticated;
 -- Only the server-side Edge Function may access transport details.
 alter table public.gr_contact_email_history add column if not exists transport text;
-alter table public.gr_contact_email_history add column if not exists provider_message_id text;
 alter table public.gr_quotation_email_history add column if not exists transport text;
-alter table public.gr_quotation_email_history add column if not exists provider_message_id text;
+
