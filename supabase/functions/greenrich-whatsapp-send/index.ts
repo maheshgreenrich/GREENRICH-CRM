@@ -108,7 +108,10 @@ function components(template:any,person:Person,image:string,fields:Record<string
   "1":person.name,"2":person.email,"3":person.phone};
  const tags=spec.variables(spec.body.text);
  if(tags.length)out.push({type:"body",parameters:tags.map((tag:string)=>{
-  const text=Object.hasOwn(fixed,tag)?String(fixed[tag]||"").trim():value("body:"+tag);
+  const configured=String(fields?.["body:"+tag]||"").trim();
+  const mapped:Record<string,string>={"@crm:name":person.name,"@crm:mobile":person.phone,"@crm:email":person.email};
+  const text=configured?(Object.hasOwn(mapped,configured)?mapped[configured]:value("body:"+tag)):
+   Object.hasOwn(fixed,tag)?String(fixed[tag]||"").trim():value("body:"+tag);
   if(!text)throw Error("Missing CRM contact field for template placeholder "+tag);
   return {type:"text",text};
  })});
