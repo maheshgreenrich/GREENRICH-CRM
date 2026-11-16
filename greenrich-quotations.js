@@ -9,7 +9,7 @@ const fmt=v=>new Intl.NumberFormat('en-IN',{minimumFractionDigits:2,maximumFract
 const rupee=v=>'₹'+fmt(v),n=v=>Math.max(0,Number(v)||0),round=v=>Math.round((Number(v)+Number.EPSILON)*100)/100;
 const date=()=>new Date().toLocaleDateString('en-CA');
 const plusDays=(s,days)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10)};
-let root,access,products=[],customers=[],quotes=[],templates=[],profiles={},current,tab='quotes';
+let root,access,products=[],customers=[],quotes=[],templates=[],letterheads={},profiles={},current,tab='quotes',designerPreview='';
 const notify=(msg,type)=>access?.notify?.(msg,type);
 const company=()=>current?.company_id||access?.company||access?.companies[0];
 const productList=()=>products.filter(p=>p.company_id===company());
@@ -17,7 +17,23 @@ const getProduct=id=>productList().find(p=>p.id===id);
 const getCustomer=()=>customers.find(c=>c.id===current?.customer_id);
 const seller=()=>profiles[company()]||{};
 const preset=()=>{const p=getProduct(current?.lines?.[0]?.product_id),name=p?.name||'Product';return {title:'PRICE QUOTATION',name:'Product default · '+name,accent:'#2454aa',header:/mgb|industrial|bulk|owc|shredder|community/i.test(name)?'Commercial Composting Solution':/microbe|fertili|booster|vermicompost/i.test(name)?'Organic & Microbial Inputs':'Home Composting Solution',footer:'Thank you for choosing GreenRich.',terms:'Delivery, transportation, installation, payment and offer validity are subject to confirmation.',bank:true}};
-const chosenTemplate=()=>templates.find(t=>t.id===current?.template_id&&t.company_id===company())?.config||preset();
+const candidateTemplates=()=>{
+ const product=getProduct(current?.lines?.[0]?.product_id),cat=String(product?.category||'').toLowerCase();
+ return templates.filter(t=>t.company_id===company()&&(!t.product_id||t.product_id===product?.id)&&(
+ t.product_id===product?.id||(t.config?.scope==='category'&&String(t.config?.category||'').toLowerCase()===cat)||
+ (!t.product_id&&(!t.config?.scope||t.config.scope==='company'||!t.config.designerVersion))
+ ));
+};
+const selectedTemplate=()=>{
+ const explicit=templates.find(t=>t.id===current?.template_id&&t.company_id===company());
+ if(explicit)return explicit;
+ const candidates=candidateTemplates();
+ return candidates.find(t=>t.product_id===current?.lines?.[0]?.product_id)||
+ candidates.find(t=>t.config?.scope==='category')||
+ candidates.find(t=>t.config?.scope==='company')||null;
+};
+const chosenTemplate=()=>current?.template_snapshot||selectedTemplate()?.config||preset();
+const selectedLetterhead=()=>current?.letterhead_snapshot||letterheads[company()]?.config||null;
 const totals=()=>{let base=0,gst=0;for(const line of current.lines){const gross=round(n(line.qty)*n(line.rate)),r=n(line.tax),b=line.inclusive?round(gross/(1+r/100)):gross;base+=b;gst+=line.inclusive?round(gross-b):round(b*r/100)}base=round(base);gst=round(gst);const discount=Math.min(n(current.discount),base+gst),freight=n(current.freight);return {base,gst,discount,freight,total:round(base+gst-discount+freight)}};
 const uuid=()=>crypto.randomUUID();
 const quoteNo=()=> 'Q-'+(company()==='enviro-solutions'?'GRE':'GRG')+'-'+date().replace(/-/g,'')+'-'+uuid().slice(0,6).toUpperCase();
@@ -32,10 +48,11 @@ async function refresh(){
  read(access.db.from('gr_crm_customers').select('id,name,company,mobile,email,address1,address2,city,state,pincode').order('name')),
  read(access.db.from('gr_invoice_profiles').select('*').in('company_id',ids)),
  read(access.db.from('gr_quotations').select('*').in('company_id',ids).order('created_at',{ascending:false}).limit(300)),
- read(access.db.from('gr_quotation_templates').select('*').in('company_id',ids).order('name'))
+ read(access.db.from('gr_quotation_templates').select('*').in('company_id',ids).order('name')),
+ read(access.db.from('gr_quotation_letterheads').select('*').in('company_id',ids))
  ]);
  products=result[0].map(x=>({...x.payload,company_id:x.company_id}));customers=result[1];
- profiles=Object.fromEntries(result[2].map(x=>[x.company_id,x]));quotes=result[3];templates=result[4];
+ profiles=Object.fromEntries(result[2].map(x=>[x.company_id,x]));quotes=result[3];templates=result[4];letterheads=Object.fromEntries(result[5].map(r=>[r.company_id,r]));
 }
 function capture(){
  if(tab!=='quotes'||!current)return;
@@ -45,7 +62,9 @@ function capture(){
  current.lines=[...form.querySelectorAll('[data-line]')].map(row=>{const f=k=>row.querySelector('[data-f="'+k+'"]');return {product_id:f('product').value,description:f('description').value,qty:n(f('qty').value),rate:n(f('rate').value),tax:n(f('tax').value),inclusive:f('inclusive').checked}});
 }
 function htmlDocument(){
- const s=seller(),c=getCustomer(),cfg=chosenTemplate(),t=totals(),accent=/^#[0-9a-f]{6}$/i.test(cfg.accent)?cfg.accent:'#2454aa';
+ const design=chosenTemplate();
+ if(design.designerVersion&&window.GreenRichQuotationDesigner){return window.GreenRichQuotationDesigner.renderHtml(design,selectedLetterhead(),{...current,total:totals().total},seller(),getCustomer());}
+ const s=seller(),c=getCustomer(),cfg=design,t=totals(),accent=/^#[0-9a-f]{6}$/i.test(cfg.accent)?cfg.accent:'#2454aa';
  const lines=current.lines.map((l,i)=>{const gross=round(n(l.qty)*n(l.rate)),tax=l.inclusive?0:round(gross*n(l.tax)/100);return '<tr><td>'+(i+1)+'</td><td>'+esc(l.description||getProduct(l.product_id)?.name||'Product')+'</td><td class="right">'+fmt(l.qty)+'</td><td class="right">'+rupee(l.rate)+'</td><td class="right">'+fmt(l.tax)+'%</td><td class="right">'+rupee(gross+tax)+'</td></tr>'}).join('');
  const address=c?[c.address1,c.address2,c.city,c.state,c.pincode].filter(Boolean).join(', '):'';
  const css='*{box-sizing:border-box}body{margin:0;background:#fff;color:#1b2c47;font:12px/1.5 Arial,sans-serif}.paper{width:100%;min-height:1080px;padding:32px;margin:auto}.brand{display:flex;justify-content:space-between;gap:20px;border-bottom:3px solid '+accent+';padding-bottom:16px}.brand h1{font-size:21px;margin:0;color:'+accent+'}.brand h2{font-size:23px;margin:0;color:'+accent+'}.muted{color:#65728a;white-space:pre-line}.meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:25px 0}.meta strong{display:block;margin-bottom:5px}table{border-collapse:collapse;table-layout:fixed;width:100%}th{background:'+accent+';color:#fff;font-size:11px;text-align:left;padding:9px 7px}td{padding:10px 6px;border-bottom:1px solid #e0e5ee;word-wrap:break-word}.right{text-align:right}.total{width:290px;margin:18px 0 0 auto}.total div{display:flex;justify-content:space-between;padding:4px 0}.total .grand{font-size:16px;font-weight:700;border-top:2px solid #bccbdc;color:'+accent+'}.text{white-space:pre-wrap;margin-top:20px}.foot{margin-top:60px;border-top:1px solid #d8e1ee;padding-top:12px;font-size:11px;color:#536780}@media print{@page{size:A4;margin:0}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.paper{min-height:0}tr{break-inside:avoid}}';
@@ -55,16 +74,28 @@ const paper=()=>{const frame=root.querySelector('#grq-preview');if(frame)frame.s
 const lineForm=(l,i)=>'<div class="grq-line" data-line="'+i+'"><select data-f="product" aria-label="Product">'+selectOptions(productList(),p=>p.id,p=>p.name+(p.sku?' · '+p.sku:''),l.product_id,'Custom product')+'</select><input data-f="description" aria-label="Description" placeholder="Description" value="'+esc(l.description)+'"><input data-f="qty" type="number" min=".01" step="any" aria-label="Qty" value="'+esc(l.qty)+'"><input data-f="rate" type="number" min="0" step=".01" aria-label="Rate" value="'+esc(l.rate)+'"><input data-f="tax" type="number" min="0" step=".01" max="100" aria-label="GST %" value="'+esc(l.tax)+'"><label class="grq-inline"><input data-f="inclusive" type="checkbox"'+(l.inclusive?' checked':'')+'>Incl GST</label><button type="button" class="grq-small" data-action="remove" data-index="'+i+'" aria-label="Remove item">×</button></div>';
 function editor(){
  const saved=quotes.filter(q=>q.company_id===company()).map(q=>'<button type="button" class="grq-record'+(q.id===current.id?' current':'')+'" data-action="open" data-id="'+esc(q.id)+'"><b>'+esc(q.quotation_no)+'</b><small>'+esc(q.payload?.customer_name||'Customer')+' · '+esc(q.status)+'</small><small>'+rupee(q.payload?.total||0)+'</small></button>').join('');
- const filteredTemplates=templates.filter(t=>t.company_id===company()&&(!t.product_id||t.product_id===current.lines[0]?.product_id));
- return '<div class="grq-grid"><aside class="grq-list"><h3>Saved quotations</h3><div class="grq-scroller">'+(saved||'<p>No quotations yet.</p>')+'</div></aside><div class="grq-editor"><form id="grq-form"><div class="grq-fields"><label>Quotation no.<input name="quotation_no" maxlength="80" value="'+esc(current.quotation_no)+'" placeholder="Auto on save"></label><label>Customer<select name="customer_id">'+selectOptions(customers,c=>c.id,c=>c.name+(c.mobile?' · '+c.mobile:''),current.customer_id,'Select customer')+'</select></label><label>Date<input name="quotation_date" type="date" required value="'+esc(current.quotation_date)+'"></label><label>Valid until<input name="valid_until" type="date" value="'+esc(current.valid_until)+'"></label><label>Status<select name="status">'+['Draft','Sent','Accepted','Rejected','Expired'].map(x=>opt(x,x,current.status===x)).join('')+'</select></label><label>Product-wise template<select name="template_id">'+selectOptions(filteredTemplates,t=>t.id,t=>t.name,current.template_id,'Fixed product default')+'</select></label></div><h3>Products & rates</h3><div class="grq-lines">'+current.lines.map(lineForm).join('')+'</div><button data-action="add" type="button">+ Add product</button><div class="grq-fields"><label>Discount ₹<input name="discount" type="number" min="0" step=".01" value="'+esc(current.discount)+'"></label><label>Freight / other charges ₹<input name="freight" type="number" min="0" step=".01" value="'+esc(current.freight)+'"></label><label class="grq-wide">Custom terms<textarea name="terms" rows="3" placeholder="Blank = product template defaults">'+esc(current.terms)+'</textarea></label><label class="grq-wide">Specifications / notes<textarea name="notes" rows="3">'+esc(current.notes)+'</textarea></label></div><div class="grq-total">Quotation total <strong id="grq-total">'+rupee(totals().total)+'</strong></div><div class="grq-actions"><button data-action="preview" type="button">Refresh preview</button><button data-action="pdf" type="button">PDF viewer</button><button data-action="print" type="button">Print / Save PDF</button>'+(access.canEdit?'<button class="primary" data-action="save" type="button">Save quotation</button>':'')+'</div></form></div><div class="grq-preview-wrap"><h3>Live preview</h3><iframe id="grq-preview" sandbox="allow-same-origin" title="Quotation document preview"></iframe></div></div>';
+ const filteredTemplates=candidateTemplates();
+ return '<div class="grq-grid"><aside class="grq-list"><h3>Saved quotations</h3><div class="grq-scroller">'+(saved||'<p>No quotations yet.</p>')+'</div></aside><div class="grq-editor"><form id="grq-form"><div class="grq-fields"><label>Quotation no.<input name="quotation_no" maxlength="80" value="'+esc(current.quotation_no)+'" placeholder="Auto on save"></label><label>Customer<select name="customer_id">'+selectOptions(customers,c=>c.id,c=>c.name+(c.mobile?' · '+c.mobile:''),current.customer_id,'Select customer')+'</select></label><label>Date<input name="quotation_date" type="date" required value="'+esc(current.quotation_date)+'"></label><label>Valid until<input name="valid_until" type="date" value="'+esc(current.valid_until)+'"></label><label>Status<select name="status">'+['Draft','Sent','Accepted','Rejected','Expired'].map(x=>opt(x,x,current.status===x)).join('')+'</select></label><label>Product-wise template<select name="template_id">'+selectOptions(filteredTemplates,t=>t.id,t=>t.name,current.template_id||selectedTemplate()?.id||'','Auto · Product / Category / Company')+'</select></label></div><h3>Products & rates</h3><div class="grq-lines">'+current.lines.map(lineForm).join('')+'</div><button data-action="add" type="button">+ Add product</button><div class="grq-fields"><label>Discount ₹<input name="discount" type="number" min="0" step=".01" value="'+esc(current.discount)+'"></label><label>Freight / other charges ₹<input name="freight" type="number" min="0" step=".01" value="'+esc(current.freight)+'"></label><label class="grq-wide">Custom terms<textarea name="terms" rows="3" placeholder="Blank = product template defaults">'+esc(current.terms)+'</textarea></label><label class="grq-wide">Specifications / notes<textarea name="notes" rows="3">'+esc(current.notes)+'</textarea></label></div><div class="grq-total">Quotation total <strong id="grq-total">'+rupee(totals().total)+'</strong></div><div class="grq-actions"><button data-action="preview" type="button">Refresh preview</button><button data-action="pdf" type="button">PDF viewer</button><button data-action="print" type="button">Print / Save PDF</button>'+(access.canEdit?'<button class="primary" data-action="save" type="button">Save quotation</button>':'')+'</div></form></div><div class="grq-preview-wrap"><h3>Live preview</h3><iframe id="grq-preview" sandbox="allow-same-origin" title="Quotation document preview"></iframe></div></div>';
 }
 function templatesView(){
  const list=templates.filter(t=>t.company_id===company());
  return '<div class="grq-template-wrap"><section><h2>Product-wise templates</h2><p>Every product uses its fixed default unless a custom template is selected. Admin can save reusable designs for individual products.</p><div class="grq-table">'+list.map(t=>'<article><strong>'+esc(t.name)+'</strong><small>'+esc(productList().find(p=>p.id===t.product_id)?.name||'All products')+'</small><button data-action="template-edit" data-id="'+esc(t.id)+'">Edit</button></article>').join('')+'</div></section>'+(access.admin?'<form id="grq-template-form"><h3>Custom template editor</h3><input type="hidden" name="id"><label>Template name<input name="name" maxlength="120" required></label><label>Product<select name="product_id">'+selectOptions(productList(),p=>p.id,p=>p.name,'','All products')+'</select></label><label>Quotation title<input name="title" value="PRICE QUOTATION"></label><label>Accent<input name="accent" type="color" value="#2454aa"></label><label>Header<input name="header"></label><label>Footer<input name="footer"></label><label>Default terms<textarea name="terms" rows="5"></textarea></label><label class="grq-inline"><input type="checkbox" name="bank" checked> Include bank details</label><button type="submit" class="primary">Save template</button></form>':'<p>Template creation is available to Admin. Edit quotation notes and terms in your own quotation.</p>')+'</div>';
 }
 function render(){
- root.innerHTML='<div class="grq-app"><header class="grq-head"><div><h2>Quotations & PDF Workspace</h2><p>Customer quotations, fixed product layouts, custom templates and PDF preview</p></div><div class="grq-head-controls"><select id="grq-company" aria-label="Company">'+access.companies.map(x=>opt(x,access.companyNames?.[x]||x,company()===x)).join('')+'</select><button type="button" class="primary" data-action="new">+ New quotation</button></div></header><nav class="grq-tabs">'+[['quotes','Quotations'],['templates','Templates'],['pdf','PDF viewer & editor']].map(([key,name])=>'<button data-action="tab" data-tab="'+key+'" class="'+(tab===key?'active':'')+'">'+name+'</button>').join('')+'</nav>'+(tab==='quotes'?editor():tab==='templates'?templatesView():'<div class="grq-workbench" id="grq-pdf-root"></div>')+'</div>';
- if(tab==='quotes')paper();if(tab==='pdf')window.GreenRichPDFWorkbench?.mount(root.querySelector('#grq-pdf-root'),{documentHtml:htmlDocument(),documentName:current.quotation_no||'Quotation',notify});
+ root.innerHTML='<div class="grq-app"><header class="grq-head"><div><h2>Quotations & PDF Workspace</h2><p>Customer quotations, fixed product layouts, custom templates and PDF preview</p></div><div class="grq-head-controls"><select id="grq-company" aria-label="Company">'+access.companies.map(x=>opt(x,access.companyNames?.[x]||x,company()===x)).join('')+'</select><button type="button" class="primary" data-action="new">+ New quotation</button></div></header><nav class="grq-tabs">'+[['quotes','Quotations'],['designer','Drag & Drop Designer'],['templates','Templates'],['pdf','PDF viewer & editor']].map(([key,name])=>'<button data-action="tab" data-tab="'+key+'" class="'+(tab===key?'active':'')+'">'+name+'</button>').join('')+'</nav>'+(tab==='quotes'?editor():tab==='designer'?'<div id="grq-designer-root"></div>':tab==='templates'?templatesView():'<div class="grq-workbench" id="grq-pdf-root"></div>')+'</div>';
+ if(tab==='designer'){
+ if(!window.GreenRichQuotationDesigner)return notify('Visual designer script is not loaded. Refresh CRM.','error');
+ const record=selectedTemplate();
+ void window.GreenRichQuotationDesigner.mount(root.querySelector('#grq-designer-root'),{
+  db:access.db,userId:access.userId,admin:access.admin,company:company(),companies:access.companies,companyNames:access.companyNames,
+  products,templates,letterheads,seller:seller(),customer:getCustomer(),quotation:{...current,total:totals().total},template:record,
+  reloadTemplates:async()=>{await refresh();return templates;},
+  onSaved:()=>{notify('Saved design can now be selected in new quotations');},
+  onPreview:(doc)=>{designerPreview=doc;tab='pdf';render();},
+  notify
+ }).catch(e=>notify(e.message,'error'));
+ }
+ if(tab==='quotes')paper();if(tab==='pdf')window.GreenRichPDFWorkbench?.mount(root.querySelector('#grq-pdf-root'),{documentHtml:designerPreview||htmlDocument(),documentName:current.quotation_no||'Quotation',notify});
 }
 async function save(){
  capture();
@@ -72,8 +103,10 @@ async function save(){
  if(!current.customer_id)throw Error('Select a customer');
  if(!current.lines.length||current.lines.some(x=>!x.description.trim()||x.qty<=0))throw Error('Add a description and positive quantity for every item');
  if(current.valid_until&&current.valid_until<current.quotation_date)throw Error('Validity date cannot precede quotation date');
- const customer=getCustomer(),payload={lines:current.lines,discount:current.discount,freight:current.freight,notes:current.notes,terms:current.terms,customer_name:customer.name,total:totals().total};
- const body={company_id:company(),quotation_no:current.quotation_no||quoteNo(),customer_id:current.customer_id,template_id:current.template_id||null,quotation_date:current.quotation_date,valid_until:current.valid_until||null,status:current.status,payload,updated_by:access.userId,updated_at:new Date().toISOString()};
+ const customer=getCustomer(),record=selectedTemplate();
+ const payload={lines:current.lines,discount:current.discount,freight:current.freight,notes:current.notes,terms:current.terms,customer_name:customer.name,total:totals().total,
+ template_snapshot:current.template_snapshot||record?.config||null,letterhead_snapshot:current.letterhead_snapshot||selectedLetterhead()};
+ const body={company_id:company(),quotation_no:current.quotation_no||quoteNo(),customer_id:current.customer_id,template_id:current.template_id||record?.id||null,quotation_date:current.quotation_date,valid_until:current.valid_until||null,status:current.status,payload,updated_by:access.userId,updated_at:new Date().toISOString()};
  const query=current.id?access.db.from('gr_quotations').update(body).eq('company_id',company()).eq('id',current.id).select().single():access.db.from('gr_quotations').insert({...body,created_by:access.userId}).select().single();
  const {data,error}=await query;if(error)throw Error('Save failed: '+error.message);current.id=data.id;current.quotation_no=data.quotation_no;await refresh();notify('Quotation saved to Supabase');render();
 }
@@ -91,7 +124,7 @@ function print(){
 }
 async function perform(button){
  const a=button.dataset.action;
- if(a==='tab'){if(tab==='quotes')capture();tab=button.dataset.tab;render();return}
+ if(a==='tab'){if(tab==='quotes')capture();designerPreview='';tab=button.dataset.tab;render();return}
  if(a==='new'){current=empty();tab='quotes';render();return}
  if(a==='add'){capture();current.lines.push({product_id:'',description:'',qty:1,rate:0,tax:0,inclusive:false});render();return}
  if(a==='remove'){capture();if(current.lines.length>1)current.lines.splice(Number(button.dataset.index),1);render();return}
@@ -99,7 +132,7 @@ async function perform(button){
  if(a==='preview'){capture();paper();return}
  if(a==='save'){await save();return}
  if(a==='print'){print();return}
- if(a==='pdf'){capture();tab='pdf';render();return}
+ if(a==='pdf'){capture();designerPreview='';tab='pdf';render();return}
  if(a==='template-edit'){
   const t=templates.find(x=>x.id===button.dataset.id),form=root.querySelector('#grq-template-form');if(!t||!form)return;
   for(const key of ['id','name','product_id'])form.elements.namedItem(key).value=t[key]||'';
@@ -113,8 +146,9 @@ function bind(){
   if(event.target.id==='grq-company'){access.company=event.target.value;current=empty();render();return}
   if(tab==='quotes'&&event.target.matches('[data-f="product"]')){
    const row=event.target.closest('[data-line]'),index=Number(row?.dataset.line);capture();const p=getProduct(current.lines[index]?.product_id);
-   if(p){Object.assign(current.lines[index],{description:p.name,rate:n(p.price),tax:n(p.tax),inclusive:!!p.inclusive})}current.template_id='';render();return;
+   if(p){Object.assign(current.lines[index],{description:p.name,rate:n(p.price),tax:n(p.tax),inclusive:!!p.inclusive})}current.template_id='';current.template_snapshot=null;current.letterhead_snapshot=null;render();return;
   }
+  if(tab==='quotes'&&event.target.name==='template_id'){current.template_snapshot=null;current.letterhead_snapshot=null;}
   if(tab==='quotes'&&event.target.closest('#grq-form')){capture();paper()}
  };
  root.oninput=event=>{if(tab==='quotes'&&event.target.closest('#grq-form')){capture();paper()}};
