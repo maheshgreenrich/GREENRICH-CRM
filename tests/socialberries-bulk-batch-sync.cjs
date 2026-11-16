@@ -32,7 +32,7 @@ for(const t of ['create table if not exists public.gr_wa_bulk_batches',
  'message_statistics jsonb','enable row level security',
  'revoke all on public.gr_wa_bulk_batches from public,anon,authenticated'])
  assert.ok(migration.includes(t),'Private schema contract missing: '+t);
-assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261116-auto-meta-template-1'));
+assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261116-zero-repeat-sync-1'));
 const demo={status:'completed',message_statistics:{total_messages:3,pending:2,sent:0,delivered:0,read:0,failed:1,success_rate:0,failure_rate:33.33}};
 assert.equal(demo.status,'completed');
 assert.notEqual(demo.message_statistics.delivered,demo.message_statistics.total_messages,
