@@ -2,8 +2,8 @@
 (()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles','#field-location-access','#settings-field-access'].includes(location.hash)?'settings':location.hash==='#live-staff-gps'?'service':'dashboard'),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles','#field-location-access':'fieldaccess','#settings-field-access':'fieldaccess'})[location.hash]||'fieldaccess';
 const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','quotations','dispatch','stock','marketing','operations','service','purchase','accounts','settings'];
-const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',quotations:'Quotations & PDF',dispatch:'Dispatch',stock:'Stock & Products',operations:'Operations & Production',service:'Service and Installation',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
-const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',orders:'sales',dispatch:'dispatch',stock:'products'};
+const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',quotations:'Quotations & PDF',dispatch:'Dispatch',stock:'Inventory',operations:'Operations & Production',service:'Service and Installation',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
+const crmMap={crm:'dashboard',leads:'leads',customers:'customers',sales:'sales',tasks:'tasks',orders:'sales',dispatch:'dispatch'};
 const crmAccess=()=>({
  dashboard:can('sales')&&can('customers')&&can('leads'),
  sales:can('sales')||can('orders'),
@@ -92,7 +92,7 @@ function configureCompanySelector(){
    manager.choose(select.value,user.id);
    if(label)label.textContent=manager.name(user.id);
    document.title='GreenRich ONE · '+manager.name(user.id);
-   if(crmMap[page]||page==='marketing'||page==='quotations')void render();
+   if(crmMap[page]||page==='stock'||page==='operations'||page==='marketing'||page==='quotations')void render();
    // Attendance is a completed module: changing company never re-renders it.
   }catch(error){toast(error.message);select.value=manager.selected(user.id)}
  };
@@ -210,6 +210,16 @@ async function render(){
   else if(page==='attendance')await attendance(c);
   else if(page==='settings'){crmCache=null;await settings(c)}
   else if(page==='service')serviceInstallation(c)
+  else if(page==='stock'){
+   if(!window.GreenRichInventory)throw Error('Inventory module is missing. Refresh the CRM.');
+   const manager=window.GreenRichCompanies;
+   await window.GreenRichInventory.mount(c,{
+    db,companies:manager.allowed(),scope:manager.selected(user.id),companyName:id=>manager.list().find(x=>x.id===id)?.name||id,
+    can:(module,action='view')=>roleName()==='Admin'||can(module,action),
+    openLegacy:async()=>{c.replaceChildren();const back=document.createElement('button');back.type='button';back.textContent='← Back to Inventory';back.className='gr-inventory-return';back.onclick=()=>{crmCache=null;void render()};c.append(back);await crmWorkspace(c,'products');},
+    openOperations:()=>{page='operations';navigation();void render();}
+   });
+  }
   else if(page==='operations')await operations(c)
   else if(page==='accounts')await window.GreenRichAccounts.mount(c,{db,companyId:window.GreenRichCompanies.selected(user.id)})
   else if(page==='quotations'){
