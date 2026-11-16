@@ -183,6 +183,7 @@ async function configureOAuth(db:any,profile:any,company:string,payload:any){
  if(error)throw error;
  await db.from('gr_gmail_private_tokens').delete().eq('company_id',company);
  await db.from('gr_gmail_connections').update({status:'needs_reconnect',updated_at:new Date().toISOString()}).eq('company_id',company);
+ await db.from('gr_gmail_sender_accounts').update({status:'needs_reconnect',updated_at:new Date().toISOString()}).eq('company_id',company);
  return {configured:true,client_id:id,status:'needs_reconnect'};
 }
 function contactMime(from:string,to:string,subject:string,body:string){
@@ -203,8 +204,8 @@ function safeRichHtml(html:unknown){
  if(typeof html!=='string')return '';
  if(html.length>35000)throw Error('Email body exceeds maximum size');
  const clean=sanitizeHtml(html,{
-  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','h1','h2','h3','hr'],
-  allowedAttributes:{a:['href','title','target'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
+  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','font','h1','h2','h3','hr'],
+  allowedAttributes:{a:['href','title','target'],font:['color','size','face'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
   allowedSchemes:['https','http','mailto'],allowedSchemesAppliedToAttributes:['href'],
   allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/],
     'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/]}}
@@ -286,6 +287,7 @@ async function sendContact(db:any,profile:any,payload:any){
  }).select('id').single();
  if(logged.error){if(logged.error.code==='23505')throw Error('This send has already been requested; check history');throw logged.error}
  const rowId=logged.data.id;
+ let deliveryStarted=false;
  try{
   const manifest:any[]=[];
   for(let i=0;i<attachments.length;i++){
@@ -299,6 +301,7 @@ async function sendContact(db:any,profile:any,payload:any){
    const upd=await db.from('gr_contact_email_history').update({attachment_manifest:manifest}).eq('id',rowId);
    if(upd.error)throw Error('Attachment audit could not be saved; email was not sent');
   }
+  deliveryStarted=true;
   const result=await deliverMail(db,company,to,cc,subject,body,undefined,undefined,{
    html,bcc,attachments,gmail_account_id:senderAccountId
   });
@@ -310,7 +313,8 @@ async function sendContact(db:any,profile:any,payload:any){
  }catch(error){
   const {data:entry}=await db.from('gr_contact_email_history').select('status').eq('id',rowId).single();
   if(entry?.status==='sending')await db.from('gr_contact_email_history').update({
-   status:'needs_review',failure_reason:'Provider outcome may be uncertain. Check Sent Mail and do not retry blindly.'
+   status:deliveryStarted?'needs_review':'failed',
+   failure_reason:deliveryStarted?'Provider outcome may be uncertain. Check Sent Mail and do not retry blindly.':'Email was not sent: attachment preparation failed.'
   }).eq('id',rowId);
   throw error;
  }
@@ -588,6 +592,17 @@ Deno.serve(async req=>{
    await allowed(db,profile,company,'view');
    const {data}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
    return json({...await oauthStatus(db,company),...await transportStatus(db,company),gmail_accounts:await gmailSenders(db,company)});
+  }
+  if(action==='contact_attachment_url'){
+   await allowed(db,profile,company,'view');
+   const id=plain(payload.history_id,60),index=Number(payload.attachment_index);
+   if(!/^[0-9a-f-]{36}$/i.test(id)||!Number.isInteger(index)||index<0||index>5)throw Error('Invalid file request');
+   const {data:record}=await db.from('gr_contact_email_history').select('attachment_manifest').eq('id',id).eq('company_id',company).maybeSingle();
+   const attachment=Array.isArray(record?.attachment_manifest)?record.attachment_manifest[index]:null;
+   if(!attachment?.path||!String(attachment.path).startsWith(company+'/'+id+'/'))throw Error('Archived attachment not available');
+   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90);
+   if(error)throw error;
+   return json({url:data.signedUrl});
   }
   if(action==='pdf_url'){
    await allowed(db,profile,company,'view');
