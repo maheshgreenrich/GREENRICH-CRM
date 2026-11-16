@@ -6,7 +6,7 @@
 const G='https://cdn.jsdelivr.net/npm/grapesjs@0.23.2/dist/grapes.min.js';
 const GC='https://cdn.jsdelivr.net/npm/grapesjs@0.23.2/dist/css/grapes.min.css';
 const D='https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js';
-const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;':'&quot;',"'":'&#39;'}[c]));
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeCss=x=>String(x||'').replace(/@import[^;]*;|url\s*\([^)]*\)|expression\s*\([^)]*\)|<\/?style[^>]*>/gi,'');
 const load=(url,test)=>test()?Promise.resolve():new Promise((resolve,reject)=>{const el=document.createElement('script');el.src=url;el.onload=resolve;el.onerror=()=>reject(Error('Could not load visual editor dependency'));document.head.append(el)});
 const withAssets=async()=>{if(!document.querySelector('[data-grqd-grapes-css]')){const l=document.createElement('link');l.rel='stylesheet';l.href=GC;l.dataset.grqdGrapesCss='1';document.head.append(l)}await Promise.all([load(G,()=>!!window.grapesjs),load(D,()=>!!window.DOMPurify)])};
