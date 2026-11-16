@@ -168,7 +168,7 @@
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
-   '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg,image/webp"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
+   '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
    '<p class="grwc-muted grwc-span">Only approved templates with complete message content and opted-in contacts can be sent. A screenshot reference must first be synced once in Settings → WhatsApp Integration.</p>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
@@ -1138,9 +1138,9 @@
    const excluded=selected.size-matches.length;
    const file=campaignImage||f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
-   const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+   const allowed={'image/jpeg':'jpg','image/png':'png'};
    if(hasFile&&(!allowed[file.type]||file.size>5*1024*1024))
-    return alert('Choose a JPG, PNG or WebP campaign image under 5 MB.','warning');
+    return alert('Choose a JPEG or PNG campaign image under 5 MB; WebP is not accepted for this template header.','warning');
    if(hasFile&&!app.admin)
     return alert('Only company Admin can upload a private campaign image.','warning');
    const consent=rows.consents||[];
