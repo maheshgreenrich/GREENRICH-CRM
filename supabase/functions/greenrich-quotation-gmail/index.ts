@@ -192,30 +192,116 @@ function contactMime(from:string,to:string,subject:string,body:string){
  'Content-Transfer-Encoding: base64','',b64(bytes(body)),''];
  return b64url(bytes(lines.join('\r\n')));
 }
+
+const attachmentMime={
+ 'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp',
+ 'text/plain':'.txt',
+ 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
+ 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'
+};
+function safeRichHtml(html:unknown){
+ if(typeof html!=='string')return '';
+ if(html.length>35000)throw Error('Email body exceeds maximum size');
+ const clean=sanitizeHtml(html,{
+  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','h1','h2','h3','hr'],
+  allowedAttributes:{a:['href','title','target'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
+  allowedSchemes:['https','http','mailto'],allowedSchemesAppliedToAttributes:['href'],
+  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/],
+    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/]}}
+ });
+ return clean.trim();
+}
+async function incomingAttachments(db:any,company:string,payload:any,kind:string,contactId:string){
+ const input=Array.isArray(payload.attachments)?payload.attachments:[];
+ if(input.length>4)throw Error('Maximum four attachments');
+ const result:any[]=[];let total=0;
+ for(const file of input){
+  const name=plain(file?.name,110).replace(/[\/\\\r\n<>]/g,'_');
+  const type=plain(file?.type,150),content=String(file?.base64||'');
+  if(!name||!Object.keys(attachmentMime).includes(type)||!name.toLowerCase().endsWith(attachmentMime[type]))
+   throw Error('Unsupported attachment. Use PDF, images, TXT, DOCX or XLSX');
+  if(!content||content.length>5_700_000||!/^[A-Za-z0-9+/]+={0,2}$/.test(content))
+   throw Error('Attachment is invalid or exceeds 4 MB');
+  let data:Uint8Array;
+  try{data=unb64(content)}catch(_){throw Error('Invalid attachment encoding')}
+  if(!data.length||data.length>4_194_304)throw Error('Each attachment must be under 4 MB');
+  total+=data.length;if(total>6_000_000)throw Error('Total attachments must be below 6 MB');
+  // File type and filename are checked; no attachment is executed or publicly served.
+  result.push({filename:name,content:data,contentType:type});
+ }
+ const archiveId=plain(payload.archive_pdf_id,60);
+ if(archiveId){
+  if(!/^[0-9a-f-]{36}$/i.test(archiveId))throw Error('Invalid archived quotation attachment');
+  const {data:record}=await db.from('gr_quotation_email_history')
+   .select('pdf_path,customer_id,quotation_id,company_id').eq('id',archiveId).eq('company_id',company).maybeSingle();
+  if(!record?.pdf_path)throw Error('Archived quotation PDF is unavailable');
+  let allowed=false;
+  if(kind==='customer')allowed=record.customer_id===contactId;
+  else{
+   const {data:lead}=await db.from('gr_lead_pipeline').select('customer_id').eq('lead_id',contactId).eq('company_id',company).maybeSingle();
+   allowed=Boolean(lead?.customer_id&&lead.customer_id===record.customer_id);
+  }
+  if(!allowed)throw Error('Archived quotation does not belong to this contact');
+  const {data,error}=await db.storage.from('gr-quotation-pdfs').download(record.pdf_path);
+  if(error||!data)throw Error('Could not read saved quotation PDF');
+  const raw=new Uint8Array(await data.arrayBuffer());
+  if(raw.length>4_194_304||total+raw.length>6_000_000)throw Error('Attachments exceed 6 MB total');
+  result.push({filename:'Quotation-'+String(record.quotation_id).slice(0,8)+'.pdf',content:raw,contentType:'application/pdf'});
+ }
+ return result;
+}
+
 async function sendContact(db:any,profile:any,payload:any){
  const company=plain(payload.company_id,50);
  const kind=plain(payload.contact_type,15),id=plain(payload.contact_id,100);
  if(!['customer','lead'].includes(kind)||!id)throw Error('Customer or lead reference required');
  await allowed(db,profile,company,kind==='customer'?'send_customer':'send_lead');
- const recipient=plain(payload.to,254),subject=plain(payload.subject,200),body=plain(payload.body,10000),key=plain(payload.request_key,60);
- if(!validEmail(recipient)||!subject||!body||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject, body and request ID required');
+ const to=parseEmail(payload.to),cc=parseEmail(payload.cc),bcc=parseEmail(payload.bcc);
+ const recipient=to[0]||'',subject=plain(payload.subject,200),body=plain(payload.body,20000),key=plain(payload.request_key,60);
+ const html=safeRichHtml(payload.html_body||'');
+ if(to.length<1||to.length>5||cc.length>5||bcc.length>5||[...to,...cc,...bcc].some(x=>!validEmail(x)))throw Error('Maximum 5 addresses in To, CC and BCC; all must be valid');
+ if(!body&&!html)throw Error('Email message is required');
+ const senderAccountId=plain(payload.sender_account_id,60);
+ if(!validEmail(recipient)||!subject||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject and request ID required');
  if(kind==='customer'){
   const {data}=await db.from('gr_crm_customers').select('id,email').eq('id',id).maybeSingle();
-  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked customer email');
+  if(!data||!to.some(x=>String(data.email||'').toLowerCase()===x.toLowerCase()))throw Error('The contact’s registered email must be included in To');
  }else{
   const {data}=await db.from('gr_lead_pipeline').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
-  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked lead email');
+  if(!data||!to.some(x=>String(data.email||'').toLowerCase()===x.toLowerCase()))throw Error('The lead’s registered email must be included in To');
  }
  const transport=await transportStatus(db,company);
- if(!transport.ready)throw Error('Company email sender is not connected. Configure it in Settings.');
+ if(!transport.ready&&!senderAccountId)throw Error('Company email sender is not connected. Configure it in Settings.');
+ const selection=senderAccountId?await selectedGmail(db,company,senderAccountId):null;
+ const senderEmail=selection?.sender_email||transport.connection.sender_email;
+ if(!senderEmail)throw Error('A company sender address must be connected');
+ const attachments=await incomingAttachments(db,company,payload,kind,id);
+ if(attachments.length>5)throw Error('Too many attachments');
+ const auditFiles=attachments.map(a=>({name:a.filename,type:a.contentType,bytes:a.content.length}));
  const logged=await db.from('gr_contact_email_history').insert({
-  company_id:company,request_key:key,recipient,subject,body,contact_type:kind,contact_id:id,
-  sender_email:transport.connection.sender_email,transport:transport.transport,sent_by:profile.id
+  company_id:company,request_key:key,recipient,cc,bcc,subject,body,html_body:html||null,
+  attachment_manifest:auditFiles,contact_type:kind,contact_id:id,
+  sender_email:senderEmail,sender_account_id:selection?.id==='primary'?null:selection?.id||null,
+  transport:selection?'gmail':transport.transport,sent_by:profile.id
  }).select('id').single();
  if(logged.error){if(logged.error.code==='23505')throw Error('This send has already been requested; check history');throw logged.error}
  const rowId=logged.data.id;
  try{
-  const result=await deliverMail(db,company,[recipient],[],subject,body);
+  const manifest:any[]=[];
+  for(let i=0;i<attachments.length;i++){
+   const item=attachments[i],destination=company+'/'+rowId+'/'+i+'-'+item.filename;
+   const upload=await db.storage.from('gr-mail-attachments').upload(destination,item.content,{
+    upsert:false,contentType:item.contentType});
+   if(upload.error)throw Error('Could not archive email attachment; message was NOT sent');
+   manifest.push({name:item.filename,type:item.contentType,bytes:item.content.length,path:destination});
+  }
+  if(manifest.length){
+   const upd=await db.from('gr_contact_email_history').update({attachment_manifest:manifest}).eq('id',rowId);
+   if(upd.error)throw Error('Attachment audit could not be saved; email was not sent');
+  }
+  const result=await deliverMail(db,company,to,cc,subject,body,undefined,undefined,{
+   html,bcc,attachments,gmail_account_id:senderAccountId
+  });
   const saved=await db.from('gr_contact_email_history').update({
    status:'sent',transport:result.transport,provider_message_id:result.id||null,gmail_message_id:result.transport==='gmail'?result.id||null:null,sent_at:new Date().toISOString()
   }).eq('id',rowId);
@@ -224,7 +310,7 @@ async function sendContact(db:any,profile:any,payload:any){
  }catch(error){
   const {data:entry}=await db.from('gr_contact_email_history').select('status').eq('id',rowId).single();
   if(entry?.status==='sending')await db.from('gr_contact_email_history').update({
-   status:'needs_review',failure_reason:'Uncertain provider outcome; check sender account before retrying'
+   status:'needs_review',failure_reason:'Provider outcome may be uncertain. Check Sent Mail and do not retry blindly.'
   }).eq('id',rowId);
   throw error;
  }
