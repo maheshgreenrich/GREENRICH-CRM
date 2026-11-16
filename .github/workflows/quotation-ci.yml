@@ -8,6 +8,8 @@ on:
       - 'tests/multimail-settings.cjs'
       - 'supabase/migrations/20261116193000_mail_transport_configs.sql'
       - 'greenrich-contact-email.*'
+      - 'greenrich-quotation-history.js'
+      - 'tests/email-editor-history.cjs'
       - 'tests/rich-contact-email.cjs'
       - 'supabase/migrations/20261116203000_rich_email_multi_sender.sql'
       - 'greenrich-customer-profile.js'
@@ -51,3 +53,4 @@ jobs:
           node tests/gmail-settings-contact.cjs
           node tests/multimail-settings.cjs
           node tests/rich-contact-email.cjs
+          node tests/email-editor-history.cjs
