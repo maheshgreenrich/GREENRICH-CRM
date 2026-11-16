@@ -29,9 +29,29 @@ const companyStorage=id=>id==='grow-india'?legacyKey:legacyKey+'::'+id;
 function ensureCRMData(store){if(!Array.isArray(store.tags))store.tags=[];if(!Number.isInteger(store.orderSequence)||store.orderSequence<0)store.orderSequence=0;if(!store.invoiceSequences||typeof store.invoiceSequences!=='object')store.invoiceSequences={};return store}
 function attachSharedCustomers(store){const shared=window.GreenRichSharedCustomers?.snapshot();if(shared){store.customers=shared.customers;store.tags=shared.tags}return ensureCRMData(store)}
 function loadCompanyData(id){if(id===activeCompany)return attachSharedCustomers(data);let parsed;try{parsed=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial()}catch{parsed=initial()}return attachSharedCustomers(parsed)}
+// Allocate newly received inventory to outstanding orders in creation order.
+// Previously allocated units remain reserved; never allocate the same unit twice.
+function reconcileOrderStock(copy){
+ if(!Array.isArray(copy.products)||!Array.isArray(copy.sales))return;
+ for(const product of copy.products){
+  let free=Math.max(0,Number(product.stock)||0);
+  for(const order of copy.sales){
+   if(order.product_id!==product.id||!consumesStock(order))continue;
+   const quantity=Math.max(0,Number(order.qty)||0);
+   const allocated=Math.min(quantity,Math.max(0,Number(order.stock_allocated_qty??quantity)||0));
+   const need=Math.max(0,quantity-allocated);
+   const take=Math.min(free,need);
+   if(take){order.stock_allocated_qty=allocated+take;free-=take}
+   order.stock_shortage=need-take;
+   order.stock_status=order.stock_shortage?'Low Stock':'Available';
+  }
+  product.stock=free;
+ }
+}
 function saveCompanyData(id,copy){
  try{
   const previous=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial();
+  reconcileOrderStock(copy);
   if(!window.GreenRichCRMCloud)throw Error('Cloud synchronization service unavailable');
   localStorage.setItem(companyStorage(id),JSON.stringify(copy));
   if(id===activeCompany)data=copy;
