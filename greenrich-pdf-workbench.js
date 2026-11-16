@@ -24,15 +24,21 @@
   document.body.append(iframe);
   try{
    await new Promise(resolve=>{iframe.onload=resolve;iframe.srcdoc=html});
-   const body=iframe.contentDocument.querySelector('.paper')||iframe.contentDocument.body;
-   const canvas=await window.html2canvas(body,{backgroundColor:'#fff',scale:1.5,useCORS:true,logging:false});
-   const pdf=await window.PDFLib.PDFDocument.create(),pageW=595.28,pageH=841.89,cropH=Math.floor(canvas.width*pageH/pageW);
-   for(let y=0;y<canvas.height;y+=cropH){
-    const h=Math.min(cropH,canvas.height-y),part=document.createElement('canvas');part.width=canvas.width;part.height=h;
-    part.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
-    const img=await pdf.embedPng(part.toDataURL('image/png'));
-    const page=pdf.addPage([pageW,pageH]);const renderedH=pageW*h/canvas.width;
-    page.drawImage(img,{x:0,y:pageH-renderedH,width:pageW,height:renderedH});
+   await iframe.contentDocument.fonts?.ready;
+   await Promise.all([...iframe.contentDocument.images].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve})));
+   const pages=[...iframe.contentDocument.querySelectorAll('.grqd-export-page')];
+   const targets=pages.length?pages:[iframe.contentDocument.querySelector('.paper')||iframe.contentDocument.body];
+   const pdf=await window.PDFLib.PDFDocument.create(),pageW=595.28,pageH=841.89;
+   for(const target of targets){
+    const canvas=await window.html2canvas(target,{backgroundColor:'#fff',scale:1.35,useCORS:true,logging:false,windowWidth:794,scrollX:0,scrollY:0});
+    const cropH=Math.floor(canvas.width*pageH/pageW);
+    for(let y=0;y<canvas.height;y+=cropH){
+     const h=Math.min(cropH,canvas.height-y),part=document.createElement('canvas');part.width=canvas.width;part.height=h;
+     part.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+     const img=await pdf.embedPng(part.toDataURL('image/png'));
+     const page=pdf.addPage([pageW,pageH]);const renderedH=pageW*h/canvas.width;
+     page.drawImage(img,{x:0,y:pageH-renderedH,width:pageW,height:renderedH});
+    }
    }
    updatePdf(new Blob([await pdf.save()],{type:'application/pdf'}),filename.replace(/\.pdf$/i,'')+'.pdf');
    tell('Quotation PDF created and ready to download');
