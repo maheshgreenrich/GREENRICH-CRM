@@ -7,3 +7,9 @@
 .grgmail-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:13px}
 .grgmail-actions button{min-height:42px}
 .grgmail-settings .grmail-alert{margin:12px 0;display:block}
+
+.grgmail-accounts{background:#f7fafd;border:1px solid #d8e5f0;border-radius:11px;padding:15px;margin-top:15px}
+.grgmail-account{padding:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #e0eaf3}
+.grgmail-account:last-child{border-bottom:0}
+.grgmail-account button{white-space:nowrap}
+.grgmail-accounts p{font-size:12px;color:#62788f;margin-top:12px}
