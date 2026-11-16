@@ -20,7 +20,7 @@
   await Promise.all([pdfLib(),screenshotLib()]);
   const iframe=document.createElement('iframe');
   iframe.title='Temporary quotation renderer';
-  iframe.style.cssText='position:fixed;left:-20000px;top:0;width:794px;height:1200px;border:0;visibility:hidden';
+  iframe.style.cssText='position:fixed;left:-20000px;top:0;width:794px;height:1200px;border:0;pointer-events:none';
   document.body.append(iframe);
   try{
    await new Promise(resolve=>{iframe.onload=resolve;iframe.srcdoc=html});
