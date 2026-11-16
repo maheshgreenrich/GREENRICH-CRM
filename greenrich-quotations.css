@@ -1,0 +1,48 @@
+/* GREENRICH ONE quotation workspace */
+.grq-app{font:14px/1.45 Inter,Arial,sans-serif;color:#20324f;padding:10px 2px 35px}
+.grq-app *{box-sizing:border-box}
+.grq-app h2{font-size:23px;margin:0}
+.grq-app h3{font-size:16px;margin:0 0 12px}
+.grq-app p{color:#657890;margin:6px 0 15px}
+.grq-app button,.grq-app select,.grq-app input,.grq-app textarea{font:inherit}
+.grq-app button{cursor:pointer;min-height:34px;padding:9px 13px;border:1px solid #cbd7ea;border-radius:9px;background:#fff;color:#2454aa;font-weight:650}
+.grq-app button:hover{background:#eef4ff}
+.grq-app button.primary{color:white;background:#2454aa;border-color:#2454aa}
+.grq-app input,.grq-app textarea,.grq-app select{min-width:0;max-width:100%;width:100%;padding:9px;border:1px solid #cbd7e5;border-radius:8px;background:white;color:#20324f}
+.grq-app label{display:block;font-size:12px;font-weight:650;color:#4a6282}
+.grq-app label input,.grq-app label select,.grq-app label textarea{margin-top:5px}
+.grq-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.grq-head-controls,.grq-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.grq-head-controls select{min-width:220px}
+.grq-tabs{display:flex;gap:7px;border-bottom:1px solid #dbe4ef;margin-bottom:16px;padding-bottom:9px;flex-wrap:wrap}
+.grq-tabs button.active{background:#2454aa;color:white}
+.grq-grid{display:grid;grid-template-columns:minmax(160px,200px) minmax(350px,1.05fr) minmax(360px,.95fr);gap:14px;align-items:start}
+.grq-list,.grq-editor,.grq-preview-wrap,.grq-template-wrap,.grq-workbench{background:#fff;border:1px solid #dce5f1;border-radius:13px;padding:18px;box-shadow:0 3px 14px #192d4711}
+.grq-scroller{max-height:680px;overflow:auto}
+.grq-record{width:100%;text-align:left;display:flex;flex-direction:column;gap:4px;margin-bottom:7px}
+.grq-record small{font-size:11px;color:#62768a}
+.grq-record.current{background:#e9f0ff}
+.grq-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:18px}
+.grq-wide{grid-column:1/-1}
+.grq-lines{display:flex;flex-direction:column;gap:10px;margin:10px 0}
+.grq-line{display:grid;grid-template-columns:1fr 1.2fr 64px 85px 62px 90px 32px;gap:5px;align-items:center}
+.grq-line input,.grq-line select{font-size:12px;padding:7px}
+.grq-app .grq-inline{display:flex;gap:5px;align-items:center;font-size:11px}
+.grq-inline input[type=checkbox]{width:auto;margin:0}
+.grq-line button.grq-small{padding:5px;min-height:30px}
+.grq-total{display:flex;justify-content:space-between;border-top:1px solid #dbe4ef;padding:14px 0;margin-top:12px}
+.grq-total strong{color:#2454aa;font-size:21px}
+.grq-actions{margin-top:12px}
+.grq-preview-wrap{position:sticky;top:12px}
+.grq-preview-wrap iframe{width:100%;height:680px;border:1px solid #dbe4ef;border-radius:8px;background:#fff}
+.grq-template-wrap{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.grq-template-wrap form{display:flex;flex-direction:column;gap:12px}
+.grq-table article{border:1px solid #dbe4ef;padding:10px;margin-bottom:9px;border-radius:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.grq-table small{color:#657890}
+.grq-workbench iframe{width:100%;height:min(72vh,780px);background:#f2f4f8;border:1px solid #d5dfeb;border-radius:8px;margin-top:16px}
+.grq-workbench .grq-actions input{width:260px}
+.grq-workbench label.grq-upload{position:relative;padding:10px 13px;border:1px solid #cbd7ea;border-radius:9px;color:#2454aa;cursor:pointer}
+.grq-upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+@media(max-width:1500px){.grq-grid{grid-template-columns:180px minmax(320px,1fr)}.grq-preview-wrap{grid-column:2;position:static}.grq-line{grid-template-columns:1fr 1fr 65px 75px 60px 75px 32px}}
+@media(max-width:900px){.grq-grid,.grq-template-wrap{display:block}.grq-list,.grq-editor,.grq-preview-wrap{margin-bottom:14px}.grq-preview-wrap{position:static}.grq-line{grid-template-columns:1fr 1fr 55px 75px 55px 80px 32px}.grq-head{display:block}.grq-head-controls{margin-top:14px}}
+@media(max-width:600px){.grq-fields{grid-template-columns:1fr}.grq-line{grid-template-columns:1fr 1fr}.grq-preview-wrap iframe{height:480px}}
