@@ -9,13 +9,13 @@
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],prodBalances:[],focus:null,filter:'',busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],requisitions:[],prodBalances:[],focus:null,filter:'',busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
  const companyOptions=()=>S.ctx.companies.map(id=>'<option value="'+esc(id)+'"'+(S.scope===id?' selected':'')+'>'+esc(companyName(id))+'</option>').join('');
  const e=(key,title,val='',required=true)=>'<label>'+esc(title)+'<input name="'+key+'" value="'+esc(val)+'" '+(required?'required':'')+'></label>';
- const choice=(key,title,arr,selected='')=>'<label>'+esc(title)+'<select name="'+key+'" required><option value="">Select…</option>'+arr.map(([id,label])=>'<option value="'+esc(id)+'"'+(String(selected)===String(id)?' selected':'')+'>'+esc(label)+'</option>').join('')+'</select></label>';
+ const choice=(key,title,arr,selected='',required=true)=>'<label>'+esc(title)+'<select name="'+key+'" '+(required?'required':'')+'><option value="">Select…</option>'+arr.map(([id,label])=>'<option value="'+esc(id)+'"'+(String(selected)===String(id)?' selected':'')+'>'+esc(label)+'</option>').join('')+'</select></label>';
  const notify=(message,error=false)=>{const box=S.root.querySelector('[data-inventory-notice]');if(box){box.hidden=false;box.textContent=message;box.dataset.error=error?'true':'false'}};
  async function rows(table,select='*',configure){
   const all=[];for(let from=0;from<10000;from+=1000){
@@ -47,7 +47,7 @@
     purchasable:stage==='RM'||p.source_type==='Buy',unit:p.uom||'nos',aggregate:aggregates.find(x=>x.company_id===r.company_id&&x.material_id===id)?.quantity??null,
     material:p,original:'ops',overlap});
   }
-  S.items=list;S.bom=materials.filter(x=>x.kind==='bom');S.locations=locations;
+  S.items=list;S.bom=materials.filter(x=>x.kind==='bom');S.requisitions=materials.filter(x=>x.kind==='requisition');S.locations=locations;
   S.balances=balances;S.movements=movements;S.pos=docs;S.prodBalances=aggregates;
  }
  const getLocBalance=item=>S.balances.filter(b=>b.company_id===item.company_id&&b.item_kind===item.stage&&b.item_id===item.id)
@@ -60,7 +60,7 @@
    '<div class="gr-inv-tabs">'+tabs.map(([key,name])=>'<button type="button" data-inv-tab="'+key+'"'+(S.tab===key?' class="active"':'')+'>'+name+'</button>').join('')+
    '<button type="button" data-inv-legacy>Open Saleable Product Editor</button><button type="button" data-inv-operations>Operations & Production</button></div>'+
    '<div data-inventory-notice role="status" hidden></div><div data-inventory-content></div></div>';
-  S.root.querySelector('[data-inv-company]').onchange=e=>{S.scope=e.target.value;draw()};
+  S.root.querySelector('[data-inv-company]').onchange=e=>{S.scope=e.target.value;S.focus=null;layout();draw()};
   S.root.querySelectorAll('[data-inv-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.invTab;S.focus=null;layout();draw()});
   S.root.querySelector('[data-inv-legacy]').onclick=()=>S.ctx.openLegacy(S.root);
   S.root.querySelector('[data-inv-operations]').onclick=()=>S.ctx.openOperations();
@@ -106,7 +106,7 @@
    '<div class="gr-inv-grid">'+choice('company','Company',S.ctx.companies.map(x=>[x,companyName(x)]),S.scope==='all'?'':S.scope)+
    choice('item','Product / Material',items.map(x=>[x.company_id+'|'+x.stage+'|'+x.id,x.code+' · '+x.name+' ['+x.stage+']']))+
    choice('action','Movement',[['verified_count','Verified physical count (Admin / Approver)'],['transfer','Transfer between locations']])+
-   choice('from_location','From warehouse (transfer only)',locs.map(x=>[x.id,x.name]))+
+   choice('from_location','From warehouse (transfer only)',locs.map(x=>[x.id,x.name]),'',false)+
    choice('to_location','To warehouse',locs.map(x=>[x.id,x.name]))+
    '<label>Quantity<input name="quantity" type="number" step="0.000001" min="0.000001" required></label>'+
    e('reference','Reference / challan', '',false)+
@@ -121,25 +121,43 @@
    (canEdit?form:'<p>Warehouse movements require stock edit permission.</p>');
  }
  function bom(){
-  const mapped=S.bom.filter(inScope),productCode=S.items.filter(inScope).map(i=>i.code).filter(Boolean);
+  const mapped=S.bom.filter(inScope),all=S.items.filter(inScope);
   const edges=mapped.map(r=>({...r.payload,company_id:r.company_id}));
-  const index=new Map(S.items.filter(inScope).map(x=>[x.company_id+'|'+x.code.toLowerCase(),x]));
-  return '<h3>Multi-level BOM and product transformation</h3><p>Approved BOMs should follow FG → SFG → IM → RM; revisions, UOM conversion, processing vendor and routing are mandatory before automated purchasing or manufacturing.</p>'+
+  const index=new Map(all.map(x=>[x.company_id+'|'+x.code.toLowerCase(),x]));
+  const assignable=all.filter(i=>i.original==='ops');
+  const choices=assignable.map(x=>[x.company_id+'|'+x.id,x.code+' · '+x.name+' ['+x.stage+']']);
+  const form=S.ctx.can('stock','create')?'<form data-inv-bom class="gr-inv-form"><h4>Add draft BOM component</h4><p>A BOM component is recorded as a draft and must be technically verified before production release.</p><div class="gr-inv-grid">'+
+   choice('company','Company',S.ctx.companies.map(x=>[x,companyName(x)]),S.scope==='all'?'':S.scope)+
+   choice('parent','Parent product',choices)+choice('child','Child / input material',choices)+
+   '<label>Quantity per parent<input type="number" name="qty" step="0.000001" min="0.000001" required></label>'+
+   choice('uom','Unit',[['nos','nos'],['kg','kg'],['mtr','mtr'],['ltr','ltr'],['sets','sets']])+
+   e('revision','BOM revision','R1')+
+   e('operation','Operation / work centre','',false)+
+   e('source','Make / Buy / Job work','',false)+
+   e('notes','Remarks','',false)+'</div><button type="submit">Save Draft BOM Line</button></form>':'';
+  return '<h3>Multi-level BOM and product transformation</h3><p>FG → SFG → IM → RM. Revisions, UOM conversion, make/buy/subcontract route, supplier, and quantities must be confirmed by Engineering before approval.</p>'+
    '<div class="gr-inv-flow"><span>FG final assembly</span><b>←</b><span>SFG welding / fitment</span><b>←</b><span>IM cutting / folding</span><b>←</b><span>RM purchase</span></div>'+
-   '<p>Workbook example: FG-001 MGB100 FRP · SFG-001 top hinge · IM-001 hinge plate · RM-001 SS sheet. Existing draft BOM mappings appear below.</p>'+
-   table(['Parent','Child','Stage','Required / parent','BOM revision','Status'],edges.map(r=>{
+   '<p>Workbook reference: FG-001 MGB100 FRP · SFG-001 top hinge · IM-001 hinge plate · RM-001 SS sheet.</p>'+
+   table(['Parent','Child','Stage','Required / parent','Revision','Status'],edges.map(r=>{
     const child=index.get(r.company_id+'|'+String(r.child_code||'').toLowerCase());
     return '<tr><td><strong>'+esc(r.parent_code)+'</strong></td><td>'+esc(r.child_code)+'</td><td>'+esc(child?.stage||'Review stage')+'</td><td>'+esc(r.qty)+' '+esc(r.uom)+'</td><td>'+esc(r.revision)+'</td><td>'+esc(r.status||'Draft')+'</td></tr>'}))+
-   '<p class="gr-inv-warning">The uploaded Excel is a mapping example, not approval of exact production quantities. BOMs must be technically validated before release.</p>';
+   form+'<p class="gr-inv-warning">Source workbook records are sample mappings, not approved manufacturing recipes. Production cannot use unapproved BOM lines.</p>';
  }
  function purchase(){
-  const items=S.items.filter(inScope).filter(i=>i.purchasable),po=S.pos.filter(inScope);
-  const shortages=items.filter(i=>i.aggregate!==null&&Number(i.aggregate)<=Number(i.material.reorder_level||0)&&i.original==='ops');
-  return '<h3>Raw Material Purchase Planning</h3><p>Low stock and reorder triggers should create Purchase Requisitions, then approved POs. Existing live production POs are listed below.</p>'+
-   '<div class="gr-inv-stats"><article><small>Purchasable materials</small><strong>'+items.length+'</strong></article><article><small>Low/reorder candidates</small><strong>'+shortages.length+'</strong></article><article><small>Live purchase orders</small><strong>'+po.length+'</strong></article></div>'+
-   '<h4>Reorder candidates</h4>'+table(['Code','Material','Stock','Reorder level','Source vendor'],shortages.map(i=>'<tr><td>'+esc(i.code)+'</td><td>'+esc(i.name)+'</td><td>'+fmt(i.aggregate)+' '+esc(i.unit)+'</td><td>'+fmt(i.material.reorder_level)+'</td><td>'+esc(i.material.preferred_vendor||i.material.preferred_vendor_id||'—')+'</td></tr>'))+
-   '<h4>Existing Purchase Orders</h4>'+table(['PO','Company','Vendor','Status','Date'],po.map(d=>'<tr><td>'+esc(d.number)+'</td><td>'+esc(companyName(d.company_id))+'</td><td>'+esc(d.payload.vendor?.name||'—')+'</td><td>'+esc(d.status)+'</td><td>'+esc(new Date(d.created_at).toLocaleDateString('en-IN'))+'</td></tr>'))+
-   '<p><button data-inv-operations>Open Purchase Order / Production Planning</button></p>';
+  const items=S.items.filter(inScope).filter(i=>i.purchasable),po=S.pos.filter(inScope),pr=S.requisitions.filter(inScope);
+  const shortages=items.filter(i=>i.original==='ops'&&i.aggregate!==null&&Number(i.aggregate)<=Number(i.material.reorder_level||0));
+  const form=S.ctx.can('purchase','create')?'<form data-inv-pr class="gr-inv-form"><h4>Create purchase requisition from material shortage</h4><div class="gr-inv-grid">'+
+   choice('item','Purchasable material',items.filter(i=>i.original==='ops').map(x=>[x.company_id+'|'+x.id,x.code+' · '+x.name+' ['+companyName(x.company_id)+']']))+
+   '<label>Required quantity<input name="quantity" type="number" min="0.000001" step="0.000001" required></label>'+
+   '<label>Need by<input name="need_by" type="date" required></label>'+
+   e('reference','Production / Sales reference','',false)+e('notes','Shortage / purpose','',false)+'</div>'+
+   '<button type="submit">Create Draft Purchase Requisition</button><p>Procurement approval, supplier quotation and PO issue remain in Purchase / Operations.</p></form>':'';
+  return '<h3>Raw Material Purchase Planning</h3><p>Stock shortages can raise Purchase Requisitions. A PO is issued only after approval and vendor selection.</p>'+
+   '<div class="gr-inv-stats"><article><small>Purchasable materials</small><strong>'+items.length+'</strong></article><article><small>Low/reorder candidates</small><strong>'+shortages.length+'</strong></article><article><small>Open requisitions</small><strong>'+pr.length+'</strong></article><article><small>Purchase orders</small><strong>'+po.length+'</strong></article></div>'+
+   '<h4>Reorder alerts</h4>'+table(['Code','Material','Stock','Reorder level','Preferred source'],shortages.map(i=>'<tr><td>'+esc(i.code)+'</td><td>'+esc(i.name)+'</td><td>'+fmt(i.aggregate)+' '+esc(i.unit)+'</td><td>'+fmt(i.material.reorder_level)+'</td><td>'+esc(i.material.preferred_vendor||i.material.preferred_vendor_id||'—')+'</td></tr>'))+
+   '<h4>Purchase requisitions</h4>'+table(['Reference','Material','Requested','Need by','Approval status'],pr.map(r=>'<tr><td>'+esc(r.payload.order_ref||r.record_id)+'</td><td>'+esc(r.payload.material_code)+'</td><td>'+fmt(r.payload.quantity)+' '+esc(r.payload.uom)+'</td><td>'+esc(r.payload.need_by||'—')+'</td><td>'+esc(r.payload.status)+'</td></tr>'))+
+   '<h4>Live Purchase Orders</h4>'+table(['PO','Company','Vendor','Status','Date'],po.map(d=>'<tr><td>'+esc(d.number)+'</td><td>'+esc(companyName(d.company_id))+'</td><td>'+esc(d.payload.vendor?.name||'—')+'</td><td>'+esc(d.status)+'</td><td>'+esc(new Date(d.created_at).toLocaleDateString('en-IN'))+'</td></tr>'))+
+   form+'<p><button data-inv-operations>Open Purchase Order / Production Planning</button></p>';
  }
  function audit(){
   return '<h3>Verified physical stock movement audit</h3>'+
@@ -153,6 +171,51 @@
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});
   S.root.querySelectorAll('[data-inv-operations]').forEach(b=>b.onclick=()=>S.ctx.openOperations());
   const f=S.root.querySelector('[data-inv-form]');if(f)f.onsubmit=event=>void post(event).catch(e=>notify(e.message,true));
+  const bomForm=S.root.querySelector('[data-inv-bom]');if(bomForm)bomForm.onsubmit=e=>void saveBom(e).catch(err=>notify(err.message,true));
+  const prForm=S.root.querySelector('[data-inv-pr]');if(prForm)prForm.onsubmit=e=>void savePr(e).catch(err=>notify(err.message,true));
+ }
+ async function saveBom(event){
+  event.preventDefault();if(S.busy||!S.ctx.can('stock','create'))throw Error('Stock create permission required');
+  const fd=new FormData(event.target),co=String(fd.get('company'));
+  if(!S.ctx.companies.includes(co))throw Error('Company permission denied');
+  const parent=S.items.find(i=>i.company_id===co&&i.original==='ops'&&co+'|'+i.id===fd.get('parent'));
+  const child=S.items.find(i=>i.company_id===co&&i.original==='ops'&&co+'|'+i.id===fd.get('child'));
+  if(!parent||!child)throw Error('Select parent and child in the same company');
+  if(stages.indexOf(child.stage)<=stages.indexOf(parent.stage))throw Error('BOM must flow from FG → SFG → IM → RM (parent must be a higher production stage)');
+  const qty=Number(fd.get('qty'));if(!(qty>0))throw Error('Positive quantity required');
+  const previous=S.bom.some(b=>b.company_id===co&&b.payload.parent_code===parent.code&&b.payload.child_code===child.code&&b.payload.revision===fd.get('revision'));
+  if(previous)throw Error('This BOM component already exists in the selected revision');
+  if(!window.confirm('Save draft BOM component '+parent.code+' ← '+child.code+'?'))return;
+  const record={company_id:co,kind:'bom',record_id:uid(),payload:{
+   parent_code:parent.code,child_code:child.code,qty,uom:String(fd.get('uom')),revision:String(fd.get('revision')),
+   operation:String(fd.get('operation')||''),source_type:String(fd.get('source')||''),notes:String(fd.get('notes')||''),
+   status:'Draft',created_by:S.ctx.userId
+  }};
+  S.busy=true;
+  try{
+   const {error}=await S.ctx.db.from('gr_ops_records').insert(record);
+   if(error)throw Error(error.message);
+   await load();draw();notify('Draft BOM line saved. Engineering approval required before production.');
+  }finally{S.busy=false}
+ }
+ async function savePr(event){
+  event.preventDefault();if(S.busy||!S.ctx.can('purchase','create'))throw Error('Purchase permission required');
+  const fd=new FormData(event.target),entry=String(fd.get('item'));
+  const item=S.items.find(i=>i.original==='ops'&&i.purchasable&&i.company_id+'|'+i.id===entry);
+  if(!item||!S.ctx.companies.includes(item.company_id))throw Error('Choose an authorised purchasable material');
+  const quantity=Number(fd.get('quantity'));if(!(quantity>0))throw Error('Positive requested quantity required');
+  const record={company_id:item.company_id,kind:'requisition',record_id:uid(),payload:{
+   order_ref:String(fd.get('reference')||'PR-'+Date.now()),material_code:item.code,quantity,uom:item.unit,
+   need_by:String(fd.get('need_by')),requester:S.ctx.userId,status:'Draft',notes:String(fd.get('notes')||''),
+   material_id:item.id
+  }};
+  if(!window.confirm('Create draft purchase requisition for '+item.code+' · '+quantity+' '+item.unit+'?'))return;
+  S.busy=true;
+  try{
+   const {error}=await S.ctx.db.from('gr_ops_records').insert(record);
+   if(error)throw Error(error.message);
+   await load();draw();notify('Purchase requisition saved as Draft. Approval and PO required.');
+  }finally{S.busy=false}
  }
  async function post(event){
   event.preventDefault();if(S.busy)return;
