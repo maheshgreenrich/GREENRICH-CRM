@@ -54,7 +54,7 @@ window.GreenRichLeadProfile=(function(){
    const digits=phone.replace(/\D/g,'');
    const links=[
     phone.length>=10?'<a href="tel:'+esc(phone)+'">Call</a>':'',
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email||'')?'<a href="mailto:'+esc(lead.email)+'">Email</a>':'',
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email||'')?'<button type="button" data-grlp-email>Email</button>':'',
     digits.length>=10&&digits.length<=15?'<a target="_blank" rel="noopener noreferrer" href="https://wa.me/'+digits+'">WhatsApp</a>':''
    ].join('');
    const dup=lead.import_duplicate_type&&lead.import_duplicate_type!=='none'?
@@ -112,6 +112,11 @@ window.GreenRichLeadProfile=(function(){
       chooser.close();linker.textContent='Customer linked — refresh to view';linker.disabled=true;
      };chooser.showModal();
    };
+   const emailButton=d.querySelector('[data-grlp-email]');
+   if(emailButton)emailButton.onclick=()=>void window.GreenRichContactEmail?.open({
+    db,company,contactType:'lead',contactId:leadId,
+    name:p.name||lead.contact||lead.title,email:lead.email,notify:message=>window.alert(message)
+   }).catch(error=>window.alert(error.message));
    const full=d.querySelector('[data-full]');
    if(full)full.onclick=()=>{close();window.GreenRichCRM?.switchPage?.('customers');
      window.GreenRichShell?.setPageWithoutRemount?.('customers');
