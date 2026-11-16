@@ -30,6 +30,8 @@
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
  const serviceFor=order=>serviceLinks.find(x=>x.dispatch_id===order.id);
  const approvalStatus=s=>dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
+ const stockShortage=s=>Math.max(0,Number(s.stock_shortage)||0);
+ const stockBlocked=s=>stockShortage(s)>0;
  const filterPeriod=(period,from,to,day)=>{
   if(period==='all')return true;
   if(period==='custom')return (!from||day>=from)&&(!to||day<=to);
@@ -119,7 +121,7 @@
    case 'product':return '<strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small>';
    case 'channel':return '<span class="pill">'+esc(channelName(s))+'</span>';
    case 'qty':return num(s.qty);
-   case 'status':return '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+(Number(s.stock_shortage)>0?'<small style="display:block;color:#b45309;font-weight:700">⚠ Low Stock · '+num(s.stock_shortage)+' units short</small>':'');
+   case 'status':return '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+(stockBlocked(s)?'<small role="alert" style="display:block;color:#b45309;font-weight:700">⚠ Low Stock · '+num(stockShortage(s))+' units short · Approval blocked</small>':(!dispatchFor(s)&&s.stock_status==='Available'?'<small style="display:block;color:#15803d;font-weight:700">✓ Stock Available</small>':''));
    case 'taxable':return money(s.taxable);
    case 'tax':return money(s.tax_amount);
    case 'shipping':return money(s.shipping_charge);
@@ -127,10 +129,10 @@
    case 'invoice':return adapter.invoiceAction(s);
    case 'actions':{
     const cloud=dispatchFor(s),blocked=['Cancelled','Returned'].includes(s.status);
-    const approve=canApprove&&!cloud&&!s.approval_status&&!blocked?
+    const approve=canApprove&&!cloud&&!s.approval_status&&!blocked&&!stockBlocked(s)?
      '<button class="gr-order-approve" type="button" data-approve-order="'+esc(s.id)+'" data-approve-company="'+esc(s._companyId)+'">Approve</button>':
      (cloud?'<span class="gr-order-approved">✓ Sent to dispatch</span>':
-      (blocked?'<span class="gr-order-muted">Not approvable</span>':'<span class="gr-order-muted">'+esc(status)+'</span>'));
+      (blocked?'<span class="gr-order-muted">Not approvable</span>':stockBlocked(s)?'<span class="gr-order-muted">⚠ Low Stock — approval unavailable</span>':'<span class="gr-order-muted">'+esc(status)+'</span>'));
     return '<div class="gr-order-actions">'+window.GreenRichActionMenu.wrap(approve+adapter.rawActions('sales',s.id)+adapter.invoiceAction(s))+'</div>';
    }
    default:return '—';
@@ -212,6 +214,7 @@
   if(!sale)return actionMessage('Sale not found in this browser');
   if(['Cancelled','Returned'].includes(sale.status))return actionMessage('Cancelled or returned orders cannot be approved');
   if(dispatchFor(sale))return actionMessage('Order already approved');
+  if(stockBlocked(sale))return actionMessage('Approval blocked: Low Stock. Replenish inventory before approving this order.');
   const c=customer(sale);
   if(!window.confirm('Approve order '+orderId(sale)+' and send it to the shared Dispatch queue?'))return;
   button.disabled=true;
