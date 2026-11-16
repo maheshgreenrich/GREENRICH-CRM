@@ -45,6 +45,8 @@ jobs:
           node tests/multimail-settings.cjs
           node tests/rich-contact-email.cjs
           node tests/email-editor-history.cjs
+          node tests/inventory-wms-bom.cjs
+          node --check greenrich-inventory.js
           node tests/quotation-visual-builder.cjs
           node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js
