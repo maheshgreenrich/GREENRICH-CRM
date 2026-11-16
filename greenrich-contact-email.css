@@ -57,3 +57,7 @@
 .grce-history-file{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:9px;border:1px solid #dce7f3;background:white;border-radius:8px}
 .grce-history-file span{flex:1;min-width:170px}
 .grce-history-file button{border:1px solid #b8cde5;background:#f4f8ff;color:#2054a1;border-radius:7px;padding:6px 9px;cursor:pointer}
+
+.grce-attachment-preview{display:block;width:100%;height:310px;border:1px solid #c9d8e9;background:white;border-radius:8px;margin:8px 0}
+.grce-history-file:has(.grce-attachment-preview){width:100%}
+@media(max-width:650px){.grce-attachment-preview{height:250px}}
