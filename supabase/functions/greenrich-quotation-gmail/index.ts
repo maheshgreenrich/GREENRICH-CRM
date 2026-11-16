@@ -51,7 +51,7 @@ async function actor(req:Request){
  if(pe||!profile?.active)throw Error('Active employee profile required');
  return {db,profile,user:data.user};
 }
-async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'view'){
+async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'view'|'send_customer'|'send_lead'){
  if(!profile.company_ids?.includes(company))throw Error('Company access denied');
  if(action==='admin'){
   const {data}=await db.rpc('gr_field_is_admin',{p_company:company});
@@ -62,8 +62,8 @@ async function allowed(db:any,profile:any,company:string,action:'send'|'admin'|'
  }
  const {data:role}=await db.from('gr_roles').select('name').eq('id',profile.role_id).single();
  if(role?.name==='Admin')return;
- const modules=action==='view'?['sales','orders']:['sales','orders'];
- const actions=action==='send'?['create','edit']:['view'];
+ const modules=action==='view'?['sales','orders','customers','leads']:action==='send_customer'?['customers']:action==='send_lead'?['leads']:['sales','orders'];
+ const actions=action==='send'||action.startsWith('send_')?['create','edit']:['view'];
  const {data:grants}=await db.from('gr_role_permissions').select('allowed').eq('role_id',profile.role_id).in('module',modules).in('action',actions).eq('allowed',true).limit(1);
  if(!grants?.length)throw Error('Your role cannot '+(action==='send'?'send quotations':'view quotation documents'));
 }
@@ -166,9 +166,9 @@ function contactMime(from:string,to:string,subject:string,body:string){
 }
 async function sendContact(db:any,profile:any,payload:any){
  const company=plain(payload.company_id,50);
- await allowed(db,profile,company,'send');
  const kind=plain(payload.contact_type,15),id=plain(payload.contact_id,100);
  if(!['customer','lead'].includes(kind)||!id)throw Error('Customer or lead reference required');
+ await allowed(db,profile,company,kind==='customer'?'send_customer':'send_lead');
  const recipient=plain(payload.to,254),subject=plain(payload.subject,200),body=plain(payload.body,10000),key=plain(payload.request_key,60);
  if(!validEmail(recipient)||!subject||!body||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject, body and request ID required');
  if(kind==='customer'){
