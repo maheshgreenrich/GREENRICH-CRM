@@ -509,7 +509,9 @@ function renderCustomerProfile(){
   onEmail:({email,subject='',body=''})=>{
    const company=activeCompany==='all'?(source?source._companyId||source.company_id:permittedCompanies[0]):activeCompany;
    void window.GreenRichContactEmail?.open({
-    db:pipelineConfig.client,company,contactType:'customer',contactId:customer.id,
+    db:pipelineConfig.client,company,companies:permittedCompanies,
+    companyNames:Object.fromEntries((window.GreenRichCompanies?.list?.()||[]).map(c=>[c.id,c.name])),
+    contactType:'customer',contactId:customer.id,
     name:customer.name,email,subject,body,notify:toast
    }).catch(error=>toast(error.message,'error'));
   }

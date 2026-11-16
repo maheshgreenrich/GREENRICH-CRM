@@ -30,7 +30,7 @@ const sql=read('supabase/migrations/20261116193000_mail_transport_configs.sql');
 assert.ok(sql.includes('gr_mail_transport_configs enable row level security'));
 assert.ok(sql.includes('revoke all on public.gr_mail_transport_configs'));
 const html=read('secure.html');
-assert.ok(html.includes('greenrich-gmail-settings.js?v=20261116-multimail-1'));
+assert.ok(html.includes('greenrich-gmail-settings.js?v=20261116-rich-multi-email-1'));
 assert.ok(html.includes('greenrich-quotation-mail.js?v=20261116-multimail-1'));
 const context=vm.createContext({window:{},console});
 vm.runInContext(screen,context);

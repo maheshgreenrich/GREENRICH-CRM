@@ -55,7 +55,12 @@
     '<label>Google OAuth Client Secret<input type="password" name="client_secret" autocomplete="new-password" maxlength="800" required placeholder="Paste Google Client Secret"></label>'+
     '<p class="grgmail-note">The Client Secret is never shown after saving. Saving new OAuth credentials requires connecting Gmail again.</p>'+
     '<div class="grgmail-actions"><button type="submit">Save Google OAuth</button><button type="button" id="grgmail-connect"'+(!configured?' disabled':'')+'>Connect / Reconnect Gmail</button>'+
-    '<button type="button" id="grgmail-disconnect"'+(gmail.status!=='connected'?' disabled':'')+'>Disconnect Gmail</button></div></form>';
+    '<button type="button" id="grgmail-disconnect"'+(gmail.status!=='connected'?' disabled':'')+'>Disconnect primary Gmail</button>'+
+    '<button type="button" id="grgmail-add-account"'+(!configured?' disabled':'')+'>+ Connect another Gmail</button></div></form>'+
+    '<section class="grgmail-accounts"><h3>Connected Gmail sender accounts</h3>'+
+    (data.gmail_accounts?.length?data.gmail_accounts.map(a=>'<div class="grgmail-account"><span><strong>'+esc(a.sender_email)+'</strong> · '+(a.primary?'Primary Gmail':'Additional Gmail')+' · '+esc(a.status)+'</span>'+
+       (!a.primary?'<button type="button" data-grgmail-remove-account="'+esc(a.id)+'">Disconnect</button>':'')+'</div>').join(''):'<p>No company Gmail accounts connected yet.</p>')+
+    '<p>Each company can connect more than one official Gmail account. Employees choose the From address when composing email.</p></section>';
    }else if(provider==='smtp'){
     fields='<form id="grgmail-smtp"><h3>Webmail SMTP Server Settings</h3>'+
      '<label>SMTP hostname<input name="smtp_host" required maxlength="253" placeholder="mail.yourcompany.com" value="'+esc(smtp.host||'')+'"></label>'+
@@ -123,6 +128,16 @@
    if(api)api.onsubmit=e=>{e.preventDefault();const f=new FormData(api);void save({action:'configure_transport',transport:'resend',resend_domain:f.get('resend_domain'),resend_api_key:f.get('resend_api_key'),sender_email:f.get('sender_email'),sender_name:f.get('sender_name')})};
    const connect=root.querySelector('#grgmail-connect');
    if(connect)connect.onclick=async()=>{try{const {authorize_url}=await call({action:'connect'});window.location.assign(authorize_url)}catch(e){notify?.(e.message,'error')}};
+   const add=root.querySelector('#grgmail-add-account');
+   if(add)add.onclick=async()=>{try{
+     const {authorize_url}=await call({action:'connect_account'});
+     window.location.assign(authorize_url);
+   }catch(e){notify?.(e.message,'error')}};
+   root.querySelectorAll('[data-grgmail-remove-account]').forEach(b=>b.onclick=async()=>{
+     if(!window.confirm('Disconnect '+b.closest('.grgmail-account')?.querySelector('strong')?.textContent+' from this company?'))return;
+     try{await call({action:'disconnect_account',account_id:b.dataset.grgmailRemoveAccount});notify?.('Additional Gmail disconnected');await draw()}
+     catch(e){notify?.(e.message,'error')}
+   });
    const disconnect=root.querySelector('#grgmail-disconnect');
    if(disconnect)disconnect.onclick=async()=>{if(!window.confirm('Disconnect this company Gmail account?'))return;try{await call({action:'disconnect'});notify?.('Gmail disconnected');await draw()}catch(e){notify?.(e.message,'error')}};
    const test=root.querySelector('#grgmail-test');

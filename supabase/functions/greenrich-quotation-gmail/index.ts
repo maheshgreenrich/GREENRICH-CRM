@@ -4,6 +4,7 @@
 // Never place OAuth credentials or service keys in public GitHub Pages files.
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import nodemailer from 'npm:nodemailer@7.0.10';
+import sanitizeHtml from 'npm:sanitize-html@2.17.0';
 
 const ORIGIN = 'https://maheshgreenrich.github.io';
 const HOME = ORIGIN + '/GREENRICH-CRM/secure.html';
@@ -104,6 +105,16 @@ async function callback(req:Request){
   const sender=await info.json();
   if(!info.ok||!sender.email_verified||!validEmail(sender.email))throw Error('Verified Gmail address unavailable');
   const encrypted=await encrypt(token.refresh_token);
+  if(state.sender_account_id){
+   const existing=await db.from('gr_gmail_sender_accounts').select('id,company_id').eq('company_id',state.company_id).eq('sender_email',sender.email).maybeSingle();
+   if(existing.error)throw existing.error;
+   const record={company_id:state.company_id,sender_email:sender.email,encrypted_refresh_token:encrypted,
+    status:'connected',connected_at:new Date().toISOString(),connected_by:state.initiated_by,updated_at:new Date().toISOString()};
+   const saved=await db.from('gr_gmail_sender_accounts').upsert(
+    {...record,id:existing.data?.id||state.sender_account_id},{onConflict:'id'});
+   if(saved.error)throw saved.error;
+   return callbackRedirect('connected');
+  }
   const one=await db.from('gr_gmail_private_tokens').upsert({company_id:state.company_id,encrypted_refresh_token:encrypted,updated_at:new Date().toISOString()});
   if(one.error)throw one.error;
   const two=await db.from('gr_gmail_connections').upsert({
@@ -114,12 +125,13 @@ async function callback(req:Request){
   return callbackRedirect('connected');
  }catch(error){console.error('Gmail OAuth callback failed',String(error));return callbackRedirect('failed')}
 }
-async function createAuthorizeUrl(db:any,profile:any,company:string){
+async function createAuthorizeUrl(db:any,profile:any,company:string,addAccount=false){
  await allowed(db,profile,company,'admin');
  const creds=await oauthCredentials(db,company);
  const state=random(),verifier=random(),challenge=b64url(await digest(bytes(verifier)));
  const {error}=await db.from('gr_gmail_oauth_states').insert({
   nonce:state,company_id:company,initiated_by:profile.id,code_verifier:verifier,
+  sender_account_id:addAccount?uuid():null,
   expires_at:new Date(Date.now()+10*60*1000).toISOString()
  });
  if(error)throw error;
@@ -131,9 +143,11 @@ async function createAuthorizeUrl(db:any,profile:any,company:string){
  }))target.searchParams.set(k,v);
  return target.toString();
 }
-async function getAccessToken(db:any,company:string){
+async function getAccessToken(db:any,company:string,senderAccountId='primary'){
  const creds=await oauthCredentials(db,company);
- const {data:token,error}=await db.from('gr_gmail_private_tokens').select('encrypted_refresh_token').eq('company_id',company).maybeSingle();
+ const {data:token,error}=senderAccountId&&senderAccountId!=='primary'
+  ?await db.from('gr_gmail_sender_accounts').select('encrypted_refresh_token').eq('company_id',company).eq('id',senderAccountId).eq('status','connected').maybeSingle()
+  :await db.from('gr_gmail_private_tokens').select('encrypted_refresh_token').eq('company_id',company).maybeSingle();
  if(error||!token)throw Error('Company Gmail is not connected');
  const refresh=await decrypt(token.encrypted_refresh_token);
  const response=await fetch('https://oauth2.googleapis.com/token',{
@@ -144,6 +158,19 @@ async function getAccessToken(db:any,company:string){
  const result=await response.json();
  if(!response.ok||!result.access_token)throw Error('Gmail authorization expired. Ask Admin to reconnect');
  return result.access_token as string;
+}
+async function gmailSenders(db:any,company:string){
+ const {data:legacy}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ const {data:extras,error}=await db.from('gr_gmail_sender_accounts').select('id,sender_email,status,connected_at').eq('company_id',company).order('connected_at');
+ if(error)throw error;
+ return [...(legacy?.status==='connected'?[{id:'primary',sender_email:legacy.sender_email,status:'connected',primary:true}]:[]),
+  ...(extras||[]).map((a:any)=>({id:a.id,sender_email:a.sender_email,status:a.status,primary:false}))];
+}
+async function selectedGmail(db:any,company:string,accountId:string){
+ const options=await gmailSenders(db,company);
+ const chosen=options.find((a:any)=>a.id===accountId&&a.status==='connected');
+ if(!chosen)throw Error('Selected Gmail sender is not connected to this company');
+ return chosen;
 }
 async function configureOAuth(db:any,profile:any,company:string,payload:any){
  await allowed(db,profile,company,'admin');requireSetup();
@@ -156,6 +183,7 @@ async function configureOAuth(db:any,profile:any,company:string,payload:any){
  if(error)throw error;
  await db.from('gr_gmail_private_tokens').delete().eq('company_id',company);
  await db.from('gr_gmail_connections').update({status:'needs_reconnect',updated_at:new Date().toISOString()}).eq('company_id',company);
+ await db.from('gr_gmail_sender_accounts').update({status:'needs_reconnect',updated_at:new Date().toISOString()}).eq('company_id',company);
  return {configured:true,client_id:id,status:'needs_reconnect'};
 }
 function contactMime(from:string,to:string,subject:string,body:string){
@@ -165,30 +193,118 @@ function contactMime(from:string,to:string,subject:string,body:string){
  'Content-Transfer-Encoding: base64','',b64(bytes(body)),''];
  return b64url(bytes(lines.join('\r\n')));
 }
+
+const attachmentMime={
+ 'application/pdf':'.pdf','image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp',
+ 'text/plain':'.txt',
+ 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'.docx',
+ 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'.xlsx'
+};
+function safeRichHtml(html:unknown){
+ if(typeof html!=='string')return '';
+ if(html.length>35000)throw Error('Email body exceeds maximum size');
+ const clean=sanitizeHtml(html,{
+  allowedTags:['p','div','br','strong','b','em','i','u','s','ul','ol','li','blockquote','a','span','font','h1','h2','h3','hr'],
+  allowedAttributes:{a:['href','title','target'],font:['color','size','face'],span:['style'],p:['style'],div:['style'],h1:['style'],h2:['style'],h3:['style']},
+  allowedSchemes:['https','http','mailto'],allowedSchemesAppliedToAttributes:['href'],
+  allowedStyles:{'*':{'color':[/^#[0-9a-fA-F]{3,6}$/],'background-color':[/^#[0-9a-fA-F]{3,6}$/],
+    'text-align':[/^(left|right|center|justify)$/],'font-size':[/^(10|12|14|16|18|20|24|28)px$/]}}
+ });
+ return clean.trim();
+}
+async function incomingAttachments(db:any,company:string,payload:any,kind:string,contactId:string){
+ const input=Array.isArray(payload.attachments)?payload.attachments:[];
+ if(input.length>4)throw Error('Maximum four attachments');
+ const result:any[]=[];let total=0;
+ for(const file of input){
+  const name=plain(file?.name,110).replace(/[\/\\\r\n<>]/g,'_');
+  const type=plain(file?.type,150),content=String(file?.base64||'');
+  if(!name||!Object.keys(attachmentMime).includes(type)||!(name.toLowerCase().endsWith(attachmentMime[type])||(type==='image/jpeg'&&name.toLowerCase().endsWith('.jpeg'))))
+   throw Error('Unsupported attachment. Use PDF, images, TXT, DOCX or XLSX');
+  if(!content||content.length>5_700_000||!/^[A-Za-z0-9+/]+={0,2}$/.test(content))
+   throw Error('Attachment is invalid or exceeds 4 MB');
+  let data:Uint8Array;
+  try{data=unb64(content)}catch(_){throw Error('Invalid attachment encoding')}
+  if(!data.length||data.length>4_194_304)throw Error('Each attachment must be under 4 MB');
+  total+=data.length;if(total>6_000_000)throw Error('Total attachments must be below 6 MB');
+  // File type and filename are checked; no attachment is executed or publicly served.
+  result.push({filename:name,content:data,contentType:type});
+ }
+ const archiveId=plain(payload.archive_pdf_id,60);
+ if(archiveId){
+  if(!/^[0-9a-f-]{36}$/i.test(archiveId))throw Error('Invalid archived quotation attachment');
+  const {data:record}=await db.from('gr_quotation_email_history')
+   .select('pdf_path,customer_id,quotation_id,company_id').eq('id',archiveId).eq('company_id',company).maybeSingle();
+  if(!record?.pdf_path)throw Error('Archived quotation PDF is unavailable');
+  let allowed=false;
+  if(kind==='customer')allowed=record.customer_id===contactId;
+  else{
+   const {data:lead}=await db.from('gr_lead_pipeline').select('customer_id').eq('lead_id',contactId).eq('company_id',company).maybeSingle();
+   allowed=Boolean(lead?.customer_id&&lead.customer_id===record.customer_id);
+  }
+  if(!allowed)throw Error('Archived quotation does not belong to this contact');
+  const {data,error}=await db.storage.from('gr-quotation-pdfs').download(record.pdf_path);
+  if(error||!data)throw Error('Could not read saved quotation PDF');
+  const raw=new Uint8Array(await data.arrayBuffer());
+  if(raw.length>4_194_304||total+raw.length>6_000_000)throw Error('Attachments exceed 6 MB total');
+  result.push({filename:'Quotation-'+String(record.quotation_id).slice(0,8)+'.pdf',content:raw,contentType:'application/pdf'});
+ }
+ return result;
+}
+
 async function sendContact(db:any,profile:any,payload:any){
  const company=plain(payload.company_id,50);
  const kind=plain(payload.contact_type,15),id=plain(payload.contact_id,100);
  if(!['customer','lead'].includes(kind)||!id)throw Error('Customer or lead reference required');
  await allowed(db,profile,company,kind==='customer'?'send_customer':'send_lead');
- const recipient=plain(payload.to,254),subject=plain(payload.subject,200),body=plain(payload.body,10000),key=plain(payload.request_key,60);
- if(!validEmail(recipient)||!subject||!body||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject, body and request ID required');
+ const to=parseEmail(payload.to),cc=parseEmail(payload.cc),bcc=parseEmail(payload.bcc);
+ const recipient=to[0]||'',subject=plain(payload.subject,200),body=plain(payload.body,20000),key=plain(payload.request_key,60);
+ const html=safeRichHtml(payload.html_body||'');
+ if(to.length<1||to.length>5||cc.length>5||bcc.length>5||[...to,...cc,...bcc].some(x=>!validEmail(x)))throw Error('Maximum 5 addresses in To, CC and BCC; all must be valid');
+ if(!body&&!html)throw Error('Email message is required');
+ const senderAccountId=plain(payload.sender_account_id,60);
+ if(!validEmail(recipient)||!subject||!/^[0-9a-f-]{36}$/i.test(key))throw Error('Valid email, subject and request ID required');
  if(kind==='customer'){
   const {data}=await db.from('gr_crm_customers').select('id,email').eq('id',id).maybeSingle();
-  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked customer email');
+  if(!data||!to.some(x=>String(data.email||'').toLowerCase()===x.toLowerCase()))throw Error('The contact’s registered email must be included in To');
  }else{
   const {data}=await db.from('gr_lead_pipeline').select('lead_id,email,company_id').eq('lead_id',id).eq('company_id',company).maybeSingle();
-  if(!data||String(data.email||'').toLowerCase()!==recipient.toLowerCase())throw Error('Recipient must match the linked lead email');
+  if(!data||!to.some(x=>String(data.email||'').toLowerCase()===x.toLowerCase()))throw Error('The lead’s registered email must be included in To');
  }
  const transport=await transportStatus(db,company);
- if(!transport.ready)throw Error('Company email sender is not connected. Configure it in Settings.');
+ if(!transport.ready&&!senderAccountId)throw Error('Company email sender is not connected. Configure it in Settings.');
+ const selection=senderAccountId?await selectedGmail(db,company,senderAccountId):null;
+ const senderEmail=selection?.sender_email||transport.connection.sender_email;
+ if(!senderEmail)throw Error('A company sender address must be connected');
+ const attachments=await incomingAttachments(db,company,payload,kind,id);
+ if(attachments.length>5)throw Error('Too many attachments');
+ const auditFiles=attachments.map(a=>({name:a.filename,type:a.contentType,bytes:a.content.length}));
  const logged=await db.from('gr_contact_email_history').insert({
-  company_id:company,request_key:key,recipient,subject,body,contact_type:kind,contact_id:id,
-  sender_email:transport.connection.sender_email,transport:transport.transport,sent_by:profile.id
+  company_id:company,request_key:key,recipient, to_recipients:to,cc,bcc,subject,body,html_body:html||null,
+  attachment_manifest:auditFiles,contact_type:kind,contact_id:id,
+  sender_email:senderEmail,sender_account_id:selection?.id==='primary'?null:selection?.id||null,
+  transport:selection?'gmail':transport.transport,sent_by:profile.id
  }).select('id').single();
  if(logged.error){if(logged.error.code==='23505')throw Error('This send has already been requested; check history');throw logged.error}
  const rowId=logged.data.id;
+ let deliveryStarted=false;
  try{
-  const result=await deliverMail(db,company,[recipient],[],subject,body);
+  const manifest:any[]=[];
+  for(let i=0;i<attachments.length;i++){
+   const item=attachments[i],destination=company+'/'+rowId+'/'+i+'-'+item.filename;
+   const upload=await db.storage.from('gr-mail-attachments').upload(destination,item.content,{
+    upsert:false,contentType:item.contentType});
+   if(upload.error)throw Error('Could not archive email attachment; message was NOT sent');
+   manifest.push({name:item.filename,type:item.contentType,bytes:item.content.length,path:destination});
+  }
+  if(manifest.length){
+   const upd=await db.from('gr_contact_email_history').update({attachment_manifest:manifest}).eq('id',rowId);
+   if(upd.error)throw Error('Attachment audit could not be saved; email was not sent');
+  }
+  deliveryStarted=true;
+  const result=await deliverMail(db,company,to,cc,subject,body,undefined,undefined,{
+   html,bcc,attachments,gmail_account_id:senderAccountId
+  });
   const saved=await db.from('gr_contact_email_history').update({
    status:'sent',transport:result.transport,provider_message_id:result.id||null,gmail_message_id:result.transport==='gmail'?result.id||null:null,sent_at:new Date().toISOString()
   }).eq('id',rowId);
@@ -197,7 +313,8 @@ async function sendContact(db:any,profile:any,payload:any){
  }catch(error){
   const {data:entry}=await db.from('gr_contact_email_history').select('status').eq('id',rowId).single();
   if(entry?.status==='sending')await db.from('gr_contact_email_history').update({
-   status:'needs_review',failure_reason:'Uncertain provider outcome; check sender account before retrying'
+   status:deliveryStarted?'needs_review':'failed',
+   failure_reason:deliveryStarted?'Provider outcome may be uncertain. Check Sent Mail and do not retry blindly.':'Email was not sent: attachment preparation failed.'
   }).eq('id',rowId);
   throw error;
  }
@@ -318,9 +435,12 @@ async function testTransport(db:any,profile:any,company:string){
  await db.from('gr_mail_transport_configs').update({status:'verified',verified_at:new Date().toISOString()}).eq('company_id',company);
  return {tested:true,transport:'resend',message:'API key and verified domain confirmed. No email was sent.'};
 }
-async function deliverMail(db:any,company:string,to:string[],cc:string[],subject:string,body:string,pdf?:Uint8Array,pdfName?:string){
+async function deliverMail(db:any,company:string,to:string[],cc:string[],subject:string,body:string,
+ pdf?:Uint8Array,pdfName?:string,
+ opts:{html?:string,bcc?:string[],attachments?:any[],gmail_account_id?:string}={}){
  const config=await transportConfig(db,company);
- const transport=config?.transport||'gmail';
+ const transport=opts.gmail_account_id?'gmail':config?.transport||'gmail';
+ const sendAttachments=[...(opts.attachments||[]),...(pdf?[{filename:pdfName||'Quotation.pdf',content:pdf,contentType:'application/pdf'}]:[])];
  if(transport==='smtp'){
   if(!config?.encrypted_smtp_password||config.status!=='verified')throw Error('Test and verify company SMTP in Settings before sending');
   validateSmtpHost(config.smtp_host);
@@ -328,8 +448,8 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
   try{
    const info=await smtp.sendMail({
     from:{name:config.sender_name||'',address:config.sender_email},
-    to,cc,subject,text:body,
-    ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:pdf,contentType:'application/pdf'}]}:{})
+    to,cc,bcc:opts.bcc||[],subject,text:body,html:opts.html||undefined,
+    attachments:sendAttachments
    });
    return {id:info.messageId||null,threadId:null,transport:'smtp'};
   }finally{smtp.close()}
@@ -341,18 +461,25 @@ async function deliverMail(db:any,company:string,to:string[],cc:string[],subject
    'Content-Type':'application/json'
   },body:JSON.stringify({
    from:(config.sender_name?config.sender_name.replace(/[<>\r\n]/g,'')+' <'+config.sender_email+'>':config.sender_email),
-   to,cc,subject,text:body,
-   ...(pdf?{attachments:[{filename:pdfName||'Quotation.pdf',content:b64(pdf)}]}:{})
+   to,cc,bcc:opts.bcc||[],subject,text:body,html:opts.html||undefined,
+   ...(sendAttachments.length?{attachments:sendAttachments.map((a:any)=>({filename:a.filename,content:b64(a.content)}))}:{})
   })});
   const out=await response.json().catch(()=>({}));
   if(!response.ok)throw Error('Email API rejected send (HTTP '+response.status+'): '+plain(out.message,140));
   return {id:out.id||null,threadId:null,transport:'resend'};
  }
- const {data:gmail}=await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
- if(gmail?.status!=='connected')throw Error('Gmail is not connected. Configure it in Settings.');
- const token=await getAccessToken(db,company);
- const raw=pdf?mime(gmail.sender_email,to,cc,subject,body,pdf,pdfName||'Quotation.pdf'):
- contactMime(gmail.sender_email,to[0],subject,body);
+ const account=opts.gmail_account_id?await selectedGmail(db,company,opts.gmail_account_id):null;
+ const {data:gmail}=account?{data:account}:await db.from('gr_gmail_connections').select('sender_email,status').eq('company_id',company).maybeSingle();
+ if(gmail?.status!=='connected')throw Error('Selected Gmail is not connected. Configure it in Settings.');
+ const token=await getAccessToken(db,company,account?.id||'primary');
+ // NodeMailer stream transport generates standards-compliant multipart MIME for
+ // HTML, BCC and arbitrary validated attachments; Gmail API receives raw MIME.
+ const builder=nodemailer.createTransport({streamTransport:true,buffer:true});
+ const mail=await builder.sendMail({
+  from:gmail.sender_email,to,cc,bcc:opts.bcc||[],subject,text:body,
+  html:opts.html||undefined,attachments:sendAttachments
+ });
+ const raw=b64url(new Uint8Array(mail.message));
  const response=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{
   method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({raw})
  });
@@ -444,6 +571,16 @@ Deno.serve(async req=>{
   if(action==='test_transport')return json(await testTransport(db,profile,company));
   if(action==='send_contact')return json(await sendContact(db,profile,payload));
   if(action==='connect')return json({authorize_url:await createAuthorizeUrl(db,profile,company)});
+  if(action==='connect_account')return json({authorize_url:await createAuthorizeUrl(db,profile,company,true)});
+  if(action==='disconnect_account'){
+   await allowed(db,profile,company,'admin');
+   const id=plain(payload.account_id,60);
+   if(id==='primary')throw Error('Use Disconnect Gmail for the primary sender');
+   if(!/^[0-9a-f-]{36}$/i.test(id))throw Error('Invalid Gmail account');
+   const {error}=await db.from('gr_gmail_sender_accounts').delete().eq('id',id).eq('company_id',company);
+   if(error)throw error;
+   return json({disconnected:true});
+  }
   if(action==='disconnect'){
    await allowed(db,profile,company,'admin');
    await db.from('gr_gmail_private_tokens').delete().eq('company_id',company);
@@ -454,7 +591,18 @@ Deno.serve(async req=>{
   if(action==='status'){
    await allowed(db,profile,company,'view');
    const {data}=await db.from('gr_gmail_connections').select('status,sender_email,connected_at').eq('company_id',company).maybeSingle();
-   return json({...await oauthStatus(db,company),...await transportStatus(db,company)});
+   return json({...await oauthStatus(db,company),...await transportStatus(db,company),gmail_accounts:await gmailSenders(db,company)});
+  }
+  if(action==='contact_attachment_url'){
+   await allowed(db,profile,company,'view');
+   const id=plain(payload.history_id,60),index=Number(payload.attachment_index);
+   if(!/^[0-9a-f-]{36}$/i.test(id)||!Number.isInteger(index)||index<0||index>5)throw Error('Invalid file request');
+   const {data:record}=await db.from('gr_contact_email_history').select('attachment_manifest').eq('id',id).eq('company_id',company).maybeSingle();
+   const attachment=Array.isArray(record?.attachment_manifest)?record.attachment_manifest[index]:null;
+   if(!attachment?.path||!String(attachment.path).startsWith(company+'/'+id+'/'))throw Error('Archived attachment not available');
+   const {data,error}=await db.storage.from('gr-mail-attachments').createSignedUrl(attachment.path,90);
+   if(error)throw error;
+   return json({url:data.signedUrl});
   }
   if(action==='pdf_url'){
    await allowed(db,profile,company,'view');
