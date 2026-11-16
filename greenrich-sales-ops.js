@@ -29,7 +29,7 @@
  const orderKey=s=>(s._companyId||s.company_id)+'|'+s.id;
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
  const serviceFor=order=>serviceLinks.find(x=>x.dispatch_id===order.id);
- const approvalStatus=s=>dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
+ const approvalStatus=s=>stockBlocked(s)?'Low Stock Alert':dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
  const stockShortage=s=>Math.max(0,Number(s.stock_shortage)||0);
  const stockBlocked=s=>stockShortage(s)>0;
  const filterPeriod=(period,from,to,day)=>{
@@ -121,7 +121,11 @@
    case 'product':return '<strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small>';
    case 'channel':return '<span class="pill">'+esc(channelName(s))+'</span>';
    case 'qty':return num(s.qty);
-   case 'status':return '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+(stockBlocked(s)?'<small role="alert" style="display:block;color:#b45309;font-weight:700">⚠ Low Stock · '+num(stockShortage(s))+' units short · Approval blocked</small>':(!dispatchFor(s)&&s.stock_status==='Available'?'<small style="display:block;color:#15803d;font-weight:700">✓ Stock Available</small>':''));
+   case 'status':return stockBlocked(s)?
+    '<span role="alert" style="display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:20px;padding:6px 12px;font-weight:800">⚠ Low Stock Alert</span>'+
+    '<small style="display:block;color:#b91c1c;font-weight:700;margin-top:5px">Required: '+num(s.qty)+' · Allocated: '+num(Math.max(0,Number(s.stock_allocated_qty)||0))+' · Balance needed: '+num(stockShortage(s))+' units</small>':
+    '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+
+    (!dispatchFor(s)&&s.stock_status==='Available'?'<small style="display:block;color:#15803d;font-weight:700">✓ Stock Available</small>':'');
    case 'taxable':return money(s.taxable);
    case 'tax':return money(s.tax_amount);
    case 'shipping':return money(s.shipping_charge);
