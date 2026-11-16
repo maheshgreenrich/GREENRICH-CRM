@@ -23,7 +23,7 @@ assert.ok(gateway.includes('message_statistics:detailById.get(x.provider_batch_i
 for(const t of ['data-provider-report','data-provider-history',
  'Sync SocialBerries Bulk Batches','Saved Bulk Campaign History',
  'async function checkProvider(id,action)','batch_history','data-provider-prev','data-provider-next',
- 'data-batch-stats','batch_detail','read-only provider sync',
+ 'data-batch-stats','batch_detail','Read-only provider sync',
  'Completed = campaign processing','Total','Pending','Delivered','Read','Failed',
  'success_rate','effective_failure_rate','No WhatsApp messages are sent'])
  assert.ok(ui.includes(t),'Missing Marketing bulk tracking UI: '+t);
