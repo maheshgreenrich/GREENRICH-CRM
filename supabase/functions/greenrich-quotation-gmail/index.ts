@@ -219,7 +219,7 @@ async function incomingAttachments(db:any,company:string,payload:any,kind:string
  for(const file of input){
   const name=plain(file?.name,110).replace(/[\/\\\r\n<>]/g,'_');
   const type=plain(file?.type,150),content=String(file?.base64||'');
-  if(!name||!Object.keys(attachmentMime).includes(type)||!name.toLowerCase().endsWith(attachmentMime[type]))
+  if(!name||!Object.keys(attachmentMime).includes(type)||!(name.toLowerCase().endsWith(attachmentMime[type])||(type==='image/jpeg'&&name.toLowerCase().endsWith('.jpeg'))))
    throw Error('Unsupported attachment. Use PDF, images, TXT, DOCX or XLSX');
   if(!content||content.length>5_700_000||!/^[A-Za-z0-9+/]+={0,2}$/.test(content))
    throw Error('Attachment is invalid or exceeds 4 MB');
@@ -280,7 +280,7 @@ async function sendContact(db:any,profile:any,payload:any){
  if(attachments.length>5)throw Error('Too many attachments');
  const auditFiles=attachments.map(a=>({name:a.filename,type:a.contentType,bytes:a.content.length}));
  const logged=await db.from('gr_contact_email_history').insert({
-  company_id:company,request_key:key,recipient,cc,bcc,subject,body,html_body:html||null,
+  company_id:company,request_key:key,recipient, to_recipients:to,cc,bcc,subject,body,html_body:html||null,
   attachment_manifest:auditFiles,contact_type:kind,contact_id:id,
   sender_email:senderEmail,sender_account_id:selection?.id==='primary'?null:selection?.id||null,
   transport:selection?'gmail':transport.transport,sent_by:profile.id
