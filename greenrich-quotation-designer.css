@@ -1,0 +1,36 @@
+
+/* Visual GreenRich proposal editor. Kept separate from legacy quotation forms. */
+.grqd-studio{font:13px/1.45 Inter,Arial,sans-serif;color:#1c324a;background:#f6f8fc;padding:14px;border-radius:14px}
+.grqd-studio *{box-sizing:border-box}
+.grqd-studio>header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}
+.grqd-studio h2{margin:0;font-size:22px;color:#203c60}
+.grqd-studio h3{font-size:14px;margin:0 0 12px}
+.grqd-studio p{margin:5px 0;color:#718198}
+.grqd-studio button{border:1px solid #d1dced;border-radius:7px;background:white;padding:9px 12px;cursor:pointer;color:#2454a5;font-weight:600}
+.grqd-studio button.primary{background:#2453af;color:#fff}
+.grqd-studio button.active{background:#e5efff;border-color:#3d6ec9;color:#1b4ca1}
+.grqd-buttons{display:flex;gap:9px;flex-wrap:wrap}
+.grqd-controls{display:grid;grid-template-columns:1.3fr 1.3fr 1fr 1fr 1fr;gap:10px;background:#fff;border:1px solid #dce5f0;padding:12px;border-radius:10px}
+.grqd-controls label{display:block;font-size:11px;color:#57718c;font-weight:700}
+.grqd-controls input,.grqd-controls select{width:100%;margin-top:5px;border:1px solid #ccd7e6;border-radius:7px;padding:8px;font:inherit;background:#fff;color:#253b5b}
+.grqd-modes{display:flex;gap:10px;align-items:center;margin:13px 0;flex-wrap:wrap}
+.grqd-modes small{color:#647993}
+.grqd-editor-grid{display:grid;grid-template-columns:185px minmax(400px,1fr) 240px;gap:12px;min-height:860px}
+.grqd-editor-grid>aside{padding:12px;border:1px solid #dce5f0;background:white;border-radius:10px;min-width:0;overflow:auto;max-height:930px}
+.grqd-editor-grid>aside label{display:block;margin-top:12px}
+.grqd-editor-grid>aside input[type=file]{max-width:100%}
+.grqd-editor-grid>aside small{display:block;color:#61748c}
+#grqd-canvas{border:1px solid #dce5f0;border-radius:10px;overflow:hidden;min-height:840px}
+#grqd-blocks .gjs-blocks-c{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+#grqd-blocks .gjs-block{width:100%;min-height:65px;box-shadow:none;border:1px solid #e0e6ee;color:#244468;border-radius:8px;margin:3px}
+#grqd-blocks .gjs-block-label{font-size:11px;line-height:1.25}
+#grqd-styles .gjs-sm-sector-title{background:#eef4ff;color:#2c4b71}
+#grqd-styles,#grqd-layers{max-height:430px;overflow-y:auto}
+.grqd-studio .gjs-editor{font-family:Arial,sans-serif}
+.grqd-studio .gjs-one-bg{background:#ffffff}
+.grqd-studio .gjs-two-color{color:#304965}
+.grqd-studio .gjs-four-color{color:#3566bb}
+.grqd-studio .gjs-three-bg{background:#eff4ff}
+.grqd-studio .gjs-pn-views-container{display:none}
+@media(max-width:1400px){.grqd-editor-grid{grid-template-columns:160px minmax(320px,1fr)}.grqd-editor-grid>aside:last-child{grid-column:1/-1;max-height:none}.grqd-controls{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.grqd-studio>header{display:block}.grqd-buttons{margin-top:12px}.grqd-editor-grid{display:flex;flex-direction:column}.grqd-editor-grid>aside{max-height:none}.grqd-controls{grid-template-columns:repeat(2,minmax(0,1fr))}#grqd-canvas{min-height:650px}.grqd-modes{align-items:stretch}}
