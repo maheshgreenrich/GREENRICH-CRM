@@ -8,7 +8,7 @@ const settings=read('greenrich-company-admin.js'),one=read('greenrich-one.js'),m
 assert.match(settings,/Gmail Connectivity/);assert.match(settings,/ctx.openGmailSettings/);
 assert.match(one,/GreenRichGmailSettings\.mount/);
 assert.match(mail,/action:'send_contact'/);assert.match(mail,/crypto\.randomUUID\(\)/);
-assert.match(mail,/Company Gmail not connected/);
+assert.match(mail,/Company email not connected/);
 const cp=read('greenrich-customer-profile.js');
 assert.match(cp,/data-gr360/);assert.match(cp,/onEmail\?\./);
 assert.match(cp,/kind==='whatsapp'\?'__BLANK__'/);
