@@ -41,3 +41,19 @@
 .grce-rich .grce-actions .grce-primary{background:#235bb5;border-color:#235bb5;color:#fff}
 .grce-rich .grce-actions .grce-primary:disabled{background:#9cb7db;border-color:#9cb7db;cursor:not-allowed}
 @media(max-width:650px){.gr-contact-email-modal.grce-rich{width:98vw}.grce-rich #grce-form{padding:10px 12px}.grce-rich .grce-line label{flex:0 0 56px;width:56px}.grce-rich .grce-toolbar{gap:1px}.grce-rich .grce-heading{padding:14px 13px 10px}}
+
+/* Gmail-style emoji library, inline image blocks and email history preview */
+.grce-rich .grce-emojis{display:block;max-height:240px;overflow-y:auto;border:1px solid #d9e5f2;box-shadow:0 5px 18px #2c477019}
+.grce-rich .grce-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(37px,1fr));gap:2px}
+.grce-rich .grce-emoji-grid button{font-size:23px;line-height:1.4;padding:4px;border:0;background:transparent;border-radius:7px;cursor:pointer}
+.grce-rich .grce-emoji-grid button:hover{background:#dceaff}
+.grce-rich .grce-editor img{max-width:100%;height:auto;cursor:pointer;border-radius:6px}
+.grce-history-card{padding:13px 8px}
+.grce-history-expand{margin:8px 0 0;padding:7px 11px;border:1px solid #c6d9ef;background:#f7fbff;color:#2456a5;border-radius:7px;cursor:pointer}
+.grce-history-detail{margin:10px 0;padding:12px;border:1px solid #dce6f2;border-radius:10px;background:#f7faff}
+.grce-history-detail[hidden]{display:none}
+.grce-history-fields{font-size:12px;color:#5d728a;margin:5px 0 12px;overflow-wrap:anywhere}
+.grce-history-preview{display:block;border:1px solid #d2dfeb;background:white;border-radius:9px;width:100%;height:230px;margin:10px 0}
+.grce-history-file{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:9px;border:1px solid #dce7f3;background:white;border-radius:8px}
+.grce-history-file span{flex:1;min-width:170px}
+.grce-history-file button{border:1px solid #b8cde5;background:#f4f8ff;color:#2054a1;border-radius:7px;padding:6px 9px;cursor:pointer}
