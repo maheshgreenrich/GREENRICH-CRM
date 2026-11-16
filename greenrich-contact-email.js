@@ -59,7 +59,7 @@
   const $=selector=>dialog.querySelector(selector);
   const form=$('#grce-form'),status=$('#grce-status'),button=$('#grce-send'),editor=$('#grce-editor');
   const feedback=(msg,type)=>{status.textContent=msg;notify?.(msg,type)};
-  const updateCount=()=>{$('#grce-count').textContent=editor.innerText.length.toLocaleString('en-IN')+' characters'};
+  const updateCount=()=>{$('#grce-count').textContent=String(editor.innerText??editor.textContent??'').length.toLocaleString('en-IN')+' characters'};
   updateCount();
   dialog.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>dialog.close());
   const selectSender=()=>{
@@ -152,7 +152,7 @@
    event.preventDefault();if(sending||button.disabled)return;
    const fd=new FormData(form),to=split(fd.get('to')),cc=split(fd.get('cc')),bcc=split(fd.get('bcc'));
    const subject=String(fd.get('subject')||'').trim();
-   const plain=editor.innerText.trim(),html=editor.innerHTML;
+   const plain=String(editor.innerText??editor.textContent??'').trim(),html=editor.innerHTML;
    if(!to.some(x=>x.toLowerCase()===email.toLowerCase())){
     feedback('The contact’s registered email must remain in To.','error');return;
    }
