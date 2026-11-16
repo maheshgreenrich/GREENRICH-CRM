@@ -51,6 +51,7 @@ jobs:
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
+          node tests/whatsapp-dynamic-template-params.cjs
           node tests/quotation-visual-builder.cjs
           node --check greenrich-quotation-designer.js
           node --check greenrich-quotations.js

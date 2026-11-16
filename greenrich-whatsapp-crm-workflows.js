@@ -3,7 +3,7 @@
    No network calls to undocumented provider endpoints and no simulated sends. */
 (()=>{
  let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set();
- let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null,campaignImage=null;
+ let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null,campaignImage=null,campaignParamValues={};
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  const name=id=>companies[id]||id;
@@ -17,6 +17,54 @@
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
  const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot · API unverified':'Unverified');
  const templateOptions=(c,connectionId='')=>templates(c).filter(t=>t.category==='marketing'&&(!connectionId||t.connection_id===connectionId)).map(t=>[t.id,t.name+' · '+t.language+' · '+(t.provider_approval==='approved'&&t.provider_source==='verified_provider'?'Verified via Meta':t.provider_approval==='approved'&&t.provider_source==='admin_confirmed'?'Admin-confirmed':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · not verified':t.provider_preview?.status==='APPROVED'?'Meta approved reported · body missing':'Approval not confirmed')]);
+ function templateRequirements(t){
+  const comps=Array.isArray(t?.provider_preview?.components)?t.provider_preview.components:[];
+  const body=comps.find(x=>String(x.type).toUpperCase()==='BODY');
+  const header=comps.find(x=>String(x.type).toUpperCase()==='HEADER');
+  const buttons=comps.find(x=>String(x.type).toUpperCase()==='BUTTONS')?.buttons||[];
+  const tags=text=>[...String(text||'').matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1].trim().toLowerCase());
+  const fields=[];
+  if(String(header?.format).toUpperCase()==='TEXT')for(const tag of tags(header.text))fields.push({key:'header:'+tag,label:'Header '+tag});
+  for(const tag of tags(body?.text)){
+   if(!['clientname','clientemail','clientmobile','1','2','3'].includes(tag))
+    fields.push({key:'body:'+tag,label:'Body variable '+tag});
+  }
+  if(!Array.isArray(buttons))return {fields,unsupported:['Invalid approved button definitions'],format:''};
+  buttons.forEach((b,i)=>{
+   const type=String(b.type||'').toUpperCase();
+   if(type==='COPY_CODE')fields.push({key:'coupon:'+i,label:'Coupon code · '+(b.text||'Copy code')});
+   if(type==='URL'&&tags(b.url).length)fields.push({key:'url:'+i,label:'Website button URL suffix · '+(b.text||'Website')});
+  });
+  const format=String(header?.format||'').toUpperCase();
+  const unsupported=[];
+  if(['VIDEO','DOCUMENT'].includes(format))unsupported.push(format+' headers are not yet supported for CRM campaign sending');
+  if(comps.some(x=>['CAROUSEL','LIMITED_TIME_OFFER'].includes(String(x.type).toUpperCase())))
+   unsupported.push('Complex carousel / limited-time template content needs provider-specific support');
+  if(buttons.some(b=>!['COPY_CODE','URL','PHONE_NUMBER','QUICK_REPLY'].includes(String(b.type||'').toUpperCase())))
+   unsupported.push('This template includes an unsupported button type');
+  return {fields,format,unsupported,body};
+ }
+ function drawTemplateRequirements(form){
+  const region=form?.querySelector('[data-wa-required-fields]');if(!region)return;
+  const id=form.elements.template_id?.value;
+  const template=rows.templates.find(t=>t.id===id);
+  if(!template){region.innerHTML='<p class="grwc-muted">Choose a template to see its required message variables, media and buttons.</p>';return}
+  const spec=templateRequirements(template);
+  const stored=campaignParamValues[id]||{};
+  const hints=[];
+  if(template.provider_source!=='verified_provider')
+   hints.push('This template is Admin-confirmed only. Check the exact Meta-approved name, language, ID, and button types in SocialBerries before sending.');
+  if(spec.format==='IMAGE')hints.push('IMAGE header required. Choose a file above; a stored image preview is not sufficient unless its media is attached.');
+  if(spec.body?.text)hints.push('BODY template variables: '+[...String(spec.body.text).matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]).join(', ')+'. Numeric 1–3 / named client fields are mapped from each contact.');
+  region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
+   (hints.length?'<p class="grwc-notice">'+hints.map(esc).join(' ')+'</p>':'')+
+   (spec.unsupported.length?'<p class="grwc-notice">'+spec.unsupported.map(esc).join(' · ')+'</p>':'')+
+   '<div class="grwc-grid">'+spec.fields.map(f=>'<label>'+esc(f.label)+
+      '<input type="text" name="wa_parameter" data-wa-field="'+esc(f.key)+'" required maxlength="200" value="'+esc(stored[f.key]||'')+'" placeholder="Required for approved template"></label>').join('')+'</div>'+
+   (!spec.fields.length?'<p class="grwc-muted">No additional custom text or button values are required by the saved template JSON.</p>':'');
+  const button=form.querySelector('[data-send-campaign]');
+  if(button)button.disabled=!!spec.unsupported.length;
+ }
  const headers=(title,sub,action='')=>'<div class="grwc-title"><div><h3>'+esc(title)+'</h3><p>'+esc(sub)+'</p></div>'+action+'</div>';
  const empty=(message)=>'<div class="grwc-empty">'+esc(message)+'</div>';
  const scoped=(a)=>a.filter(x=>scope==='all'||x.company_id===scope);
@@ -120,7 +168,8 @@
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
-   '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg,image/webp"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
+   '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
+   '<div class="grwc-span" data-wa-required-fields></div>'+ 
    '<p class="grwc-muted grwc-span">Only approved templates with complete message content and opted-in contacts can be sent. A screenshot reference must first be synced once in Settings → WhatsApp Integration.</p>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
@@ -253,6 +302,7 @@
    }
    // Campaign name is created automatically.
   }
+  if(form)drawTemplateRequirements(form);
  }
  const input=(label,key,value='',type='text')=>'<label>'+esc(label)+'<input name="'+esc(key)+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const note=(label,key,v='')=>'<label class="grwc-span">'+esc(label)+'<textarea name="'+esc(key)+'" rows="3">'+esc(v)+'</textarea></label>';
@@ -933,7 +983,7 @@
  }
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
-  current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;
+  current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;campaignParamValues={};
   startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
   try{await fetchAll();marketingDraw()}
@@ -999,10 +1049,21 @@
     if(status)status.textContent=campaignImage?'Selected for sending: '+campaignImage.name:'No image selected';
     return;
    }
+   if(form&&e.target.dataset?.waField){
+    const id=form.elements.template_id.value;
+    if(!campaignParamValues[id])campaignParamValues[id]={};
+    campaignParamValues[id][e.target.dataset.waField]=String(e.target.value||'');
+    return;
+   }
+   if(form&&e.target.name==='template_id'){
+    drawTemplateRequirements(form);
+    return;
+   }
    if(form&&e.target.name==='connection_id'){
     const connectionId=e.target.value,c=campaignConnection(connectionId)?.company_id||'';
     const tpl=form.querySelector('[name=template_id]');
     if(tpl)tpl.innerHTML=options(templateOptions(c,connectionId),'Choose a template for this provider');
+    drawTemplateRequirements(form);
     return;
    }
    const map={'grwc-company':'scope','grwc-kind':'kind','grwc-source':'source','grwc-tag':'tag','grwc-owner':'owner',
@@ -1065,12 +1126,21 @@
     const otherLeads=chosen.filter(x=>x.type==='Lead'&&x.company_id!==companyId).length;
     return alert('None of the '+selected.size+' selected contacts can be sent by this provider. '+invalid+' invalid mobile number(s), '+otherLeads+' lead(s) from a different company.','warning');
    }
+   const spec=templateRequirements(template);
+   if(spec.unsupported.length)return alert('Cannot send this template: '+spec.unsupported.join(' · '),'warning');
+   const templateFields={};
+   for(const entry of spec.fields){
+    const control=[...e.target.querySelectorAll('[data-wa-field]')].find(x=>x.dataset.waField===entry.key);
+    const value=String(control?.value||'').trim();
+    if(!value)return alert('Complete required template field: '+entry.label,'warning');
+    templateFields[entry.key]=value;
+   }
    const excluded=selected.size-matches.length;
    const file=campaignImage||f.get('image');
    const hasFile=!!file&&typeof file.size==='number'&&file.size>0;
-   const allowed={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
+   const allowed={'image/jpeg':'jpg','image/png':'png'};
    if(hasFile&&(!allowed[file.type]||file.size>5*1024*1024))
-    return alert('Choose a JPG, PNG or WebP campaign image under 5 MB.','warning');
+    return alert('Choose a JPEG or PNG campaign image under 5 MB; WebP is not accepted for this template header.','warning');
    if(hasFile&&!app.admin)
     return alert('Only company Admin can upload a private campaign image.','warning');
    const consent=rows.consents||[];
@@ -1078,13 +1148,13 @@
     sameMobile(w.mobile,x.mobile)&&w.consent_status==='opted_in'&&!!w.consent_source&&!!w.consent_at&&!w.opt_out_at));
    // The server validates all sending requirements in one read-only request before any draft is created.
    const signature=JSON.stringify([companyId,connectionId,templateId,matches.map(x=>x.id).sort(),
-    hasFile?[file.name,file.size,file.lastModified]:null]);
+    hasFile?[file.name,file.size,file.lastModified]:null,templateFields]);
    let record=lastPrepared?.signature===signature?lastPrepared.record:null;
    sendBusy=true;
    const clicked=e.target.querySelector('[data-send-campaign]');if(clicked){clicked.disabled=true;clicked.textContent='Sending…'}
    try{
     const readiness=await secureSend('preflight_marketing',{
-     connection_id:connectionId,template_id:templateId,crm_ids:matches.map(x=>x.id),has_image:hasFile
+     connection_id:connectionId,template_id:templateId,crm_ids:matches.map(x=>x.id),has_image:hasFile,template_fields:templateFields
     });
     if(!readiness.ready){
      const issues=readiness.blockers||[];
@@ -1099,6 +1169,7 @@
        selected_customers:matches.filter(x=>x.type==='Customer').length,
        selected_leads:matches.filter(x=>x.type==='Lead').length,
        crm_consent_checked_count:eligible.length,selection:'manual',source:'greenrich_crm',
+       template_fields:templateFields,
        company_rule:'shared_customers_provider_sender_leads_company_scoped'},
       status:'draft',
       notes:'Not sent. Template requires verified approved components. Media images are private draft assets, not a provider-sent template header. Actual messaging requires opt-in and verified sender.'

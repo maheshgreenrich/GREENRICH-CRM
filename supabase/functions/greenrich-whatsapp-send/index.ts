@@ -57,23 +57,74 @@ async function audience(db:any,campaign:any,company:string){
  return {selected:ids.length,eligible,remaining:eligible.filter(x=>!attempted.has(x.phone)),
   no_phone:ids.length-people.length,no_consent:people.length-eligible.length,attempted:attempted.size,states};
 }
-function components(template:any,person:Person,image:string){
- const p=template.provider_preview;
- if(!p||p.status!=="APPROVED"||String(p.category).toUpperCase()!=="MARKETING"||String(p.id)!==String(template.provider_template_id)
-  ||p.name!==template.name||p.language!==template.language||!Array.isArray(p.components))
-  throw Error("Approved MARKETING template metadata is incomplete");
- const body=p.components.find((c:any)=>String(c.type).toUpperCase()==="BODY");
- const header=p.components.find((c:any)=>String(c.type).toUpperCase()==="HEADER");
+function templateSpecs(template:any){
+ const preview=template?.provider_preview;
+ if(!preview||preview.status!=="APPROVED"||String(preview.category).toUpperCase()!=="MARKETING"||
+  String(preview.id)!==String(template.provider_template_id)||
+  preview.name!==template.name||preview.language!==template.language||
+  !Array.isArray(preview.components))throw Error("Approved MARKETING template metadata is incomplete or mismatched");
+ const parts=preview.components,body=parts.find((x:any)=>String(x.type).toUpperCase()==="BODY");
+ const header=parts.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
  if(typeof body?.text!=="string"||!body.text.trim())throw Error("Approved BODY component missing");
- if(image&&String(header?.format).toUpperCase()!=="IMAGE")throw Error("This template does not support an IMAGE header");
- if(!image&&String(header?.format).toUpperCase()==="IMAGE")throw Error("This template requires a campaign image");
- const result:any[]=[];
- if(image)result.push({type:"header",parameters:[{type:"image",image:{link:image}}]});
- const vars=[...body.text.matchAll(/\{\{([^{}]+)\}\}/g)].map(x=>x[1].trim().toLowerCase());
- const values:Record<string,string>={clientname:person.name,clientemail:person.email,clientmobile:person.phone,"1":person.name,"2":person.email,"3":person.phone};
- if(vars.some(x=>!Object.hasOwn(values,x)||!values[x]))throw Error("Template variables must match available customer name, email or mobile");
- if(vars.length)result.push({type:"body",parameters:vars.map(x=>({type:"text",text:values[x]}))});
- return result;
+ const variables=(text:string)=>[...String(text||"").matchAll(/\{\{([^{}]+)\}\}/g)].map(x=>x[1].trim().toLowerCase());
+ const headFormat=String(header?.format||"").toUpperCase();
+ const unsupported=parts.some((x:any)=>["CAROUSEL","LIMITED_TIME_OFFER"].includes(String(x.type).toUpperCase()));
+ if(unsupported)throw Error("This template has complex components not yet supported by CRM. Confirm provider template requirements.");
+ if(headFormat&&!["IMAGE","TEXT","VIDEO","DOCUMENT"].includes(headFormat))
+  throw Error("Unsupported template header format");
+ const buttons=parts.find((x:any)=>String(x.type).toUpperCase()==="BUTTONS")?.buttons||[];
+ if(!Array.isArray(buttons))throw Error("Invalid approved template buttons");
+ const requirements:any[]=[];
+ if(headFormat==="TEXT")for(const tag of variables(header?.text||""))requirements.push({key:"header:"+tag,kind:"header_text",label:"Header "+tag});
+ for(const tag of variables(body.text)){
+  if(["clientname","clientemail","clientmobile","1","2","3"].includes(tag))continue;
+  requirements.push({key:"body:"+tag,kind:"body",label:"Body "+tag});
+ }
+ buttons.forEach((button:any,index:number)=>{
+  const kind=String(button.type||"").toUpperCase();
+  if(kind==="COPY_CODE")requirements.push({key:"coupon:"+index,kind:"coupon",label:"Copy code · "+(button.text||"Button "+(index+1))});
+  else if(kind==="URL"&&variables(button.url||"").length)requirements.push({key:"url:"+index,kind:"url",label:"Dynamic website URL suffix · "+(button.text||"Button "+(index+1))});
+  else if(!["QUICK_REPLY","URL","PHONE_NUMBER"].includes(kind))throw Error("Unsupported dynamic button type "+kind);
+ });
+ return {headFormat,header,body,buttons,requirements,variables};
+}
+function components(template:any,person:Person,image:string,fields:Record<string,string>={}){
+ const spec=templateSpecs(template),out:any[]=[];
+ if(image&&spec.headFormat!=="IMAGE")throw Error("This template has no IMAGE header");
+ if(!image&&spec.headFormat==="IMAGE")throw Error("Template requires an IMAGE header");
+ if(["VIDEO","DOCUMENT"].includes(spec.headFormat))
+  throw Error("This template requires "+spec.headFormat+" media; CRM currently supports IMAGE header only");
+ const value=(key:string)=>{
+  const v=String(fields?.[key]||"").trim();
+  if(!v||v.length>200||/[<>]/.test(v))throw Error("Required template field "+key+" is missing or invalid");
+  return v;
+ };
+ if(image)out.push({type:"header",parameters:[{type:"image",image:{link:image}}]});
+ if(spec.headFormat==="TEXT"){
+  const tags=spec.variables(spec.header?.text||"");
+  if(tags.length)out.push({type:"header",parameters:tags.map((tag:string)=>({type:"text",text:value("header:"+tag)}))});
+ }
+ const fixed:Record<string,string>={clientname:person.name,clientemail:person.email,clientmobile:person.phone,
+  "1":person.name,"2":person.email,"3":person.phone};
+ const tags=spec.variables(spec.body.text);
+ if(tags.length)out.push({type:"body",parameters:tags.map((tag:string)=>{
+  const text=Object.hasOwn(fixed,tag)?String(fixed[tag]||"").trim():value("body:"+tag);
+  if(!text)throw Error("Missing CRM contact field for template placeholder "+tag);
+  return {type:"text",text};
+ })});
+ spec.buttons.forEach((b:any,index:number)=>{
+  const kind=String(b.type||"").toUpperCase();
+  if(kind==="COPY_CODE"){
+   const code=value("coupon:"+index);
+   if(!/^[a-zA-Z0-9_-]{1,20}$/.test(code))throw Error("Coupon code must be 1–20 letters, numbers, hyphens or underscores");
+   out.push({type:"button",sub_type:"copy_code",index:String(index),
+    parameters:[{type:"coupon_code",coupon_code:code}]});
+  }else if(kind==="URL"&&spec.variables(b.url||"").length){
+   out.push({type:"button",sub_type:"url",index:String(index),
+    parameters:[{type:"text",text:value("url:"+index)}]});
+  }
+ });
+ return out;
 }
 type SendOutcome={id:string|null;code:string;reason:string;uncertain:boolean};
 function safeProviderReason(v:unknown){
@@ -250,15 +301,23 @@ Deno.serve(async request=>{
     blockers.push("No selected recipients have documented WhatsApp marketing opt-in for this sender company");
    // Invalid, duplicate and other-company contacts are skipped; eligible contacts may still send.
    const withImage=input.has_image===true;
+   if(input.template_fields&&(
+      typeof input.template_fields!=="object"||Array.isArray(input.template_fields)||
+      Object.keys(input.template_fields).length>25||
+      Object.entries(input.template_fields).some(([key,value])=>
+       !/^(header|body|coupon|url):[a-z0-9_]{1,50}$/i.test(key)||
+       typeof value!=="string"||value.length>200)
+     ))blockers.push("Template parameters contain invalid field names or values");
    if(t?.provider_preview?.components){
     const header=t.provider_preview.components.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
     const isImage=String(header?.format).toUpperCase()==="IMAGE";
     if(isImage&&!withImage)blockers.push("This approved template requires an image");
     if(!isImage&&withImage)blockers.push("The approved template has no IMAGE header; remove the image");
     if(checked.eligible.length)try{
-     components(t,checked.eligible[0],withImage?"https://example.com/approved.jpg":"");
+     components(t,checked.eligible[0],withImage?"https://example.com/approved.jpg":"",input.template_fields||{});
     }catch(e){blockers.push(e instanceof Error?e.message:"Invalid approved template parameters")}
    }
+   if(t)try{templateSpecs(t)}catch(e){blockers.push(e instanceof Error?e.message:"Invalid template format")}
    return res(200,{ok:true,ready:!blockers.length,selected:checked.selected,
     eligible:checked.eligible.length,not_eligible:checked.no_consent,
     skipped:checked.no_phone,blockers});
@@ -377,6 +436,8 @@ Deno.serve(async request=>{
   if(!group.eligible.length)blockers.push("No recipients have recorded company-specific WhatsApp marketing opt-in");
   let image="";
   if(campaign.attachment_path){
+   if(!["image/png","image/jpeg"].includes(campaign.attachment_mime))
+    blockers.push("IMAGE header must use JPEG or PNG. Upload an approved JPEG/PNG image, not WebP.");
    if(!campaign.attachment_path.startsWith(company+"/"+campaign.id+"/"))blockers.push("Invalid image association");
    else{
     const result=await db.storage.from("gr-wa-campaign-images").createSignedUrl(campaign.attachment_path,86400);
@@ -384,7 +445,7 @@ Deno.serve(async request=>{
     else image=result.data.signedUrl;
    }
   }
-  if(t&&group.remaining.length)try{components(t,group.remaining[0],image)}
+  if(t&&group.remaining.length)try{components(t,group.remaining[0],image,campaign.audience?.template_fields||{})}
   catch(e){blockers.push(e instanceof Error?e.message:"Invalid template parameters")}
   const summary={ready:blockers.length===0,selected:group.selected,eligible:group.eligible.length,
    remaining:group.remaining.length,attempted:group.attempted,no_phone:group.no_phone,
@@ -400,7 +461,7 @@ Deno.serve(async request=>{
     body:"Marketing template: "+t.name,delivery_status:"queued"}).select("id").single();
    if(claim.error){results.push({last4:person.phone.slice(-4),result:"duplicate_or_unavailable"});continue}
    let outcome:SendOutcome;
-   try{outcome=await send(config,person,t,components(t,person,image))}
+   try{outcome=await send(config,person,t,components(t,person,image,campaign.audience?.template_fields||{}))}
    catch{outcome={id:null,code:"TEMPLATE_PARAMETERS_INVALID",reason:"Template parameters did not match the approved BODY or IMAGE header.",uncertain:false}}
    const updated=await db.from("gr_wa_messages").update({
     provider_message_id:outcome.id,delivery_status:outcome.id?"queued":"failed",
