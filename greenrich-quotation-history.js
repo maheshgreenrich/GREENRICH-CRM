@@ -4,9 +4,10 @@
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const when=v=>v?new Date(v).toLocaleString('en-IN'):'—';
  const statuses={sent:'Sent',failed:'Failed',sending:'Sending',needs_review:'Needs review'};
+ const staff={};
  const row=x=>'<article class="grmail-history"><div><strong>'+esc(x.subject)+'</strong><span class="grmail-pill" data-status="'+esc(x.status)+'">'+esc(statuses[x.status]||x.status)+'</span></div>'+
  '<small>Recipient: '+esc((x.recipients||[]).join(', '))+' · '+esc(when(x.sent_at||x.attempted_at))+'</small>'+
- '<small>From: '+esc(x.sender_email)+' · Sent by employee: '+esc(x.sent_by)+'</small>'+
+ '<small>From: '+esc(x.sender_email)+' · Sent by employee: '+esc(staff[x.sent_by]||x.sent_by)+'</small>'+
  '<small>Quotation ID: '+esc(x.quotation_id)+' · Products: '+esc((x.product_ids||[]).join(', '))+'</small>'+
  (x.pdf_path?'<button type="button" data-grqh-pdf="'+esc(x.id)+'" data-grqh-company="'+esc(x.company_id)+'">View sent PDF</button>':'')+'</article>';
  async function showPdf(db,id,company,notify){
@@ -33,6 +34,11 @@
     db.from('gr_quotation_email_history').select('*').eq('customer_id',customerId).in('company_id',companyIds).order('attempted_at',{ascending:false}).limit(100)
    ]);
    if(quotes.error||mails.error)throw Error(quotes.error?.message||mails.error?.message);
+   const ids=[...new Set((mails.data||[]).map(x=>x.sent_by).filter(Boolean))];
+   if(ids.length){
+    const names=await db.from('gr_profiles').select('id,full_name').in('id',ids);
+    if(!names.error)for(const u of names.data||[])staff[u.id]=u.full_name;
+   }
    if(!section.isConnected)return;
    section.innerHTML='<div class="gr360-panel-heading"><div><span class="gr360-kicker">QUOTATION ARCHIVE</span><h3>Sent quotation PDFs & Gmail history</h3>'+
     '<p>Actual CRM quotation records, sender, date and attachment</p></div></div>'+
@@ -55,6 +61,8 @@
   try{
    const {data,error}=await db.from('gr_quotation_email_history').select('*').eq('company_id',companyId).contains('product_ids',[productId]).order('attempted_at',{ascending:false}).limit(100);
    if(error)throw Error(error.message);
+   const ids=[...new Set((data||[]).map(x=>x.sent_by).filter(Boolean))];
+   if(ids.length){const names=await db.from('gr_profiles').select('id,full_name').in('id',ids);if(!names.error)for(const u of names.data||[])staff[u.id]=u.full_name}
    modal.querySelector('[data-grqh-content]').innerHTML=data?.length?data.map(row).join(''):'<p>No quotation emails sent for this product yet.</p>';
   }catch(error){modal.querySelector('[data-grqh-content]').innerHTML='<p>'+esc(error.message)+'</p>'}
  }
