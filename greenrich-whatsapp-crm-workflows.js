@@ -321,6 +321,91 @@
     empty('No incoming WhatsApp assignment rules have been saved.'))+
    '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>';
  }
+ function inboxView(){
+  const source=scoped(rows.messages||[]).slice().sort((a,b)=>String(b.event_at||b.created_at).localeCompare(String(a.event_at||a.created_at)));
+  const chats=new Map();
+  for(const m of source){
+   const phone=digits(m.phone),key=m.company_id+':'+phone;
+   if(phone.length!==10)continue;
+   const entry=chats.get(key)||{company_id:m.company_id,connection_id:m.connection_id,phone:m.phone,latest:m,events:0,inbound:0};
+   entry.events++;
+   if(m.direction==='inbound')entry.inbound++;
+   chats.set(key,entry);
+  }
+  const all=targets();
+  const chatsFiltered=[...chats.values()].filter(c=>{
+   const contact=all.find(t=>t.company_id===c.company_id&&sameMobile(t.mobile,c.phone));
+   c.contact=contact;
+   return !inboxNeedle||[c.phone,contact?.name,contact?.type].some(x=>String(x||'').toLowerCase().includes(inboxNeedle));
+  });
+  return '<section class="grwc-panel">'+headers('WhatsApp Inbox & Conversation History',
+   'CRM-saved inbound/outbound events are shown below. For more history, open the connected SocialBerries provider conversation by phone.')+
+   '<div class="grwc-notice">Not all historical WhatsApp messages are currently stored in GREENRICH ONE. On-demand provider history is read-only and subject to the SocialBerries response. New-message notifications and automatic inbound lead creation require an authenticated provider webhook; this page does not claim live sync.</div>'+
+   '<div class="grwc-filters"><label>Find a contact / WhatsApp number<input id="grwc-inbox-lookup" type="search" value="'+esc(inboxNeedle)+'" placeholder="Customer name or mobile"></label></div>'+
+   '<div class="grwc-audience-summary"><b>'+chatsFiltered.length+'</b> conversations with local events · <b>'+source.filter(x=>x.direction==='inbound').length+'</b> recorded inbound events · <b>'+source.filter(x=>x.direction==='outbound').length+'</b> outbound events</div>'+
+   (chatsFiltered.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Contact</th><th>WhatsApp mobile</th><th>Company</th><th>Last recorded event</th><th>Status</th><th>History</th></tr></thead><tbody>'+
+    chatsFiltered.slice(0,250).map(c=>{
+     const conn=rows.connections.find(x=>x.company_id===c.company_id&&x.provider.toLowerCase()==='socialberries');
+     return '<tr><td>'+esc(c.contact?.name||'Not linked to CRM')+'</td><td>'+esc(c.phone)+'</td><td>'+esc(name(c.company_id))+'</td><td>'+esc(date(c.latest.event_at||c.latest.created_at))+
+      '</td><td>'+esc(c.latest.delivery_status||'unknown')+'</td><td>'+(app.admin&&conn?
+      '<button type="button" data-inbox-history="'+esc(conn.id)+'" data-inbox-phone="'+esc(c.phone)+'">Open provider chat history</button>':'Admin/provider access required')+'</td></tr>';
+    }).join('')+'</tbody></table></div>':empty('No recorded WhatsApp events match this search. Use Incoming Leads to locate an existing CRM contact; historical provider events cannot be invented.'))+
+   '<p class="grwc-muted">Customer consent, owner and tags remain managed in Leads & CRM / Customers. Provider chat lookup does not automatically import contacts or enable message sending.</p></section>';
+ }
+ function guidanceView(){
+  if(!app.companies.includes(guidanceCompany))guidanceCompany=app.companies[0];
+  const steps=(rows.guidance||[]).filter(x=>x.company_id===guidanceCompany&&
+   (guidanceProduct==='all'||x.product_label===guidanceProduct)).sort((a,b)=>a.day_offset-b.day_offset);
+  const products=[...new Set((rows.guidance||[]).filter(x=>x.company_id===guidanceCompany).map(x=>x.product_label))].sort().map(x=>[x,x]);
+  return '<section class="grwc-panel">'+headers('Product-wise WhatsApp Composting Guidance',
+   'Create an editable instruction plan for each product, with days counted from confirmed delivery. Guidance is saved as draft content only.')+
+   '<div class="grwc-notice"><b>Draft planner — not automatically sending.</b> Order dispatch/delivery dates are in GreenRich CRM, but scheduled WhatsApp delivery still requires an approved matching service template, documented opt-in where required, and an authenticated scheduler/provider delivery integration. Message content is not auto-approved by Meta.</div>'+
+   '<div class="grwc-filters">'+sel('Company','grwc-guide-company',app.companies.map(c=>[c,name(c)]),guidanceCompany,null)+
+   sel('Product guide','grwc-guide-product',products,guidanceProduct,'All products')+'</div>'+
+   (app.admin?'<div class="grwc-selection-toolbar"><button type="button" data-new-guide class="grwc-primary">+ Add instruction day</button></div>':'')+
+   (steps.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Product</th><th>When</th><th>Instruction</th><th>Media</th><th>Approved template</th><th>State</th><th></th></tr></thead><tbody>'+
+    steps.map(x=>'<tr><td>'+esc(x.product_label)+'</td><td>Delivery + '+esc(x.day_offset)+' days</td>'+
+     '<td><b>'+esc(x.title)+'</b><p>'+esc(x.instructions).slice(0,350)+'</p></td><td>'+esc(x.video_url?'Link saved':'—')+'</td>'+
+     '<td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'Not linked')+'</td><td>Draft — not sent</td><td>'+
+     (app.admin?'<button type="button" data-guide-edit="'+esc(x.id)+'">Edit</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':
+    empty('No product guidance steps saved. Add instructions for installation, adding waste, microbes, bin switching and manure harvesting at the day offsets appropriate for each product.'))+
+   '<p class="grwc-muted">Suggested planning checkpoints to customize (not automatic composting claims): delivery day, day 1, 10, 15, 20, 30, 33, 45, 60. Delivery + N is a draft scheduling rule; use actual product guidance and approved templates before activation.</p></section>';
+ }
+ function guidanceDialog(id=''){
+  if(!app.admin)return alert('Admin permission required to manage product guidance.','warning');
+  const old=(rows.guidance||[]).find(x=>x.id===id);
+  const company=old?.company_id||guidanceCompany;
+  const templatesFor=rows.templates.filter(x=>x.company_id===company&&validMarketingTemplate(x));
+  const productOptions=[...new Set([...rows.products.map(x=>x.name),...rows.dispatches.map(x=>x.product_name)].filter(Boolean))];
+  const body='<div class="grwc-notice grwc-span">Save editable product instructions only. No WhatsApp message or timer is activated by this action.</div>'+
+   '<div class="grwc-feature grwc-span"><b>Company:</b> '+esc(name(company))+'</div>'+
+   '<label>Product name<input name="product_label" list="grwc-guidance-products" required maxlength="120" value="'+esc(old?.product_label||'')+'" placeholder="e.g. MyGreenBin 25 L PP"></label>'+
+   '<datalist id="grwc-guidance-products">'+productOptions.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+
+   input('Days after confirmed delivery','day_offset',String(old?.day_offset??0),'number')+
+   input('Instruction title','title',old?.title||'')+
+   note('Instruction message / steps','instructions',old?.instructions||'')+
+   input('Installation or instruction video HTTPS URL (optional)','video_url',old?.video_url||'')+
+   field('Approved provider template (optional until ready)','template_id',options(templatesFor.map(t=>[t.id,t.name+' · '+t.language]),'Not assigned yet'))+
+   '<p class="grwc-muted grwc-span">Video links are stored for reference. WhatsApp media sending requires a compatible approved template and provider integration. Set dates/product instructions according to your actual bin guidance.</p>';
+  const d=dialog(old?'Edit product instruction':'Add product instruction',body,async fd=>{
+   const v=Object.fromEntries(fd),day=Number(v.day_offset);
+   if(!Number.isInteger(day)||day<0||day>365)throw Error('Day offset must be between 0 and 365');
+   if(String(v.product_label||'').trim().length<2||String(v.title||'').trim().length<2||
+      String(v.instructions||'').trim().length<5)throw Error('Product, instruction title and message are required');
+   const url=String(v.video_url||'').trim();
+   if(url){try{const u=new URL(url);if(u.protocol!=='https:')throw Error()}catch{throw Error('Use a valid HTTPS video URL or leave blank')}}
+   const templateId=String(v.template_id||'');
+   if(templateId&&!templatesFor.some(t=>t.id===templateId))throw Error('Selected template is unavailable for this company');
+   const payload={company_id:company,product_label:String(v.product_label).trim(),day_offset:day,
+    title:String(v.title).trim(),instructions:String(v.instructions).trim(),video_url:url,
+    template_id:templateId||null,status:'draft'};
+   const q=old?await app.db.from('gr_wa_guidance_steps').update(payload).eq('id',old.id).eq('company_id',company):
+    await app.db.from('gr_wa_guidance_steps').insert(payload);
+   if(q.error)throw Error(q.error.message);
+   await fetchAll();marketingDraw();
+  },old?'Save instruction':'Save instruction draft','Product instruction saved as a draft. No message sent.');
+  if(old){const field=d.querySelector('[name=template_id]');if(field)field.value=old.template_id||''}
+ }
  function marketingDraw(){
   if(!root?.isConnected)return;
   const previous=root.querySelector('#grwc-audience-form');
