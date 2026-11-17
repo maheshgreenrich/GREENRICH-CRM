@@ -443,7 +443,12 @@
    connection:previous.elements.connection_id?.value||'',
    template:previous.elements.template_id?.value||''
   }:null;
-  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='reports'?campaignReports():current==='inbox'?inboxView():current==='welcome'?welcomeView():current==='recurring'?recurringView():current==='guidance'?guidanceView():inboundView())+'</div>';
+  if(current!=='inbox')window.GreenRichInbox?.unmount();
+  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='reports'?campaignReports():current==='inbox'?'<div id="grwx-inbox-host"></div>':current==='welcome'?welcomeView():current==='recurring'?recurringView():current==='guidance'?guidanceView():inboundView())+'</div>';
+  if(current==='inbox')window.GreenRichInbox?.mount(root.querySelector('#grwx-inbox-host'),{
+   app,admin:app.admin,companies:app.companies,companyName:name,getRows:()=>rows,getTargets:targets,
+   refresh:async()=>{await fetchAll()},notify:alert
+  });
   const form=root.querySelector('#grwc-audience-form');
   if(form&&remembered){
    const prov=form.elements.connection_id;
