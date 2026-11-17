@@ -106,3 +106,67 @@
  #content #grwx-inbox-host .grwx-compose-row textarea{font-size:11px!important}
  #content #grwx-inbox-host .grwx-top{min-height:54px}
 }
+
+
+/* Final containment: constrain the SHELL rather than the grid, so chat history
+   cannot expand the conversation past the fixed bottom composer. */
+#content #grwx-inbox-host .grwx-shell{
+  height:clamp(540px,calc(100dvh - 170px),890px)!important;
+  max-height:calc(100dvh - 110px)!important;
+  min-height:500px!important;
+  display:flex!important;flex-direction:column!important;overflow:hidden!important;
+}
+#content #grwx-inbox-host .grwx-top{
+  height:64px!important;min-height:64px!important;max-height:64px!important;
+  flex:0 0 64px!important;overflow:hidden!important;
+}
+#content #grwx-inbox-host .grwx-grid{
+  flex:1 1 0%!important;
+  height:0!important;min-height:0!important;max-height:none!important;
+  overflow:hidden!important;align-items:stretch!important;
+  grid-template-columns:minmax(235px,26%) minmax(0,1fr) minmax(215px,23%)!important;
+}
+#content #grwx-inbox-host .grwx-sidebar{
+  display:flex!important;flex-direction:column!important;height:100%!important;min-height:0!important;
+  overflow:hidden!important;
+}
+#content #grwx-inbox-host .grwx-users{height:0!important;min-height:0!important;max-height:none!important;flex:1 1 0%!important;overflow-y:auto!important;}
+#content #grwx-inbox-host .grwx-conversation{
+  display:flex!important;flex-direction:column!important;height:100%!important;
+  min-height:0!important;max-height:none!important;overflow:hidden!important;
+}
+#content #grwx-inbox-host .grwx-chat-head{flex:0 0 auto!important;height:68px!important;min-height:68px!important;overflow:hidden!important}
+#content #grwx-inbox-host .grwx-provider-note{flex:0 0 auto!important;min-height:28px!important;max-height:60px!important;overflow:auto!important}
+#content #grwx-inbox-host .grwx-messages{
+  display:flex!important;flex:1 1 0%!important;height:0!important;min-height:0!important;
+  max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;
+  flex-direction:column!important;align-items:stretch!important;
+}
+#content #grwx-inbox-host .grwx-chat-footer{
+  display:flex!important;flex:0 0 auto!important;flex-direction:column!important;
+  position:relative!important;bottom:auto!important;max-height:210px!important;
+  overflow-y:auto!important;background:#fff!important;z-index:3!important;
+}
+#content #grwx-inbox-host .grwx-customer-profile{height:100%!important;max-height:none!important;overflow-y:auto!important}
+#content #grwx-inbox-host .grwx-accuracy{flex:0 0 auto!important;max-height:34px!important;overflow:hidden!important}
+#content #grwx-inbox-host .grwx-user{flex:0 0 68px!important;min-height:68px!important;max-height:68px!important;padding:7px 9px!important}
+#content #grwx-inbox-host .grwx-user-copy{flex:1!important;min-width:0!important;overflow:hidden!important}
+#content #grwx-inbox-host .grwx-user-copy b,#content #grwx-inbox-host .grwx-user-copy small{
+  overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;
+}
+#content #grwx-inbox-host .grwx-user .grwx-last-message{margin:1px 0 0!important}
+#content #grwx-inbox-host .grwx-person-date{display:none!important}
+@media(max-width:1050px){
+  #content #grwx-inbox-host .grwx-grid{
+    grid-template-columns:minmax(210px,34%) minmax(0,1fr)!important;
+  }
+  #content #grwx-inbox-host .grwx-customer-profile{display:none!important}
+}
+@media(max-width:640px){
+  #content #grwx-inbox-host .grwx-shell{min-height:420px!important;height:calc(100dvh - 110px)!important}
+  #content #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(110px,35%) minmax(0,1fr)!important}
+  #content #grwx-inbox-host .grwx-top{height:55px!important;min-height:55px!important;max-height:55px!important;flex-basis:55px!important}
+  #content #grwx-inbox-host .grwx-user{flex-basis:55px!important;min-height:55px!important;max-height:55px!important}
+  #content #grwx-inbox-host .grwx-chat-head{min-height:52px!important;height:52px!important}
+  #content #grwx-inbox-host .grwx-chat-footer{max-height:220px!important}
+}
