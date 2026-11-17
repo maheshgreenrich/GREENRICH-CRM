@@ -52,6 +52,7 @@ jobs:
           node tests/whatsapp-inbox-composer-layout.cjs
           node tests/whatsapp-inbox-sticky-composer-v4.cjs
           node tests/whatsapp-inbox-polish-v5.cjs
+          node tests/whatsapp-inbox-dom-v6.cjs
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
