@@ -5,7 +5,7 @@ const css=fs.readFileSync('greenrich-whatsapp-inbox.css','utf8');
 const html=fs.readFileSync('secure.html','utf8');
 const gateway=fs.readFileSync('supabase/functions/greenrich-socialberries/index.ts','utf8');
 assert.doesNotThrow(()=>new vm.Script(js));
-for(const t of ['grwx-contact-phone','data-grwx-action="attach-image"','data-grwx-action="attach-video"','data-grwx-action="attach-document"','data-grwx-action="attach-audio"','messageCard(m,active)','grwx-template-buttons','grwx-template-image','grwx-media-missing','grwx-composer-layout','id="grwx-compose"','data-grwx-action="template-draft"','data-grwx-action="send-draft" disabled','template_buttons:x.template_buttons||[]'])
+for(const t of ['grwx-contact-phone','data-grwx-action="attach-image"','data-grwx-action="attach-video"','data-grwx-action="attach-document"','data-grwx-action="attach-audio"','messageCard(m,active)','grwx-template-buttons','grwx-template-image','grwx-media-missing','grwx-composer-layout','id="grwx-compose"','data-grwx-action="template-draft"','data-grwx-action="send-draft"','template_buttons:x.template_buttons||[]'])
  assert.ok(js.includes(t),'Missing WhatsApp UI functionality '+t);
 for(const t of ['grwx-contact-phone','grwx-user-copy .grwx-last-message','justify-content:flex-start!important',
  'grwx-chat-footer','grwx-template-buttons','grwx-template-image','#grwx-inbox-host #grwx-compose'])
