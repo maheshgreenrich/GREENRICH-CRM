@@ -112,7 +112,7 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
@@ -125,9 +125,9 @@
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
    optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
    optional('gr_wa_messages','id,company_id,connection_id,campaign_id,direction,body,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,event_at,created_at'),
-   optional('gr_wa_guidance_steps'),optional('gr_wa_bulk_batches')
+   optional('gr_wa_guidance_steps'),optional('gr_wa_bulk_batches'),optional('gr_wa_inbound_events')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -325,7 +325,14 @@
    (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Company</th><th>Event</th><th>Source</th><th>Salesperson</th><th>State</th></tr></thead><tbody>'+
     rules.map(r=>'<tr><td>'+esc(name(r.company_id))+'</td><td>'+esc(r.event_type)+'</td><td>'+esc(r.source_name)+'</td><td>'+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common sales queue')+'</td><td>Draft · webhook not connected</td></tr>').join('')+'</tbody></table></div>':
     empty('No incoming WhatsApp assignment rules have been saved.'))+
-   '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>';
+   '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>'+
+   '<section class="grwc-panel">'+headers('Trusted incoming WhatsApp / website OTP event log',
+     'Signed server events are deduplicated, linked to existing customers/leads or assigned to the selected salesperson. No login OTP means marketing consent.')+
+   (scoped(rows.inboundEvents||[]).length?'<div class="grwc-tablewrap"><table><thead><tr><th>Received</th><th>Type</th><th>WhatsApp</th><th>Lead ID</th><th>Routing</th><th>Status</th></tr></thead><tbody>'+
+    scoped(rows.inboundEvents).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,100).map(e=>
+     '<tr><td>'+esc(date(e.created_at))+'</td><td>'+esc(e.event_type)+'</td><td>'+esc(e.mobile)+'</td><td>'+esc(e.lead_id||e.customer_id||'—')+'</td><td>'+esc(e.source_name||'Waiting for active assignment rule')+'</td><td>'+esc(e.status)+'</td></tr>').join('')+
+    '</tbody></table></div>':empty('No verified server events received yet. SocialBerries webhook relay / website OTP backend needs the authenticated inbound event endpoint and signing secret.'))+
+   '<p class="grwc-muted">This event log does not prove Meta has delivered messages. No inbound contacts are automatically opted in to marketing campaigns.</p></section>';
  }
  function inboxView(){
   const source=scoped(rows.messages||[]).slice().sort((a,b)=>String(b.event_at||b.created_at).localeCompare(String(a.event_at||a.created_at)));
@@ -591,8 +598,8 @@
     (l.imported_lead_id?'—':'<button type="button" data-import-provider-lead="'+esc(l.id)+'">Review & import</button>')+'</td></tr>').join('')+
     '</tbody></table></div>':empty('No staged SocialBerries leads yet. Configure the connection, then click Sync Leads.'))+
    '<p class="grwc-muted">The documented Get Leads API includes unusually required client fields in the GET request body. If its endpoint rejects page-only GET, ask SocialBerries for the correct GET request format; no records will be guessed or imported.</p></section>'+
-   '<section class="grwc-panel">'+headers('4 · WhatsApp and website enquiry → CRM Lead','Choose source, tags and salesperson for each inbound enquiry type. OTP-only login events must not create marketing leads.', '<button type="button" data-new-inbound>+ Mapping</button>')+
-   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common')+'</p><small>Awaiting verified webhook</small></div>').join(''):empty('No inbound assignment mappings.'))+'</section>'+
+   '<section class="grwc-panel">'+headers('4 · Incoming lead & website WhatsApp OTP assignment','Choose the employee and CRM tag for each event source. Activation only processes signed server events; no marketing opt-in is inferred.', '<button type="button" data-new-inbound>+ Assignment rule</button>')+
+   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common queue')+'</p><p>Tags: '+esc((r.tag_ids||[]).map(id=>rows.tags.find(t=>t.id===id)?.name||id).join(', ')||'None')+'</p><small>'+esc(r.status==='active'?'Active rule — signed source required':'Draft / paused')+'</small> <button type="button" data-inbound-rule-status="'+esc(r.id)+'" data-next-status="'+(r.status==='active'?'paused':'active')+'">'+(r.status==='active'?'Pause':'Activate')+'</button></div>').join(''):empty('No incoming lead assignment rules have been saved.'))+'</section>'+
    '<section class="grwc-panel">'+headers('5 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('6 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
@@ -632,6 +639,19 @@
    if(e.target.closest('[data-settings-confirm-template]'))return settingsTemplateApproval(c,container);
    if(e.target.closest('[data-import-template-metadata]'))return importTemplateMetadata(c,container);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
+   const ruleButton=e.target.closest('[data-inbound-rule-status]');
+   if(ruleButton){
+    const r=rows.inbound.find(x=>x.id===ruleButton.dataset.inboundRuleStatus&&x.company_id===c);
+    const next=ruleButton.dataset.nextStatus;
+    if(!app.admin||!r||!['active','paused'].includes(next))return alert('Invalid company assignment rule','error');
+    try{
+     const saved=await app.db.from('gr_wa_inbound_rules').update({status:next}).eq('id',r.id).eq('company_id',c);
+     if(saved.error)throw Error(saved.error.message);
+     await fetchAll();settingsDraw(container);
+     alert(next==='active'?'Assignment rule activated for trusted signed events. Connect your website/backend webhook source to receive leads.':'Assignment rule paused.','success');
+    }catch(error){alert(error.message,'error')}
+    return;
+   }
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
    if(sheet){
