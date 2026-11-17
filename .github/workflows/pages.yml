@@ -219,7 +219,7 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.css?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.css &&
                grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.js &&
                grep -q 'greenrich-whatsapp-reply' /tmp/gr-live-inbox.js &&
-               grep -q "data-grwx-action=\\\"send-draft\\\"" /tmp/gr-live-inbox.js &&
+               grep -q 'data-grwx-action="send-draft"' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-contact-name' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-template-buttons' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-contact-name' /tmp/gr-live-inbox.css &&
