@@ -882,52 +882,129 @@
  function importProviderTemplate(company,container){
   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
   if(!app.admin)return alert('Only company administrators can manually sync approved templates.','warning');
-  if(!choices.length)return alert('Save a SocialBerries provider for this company first.','warning');
-  dialog('Manual Sync — Existing Approved Template',
+  if(!choices.length)return alert('Save a SocialBerries connection for this company first.','warning');
+  const known=rows.templates.filter(x=>x.company_id===company&&choices.some(c=>c.id===x.connection_id)&&x.category==='marketing');
+  const d=dialog('Manual Sync — Existing Meta-Approved Template',
+   '<div class="grwc-notice grwc-span"><b>No Meta access token or reapproval needed.</b> Copy the exact details from an already approved template in SocialBerries/WhatsApp Manager. This does not send a message. A missing required URL or header type must not be guessed.</div>'+
    field('SocialBerries provider','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose connection'),true)+
-   '<p class="grwc-notice grwc-span">This imports an <b>existing</b> Meta-approved MARKETING template. Copy the COMPLETE approved template JSON from SocialBerries, including ID, language, BODY, HEADER and CTA BUTTONS. This is an administrator confirmation, not a fresh Meta approval or API verification. No message is sent.</p>'+
-   '<label class="grwc-span">Approved template JSON file<input name="json_file" type="file" accept=".json,application/json"></label>'+
-   note('Or paste ONE complete approved template JSON','preview_json')+
-   note('Where you checked approval (SocialBerries template name, status and date)','confirmation_note','')+
-   '<label class="grwc-span"><input type="checkbox" name="attested" required> I checked this exact template ID, language, message text and CTA buttons against the approved SocialBerries template.</label>',
+   field('Existing template (optional)','existing_template',options(known.map(t=>[t.id,t.name+' · '+t.language+' · '+t.provider_template_id]),'Enter a new existing-approved template below'))+
+   input('Exact approved template ID','provider_template_id','')+
+   input('Exact approved template name','template_name','')+
+   input('Language','language','en_US')+
+   field('Header type — as approved','header_type',options([['NONE','No header'],['IMAGE','Image'],['TEXT','Text header']],'Select exact header type'),true)+
+   input('Approved text header (only when TEXT header)','header_text','')+
+   note('Exact approved message BODY','approved_body','')+
+   input('Approved footer (optional)','approved_footer','')+
+   field('First approved button','button1_kind',options([['NONE','No first button'],['URL','Website URL'],['COPY_CODE','Copy offer code'],['QUICK_REPLY','Quick reply'],['PHONE_NUMBER','Call phone number']],'Select exact button type'),true)+
+   input('First button label','button1_text','')+
+   input('First button website URL or phone (if relevant)','button1_value','')+
+   field('Second approved button','button2_kind',options([['NONE','No second button'],['URL','Website URL'],['COPY_CODE','Copy offer code'],['QUICK_REPLY','Quick reply'],['PHONE_NUMBER','Call phone number']],'Select exact button type'),true)+
+   input('Second button label','button2_text','')+
+   input('Second button website URL or phone (if relevant)','button2_value','')+
+   '<details class="grwc-span"><summary>Advanced · Import complete approved template JSON instead</summary>'+
+   '<label>Approved JSON file<input name="json_file" type="file" accept=".json,application/json"></label>'+
+   note('Or paste the full approved template JSON','preview_json')+'</details>'+
+   note('Approval evidence (source, status and date)','confirmation_note','')+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I checked the exact ID, language, full body, header and every button against the existing approved template in SocialBerries/Meta. This is an administrator confirmation, not live Meta API verification.</label>',
    async fd=>{
     const connectionId=String(fd.get('connection_id')||'');
     if(!choices.some(x=>x.id===connectionId))throw Error('Choose the correct SocialBerries connection');
-    if(fd.get('attested')!=='on')throw Error('Confirm the template against SocialBerries first');
+    if(fd.get('attested')!=='on')throw Error('Confirm the existing Meta approval first');
     const noteText=String(fd.get('confirmation_note')||'').trim();
     if(noteText.length<10)throw Error('Provide at least 10 characters of approval evidence');
-    const file=fd.get('json_file');let content=String(fd.get('preview_json')||'').trim();
+    const get=k=>String(fd.get(k)||'').trim();
+    const file=fd.get('json_file');let content=get('preview_json');
     if(file&&typeof file.text==='function'&&file.size){
      if(file.size>100000)throw Error('JSON file must be smaller than 100 KB');
      content=await file.text();
     }
-    let raw;try{raw=JSON.parse(content)}catch{throw Error('Paste valid template JSON or choose a JSON file')}
-    if(Array.isArray(raw))throw Error('Sync one approved template at a time to preserve an individual approval audit');
-    const t=raw?.preview_template?.components?raw.preview_template:raw;
+    let t;
+    if(content){
+     let raw;try{raw=JSON.parse(content)}catch{throw Error('Choose valid approved JSON or use the fields above')}
+     if(!raw||Array.isArray(raw)||typeof raw!=='object')throw Error('Provide one approved template JSON object');
+     t=raw.preview_template?.components?raw.preview_template:raw;
+    }else{
+     const name=get('template_name'),id=get('provider_template_id'),lang=get('language');
+     const body=get('approved_body'),footer=get('approved_footer');
+     const headerType=get('header_type');
+     if(!/^[0-9]{5,25}$/.test(id)||!/^[a-z][a-z0-9_]{0,119}$/.test(name)||
+       !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(lang)||!body)
+      throw Error('Enter the exact numeric template ID, lower-case template name, language and complete body');
+     if(!['NONE','IMAGE','TEXT'].includes(headerType))throw Error('Choose the exact approved header type');
+     const components=[];
+     if(headerType==='IMAGE')components.push({type:'HEADER',format:'IMAGE'});
+     if(headerType==='TEXT'){
+      if(!get('header_text'))throw Error('Enter the exact approved text header');
+      components.push({type:'HEADER',format:'TEXT',text:get('header_text')});
+     }
+     components.push({type:'BODY',text:body});
+     if(footer)components.push({type:'FOOTER',text:footer});
+     const buttons=[];
+     for(let i=1;i<=2;i++){
+      const kind=get('button'+i+'_kind'),label=get('button'+i+'_text'),value=get('button'+i+'_value');
+      if(!['NONE','URL','COPY_CODE','QUICK_REPLY','PHONE_NUMBER'].includes(kind))
+       throw Error('Choose a valid button type');
+      if(kind==='NONE'){if(label||value)throw Error('Remove unused button '+i+' fields');continue}
+      if(!label)throw Error('Enter approved button '+i+' label');
+      const b={type:kind,text:label};
+      if(kind==='URL'){
+       try{const url=new URL(value);if(url.protocol!=='https:'||!url.hostname)throw Error('HTTPS only')}
+       catch{throw Error('Enter the exact approved HTTPS website URL for button '+i)}
+       b.url=value;
+      }else if(kind==='PHONE_NUMBER'){
+       if(!/^\+?[0-9]{7,15}$/.test(value))throw Error('Enter the exact approved call number for button '+i);
+       b.phone_number=value;
+      }else if(kind==='COPY_CODE'&&value)b.example=value;
+      buttons.push(b);
+     }
+     if(buttons.length)components.push({type:'BUTTONS',buttons});
+     t={id,name,language:lang,status:'APPROVED',category:'MARKETING',components};
+    }
     if(!t||typeof t!=='object'||!/^[0-9]{5,25}$/.test(String(t.id||''))||
-       !/^[a-z][a-z0-9_]{0,511}$/.test(String(t.name||''))||
+       !/^[a-z][a-z0-9_]{0,119}$/.test(String(t.name||''))||
        !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(String(t.language||''))||
        t.status!=='APPROVED'||String(t.category||'').toUpperCase()!=='MARKETING'||
        !Array.isArray(t.components)||!t.components.some(x=>String(x.type).toUpperCase()==='BODY'&&String(x.text||'').trim()))
-     throw Error('Provide complete APPROVED MARKETING template JSON: numeric ID, name, language, BODY and components');
+     throw Error('Complete APPROVED MARKETING template details are required. Check the exact ID/name/language.');
     const existing=rows.templates.filter(x=>x.company_id===company&&x.connection_id===connectionId);
     const prior=existing.find(x=>String(x.provider_template_id)===String(t.id));
-    const sameName=existing.find(x=>x.name===t.name&&x.language===t.language&&String(x.provider_template_id)!==String(t.id));
-    if(sameName)throw Error('A template with this name/language already points to a different provider ID. Resolve that mismatch first.');
-    if(prior&&prior.name!==t.name)throw Error('The existing template ID points to a different name. Nothing changed.');
-    if(prior&&prior.provider_source==='verified_provider')throw Error('This template is already synced directly from Meta. No manual overwrite needed.');
+    const conflict=existing.find(x=>x.name===t.name&&x.language===t.language&&String(x.provider_template_id)!==String(t.id));
+    if(conflict)throw Error('This name/language maps to another template ID. No changes saved.');
+    if(prior&&prior.name!==t.name)throw Error('Template ID/name mismatch. No changes saved.');
+    if(prior&&prior.provider_source==='verified_provider')throw Error('Already directly synced with Meta. No manual overwrite.');
     const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
     if(out.error)throw Error('Template import failed: '+out.error.message);
     const q=await app.db.from('gr_wa_templates').select('id,name,language,provider_template_id')
-     .eq('company_id',company).eq('connection_id',connectionId)
-     .eq('provider_template_id',String(t.id)).limit(2);
+      .eq('company_id',company).eq('connection_id',connectionId)
+      .eq('provider_template_id',String(t.id)).limit(2);
     if(q.error||q.data?.length!==1||q.data[0].name!==t.name||q.data[0].language!==t.language)
-     throw Error('Imported template identity could not be confirmed. Check template catalog; no message was sent.');
+     throw Error('Imported identity could not be verified. No message was sent.');
     await secureSend('confirm_template',{connection_id:connectionId,template_id:q.data[0].id,
-     approved_json:JSON.stringify(t),confirmation_note:noteText,attested:true});
+      approved_json:JSON.stringify(t),confirmation_note:noteText,attested:true});
     await fetchAll();settingsDraw(container);
-    alert('Manual sync complete: '+t.name+' ('+t.language+'). Admin-confirmed approved content is saved with CTA buttons; no Meta reapproval or WhatsApp message sent.','success');
-   },'Sync Existing Approved Template','Template approval evidence recorded in CRM.');
+    alert('Manual sync saved: '+t.name+' ('+t.language+'). Review the campaign template then test one opted-in recipient. No Meta resubmission or message sent.','success');
+   },'Sync Existing Approved Template','Admin-confirmed approved template recorded; no message sent.');
+  const sel=d.querySelector('[name="existing_template"]');
+  const populate=()=>{
+   const t=known.find(x=>x.id===sel.value);
+   if(!t)return;
+   const set=(name,value)=>{const node=d.querySelector('[name="'+name+'"]');if(node)node.value=value||''};
+   set('connection_id',t.connection_id);set('provider_template_id',t.provider_template_id);
+   set('template_name',t.name);set('language',t.language);
+   set('approved_body',t.body);
+   const comps=t.provider_preview?.components||[];
+   const header=comps.find(x=>String(x.type).toUpperCase()==='HEADER');
+   const footer=comps.find(x=>String(x.type).toUpperCase()==='FOOTER');
+   set('header_type',header?String(header.format||'').toUpperCase():'');
+   set('header_text',header?.text);set('approved_footer',footer?.text);
+   const buttons=comps.find(x=>String(x.type).toUpperCase()==='BUTTONS')?.buttons||[];
+   buttons.slice(0,2).forEach((b,i)=>{
+    set('button'+(i+1)+'_kind',String(b.type||'').toUpperCase());
+    set('button'+(i+1)+'_text',b.text);
+    set('button'+(i+1)+'_value',b.url||b.phone_number||'');
+   });
+  };
+  sel?.addEventListener('change',populate);
  }
  function editProvider(c,slot,container){
   // A provider slot belongs permanently to one company. The former form
