@@ -892,7 +892,7 @@
     let raw;try{raw=JSON.parse(content)}catch{throw Error('Paste valid template JSON or choose a JSON file')}
     if(Array.isArray(raw))throw Error('Sync one approved template at a time to preserve an individual approval audit');
     const t=raw?.preview_template?.components?raw.preview_template:raw;
-    if(!t||typeof t!=='object'||!/^\\d{5,25}$/.test(String(t.id||''))||
+    if(!t||typeof t!=='object'||!/^[0-9]{5,25}$/.test(String(t.id||''))||
        !/^[a-z][a-z0-9_]{0,511}$/.test(String(t.name||''))||
        !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(String(t.language||''))||
        t.status!=='APPROVED'||String(t.category||'').toUpperCase()!=='MARKETING'||
