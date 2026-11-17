@@ -50,6 +50,7 @@ jobs:
           node --check greenrich-whatsapp-crm-workflows.js
           node --check greenrich-whatsapp-inbox.js
           node tests/whatsapp-inbox-composer-layout.cjs
+          node tests/whatsapp-inbox-sticky-composer-v4.cjs
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
