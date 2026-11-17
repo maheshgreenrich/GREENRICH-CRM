@@ -55,11 +55,26 @@
   const state=history.get(selected)||{};
   const provider=state.messages||[];
   const crm=active?.messages||[];
-  const seen=new Set(provider.map(m=>m.id).filter(Boolean));
-  const rendered=[...provider.map(x=>({text:x.text||(x.template_name?'Template: '+x.template_name:(x.has_attachment?'Attachment: '+(x.attachment_type||'media')+' (file preview unavailable through current API)':'[Provider did not return readable message text]')),direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',when:x.event_at,status:x.status,id:x.id,origin:'provider'})),
-    ...crm.filter(x=>!x.provider_message_id||!seen.has(x.provider_message_id)).map(x=>({text:x.body||'[CRM message text unavailable]',direction:x.direction,when:x.event_at||x.created_at,status:x.delivery_status,id:x.id,origin:'crm'}))];
+  // Provider UUID and WhatsApp wamid may differ. Prefer the actual wamid
+  // so accepted campaign messages do not appear twice as separate chats.
+  const seen=new Set(provider.flatMap(m=>[m.id,m.provider_message_id]).filter(Boolean));
+  const matchingLocal=x=>crm.find(m=>m.provider_message_id&&
+    [x.id,x.provider_message_id].includes(m.provider_message_id));
+  const rendered=[...provider.map(x=>{
+    const local=matchingLocal(x);
+    const content=x.text||(x.template_name?'Template: '+x.template_name:
+      x.has_attachment?'Attachment: '+(x.attachment_type||'media')+' (media URL unavailable from provider)':
+      local?.body||'[Provider did not return readable message text]');
+    return {text:content,direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',
+      when:x.event_at,status:x.status,id:x.provider_message_id||x.id,origin:'provider'};
+   }),
+    ...crm.filter(x=>!x.provider_message_id||!seen.has(x.provider_message_id))
+      .map(x=>({text:x.body||'[CRM message text unavailable]',direction:x.direction,
+       when:x.event_at||x.created_at,status:x.delivery_status,id:x.id,origin:'crm'}))];
   rendered.sort((a,b)=>(Date.parse(a.when)||0)-(Date.parse(b.when)||0));
   const title=active?.name||'Choose a customer';
+  const previousScroll=host.querySelector('#grwx-messages');
+  const wasNearBottom=previousScroll?previousScroll.scrollHeight-previousScroll.scrollTop-previousScroll.clientHeight<100:true;
   host.innerHTML='<section class="grwx-shell">'+
    '<div class="grwx-top"><div><h3>WhatsApp Inbox</h3><p>CRM customer directory and available SocialBerries chat history</p></div>'+
     '<button type="button" data-grwx-action="refresh-directory">Refresh CRM</button></div>'+
@@ -114,6 +129,8 @@
      '<p class="grwx-empty">Select a customer to show details</p>')+'</aside></div>'+
    '<div class="grwx-accuracy">All available CRM leads/customers appear in the directory, even without messages. Provider history is fetched by selected number only. Real-time updates for all SocialBerries conversations require authenticated incoming-message/status webhooks and a complete history API.</div>'+
    '</section>';
+  const chatScroller=host.querySelector('#grwx-messages');
+  if(chatScroller&&wasNearBottom)chatScroller.scrollTop=chatScroller.scrollHeight;
  }
  async function load(pageNumber=1,silent=false){
   const chosen=customers().find(x=>x.key===selected);
