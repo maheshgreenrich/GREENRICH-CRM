@@ -311,7 +311,10 @@ Deno.serve(async request=>{
        direction,
        type:String(x.type??"unknown").slice(0,60),
        status:String(x.status??"unknown").slice(0,60),
-       text:typeof x.message_text==="string"?x.message_text.slice(0,600):"",
+       text:typeof x.message_text==="string"?x.message_text.slice(0,2000):"",
+       template_name:typeof x.template?.name==="string"?x.template.name.slice(0,180):"",
+       has_attachment:x.has_attachment===true,
+       attachment_type:typeof x.attachment_type==="string"?x.attachment_type.slice(0,50):"",
        event_at:String(x.created_on??x.created_at??"").slice(0,50)
       };
     });
