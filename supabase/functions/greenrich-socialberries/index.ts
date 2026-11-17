@@ -299,31 +299,44 @@ Deno.serve(async request=>{
     if(!out.ok)return response(request,200,{ok:false,configured:true,code:"HTTP_"+out.status,
       message:"SocialBerries message-history request returned HTTP "+out.status});
     const data=out.data;
-    // The OpenAPI Get Messages 200 schema is empty. Accept list or paginated
-    // results only, whitelist fields, and never expose an unknown response body.
-    const list=Array.isArray(data)?data:(Array.isArray(data?.results)?data.results:[]);
+    // SocialBerries' OpenAPI describes its 200 response merely as "object".
+    // Recognize only actual arrays at a small set of common envelope positions.
+    // Never silently interpret an undocumented object as zero chat messages.
+    const envelopes=[data,data?.data];
+    const list=envelopes.flatMap(v=>Array.isArray(v)?[v]:
+     [v?.results,v?.messages,v?.data].filter(Array.isArray))[0];
+    if(!list)return response(request,200,{ok:false,configured:true,shape_known:false,
+     message:"SocialBerries returned an undocumented message response object. The API example shows {}. Ask Workaxis for a real redacted GET Messages success response; no messages were deleted or marked delivered."});
     const records=list.slice(0,15).filter(x=>x&&typeof x==="object").map(x=>{
       const sender=String(x.sender??""),receiver=String(x.receiver??"");
       const direction=sender.replace(/\D/g,"")===phone?"Incoming":
         receiver.replace(/\D/g,"")===phone?"Outgoing":"Unknown";
+      const safe=val=>typeof val==="string"?val:"";
+      const template=x.template;
+      const body=Array.isArray(template?.components)?
+       template.components.find((c:any)=>String(c?.type||"").toUpperCase()==="BODY"):null;
+      // Only use real provider-supplied text. Do not fabricate dynamic variable values.
+      const messageText=safe(x.message_text)||safe(x.text)||safe(x.body?.text)||safe(body?.text);
+      const templateName=safe(template?.name)||safe(template);
+      const attachments=x.has_attachment===true||!!x.attachment;
       return {
        id:String(x.id??x.message_id??"").slice(0,120),
        provider_message_id:String(x.message_id??x.data?.messages?.[0]?.id??"").slice(0,180),
        direction,
        type:String(x.type??"unknown").slice(0,60),
        status:String(x.status??"unknown").slice(0,60),
-       text:typeof x.message_text==="string"?x.message_text.slice(0,2000):"",
-       template_name:typeof x.template?.name==="string"?x.template.name.slice(0,180):
-         typeof x.template==="string"?x.template.slice(0,180):"",
-       has_attachment:x.has_attachment===true,
-       attachment_type:typeof x.attachment_type==="string"?x.attachment_type.slice(0,50):"",
+       text:messageText.slice(0,4000),
+       template_name:templateName.slice(0,180),
+       has_attachment:attachments,
+       attachment_type:String(x.attachment_type??"").slice(0,50),
        event_at:String(x.created_on??x.created_at??"").slice(0,50)
       };
     });
-    const count=Number(data?.count);
-    return response(request,200,{ok:true,configured:true,page:Number(page),
-      messages:records,count:Number.isFinite(count)?count:null,
-      shape_known:Array.isArray(data)||Array.isArray(data?.results)});
+    const countValue=[data?.count,data?.data?.count].find(x=>x!==null&&x!==undefined);
+    const count=countValue===undefined?null:Number(countValue);
+    return response(request,200,{ok:true,configured:true,page:Number(page),limit:15,
+      messages:records,count:count!==null&&Number.isFinite(count)?count:null,
+      shape_known:true});
    }catch{return response(request,200,{ok:false,configured:true,
      message:"Could not retrieve message history. Check provider response format and API settings."})}
   }
