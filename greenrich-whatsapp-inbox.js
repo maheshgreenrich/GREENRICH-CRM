@@ -4,7 +4,7 @@
    number. "Live" implies verified provider webhooks; this UI never invents them. */
 (()=>{
  let ctx=null,host=null,selected='',filter='',kind='all',company='all',page=1,fetchSerial=0,ticker=null;
- const history=new Map();
+ const history=new Map(),drafts=new Map(),attachments=new Map();
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const clean=x=>String(x||'').replace(/\D/g,'').replace(/^91(?=[6-9]\d{9}$)/,'');
  const phone=x=>/^[6-9]\d{9}$/.test(clean(x))?clean(x):null;
@@ -89,7 +89,13 @@
        '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'"><div class="grwx-bubble">'+
         '<div>'+quote(m.text)+'</div><small>'+esc(date(m.when))+' · '+esc(m.status||m.origin)+'</small></div></div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
-      '<div class="grwx-chat-footer"><p>Read-only CRM conversation. Use SocialBerries to send/reply until its verified reply API is integrated.</p>'+
+      '<div class="grwx-chat-footer">'+
+      '<div class="grwx-attachment-tools"><label>Attach image / video / file<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"></label>'+
+      '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
+      '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
+      '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy reply</button>'+
+      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
+      '<div class="grwx-send-unavailable">Direct Send disabled: SocialBerries has not provided a verified individual text/media reply API and inbound 24-hour conversation status. Drafts are local to this open page; use Copy reply and send from SocialBerries meanwhile. Attached files are not uploaded.</div>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
@@ -143,11 +149,20 @@
    const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
    if(action==='refresh-chat')return void load(1);
+   if(action==='send-draft'){settings.notify('Direct WhatsApp reply is not connected. The provider reply endpoint and 24-hour conversation window must be verified before sending. No message was sent.','warning');return}
+   if(action==='copy-draft'){
+    const text=drafts.get(selected)||'';
+    if(!text.trim()){settings.notify('Type a message first.','warning');return}
+    try{await navigator.clipboard.writeText(text);settings.notify('Reply copied. Send it using your connected SocialBerries inbox. No CRM send was attempted.','success')}
+    catch{settings.notify('Copy not available in this browser. Select the draft text and copy it manually.','warning')}
+    return;
+   }
    if(action==='older'){const h=history.get(selected);if(h?.hasMore)void load((h.page||1)+1);return}
    if(action==='newer'){const h=history.get(selected);if(h?.page>1)void load(h.page-1);return}
    if(action==='refresh-directory'){try{await settings.refresh();render()}catch(err){settings.notify(String(err.message||err),'error')}return}
   };
   host.oninput=e=>{
+   if(e.target.id==='grwx-compose'){drafts.set(selected,e.target.value.slice(0,4096));return}
    if(e.target.id!=='grwx-search')return;
    filter=e.target.value.toLowerCase();
    const cursor=e.target.selectionStart;render();
@@ -155,6 +170,14 @@
    try{input?.setSelectionRange(cursor,cursor)}catch{}
   };
   host.onchange=e=>{
+   if(e.target.id==='grwx-attachment'){
+    const file=e.target.files?.[0];
+    if(file&&file.size>25*1024*1024){settings.notify('Please choose a file under 25 MB. No file has been uploaded.','warning');e.target.value='';return}
+    if(file)attachments.set(selected,{name:file.name,size:file.size,type:file.type});
+    else attachments.delete(selected);
+    const label=host.querySelector('#grwx-attachment-name');if(label)label.textContent=file?.name||'No file selected';
+    return;
+   }
    if(e.target.id==='grwx-company'){company=e.target.value;selected=''}
    else if(e.target.id==='grwx-kind'){kind=e.target.value;selected=''}
    else return;
