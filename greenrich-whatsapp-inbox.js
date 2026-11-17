@@ -26,8 +26,9 @@
   const t=(rows.templates||[]).find(x=>x.company_id===contact.company_id&&
     String(x.name||'').toLowerCase()===name&&
     (x.language==='en_US'||!x.language));
-  if(!t||t.provider_approval!=='approved')return null;
-  const components=Array.isArray(t.provider_preview?.components)?t.provider_preview.components:[];
+  if(!t)return null; // Preview does not grant permission to send; never alter approval.
+  const pv=typeof t.provider_preview==='string'?(()=>{try{return JSON.parse(t.provider_preview)}catch{return {}}})():t.provider_preview||{};
+  const components=Array.isArray(pv.components)?pv.components:[];
   const header=components.find(c=>String(c.type).toUpperCase()==='HEADER');
   const buttons=components.find(c=>String(c.type).toUpperCase()==='BUTTONS');
   const links=[header?.example?.header_handle?.[0],header?.example?.header_url,
@@ -114,7 +115,7 @@
   const previousScroll=host.querySelector('#grwx-messages');
   const wasNearBottom=previousScroll?previousScroll.scrollHeight-previousScroll.scrollTop-previousScroll.clientHeight<100:true;
   host.innerHTML='<section class="grwx-shell">'+
-   '<div class="grwx-top"><div><h3>WhatsApp Inbox</h3><p>CRM customer directory and available SocialBerries chat history</p></div>'+
+   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v6</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
     '<button type="button" data-grwx-action="refresh-directory">Refresh CRM</button></div>'+
    '<div class="grwx-grid">'+
     '<aside class="grwx-sidebar"><div class="grwx-side-controls"><strong>Chats & customers</strong><small>'+visible.length+' shown · '+all.length+' total contacts</small>'+
@@ -125,9 +126,9 @@
     '<div class="grwx-users">'+(visible.length?visible.slice(0,1200).map(x=>
      '<button type="button" class="grwx-user '+(x.key===selected?'active':'')+'" data-grwx-contact="'+esc(x.key)+'">'+
        '<span class="grwx-avatar">'+esc((x.name||'?').charAt(0).toUpperCase())+'</span>'+
-       '<span class="grwx-user-copy"><b>'+esc(x.name)+'</b><small class="grwx-contact-phone">+91 '+esc(x.number)+'</small>'+
-       '<small class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</small></span>'+
-       '<time>'+esc(date(x.recent?.event_at||x.recent?.created_at).split(',')[0])+'</time></button>'
+       '<span class="grwx-user-copy"><strong class="grwx-contact-name">'+esc(x.name)+'</strong><span class="grwx-contact-phone">+91 '+esc(x.number)+'</span>'+
+       '<span class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</span></span>'+
+       '</button>'
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
     '<main class="grwx-conversation">'+
     (active?'<div class="grwx-chat-head"><span class="grwx-avatar">'+esc(title.charAt(0).toUpperCase())+'</span>'+
@@ -153,7 +154,7 @@
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
       '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
       '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
-      '<div class="grwx-send-unavailable" title="Direct Send requires verified SocialBerries reply and media API. Selected files are not uploaded.">Send unavailable · Draft only; attachments are not uploaded.</div>'+
+      '<p class="grwx-send-unavailable" title="Requires verified SocialBerries single-message API">Draft only — sending and uploads are not yet connected.</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
