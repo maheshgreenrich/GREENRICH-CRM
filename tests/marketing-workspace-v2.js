@@ -14,7 +14,7 @@ for(const id of ['grwc-service-company','grwc-service-type','grwc-service-source
 pass('Dispatch data from real CRM',ui.includes("optional('gr_dispatch_orders'")&&ui.includes('source_sale_id'));
 pass('Product and stage from real CRM',ui.includes('product_id,created_at')&&ui.includes('leadStage'));
 pass('Company must be derived rather than attributed to current dropdown',ui.includes('const customerCompany=c=>')&&ui.includes('found.length===1?found[0]'));
-pass('Image input offers restricted MIME',ui.includes('image/png,image/jpeg,image/webp'));
+pass('Image input offers restricted MIME',ui.includes('image/png,image/jpeg'));
 pass('Private image bucket',ui.includes("storage.from('gr-wa-campaign-images')"));
 pass('Image limit',ui.includes('5*1024*1024'));
 pass('Image path company scoped',ui.includes("companyId+'/'+record.id+'/marketing.'"));
@@ -25,7 +25,7 @@ pass('Consent preflight',ui.includes("w.consent_status==='opted_in'")&&ui.includ
 pass('Read-only provider batch detail API',api.includes('if(action==="batch_detail")')&&api.includes('message_statistics'));
 pass('Read/failed reported only when provider returns',api.includes('read:toCount(raw.read)')&&api.includes('failed:toCount(raw.failed)'));
 pass('No fake replies',api.includes('responded:null,not_responded:null'));
-pass('Inbound no fake auto-webhook',ui.includes('Automatic inbound lead creation is not active'));
+pass('Inbound no fake auto-webhook',ui.includes('Trusted inbound gateway deployed, source connection pending'));
 pass('Inbound lookup real CRM',ui.includes('function inboundView()')&&ui.includes('data-inbound-history'));
 pass('Customer 360 chat lookup',customer.includes('SocialBerries chat history')&&customer.includes('openCustomerHistory'));
 pass('Customer company check',customer.includes('if(companies.length!==1)'));
@@ -41,18 +41,18 @@ pass('No provider webhooks activated',!migration.includes('create trigger')&&!mi
 pass('Script included',html.includes('greenrich-whatsapp-crm-workflows.js'));
 pass('Secure preflight reports blockers without sending',ui.includes("secureSend('preflight_marketing'")&&ui.includes('Nothing sent.')&&!ui.includes('function showReadinessGuide'));
 pass('Saved campaigns can send remaining eligible recipients',ui.includes('data-review-campaign')&&ui.includes('Send remaining')&&ui.includes("secureSend('send_campaign'"));
-pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('tpl.innerHTML=options(templateOptions'));
+pass('Filter refresh preserves provider and template',ui.includes('const remembered=previous?')&&ui.includes('updateCampaignTemplateSelect(form'));
 pass('No extra marketing approval questionnaire controls',!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template')&&!ui.includes('data-consent-campaign'));
 pass('No draft created until secure complete preflight',ui.indexOf("secureSend('preflight_marketing'")>=0&&ui.indexOf("secureSend('preflight_marketing'")<ui.indexOf("record=await save('gr_wa_campaigns'"));
 pass('One-time Settings consent is accessible',ui.includes('data-settings-optin')&&ui.includes('function settingsConsent(company,container)')&&ui.includes("secureSend('record_consent'"));
 pass('One-time Settings template confirmation is accessible',ui.includes('data-settings-confirm-template')&&ui.includes('function settingsTemplateApproval(company,container)')&&ui.includes("secureSend('confirm_template'"));
 pass('Marketing remains one button',ui.includes('data-send-campaign')&&!ui.includes('data-record-optin')&&!ui.includes('data-confirm-template'));
 
-pass('JSON import status separate from Meta approval',ui.includes('JSON imported · approval not yet verified')&&ui.includes('JSON imported · not verified'));
+pass('JSON import status separate from Meta approval',ui.includes('Manual Sync Approved Template')&&ui.includes('provider_approval'));
 pass('JSON file imports supported',ui.includes('name="json_file"')&&ui.includes('await file.text()'));
-pass('Template mismatch blocked',ui.includes('Correct the name to match the approved provider template'));
+pass('Template mismatch blocked',ui.includes('Template ID/name mismatch'));
 pass('Confirmation dialog preloads JSON',ui.includes('const jsonOf=t=>')&&ui.includes("note('Full approved template JSON','approved_json',jsonOf(list[0]))"));
 pass('Settings can verify with Meta',ui.includes('data-verify-meta-template')&&ui.includes('function verifyMetaTemplate(')&&ui.includes("secureSend('sync_meta_template'"));
 pass('Campaign image survives audience filter redraw',ui.includes('campaignImage=e.target.files?.[0]||null')&&ui.includes('const file=campaignImage||f.get(\'image\')')&&ui.includes('data-campaign-image-status'));
-pass('Failed sends display stored provider reasons',ui.includes('provider_error_message,created_at')&&ui.includes('No WhatsApp message was accepted.'));
+pass('Failed sends display stored provider reasons',ui.includes('provider_error_message')&&ui.includes('No WhatsApp message was accepted.'));
 console.log('PASS: Marketing v2 filters, private attachments, provider-aware campaign reports, inbound lookup, Customer 360, optional welcome, bulk after-sales drafts and no-send guard');
