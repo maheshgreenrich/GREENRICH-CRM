@@ -136,3 +136,50 @@
  #grwx-inbox-host .grwx-compose-row{flex-wrap:wrap}
  #grwx-inbox-host #grwx-compose{flex-basis:100%!important}
 }
+
+/* v5 WhatsApp-style UI polish; override app-wide form/button rules */
+#grwx-inbox-host .grwx-shell{grid-template-rows:56px minmax(0,1fr)!important;}
+#grwx-inbox-host .grwx-grid{grid-template-columns:270px minmax(0,1fr) 255px!important;}
+#grwx-inbox-host .grwx-sidebar{min-width:0!important;}
+#grwx-inbox-host .grwx-user{height:65px!important;max-height:65px!important;min-height:65px!important;padding:8px 10px!important;gap:8px!important;}
+#grwx-inbox-host .grwx-user time{display:none!important;}
+#grwx-inbox-host .grwx-user-copy{display:grid!important;grid-template-rows:auto auto auto!important;gap:2px!important;width:calc(100% - 48px)!important;max-width:calc(100% - 48px)!important;}
+#grwx-inbox-host .grwx-user-copy b{font-size:12px!important;line-height:1.3!important;white-space:nowrap!important;}
+#grwx-inbox-host .grwx-user-copy .grwx-contact-phone{font-size:11px!important;letter-spacing:0!important;overflow:visible!important;text-overflow:clip!important;white-space:nowrap!important;color:#285d89!important;}
+#grwx-inbox-host .grwx-user-copy .grwx-last-message{font-size:10px!important;margin:0!important;max-width:100%!important;}
+#grwx-inbox-host .grwx-conversation{grid-template-rows:56px auto minmax(0,1fr) auto!important;}
+#grwx-inbox-host .grwx-chat-head{height:56px!important;min-height:56px!important;}
+#grwx-inbox-host .grwx-messages{align-items:stretch!important;justify-content:flex-start!important;align-content:start!important;gap:7px!important;padding:8px 12px!important;}
+#grwx-inbox-host .grwx-message{margin:0!important;padding:0!important;min-height:0!important;flex-shrink:0!important;}
+#grwx-inbox-host .grwx-bubble{margin:0!important;max-width:min(78%,530px)!important;padding:9px 11px!important;line-height:1.45!important;}
+#grwx-inbox-host .grwx-chat-footer{display:flex!important;flex-direction:column!important;gap:6px!important;min-height:84px!important;max-height:174px!important;padding:8px 11px!important;border-top:1px solid #e3eaf1!important;background:#fff!important;}
+#grwx-inbox-host .grwx-attachment-tools{min-height:24px!important;display:flex!important;align-items:center!important;gap:10px!important;margin:0!important;}
+#grwx-inbox-host .grwx-attach-button{display:inline-flex!important;align-items:center!important;justify-content:center!important;position:relative!important;overflow:hidden!important;min-width:76px!important;min-height:28px!important;padding:4px 9px!important;background:#f4f7fa!important;border:1px solid #e2eaf1!important;border-radius:18px!important;color:#476780!important;font-size:11px!important;font-weight:650!important;cursor:pointer!important;}
+#grwx-inbox-host .grwx-attach-button input{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important;z-index:1;}
+#grwx-inbox-host #grwx-attachment-name{font-size:10px!important;max-width:260px!important;color:#738aa0;}
+#grwx-inbox-host .grwx-compose-row{display:flex!important;align-items:center!important;gap:6px!important;min-height:40px!important;margin:0!important;}
+#grwx-inbox-host #grwx-compose{height:42px!important;min-height:42px!important;max-height:85px!important;resize:vertical!important;border-radius:22px!important;padding:10px 14px!important;}
+#grwx-inbox-host .grwx-compose-row button{height:36px!important;min-height:36px!important;border-radius:18px!important;padding:7px 12px!important;white-space:nowrap!important;}
+#grwx-inbox-host .grwx-compose-row [data-grwx-action="send-draft"]{border-radius:50%!important;width:40px!important;height:40px!important;min-width:40px!important;padding:0!important;}
+#grwx-inbox-host .grwx-send-unavailable{font-size:9px!important;line-height:1.2!important;color:#8b7780!important;}
+#grwx-inbox-host .grwx-pagination{display:flex!important;justify-content:flex-end!important;align-items:center!important;gap:8px!important;margin:0!important;}
+#grwx-inbox-host .grwx-pagination button{padding:2px 7px!important;font-size:10px!important;}
+#grwx-inbox-host .grwx-template-image{display:block;width:100%;max-width:440px;max-height:310px;object-fit:contain;border-radius:8px;margin:0 0 9px;background:#f2f4f6;}
+#grwx-inbox-host .grwx-media-missing{border:1px dashed #c4d4e1;background:#f5f8fb;border-radius:7px;padding:12px;color:#657f94;font-size:11px;margin-bottom:7px;}
+#grwx-inbox-host .grwx-template-buttons{display:grid;gap:2px;margin-top:10px;border-top:1px solid #d4e5d6;}
+#grwx-inbox-host .grwx-template-buttons span{display:block;padding:7px 2px;text-align:center;color:#1576b3;font-size:11px;border-bottom:1px solid #d4e5d6;}
+@media(max-width:1180px){#grwx-inbox-host .grwx-grid{grid-template-columns:260px minmax(0,1fr) 235px!important}}
+@media(max-width:1000px){#grwx-inbox-host .grwx-grid{grid-template-columns:255px minmax(0,1fr)!important}}
+@media(max-width:650px){
+ #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(145px,38%) minmax(0,1fr)!important}
+ #grwx-inbox-host .grwx-user-copy .grwx-contact-phone{font-size:9px!important}
+ #grwx-inbox-host .grwx-compose-row{flex-wrap:wrap!important}
+ #grwx-inbox-host #grwx-compose{flex-basis:100%!important}
+ #grwx-inbox-host .grwx-chat-footer{max-height:220px!important}
+}
+
+/* Compact WhatsApp-inspired attachment shortcuts; selected files stay local. */
+#grwx-inbox-host .grwx-attachment-tools{gap:5px!important;min-height:29px!important}
+#grwx-inbox-host .grwx-attachment-tools .grwx-tool-icon{width:31px!important;height:29px!important;min-width:31px!important;min-height:29px!important;border-radius:50%!important;padding:0!important;background:#f2f6fa!important;color:#436581!important;font-size:17px!important;border:0!important;line-height:1!important}
+#grwx-inbox-host #grwx-attachment{display:none!important}
+#grwx-inbox-host #grwx-attachment-name{margin-left:7px!important;max-width:260px!important}

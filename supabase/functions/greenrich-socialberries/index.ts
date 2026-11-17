@@ -325,6 +325,30 @@ Deno.serve(async request=>{
       const messageText=safe(x.message_text)||safe(x.text)||safe(x.body?.text)||safe(body?.text);
       const templateName=safe(template?.name)||safe(template);
       const attachments=x.has_attachment===true||!!x.attachment;
+      // Only expose already-present public HTTPS media URLs, not provider auth
+      // tokens, media IDs, private storage paths, or arbitrary API objects.
+      const publicMedia=(value:unknown)=>{
+       if(typeof value!=="string"||value.length>1800)return "";
+       try{
+        const u=new URL(value);
+        const allowed=u.hostname==="api.antcrm.co"||
+          u.hostname==="s3.ap-south-1.amazonaws.com"||
+          u.hostname==="www.workaxis.in"||
+          u.hostname==="lookaside.fbsbx.com";
+        return u.protocol==="https:"&&!u.username&&!u.password&&allowed?u.href:"";
+       }catch{return ""}
+      };
+      const mediaURL=[x.image?.link,x.media?.url,x.attachment?.url,x.attachment?.link,
+        x.media_url,x.image_url].map(publicMedia).find(Boolean)||"";
+      const templateHeader=Array.isArray(template?.components)?template.components.find(
+       (c:any)=>String(c.type||"").toUpperCase()==="HEADER"):null;
+      const buttonGroup=Array.isArray(template?.components)?template.components.find(
+       (c:any)=>String(c.type||"").toUpperCase()==="BUTTONS"):null;
+      const templateImage=publicMedia(templateHeader?.image?.link)||
+        publicMedia(templateHeader?.example?.header_handle?.[0]);
+      const templateButtons=Array.isArray(buttonGroup?.buttons)?
+        buttonGroup.buttons.slice(0,3).map((btn:any)=>
+         typeof btn?.text==="string"?btn.text.slice(0,70):"").filter(Boolean):[];
       return {
        id:String(x.id??x.message_id??"").slice(0,120),
        provider_message_id:String(x.message_id??x.data?.messages?.[0]?.id??"").slice(0,180),
@@ -335,6 +359,10 @@ Deno.serve(async request=>{
        template_name:templateName.slice(0,180),
        has_attachment:attachments,
        attachment_type:String(x.attachment_type??"").slice(0,50),
+       media_url:mediaURL||templateImage,
+       template_buttons:templateButtons,
+       template_image_expected:String(templateHeader?.format||"").toUpperCase()==="IMAGE",
+       media_type:String(x.attachment_type??(x.image?"image":"")).slice(0,25),
        event_at:String(x.created_on??x.created_at??"").slice(0,50)
       };
     });
