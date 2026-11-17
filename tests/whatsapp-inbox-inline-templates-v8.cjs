@@ -38,7 +38,8 @@ assert.ok(element.querySelector('#grwx-template-image'),'IMAGE header requires i
 assert.ok(element.querySelector('[data-grwx-action="send-template"]'),'Send selected template action missing');
 assert.ok(element.textContent.includes('Buy Now'),'Existing CTA button label must be visible');
 assert.ok(js.includes("if(action==='send-draft'||action==='send-attachment')"),'Text and media actions must be separate');
-assert.ok(js.includes("const media=action==='send-attachment'?attachments.get(selected):null"),'Text Send must never pick up a stale file');
+assert.ok(js.includes("const media=attachments.get(selected)||null"),'Send arrow must attach the explicitly selected file');
+assert.ok(js.includes("if(!draft&&!media)"),'Text or attachment required for sending');
 assert.ok(server.includes('if(kind==="template")'),'Approved template send branch missing');
 assert.ok(server.includes('gr_wa_template_media'),'Template IMAGE header must be hosted for SocialBerries');
 assert.ok(server.includes('Recipient has no recorded marketing opt-in'),'Marketing consent check missing');
