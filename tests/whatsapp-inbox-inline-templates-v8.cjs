@@ -17,7 +17,7 @@ const t={id:'bff0a251-d34b-4397-8a70-f9557320a3c7',company_id:'grow-india',
  provider_template_id:'2246803270052788',body:'Hello 🌱',
  provider_preview:{components:[{type:'HEADER',format:'IMAGE'},{type:'BODY',text:'Hello 🌱'},
    {type:'BUTTONS',buttons:[{text:'Buy Now',type:'URL',url:'https://mygreenbin.in'}]}]}};
-const rows={connections:[{id:selectedConnection,company_id:'grow-india',provider:'socialberries'}],
+const rows={connections:[{id:selectedConnection,company_id:'grow-india',provider:'socialberries',enabled:true,setup_state:'verified'}],
  templates:[t],messages:[],profiles:[],tags:[]};
 const element=w.document.getElementById('grwx-inbox-host');
 const settings={admin:true,companies:['grow-india'],companyName:()=> 'GreenRich Grow India Pvt Ltd',
