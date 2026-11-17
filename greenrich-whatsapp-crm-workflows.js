@@ -205,7 +205,7 @@
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
-   '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; no reapproval in Meta is needed.</p>'+
+   '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; No reapproval in Meta is needed.</p>'+
    '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh CRM template list</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
