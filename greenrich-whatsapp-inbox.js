@@ -93,7 +93,8 @@
       '<div class="grwx-attachment-tools"><label>Attach image / video / file<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"></label>'+
       '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
-      '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy reply</button>'+
+      '<button type="button" data-grwx-action="template-draft">Template</button>'+
+      '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
       '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
       '<div class="grwx-send-unavailable">Direct Send disabled: SocialBerries has not provided a verified individual text/media reply API and inbound 24-hour conversation status. Drafts are local to this open page; use Copy reply and send from SocialBerries meanwhile. Attached files are not uploaded.</div>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
@@ -149,6 +150,11 @@
    const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
    if(action==='refresh-chat')return void load(1);
+   if(action==='template-draft'){
+    const person=customers().find(x=>x.key===selected);
+    if(person)settings.openTemplateFor?.(person);
+    return;
+   }
    if(action==='send-draft'){settings.notify('Direct WhatsApp reply is not connected. The provider reply endpoint and 24-hour conversation window must be verified before sending. No message was sent.','warning');return}
    if(action==='copy-draft'){
     const text=drafts.get(selected)||'';
