@@ -2,7 +2,7 @@
 /* CRM-led WhatsApp handoff, not a replacement for SocialBerries.
    No network calls to undocumented provider endpoints and no simulated sends. */
 (()=>{
- let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set();
+ let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set(),inboxNeedle='',guidanceCompany='grow-india',guidanceProduct='all';
  let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null,campaignImage=null,campaignParamValues={};
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
@@ -112,7 +112,7 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
@@ -124,9 +124,10 @@
    optional('gr_dispatch_orders','id,company_id,source_sale_id,order_id,order_date,customer_id,customer_name,customer_mobile,product_name,sku,status,dispatched_at,delivered_at,customer_email'),
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
    optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
-   optional('gr_wa_messages','id,company_id,campaign_id,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,created_at')
+   optional('gr_wa_messages','id,company_id,connection_id,campaign_id,direction,body,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,event_at,created_at'),
+   optional('gr_wa_guidance_steps')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -179,7 +180,7 @@
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
  '<div class="grwc-notice">Select customers, the WhatsApp provider, an approved marketing template and an optional image. Click <b>Send Campaign</b>. The server checks marketing permission and sending readiness automatically.</div>'+
- '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
+ '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['reports','Campaign History'],['inbox','WhatsApp Inbox'],['sync','Lead Assignment'],['welcome','Lead Welcome'],['recurring','After-Sales'],['guidance','Product Guidance']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),tags=rows.tags,chosen=selectedStatus();
   return '<section class="grwc-panel">'+headers('CRM audience selection','Filter Leads and Customers from GreenRich ONE; no contact upload required to build an audience.')+
@@ -207,7 +208,7 @@
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
    '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; No reapproval in Meta is needed.</p>'+
    '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh CRM template list</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
-   '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
+   '<button type="submit" class="grwc-primary" data-send-campaign>Review & Send Campaign</button></form></section>';
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
@@ -217,7 +218,9 @@
    'Provider acceptance is not WhatsApp delivery. Actual deliveries depend on reported provider events.')+
    '<div class="grwc-grid grwc-kpis">'+
    [['Campaigns',relevant.length],['Local attempts',tracked.length],
-    ['Awaiting provider delivery',tracked.filter(x=>x.delivery_status==='queued').length],
+    ['Delivered (confirmed)',tracked.filter(x=>['delivered','read'].includes(x.delivery_status)).length],
+    ['Read (confirmed)',tracked.filter(x=>x.delivery_status==='read').length],
+    ['Awaiting delivery status',tracked.filter(x=>['queued','sent'].includes(x.delivery_status)).length],
     ['Failed / uncertain',tracked.filter(x=>x.delivery_status==='failed').length],
     ['Provider batches linked',completed.length]].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
    (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Attempts</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
@@ -230,7 +233,7 @@
     const allAttempted=attempts.length>0&&attempts.length>=Number(x.audience?.selected_count||0);
     return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(state)+(last?'<div class="grwc-muted">Reason: '+esc(reason)+'</div>':'')+'</td><td>'+(allAttempted?'<small>Already attempted · do not automatically retry</small>':'<button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button>')+'</td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
-   '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
+   '<p class="grwc-muted">Delivered and Read counts require provider-reported status. Meta website CTA click metrics are not yet available in this CRM API; zero is not displayed as a made-up click count. Uncertain attempts are never auto-retried. Read receipts can be disabled by recipients.</p>'+
    (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">Provider batch data is synchronised read-only; campaign processing status is not message delivery. Use one company at a time.</p>':'')+
    '</section>';
  }
@@ -325,7 +328,7 @@
    connection:previous.elements.connection_id?.value||'',
    template:previous.elements.template_id?.value||''
   }:null;
-  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='welcome'?welcomeView():current==='recurring'?recurringView():inboundView())+'</div>';
+  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='reports'?campaignReports():current==='inbox'?inboxView():current==='welcome'?welcomeView():current==='recurring'?recurringView():current==='guidance'?guidanceView():inboundView())+'</div>';
   const form=root.querySelector('#grwc-audience-form');
   if(form&&remembered){
    const prov=form.elements.connection_id;
@@ -1300,12 +1303,13 @@
    marketingDraw();
   };
   element.oninput=e=>{
-   const ids={'grwc-search':'needle','grwc-service-search':'serviceNeedle','grwc-inbound-lookup':'inboundNeedle'};
+   const ids={'grwc-search':'needle','grwc-service-search':'serviceNeedle','grwc-inbound-lookup':'inboundNeedle','grwc-inbox-lookup':'inboxNeedle'};
    if(!ids[e.target.id])return;
    const field=e.target.id,pos=e.target.selectionStart;
    if(field==='grwc-search')needle=e.target.value.toLowerCase();
    if(field==='grwc-service-search')serviceNeedle=e.target.value.toLowerCase();
    if(field==='grwc-inbound-lookup')inboundNeedle=e.target.value.toLowerCase();
+   if(field==='grwc-inbox-lookup')inboxNeedle=e.target.value.toLowerCase();
    marketingDraw();
    const input=element.querySelector('#'+field);
    input?.focus();
