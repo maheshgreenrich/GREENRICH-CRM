@@ -11,7 +11,7 @@ for(const phrase of ['#grwx-inbox-host .grwx-grid','overflow-y:auto','min-height
  'grwx-compose-row','grwx-customer-profile','grwx-users']) assert.ok(css.includes(phrase),phrase);
 for(const phrase of ['id="grwx-compose"','id="grwx-attachment"','data-grwx-action="send-draft"',
  'data-grwx-action="send-template"','data-grwx-action="template-draft"','drafts.set(selected',
- 'grwx-template-picker','data-grwx-action="send-attachment"','file.size>8*1024*1024',
+ 'grwx-template-picker','grwx-media-preview','file.size>8*1024*1024',
  'Text sends without attachments','24 hours']) assert.ok(inbox.includes(phrase),phrase);
 assert.ok(!inbox.includes('data-grwx-action="copy-draft"'),'Copy button must be removed from inbox');
 assert.ok(provider.includes('template_name:')&&provider.includes('attachment_type:'),'Show provider media/template metadata');
