@@ -17,5 +17,5 @@ const before=backend.slice(backend.indexOf('if(action==="diagnose_connection")')
 assert.ok(!/await send\(|send_campaign|action==="record_consent"/.test(before),'Diagnostics must not send or mutate');
 assert.ok(!before.includes('BASIC_PASSWORD')&&!before.includes('BASIC_USERNAME'),'Never reveal credentials');
 const html=read('secure.html');
-assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261116-zero-repeat-sync-1'));
+assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-manual-sync-visible-2'));
 console.log('PASS: read-only, admin-scoped WhatsApp sending diagnosis, safe blockers, failed-send detail and UI wiring');
