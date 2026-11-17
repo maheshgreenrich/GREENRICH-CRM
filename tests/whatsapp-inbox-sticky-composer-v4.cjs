@@ -13,7 +13,7 @@ assert.ok(css.includes('#grwx-inbox-host #grwx-compose'),'Textarea must be visib
 assert.ok(css.includes('visibility:visible!important'),'Textarea must not be hidden by global CRM styles');
 assert.ok(css.includes('#grwx-inbox-host .grwx-accuracy{display:none!important}'),'Long status explanation must not overlap composer');
 for(const asset of ['greenrich-whatsapp-inbox.css','greenrich-whatsapp-inbox.js','greenrich-whatsapp-crm-workflows.js'])
- assert.ok(html.includes(asset+'?v='+(asset==='greenrich-whatsapp-crm-workflows.js'?'20261117-inbox-grid-v4':'20261117-inbox-send-v7')),'Asset references must match their actual release: '+asset);
+ assert.ok(html.includes(asset+'?v='+(asset==='greenrich-whatsapp-crm-workflows.js'?'20261117-inbox-grid-v4':'20261117-inbox-inline-templates-v8')),'Asset references must match their actual release: '+asset);
 assert.ok(js.includes('id="grwx-compose"'),'Composer exists in active chat');
 assert.ok(js.includes('data-grwx-action="template-draft"'),'Template shortcut exists');
 assert.ok(js.includes('id="grwx-attachment"'),'File selector exists');
