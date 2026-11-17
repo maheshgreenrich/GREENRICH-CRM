@@ -15,13 +15,32 @@
  const options=(items,blank='None — do not send')=>'<option value="">'+esc(blank)+'</option>'+items.map(x=>'<option value="'+esc(x[0])+'">'+esc(x[1])+'</option>').join('');
  const templates=c=>rows.templates.filter(t=>t.company_id===c);
  const connectionLabel=id=>rows.connections.find(c=>c.id===id)?.display_name||'Not connected';
- const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_approval==='approved'?'Provider verified':t.provider_preview?.status==='APPROVED'?'Screenshot · API unverified':'Unverified');
+ const tmpl=t=>t.name+' · '+t.language+' · '+(t.body?'Preview recorded':'Metadata only')+' · '+(t.provider_approval!=='approved'?'Not verified for sending':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.provider_source==='verified_provider'?'Verified directly with Meta':'Unverified');
  const validMarketingTemplate=t=>t.category==='marketing'&&t.provider_approval==='approved'&&
    ['verified_provider','admin_confirmed'].includes(t.provider_source)&&
    !!String(t.body||'').trim()&&Array.isArray(t.provider_preview?.components)&&t.provider_preview.components.some(c=>String(c.type).toUpperCase()==='BODY');
  const templateOptions=(c,connectionId='')=>templates(c).filter(t=>
    validMarketingTemplate(t)&&(!connectionId||t.connection_id===connectionId))
    .map(t=>[t.id,t.name+' · '+t.language+' · Ready']);
+ // Pending references are visible to explain why they cannot yet be sent.
+ // Disabled options cannot be selected as a campaign template.
+ const templateSelectHtml=(company,connectionId)=>'<option value="">Choose an approved template</option>'+
+   templates(company).filter(t=>t.category==='marketing'&&t.connection_id===connectionId)
+    .map(t=>'<option value="'+esc(t.id)+'"'+(validMarketingTemplate(t)?'':' disabled')+'>'+
+     esc(t.name+' · '+t.language+(validMarketingTemplate(t)?' · Ready':' · Pending manual sync / missing approved components'))+'</option>').join('');
+ function updateCampaignTemplateSelect(form,keepValue=''){
+  if(!form)return;
+  const conn=form.elements.connection_id?.value||'',company=campaignConnection(conn)?.company_id||'';
+  const input=form.elements.template_id;
+  if(input){
+   input.innerHTML=templateSelectHtml(company,conn);
+   if(keepValue&&Array.from(input.options).some(o=>o.value===keepValue&&!o.disabled))input.value=keepValue;
+  }
+  const list=rows.templates.filter(t=>t.connection_id===conn&&t.category==='marketing');
+  const ready=list.filter(validMarketingTemplate).length;
+  const status=form.querySelector('[data-marketing-sync-status]');
+  if(status)status.textContent=ready+' ready · '+(list.length-ready)+' pending full approved template details. Pending templates are shown but cannot be sent. Use Admin → WhatsApp Settings → Manual Sync Approved Template.';
+ }
  function templateRequirements(t){
   const comps=Array.isArray(t?.provider_preview?.components)?t.provider_preview.components:[];
   const body=comps.find(x=>String(x.type).toUpperCase()==='BODY');
@@ -186,7 +205,7 @@
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
-   '<p class="grwc-muted grwc-span">Templates sync automatically from your company Meta account after one-time connection. Incomplete references are hidden from sending; no repeat Meta approval or JSON typing is needed.</p>'+
+   '<p class="grwc-muted grwc-span">Manual template sync is supported in Admin → WhatsApp Settings. Missing approved components are shown as pending, and cannot be sent until an approved full template is saved. No reapproval in Meta is needed.</p>'+
    '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh approved templates</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
@@ -312,20 +331,13 @@
    const prov=form.elements.connection_id;
    if(Array.from(prov.options).some(o=>o.value===remembered.connection)){
     prov.value=remembered.connection;
-    const company=campaignConnection(remembered.connection)?.company_id||'';
-    const tpl=form.elements.template_id;
-    tpl.innerHTML=options(templateOptions(company,remembered.connection),'Choose a template for this provider');
-    if(Array.from(tpl.options).some(o=>o.value===remembered.template))tpl.value=remembered.template;
+    updateCampaignTemplateSelect(form,remembered.template);
    }
    // Campaign name is created automatically.
   }
   if(form){
+   if(!remembered)updateCampaignTemplateSelect(form);
    drawTemplateRequirements(form);
-   const status=form.querySelector('[data-marketing-sync-status]');
-   const currentConn=form.elements.connection_id?.value;
-   const total=rows.templates.filter(t=>t.connection_id===currentConn&&t.category==='marketing').length;
-   const ready=rows.templates.filter(t=>t.connection_id===currentConn&&validMarketingTemplate(t)).length;
-   if(status)status.textContent=ready+' ready · '+(total-ready)+' references awaiting automatic sync.';
   }
  }
  const input=(label,key,value='',type='text')=>'<label>'+esc(label)+'<input name="'+esc(key)+'" type="'+type+'" value="'+esc(value)+'"></label>';
@@ -414,7 +426,7 @@
   // Settings owns its own company selector. "Both Companies" in the workspace
   // is not a valid provider record: always work with one explicitly shown company.
   let c=scope==='all'?(app.companies.includes('grow-india')?'grow-india':app.companies[0]):scope;
-  const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c),opted=rows.consents.filter(w=>w.company_id===c&&w.consent_status==='opted_in'&&w.consent_source&&w.consent_at&&!w.opt_out_at).length,approved=templ.filter(t=>t.category==='marketing'&&t.provider_approval==='approved'&&['verified_provider','admin_confirmed'].includes(t.provider_source)).length;
+  const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c),opted=rows.consents.filter(w=>w.company_id===c&&w.consent_status==='opted_in'&&w.consent_source&&w.consent_at&&!w.opt_out_at).length,approved=templ.filter(validMarketingTemplate).length;
   container.innerHTML='<div class="grwc">'+
    '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
    '<div class="grwc-notice"><b>WhatsApp Marketing setup:</b> '+opted+' recorded opt-in(s) · '+approved+' confirmed MARKETING template(s) for '+esc(name(c))+'. Complete these one-time setup steps below. Marketing stays a simple Send Campaign page. API credentials stay in Supabase Secrets.</div>'+
@@ -444,7 +456,7 @@
    '<p class="grwc-muted">Manual sync imports the full existing SocialBerries-approved template and records admin evidence in one step. It does not create or resubmit a template to Meta.</p>'+
    '<details class="grwc-span"><summary>Advanced · Template recovery tools</summary><p class="grwc-muted">Link metadata only if you do not have the approved template JSON.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button></details>'+
-   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting automatic sync')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
+   (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(validMarketingTemplate(t)?(t.provider_source==='verified_provider'?'Send-ready · Meta synced':'Send-ready · Admin confirmed'):t.provider_approval!=='approved'?'Not verified · manual sync required':t.body&&Array.isArray(t.provider_preview?.components)?'Incomplete approved template':'Missing approved components · manual sync required')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-sync-approved-templates>Refresh approved templates</button></div></div>'+
@@ -1153,9 +1165,7 @@
     return;
    }
    if(form&&e.target.name==='connection_id'){
-    const connectionId=e.target.value,c=campaignConnection(connectionId)?.company_id||'';
-    const tpl=form.querySelector('[name=template_id]');
-    if(tpl)tpl.innerHTML=options(templateOptions(c,connectionId),'Choose a template for this provider');
+    updateCampaignTemplateSelect(form);
     drawTemplateRequirements(form);
     return;
    }
