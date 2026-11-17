@@ -447,7 +447,14 @@
   root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='reports'?campaignReports():current==='inbox'?'<div id="grwx-inbox-host"></div>':current==='welcome'?welcomeView():current==='recurring'?recurringView():current==='guidance'?guidanceView():inboundView())+'</div>';
   if(current==='inbox')window.GreenRichInbox?.mount(root.querySelector('#grwx-inbox-host'),{
    app,admin:app.admin,companies:app.companies,companyName:name,getRows:()=>rows,getTargets:targets,
-   refresh:async()=>{await fetchAll()},notify:alert
+   refresh:async()=>{await fetchAll()},notify:alert,
+   openTemplateFor:person=>{
+    const target=targets().find(x=>x.id===person.id);
+    if(!target||!target.company_id||!app.companies.includes(target.company_id))
+     return alert('This contact needs a matching CRM company assignment before preparing a WhatsApp template.','warning');
+    scope=target.company_id;selected=new Set([target.id]);current='audience';window.GreenRichInbox?.unmount();marketingDraw();
+    alert('Customer selected for a one-recipient campaign draft. Choose your approved template and review before sending.','info');
+   }
   });
   const form=root.querySelector('#grwc-audience-form');
   if(form&&remembered){
