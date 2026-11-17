@@ -15,7 +15,7 @@ w.eval(js);
 const id='d659481e-63c6-4ce1-85fd-51029dd72b4e';
 const host=w.document.getElementById('grwx-inbox-host');
 let calls=[];
-const rows={messages:[],templates:[],profiles:[],tags:[],connections:[{id,company_id:'grow-india',provider:'socialberries'}]};
+const rows={messages:[],templates:[],profiles:[],tags:[],connections:[{id,company_id:'grow-india',provider:'socialberries',enabled:true,setup_state:'verified'}]};
 const targets=[
  {id:'L:grow-india:one',company_id:'grow-india',mobile:'9150014040',name:'Customer One',type:'Lead'},
  {id:'L:grow-india:two',company_id:'grow-india',mobile:'9655735712',name:'Customer Two',type:'Lead'}
