@@ -17,5 +17,5 @@ assert.ok(!inbox.includes('data-grwx-action="copy-draft"'),'Copy button must be 
 assert.ok(provider.includes('template_name:')&&provider.includes('attachment_type:'),'Show provider media/template metadata');
 assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-company-v10'));
 assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
-assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbox-grid-v4'));
+assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbound-source-v11'));
 console.log('PASS: inbox alignment, fixed composer, safe provider-media metadata and reviewed template handoff');
