@@ -29,5 +29,5 @@ for(const k of ['function templateSpecs(template:any)','function components(temp
  'input.template_fields||{}','if(!["image/png","image/jpeg"].includes(campaign.attachment_mime))'])
  assert.ok(backend.includes(k),'Missing required send and preflight handling '+k);
 assert.ok(backend.includes('template.provider_preview'),'Approved metadata must remain intact');
-assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbox-grid-v4'));
+assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbound-source-v11'));
 console.log('PASS: template-derived dynamic BODY, HEADER, COPY_CODE and URL fields; backend sending/preflight and JPEG/PNG safety');
