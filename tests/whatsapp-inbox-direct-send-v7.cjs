@@ -5,7 +5,7 @@ const src=fs.readFileSync('greenrich-whatsapp-inbox.js','utf8');
 const server=fs.readFileSync('supabase/functions/greenrich-whatsapp-reply/index.ts','utf8');
 const html=fs.readFileSync('secure.html','utf8');
 assert.doesNotThrow(()=>new vm.Script(src));
-const docs=['"https://api.antcrm.co"','"whatsapp/messages/"','u.searchParams.set("phone_number",phone)',
+const docs=['"https://api.antcrm.co"','"/whatsapp/messages/"','u.searchParams.set("phone_number",phone)',
  'u.searchParams.set("page","1")','u.searchParams.set("limit","50")',
  'sender===phone','24*60*60*1000','formBody.set("attachment",file as File',
  'JSON.stringify({type:"text",message_text:text})','Content-Type','"multipart/form-data"',
