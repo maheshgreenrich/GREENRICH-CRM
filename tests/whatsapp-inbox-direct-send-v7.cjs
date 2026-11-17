@@ -26,6 +26,6 @@ const button=w.document.querySelector('[data-grwx-action="send-draft"]');
 assert.ok(button&&!button.disabled,'Admin with verified provider should have clickable send control');
 assert.ok(w.document.querySelector('#grwx-compose'),'Text composer absent');
 assert.equal(w.document.querySelectorAll('.grwx-tool-icon').length,4);
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
 w.GreenRichInbox.unmount();w.close();
 console.log('PASS: direct reply endpoint contract, explicit 24-hour customer verification, admin send composer');
