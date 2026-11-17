@@ -48,6 +48,8 @@ jobs:
           node tests/inventory-wms-bom.cjs
           node --check greenrich-inventory.js
           node --check greenrich-whatsapp-crm-workflows.js
+          node --check greenrich-whatsapp-inbox.js
+          node tests/whatsapp-inbox-composer-layout.cjs
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
@@ -87,6 +89,7 @@ jobs:
           node tests/whatsapp-campaign-selection.js
           node tests/whatsapp-operations-hub.cjs
           node tests/whatsapp-three-pane-inbox.cjs
+          node tests/whatsapp-inbox-composer-layout.cjs
           node tests/whatsapp-guarded-sending.js
           node tests/customer-edit-lead-inline-marketing-filters.js
           node tests/whatsapp-provider-slot-edit.js
