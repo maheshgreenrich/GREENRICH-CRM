@@ -9,8 +9,8 @@ const docs=['"https://api.antcrm.co"','"whatsapp/messages/"','u.searchParams.set
  'u.searchParams.set("page","1")','u.searchParams.set("limit","50")',
  'sender===phone','24*60*60*1000','formBody.set("attachment",file as File',
  'JSON.stringify({type:"text",message_text:text})','Content-Type','"multipart/form-data"',
- 'await userDb.rpc("gr_wa_admin"','client.from','gr_wa_messages','request_id','connection_id',
- 'if(!allowed)return out(422','provider_message_id','Authorization:"Basic "+btoa',
+ 'await userDb.rpc("gr_wa_admin"','userDb.from','gr_wa_messages','request_id','connection_id',
+ 'if(!allowed)return out(422','provider_message_id','auth:"Basic "+btoa',
  'No verified incoming customer message in the past 24 hours'];
 for(const token of docs)assert.ok(server.includes(token),'Missing server-side send requirement '+token);
 const dom=new JSDOM('<div id="inbox"></div>',{runScripts:'outside-only',url:'https://maheshgreenrich.github.io'});
