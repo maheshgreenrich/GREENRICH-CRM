@@ -214,7 +214,7 @@
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
   const providerBatches=(rows.batches||[]).filter(x=>scope==='all'||x.company_id===scope)
     .slice().sort((a,b)=>String(b.synced_at).localeCompare(String(a.synced_at))).slice(0,100);
-  const stat=(b,key)=>Number.isFinite(Number(b.message_statistics?.[key]))?Number(b.message_statistics[key]):'—';
+  const stat=(b,key)=>b.message_statistics?.[key]!==null&&b.message_statistics?.[key]!==undefined&&Number.isFinite(Number(b.message_statistics[key]))?Number(b.message_statistics[key]):'—';
   const messages=rows.messages||[],completed=relevant.filter(x=>!!x.provider_batch_id);
   const tracked=messages.filter(m=>relevant.some(c=>c.id===m.campaign_id));
   return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
@@ -405,7 +405,7 @@
   if(!app.admin)return alert('Admin permission required to manage product guidance.','warning');
   const old=(rows.guidance||[]).find(x=>x.id===id);
   const company=old?.company_id||guidanceCompany;
-  const templatesFor=rows.templates.filter(x=>x.company_id===company&&validMarketingTemplate(x));
+  const templatesFor=rows.templates.filter(x=>x.company_id===company&&['marketing','utility'].includes(x.category)&&x.provider_approval==='approved'&&['verified_provider','admin_confirmed'].includes(x.provider_source)&&Array.isArray(x.provider_preview?.components));
   const productOptions=[...new Set([...rows.products.map(x=>x.name),...rows.dispatches.map(x=>x.product_name)].filter(Boolean))];
   const body='<div class="grwc-notice grwc-span">Save editable product instructions only. No WhatsApp message or timer is activated by this action.</div>'+
    '<div class="grwc-feature grwc-span"><b>Company:</b> '+esc(name(company))+'</div>'+
