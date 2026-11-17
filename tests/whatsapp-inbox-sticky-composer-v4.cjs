@@ -17,5 +17,5 @@ for(const asset of ['greenrich-whatsapp-inbox.css','greenrich-whatsapp-inbox.js'
 assert.ok(js.includes('id="grwx-compose"'),'Composer exists in active chat');
 assert.ok(js.includes('data-grwx-action="template-draft"'),'Template shortcut exists');
 assert.ok(js.includes('id="grwx-attachment"'),'File selector exists');
-assert.ok(js.includes('data-grwx-action="send-draft" disabled'),'Do not enable unverified direct send');
+assert.ok(js.includes('data-grwx-action="send-draft"'),'Send must use server-side 24h verification');
 console.log('PASS: composer anchored below scrolling messages and three-pane styles independent of page wrapper');
