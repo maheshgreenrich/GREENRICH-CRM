@@ -143,17 +143,18 @@
        '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'">'+messageCard(m,active)+'</div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
       '<div class="grwx-chat-footer">'+
-      '<div class="grwx-attachment-tools">'+
+      '<div class="grwx-composer-layout"><div class="grwx-attachment-tools">'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-image" aria-label="Select image" title="Select image">▧</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-video" aria-label="Select video" title="Select video">▣</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-document" aria-label="Select document" title="Select PDF or document">▤</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-audio" aria-label="Select audio" title="Select audio">♫</button>'+
       '<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden aria-label="Choose attachment">'+
-      '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
+      '</div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
       '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
-      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
+      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required" aria-label="Send unavailable">➤</button></div></div>'+
+      '<span id="grwx-attachment-name" class="grwx-attachment-meta">'+esc(attachments.get(active.key)?.name||'')+'</span>'+
       '<p class="grwx-send-unavailable" title="Requires verified SocialBerries single-message API">Draft only — sending and uploads are not yet connected.</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
