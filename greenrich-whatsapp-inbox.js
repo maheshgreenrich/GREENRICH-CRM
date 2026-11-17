@@ -5,6 +5,7 @@
 (()=>{
  let ctx=null,host=null,selected='',filter='',kind='all',company='all',page=1,fetchSerial=0,ticker=null;
  const history=new Map(),drafts=new Map(),attachments=new Map();
+ let sending=false;
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const clean=x=>String(x||'').replace(/\D/g,'').replace(/^91(?=[6-9]\d{9}$)/,'');
  const phone=x=>/^[6-9]\d{9}$/.test(clean(x))?clean(x):null;
@@ -156,9 +157,9 @@
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
       '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
-      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required" aria-label="Send unavailable">➤</button></div></div>'+
+      '<button type="button" data-grwx-action="send-draft" '+(!ctx?.admin||!active.connection||sending?'disabled':'')+' title="Reply only within 24 hours of a customer message; provider verifies again before sending" aria-label="Send WhatsApp message">'+(sending?'…':'➤')+'</button></div></div>'+
       '<span id="grwx-attachment-name" class="grwx-attachment-meta">'+esc(attachments.get(active.key)?.name||'')+'</span>'+
-      '<p class="grwx-send-unavailable" title="Requires verified SocialBerries single-message API">Draft only — sending and uploads are not yet connected.</p>'+
+      '<p class="grwx-send-unavailable">Replies require a verified incoming message within 24 hours. Provider acceptance is not delivery.</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
@@ -226,7 +227,64 @@
     if(person)settings.openTemplateFor?.(person);
     return;
    }
-   if(action==='send-draft'){settings.notify('Direct WhatsApp reply is not connected. The provider reply endpoint and 24-hour conversation window must be verified before sending. No message was sent.','warning');return}
+   if(action==='send-draft'){
+    if(sending)return;
+    const person=customers().find(x=>x.key===selected);
+    if(!ctx?.admin||!person?.connection)return settings.notify('An authorized provider connection is required.','warning');
+    const draft=(drafts.get(selected)||'').trim(),media=attachments.get(selected);
+    if(!draft&&!media)return settings.notify('Type a reply or choose an attachment first.','warning');
+    if(media?.file?.size>8*1024*1024)return settings.notify('Attachment maximum is 8 MB. No message sent.','warning');
+    // No silent sending: one explicit customer-facing action and confirmation.
+    const confirmText='Send this '+(media?'attachment':'text message')+' to '+person.name+' (+91 '+person.number+') via SocialBerries? The backend will allow free-form replies only if the customer messaged within the last 24 hours.';
+    if(!window.confirm(confirmText))return;
+    const requestId=crypto.randomUUID();
+    const form=new FormData();
+    form.set('connection_id',person.connection.id);
+    form.set('customer_key',person.key);
+    form.set('phone_number','91'+person.number);
+    form.set('request_id',requestId);
+    form.set('message_text',draft);
+    if(media?.file){
+      const types={'image/jpeg':'image','image/png':'image','video/mp4':'video',
+        'audio/mpeg':'audio','audio/mp4':'audio','audio/ogg':'audio',
+        'application/pdf':'document','text/plain':'document',
+        'application/msword':'document',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document':'document',
+        'application/vnd.ms-excel':'document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'document'};
+      const kind=types[media.file.type];
+      if(!kind)return settings.notify('Unsupported file type. Use JPEG/PNG, MP4, MP3/OGG, PDF, TXT, DOC/DOCX, XLS/XLSX.','warning');
+      form.set('type',kind);
+      form.set('attachment',media.file,media.file.name);
+    }else form.set('type','text');
+    const targetKey=selected;
+    sending=true;
+    const button=host.querySelector('[data-grwx-action="send-draft"]');
+    if(button){button.disabled=true;button.textContent='…'}
+    try{
+      // Browser sends a real multipart request directly to this authenticated Edge
+      // Function, never to Workaxis; Basic credentials never leave the backend.
+      const sess=await settings.app.db.auth.getSession();
+      const jwt=sess.data?.session?.access_token;
+      if(!jwt)throw Error('Please sign in again before sending a message');
+      const response=await fetch('https://uawgwkplkvahhmhvroul.supabase.co/functions/v1/greenrich-whatsapp-reply',{
+        method:'POST',headers:{Authorization:'Bearer '+jwt,apikey:settings.publishableKey||window.GREENRICH_PUBLIC_CONFIG?.publishableKey||''},
+        body:form
+      });
+      const data=await response.json().catch(()=>({ok:false,error:'Invalid reply response'}));
+      if(!response.ok||!data.ok)throw Error(data.error||'Unable to submit WhatsApp reply');
+      if(data.status==='accepted_by_provider'){
+        drafts.delete(targetKey);attachments.delete(targetKey);
+        if(selected===targetKey){render();void load(1)}
+        settings.notify('SocialBerries accepted your reply. Delivery is not yet confirmed.','success');
+      }else{
+        settings.notify('Provider acceptance is unconfirmed. Check history before retrying.','warning');
+      }
+      await settings.refresh?.();
+    }catch(error){settings.notify(String(error.message||error)+'. If the request may have reached SocialBerries, check history before retrying.','error')}
+    finally{sending=false;if(host?.isConnected)render()}
+    return;
+   }
    if(action==='copy-draft'){
     const text=drafts.get(selected)||'';
     if(!text.trim()){settings.notify('Type a message first.','warning');return}
@@ -249,8 +307,8 @@
   host.onchange=e=>{
    if(e.target.id==='grwx-attachment'){
     const file=e.target.files?.[0];
-    if(file&&file.size>25*1024*1024){settings.notify('Please choose a file under 25 MB. No file has been uploaded.','warning');e.target.value='';return}
-    if(file)attachments.set(selected,{name:file.name,size:file.size,type:file.type});
+    if(file&&file.size>8*1024*1024){settings.notify('Please choose a file under 8 MB. No file has been uploaded.','warning');e.target.value='';return}
+    if(file)attachments.set(selected,{name:file.name,size:file.size,type:file.type,file});
     else attachments.delete(selected);
     const label=host.querySelector('#grwx-attachment-name');if(label)label.textContent=file?.name||'No file selected';
     return;
