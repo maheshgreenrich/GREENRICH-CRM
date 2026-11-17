@@ -25,9 +25,15 @@ const env=(name:string)=>Deno.env.get(name)?.trim()||"";
 function credentials(company:string,slot:number){
  const prefix=prefixes[company+":"+slot];
  if(!prefix)return {configured:false,missing:["connection"],settings:null};
+ // Confirmed by the account owner from the Workaxis/SocialBerries API documentation.
+ // Pin only the existing GreenRich Grow India primary sender; other accounts
+ // retain their own explicitly configured host/version. Never expose Basic credentials.
+ const confirmedPrimary=company==="grow-india"&&slot===1;
  const values={
-  baseUrl:env(prefix+"_BASE_URL"),username:env(prefix+"_BASIC_USERNAME"),
-  password:env(prefix+"_BASIC_PASSWORD"),version:env(prefix+"_API_VERSION")||"v1"
+  baseUrl:confirmedPrimary?"https://api.antcrm.co":env(prefix+"_BASE_URL"),
+  username:env(prefix+"_BASIC_USERNAME"),
+  password:env(prefix+"_BASIC_PASSWORD"),
+  version:confirmedPrimary?"v1":env(prefix+"_API_VERSION")||"v1"
  };
  const missing=[
   ...(!values.baseUrl?["API base URL"]:[]),
