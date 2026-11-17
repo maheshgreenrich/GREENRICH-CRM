@@ -24,5 +24,5 @@ for(const token of ['x-gr-signature','x-gr-timestamp','GREENRICH_INBOUND_WEBHOOK
  assert.ok(inbound.includes(token),'Missing signed inbound gateway protection: '+token);
 }
 assert.ok(!ui.includes('fetch("https://whatsapp.socialberries.in'),'Do not directly send from browser');
-assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbox-grid-v4'),'Ops hub bundle must be cache refreshed');
+assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbound-source-v11'),'Ops hub bundle must be cache refreshed');
 console.log('PASS: WhatsApp operations tabs, draft guidance, truthful provider stats and signed lead webhook are present');
