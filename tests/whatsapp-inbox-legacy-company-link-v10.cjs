@@ -27,7 +27,7 @@ async function main(){
  assert.ok(root.textContent.includes('hii'),'Incoming test reply should show in selected conversation');
  assert.ok(root.textContent.includes('WhatsApp via GreenRich Grow India Pvt Ltd'),'Sender fallback clearly distinguishes from CRM company assignment');
  assert.ok(root.textContent.includes('Unassigned in CRM'),'Must not silently rewrite customer company');
- w.GreenRichInbox.unmount();w.close();
+ w.GreenRichInbox.unmount();
  // Two verified sender accounts => refuse to guess legacy sender.
  const second={...unverified,enabled:true,setup_state:'verified'};
  const settingsAmbiguous={...settings,getRows:()=>({...settings.getRows(),connections:[verified,second]})};
