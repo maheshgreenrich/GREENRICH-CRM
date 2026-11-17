@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const read=p=>fs.readFileSync(path.resolve(__dirname,'..',p),'utf8');
 const ui=read('greenrich-whatsapp-crm-workflows.js'),api=read('supabase/functions/greenrich-whatsapp-send/index.ts');
 assert.doesNotThrow(()=>new vm.Script(ui));
-for(const t of ['sync_approved_templates','Sync Approved Templates','data-sync-approved-templates',
+for(const t of ['Manual Sync — Existing Meta-Approved Template','Exact approved template ID','Exact approved message BODY','button1_kind','approval evidence','sync_approved_templates','Sync Approved Templates','data-sync-approved-templates',
  'syncApprovedTemplates(company,container','Manual Sync Approved Template',
  'No reapproval in Meta is needed','window.GreenRichWaLastSync','30*60*1000','data-wa-custom',
  'Customer name','Customer mobile','Customer email','Enter my own text / order number'])
@@ -21,5 +21,5 @@ assert.ok(block.includes('if(t?.status!=="APPROVED"'),'Only Meta-approved templa
 assert.ok(block.includes('parsed.hostname!=="graph.facebook.com"'),'Never follow untrusted pagination URLs');
 assert.ok(block.includes('if(duplicate)continue'),'Do not silently remap existing template metadata');
 assert.ok(!ui.includes('Auto-sync Templates (provider endpoint needed)'),'Old disabled placeholder must disappear');
-assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-manual-sync-visible-2'));
+assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-manual-template-fields-3'));
 console.log('PASS: optional Meta catalog sync, no JSON, automatic company Settings sync, read-only API and dynamic CRM variables');
