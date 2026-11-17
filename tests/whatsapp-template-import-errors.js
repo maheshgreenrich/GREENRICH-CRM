@@ -15,7 +15,7 @@ const win={};vm.runInNewContext(instrumented,{window:win,console},{timeout:2000}
  assert.equal(res.verified,true);
  assert.ok(src.includes('name="json_file"')&&src.includes('await file.text()'),'JSON file upload supported');
  assert.ok(src.includes('prior.name!==t.name'),'Name mismatch detected');
- assert.ok(src.includes('already verified. Do not overwrite'),'Verified templates protected');
+ assert.ok(src.includes('Already directly synced with Meta. No manual overwrite.'),'Meta-verified templates protected');
  assert.ok(sql.includes('v_existing_name<>v_name'),'DB prevents identity mismatch');
  assert.ok(sql.includes("v_existing_source in ('verified_provider','admin_confirmed')"),'DB protects approved content');
  assert.ok(src.includes("note('Full approved template JSON','approved_json',jsonOf(list[0]))"),'Prefilled review');
