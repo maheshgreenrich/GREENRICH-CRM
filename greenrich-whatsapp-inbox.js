@@ -64,8 +64,8 @@
   // Recover the exact saved template name for DISPLAY only, never for sending.
   const localName=/^Marketing template:\s*([a-z0-9_]+)\s*$/i.exec(String(m.text||''));
   const name=String(m.template_name||m.template||localName?.[1]||'').trim().toLowerCase();
-  if(!name||!contact?.company_id)return null;
-  const t=(rows.templates||[]).find(x=>x.company_id===contact.company_id&&
+  if(!name||!(contact.provider_company_id||contact.company_id))return null;
+  const t=(rows.templates||[]).find(x=>x.company_id===(contact.provider_company_id||contact.company_id)&&
     String(x.name||'').toLowerCase()===name&&
     (x.language==='en_US'||!x.language));
   if(!t)return null; // Preview does not grant permission to send; never alter approval.
@@ -81,7 +81,7 @@
  };
  const usableTemplates=person=>{
   if(!person?.connection)return [];
-  return (data().templates||[]).filter(t=>t.connection_id===person.connection.id&&t.company_id===person.company_id)
+  return (data().templates||[]).filter(t=>t.connection_id===person.connection.id&&t.company_id===(person.provider_company_id||person.company_id))
    .filter(t=>['marketing','utility','authentication'].includes(String(t.category||'').toLowerCase()))
    .sort((a,b)=>String(a.name).localeCompare(String(b.name)));
  };
@@ -136,10 +136,19 @@
    }
   }
   for(const x of list){
+   const enabled=(r.connections||[]).filter(c=>ctx.companies.includes(c.company_id)&&
+      String(c.provider||'').toLowerCase()==='socialberries'&&c.enabled===true&&c.setup_state==='verified');
+   let linked=enabled.find(c=>c.company_id===x.company_id);
+   // Legacy CRM customers may lack a consent/order company link.
+   // Use a fallback only if exactly one authorized verified sender is enabled.
+   // Never change ownership or guess when multiple senders are connected.
+   if(!linked&&!x.company_id&&x.type==='Customer'&&enabled.length===1)linked=enabled[0];
+   x.connection=linked||null;
+   x.provider_company_id=linked?.company_id||x.company_id||'';
+   x.provider_fallback=!!linked&&!x.company_id;
    x.messages=msgs.filter(m=>phone(m.phone)===x.number&&
-      (!x.company_id||x.company_id===m.company_id)).sort((a,b)=>String(a.event_at||a.created_at).localeCompare(String(b.event_at||b.created_at)));
+      x.provider_company_id===m.company_id).sort((a,b)=>String(a.event_at||a.created_at).localeCompare(String(b.event_at||b.created_at)));
    x.recent=x.messages[x.messages.length-1];
-   x.connection=(r.connections||[]).find(c=>c.company_id===x.company_id&&String(c.provider).toLowerCase()==='socialberries');
    x.salesperson=(r.profiles||[]).find(p=>p.id===x.owner)?.full_name||'Not assigned';
   }
   return list.sort((a,b)=>{
@@ -150,7 +159,7 @@
  function render(){
   if(!host?.isConnected||!ctx)return;
   const r=data(),all=customers();
-  const visible=all.filter(x=>(company==='all'||x.company_id===company)&&
+  const visible=all.filter(x=>(company==='all'||x.provider_company_id===company)&&
     (kind==='all'||kind==='leads'&&x.type==='Lead'||kind==='customers'&&x.type==='Customer')&&
     (!filter||[x.name,x.number,x.email,x.source,x.salesperson].some(v=>String(v||'').toLowerCase().includes(filter))));
   if(selected&&!all.some(x=>x.key===selected))selected='';
@@ -201,7 +210,7 @@
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
     '<main class="grwx-conversation '+(templateOpen?'grwx-with-template':'')+'">'+
     (active?'<div class="grwx-chat-head"><span class="grwx-avatar">'+esc(title.charAt(0).toUpperCase())+'</span>'+
-      '<span class="grwx-heading-person"><strong>'+esc(title)+'</strong><small>+91 '+esc(active.number)+' · '+esc(companyName(active.company_id))+'</small></span>'+
+      '<span class="grwx-heading-person"><strong>'+esc(title)+'</strong><small>+91 '+esc(active.number)+' · '+esc(active.provider_fallback?'WhatsApp sender: '+companyName(active.provider_company_id):companyName(active.company_id))+'</small></span>'+
       '<button type="button" data-grwx-action="refresh-chat" '+(!ctx.admin||!active.connection?'disabled':'')+'>'+ (state.loading?'Loading…':'Refresh chat')+'</button></div>'+
       '<div class="grwx-provider-note" aria-live="polite">'+
       (state.error?'<span class="grwx-error">'+esc(state.error)+'</span>':
@@ -246,7 +255,7 @@
     '<aside class="grwx-customer-profile">'+(active?
      '<div class="grwx-profile-head"><b>Customer details</b><div class="grwx-profile-avatar">'+esc(title.charAt(0).toUpperCase())+'</div>'+
      '<h4>'+esc(title)+'</h4><span>'+esc(active.type)+'</span></div>'+
-     [['Phone','+91 '+active.number],['Email',active.email||'Not available'],['Company',companyName(active.company_id)],
+     [['Phone','+91 '+active.number],['Email',active.email||'Not available'],['Company',active.company_id?companyName(active.company_id):active.provider_fallback?'Unassigned in CRM · WhatsApp via '+companyName(active.provider_company_id):'Not assigned'],
       ['Source',active.source||'Not recorded'],['Salesperson',active.salesperson],
       ['Tags',(active.tags||[]).map(t=>(r.tags||[]).find(z=>z.id===t)?.name||'').filter(Boolean).join(', ')||'None'],
       ['Products',(active.products||[]).join(', ')||'Not recorded'],
