@@ -246,7 +246,7 @@
  function welcomeView(){
   const rules=scoped(rows.welcomes),co=cd();
   return '<section class="grwc-panel">'+headers('Optional Welcome Template for New Leads','Choose a template while creating a lead, importing Excel/CSV, or mapping a Google Sheet. Blank means no welcome message.')+
-   '<div class="grwc-notice">If no welcome template is selected, no message preference is saved. Template choices are read from GreenRich provider references and can be refreshed; automatic SocialBerries Get Templates sync still needs the provider endpoint.</div>'+
+   '<div class="grwc-notice">If no welcome template is selected, no message preference is saved. Approved templates are managed using Manual Sync in WhatsApp Settings. Automatic Meta sync is optional.</div>'+
    '<button type="button" data-refresh-crm>Refresh available template references</button>'+
    '<div class="grwc-grid"><div class="grwc-feature"><b>1 · Manual Lead</b><p>Leads & CRM → New Lead → Assign salesperson → Welcome template (optional).</p></div>'+
    '<div class="grwc-feature"><b>2 · Excel / CSV</b><p>Leads & CRM → Import → Default welcome template or optional per-row template ID/name.</p></div>'+
@@ -319,7 +319,7 @@
    empty('Search by mobile number to identify an existing lead or customer.'))+
    '<div class="grwc-grid"><div class="grwc-feature"><b>Existing contact</b><p>Match mobile → customer / lead record → view provider chat. Customer 360 also has an on-demand read-only chat lookup.</p></div>'+
    '<div class="grwc-feature"><b>New WhatsApp enquiry</b><p>Signed webhook → deduplicate mobile → create a WhatsApp-source lead → assign salesperson or common queue.</p></div></div>'+
-   '<div class="grwc-notice"><b>Automatic inbound lead creation is not active.</b> The supplied SocialBerries API documents message lookup by known number, but not the signed webhook payload for discovering new incoming senders. No incoming enquiry is silently lost or fabricated; configure verified events before switching it on.</div></section>'+
+   '<div class="grwc-notice"><b>Trusted inbound gateway deployed, source connection pending.</b> Website WhatsApp OTP and new-message lead assignment can run only after the server-to-server signing secret and the corresponding website / SocialBerries relay are configured. Messages cannot be discovered merely by listing contacts.</div></section>'+
    '<section class="grwc-panel">'+headers('Incoming lead assignment rules',
     'Select company, source, tags and assigned salesperson under Settings → WhatsApp Integration. Common queue is allowed.')+
    (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Company</th><th>Event</th><th>Source</th><th>Salesperson</th><th>State</th></tr></thead><tbody>'+
@@ -586,7 +586,7 @@
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-sync-approved-templates>Refresh approved templates</button></div></div>'+
-    '<p class="grwc-muted">CRM contacts and Meta leads are not automatically opted in. Record genuine permission once for the correct sending company; future campaigns reuse it.</p></section>'+
+    '<p class="grwc-muted">CRM contacts, WhatsApp replies and website OTP logins are not automatically opted in to marketing. Record genuine permission for the appropriate company before sending campaigns.</p></section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
    '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
