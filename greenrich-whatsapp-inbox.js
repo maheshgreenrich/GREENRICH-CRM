@@ -139,7 +139,7 @@
   cleanup();ctx=settings;host=root;if(!host)return;
   if(!selected){const first=customers()[0];if(first)selected=first.key}
   host.onclick=async e=>{
-   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();return}
+   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
    if(action==='refresh-chat')return void load(1);
    if(action==='older'){const h=history.get(selected);if(h?.hasMore)void load((h.page||1)+1);return}
@@ -160,6 +160,8 @@
    render();
   };
   render();
+  const initial=customers().find(x=>x.key===selected);
+  if(initial?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);
   // Poll only the currently open contact, and only if its provider history was already requested.
   // This is a best-effort refresh, NOT proof of webhook-backed live synchronization.
   ticker=setInterval(()=>{
