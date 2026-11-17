@@ -123,6 +123,16 @@ Deno.serve(async(request:Request)=>{
    if(lookup.error||!lookup.data)return out(404,{ok:false,error:"Template was not found for the selected WhatsApp account"});
    approvedTemplate=lookup.data;
    const t=approvedTemplate,pv=t.provider_preview;
+   if(String(t.category||"").toLowerCase()==="marketing"){
+    // A saved approved Meta template is not equivalent to marketing consent.
+    const consent=await server.from("gr_wa_contacts")
+      .select("consent_status,consent_source,consent_at,opt_out_at,mobile")
+      .eq("company_id",c.company_id).in("mobile",[phone,phone.slice(2),"+"+phone]).limit(40);
+    if(consent.error)return out(500,{ok:false,error:"Cannot verify the recipient’s WhatsApp marketing consent"});
+    const permitted=(consent.data||[]).some((x:any)=>x.consent_status==="opted_in"&&
+     !!x.consent_at&&!!x.consent_source&&!x.opt_out_at);
+    if(!permitted)return out(422,{ok:false,error:"Recipient has no recorded marketing opt-in. Record genuine customer consent before sending this marketing template."});
+   }
    approvedComponents=Array.isArray(pv?.components)?pv.components:[];
    const bodyPart=approvedComponents.find((x:any)=>String(x.type).toUpperCase()==="BODY");
    if(t.provider_approval!=="approved"||!["verified_provider","admin_confirmed"].includes(t.provider_source)||
@@ -203,7 +213,13 @@ Deno.serve(async(request:Request)=>{
     formBody.set("attachment",file as File,(file as File).name);body=formBody;
    }
    providerResponse=await fetch(url,{method:"POST",headers,body,redirect:"error",signal:AbortSignal.timeout(20000)});
-  }catch{
+  }catch(error){
+   if(String(error instanceof Error?error.message:error).includes("Template image upload failed")||
+      String(error instanceof Error?error.message:error).includes("No public HTTPS URL")){
+    await server.from("gr_wa_messages").update({delivery_status:"failed",provider_error_code:"IMAGE_UPLOAD_FAILED",
+     provider_error_message:"Template header image upload failed before the provider was contacted."}).eq("id",recordId);
+    return out(422,{ok:false,error:"Could not prepare the template header image. No WhatsApp message was submitted."});
+   }
    await server.from("gr_wa_messages").update({delivery_status:"queued",provider_error_code:"UNCERTAIN_PROVIDER_TIMEOUT",
     provider_error_message:"Request outcome unknown. Check provider history before retrying."}).eq("id",recordId);
    return out(502,{ok:false,uncertain:true,error:"SocialBerries response was not received. Message may have been submitted; check history before retrying."});
