@@ -224,7 +224,7 @@ jobs:
                grep -q 'grwx-contact-name' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-template-buttons' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-template-picker' /tmp/gr-live-inbox.js &&
-               grep -q "data-grwx-action=\\\"send-template\\\"" /tmp/gr-live-inbox.js &&
+               grep -q 'data-grwx-action="send-template"' /tmp/gr-live-inbox.js &&
                grep -q 'grwx-contact-name' /tmp/gr-live-inbox.css &&
                grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.css &&
                curl -fsSL --max-time 15 "$base/greenrich-sales-ops.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-dispatch.js &&
