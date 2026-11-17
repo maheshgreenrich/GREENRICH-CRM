@@ -14,8 +14,8 @@ for(const token of ['grwx-sidebar','grwx-conversation','grwx-customer-profile','
  assert.ok(inbox.includes(token),'Missing three-pane WhatsApp feature: '+token);
 }
 assert.ok(marketing.includes('window.GreenRichInbox?.mount('),'The WhatsApp tab must mount the separate inbox');
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-containment-3'),'New inbox script missing from live HTML');
-assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-containment-3'),'New inbox CSS missing from live HTML');
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-grid-v4'),'New inbox script missing from live HTML');
+assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-grid-v4'),'New inbox CSS missing from live HTML');
 assert.ok(style.includes('grid-template-columns')&&style.includes('grwx-customer-profile'),'Three-column layout missing');
 assert.ok(inbox.includes('data-grwx-action="template-draft"'),'Selected contact must open reviewed template campaign');
 assert.ok(inbox.includes('data-grwx-action="send-draft" disabled'),'Unverified direct replies cannot be sent');
