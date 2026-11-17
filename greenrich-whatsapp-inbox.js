@@ -12,6 +12,40 @@
  const quote=x=>esc(x).replace(/\n/g,'<span class="grwx-linebreak"></span>');
  const companyName=x=>ctx?.companyName(x)||x||'Company not assigned';
  const data=()=>ctx?.getRows()||{};
+ // Only display a provider/local template's media URL if the payload actually
+ // contains an HTTPS link. Never invent image locations or guess Meta handles.
+ const safeMediaLink=x=>{
+  if(typeof x!=='string'||x.length>1800)return '';
+  try{const u=new URL(x);return u.protocol==='https:'&&u.username===''&&u.password===''?u.href:''}
+  catch{return ''}
+ };
+ const previewFor=(m,contact)=>{
+  const rows=data();
+  const name=String(m.template_name||m.template||'').trim().toLowerCase();
+  if(!name||!contact?.company_id)return null;
+  const t=(rows.templates||[]).find(x=>x.company_id===contact.company_id&&
+    String(x.name||'').toLowerCase()===name&&
+    (x.language==='en_US'||!x.language));
+  if(!t||t.provider_approval!=='approved')return null;
+  const components=Array.isArray(t.provider_preview?.components)?t.provider_preview.components:[];
+  const header=components.find(c=>String(c.type).toUpperCase()==='HEADER');
+  const buttons=components.find(c=>String(c.type).toUpperCase()==='BUTTONS');
+  const links=[header?.example?.header_handle?.[0],header?.example?.header_url,
+     header?.image?.link,t.header_media_url,m.media_url,m.image_url];
+  const image=links.map(safeMediaLink).find(Boolean)||'';
+  return {image,hasImage:String(header?.format||'').toUpperCase()==='IMAGE',
+    buttons:Array.isArray(buttons?.buttons)?buttons.buttons.slice(0,3).map(b=>String(b.text||'').slice(0,70)).filter(Boolean):[]};
+ };
+ const messageCard=(m,contact)=>{
+  const template=previewFor(m,contact);
+  let header='';
+  if(m.media_url&&safeMediaLink(m.media_url)&&m.media_type==='image')header='<img class="grwx-template-image" loading="lazy" alt="WhatsApp message attachment" src="'+esc(safeMediaLink(m.media_url))+'">';
+  else if(template?.image)header='<img class="grwx-template-image" loading="lazy" alt="Approved template image" src="'+esc(template.image)+'">';
+  else if(template?.hasImage||m.has_attachment&&m.attachment_type==='image')header='<div class="grwx-media-missing">Image attached in WhatsApp · Media URL not available in provider response</div>';
+  const buttons=template?.buttons?.length?'<div class="grwx-template-buttons">'+template.buttons.map(b=>'<span>'+esc(b)+'</span>').join('')+'</div>':'';
+  return '<div class="grwx-bubble">'+header+'<div class="grwx-bubble-text">'+quote(m.text)+'</div>'+buttons+
+   '<small>'+esc(date(m.when))+' · '+esc(m.status||m.origin)+'</small></div>';
+ };
  const customers=()=>{
   const r=data(),found=new Map();
   const raw=ctx.getTargets();
@@ -66,7 +100,7 @@
       x.has_attachment?'Attachment: '+(x.attachment_type||'media')+' (media URL unavailable from provider)':
       local?.body||'[Provider did not return readable message text]');
     return {text:content,direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',
-      when:x.event_at,status:x.status,id:x.provider_message_id||x.id,origin:'provider'};
+      when:x.event_at,status:x.status,id:x.provider_message_id||x.id,origin:'provider',template_name:x.template_name,has_attachment:x.has_attachment,attachment_type:x.attachment_type,media_url:x.media_url||'',media_type:x.media_type||''};
    }),
     ...crm.filter(x=>!x.provider_message_id||!seen.has(x.provider_message_id))
       .map(x=>({text:x.body||'[CRM message text unavailable]',direction:x.direction,
@@ -87,7 +121,7 @@
     '<div class="grwx-users">'+(visible.length?visible.slice(0,1200).map(x=>
      '<button type="button" class="grwx-user '+(x.key===selected?'active':'')+'" data-grwx-contact="'+esc(x.key)+'">'+
        '<span class="grwx-avatar">'+esc((x.name||'?').charAt(0).toUpperCase())+'</span>'+
-       '<span class="grwx-user-copy"><b>'+esc(x.name)+'</b><small>+91 '+esc(x.number)+' · '+esc(x.type)+'</small>'+
+       '<span class="grwx-user-copy"><b>'+esc(x.name)+'</b><small class="grwx-contact-phone">+91 '+esc(x.number)+'</small>'+
        '<small class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</small></span>'+
        '<time>'+esc(date(x.recent?.event_at||x.recent?.created_at).split(',')[0])+'</time></button>'
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
@@ -101,17 +135,16 @@
        state.checked?'SocialBerries checked '+esc(date(state.checked))+' · '+provider.length+' provider message(s) on page '+(state.page||1):
        active.connection?'Select Refresh chat to load provider messages':'This contact needs a confirmed sender-company link for provider history')+'</div>'+
       '<div class="grwx-messages" id="grwx-messages">'+(rendered.length?rendered.map(m=>
-       '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'"><div class="grwx-bubble">'+
-        '<div>'+quote(m.text)+'</div><small>'+esc(date(m.when))+' · '+esc(m.status||m.origin)+'</small></div></div>').join(''):
+       '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'">'+messageCard(m,active)+'</div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
       '<div class="grwx-chat-footer">'+
-      '<div class="grwx-attachment-tools"><label>Attach image / video / file<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"></label>'+
+      '<div class="grwx-attachment-tools"><label class="grwx-attach-button" title="Select an image, video, audio or document">📎 Attach<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"></label>'+
       '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
       '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
       '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
-      '<div class="grwx-send-unavailable">Direct Send disabled: SocialBerries has not provided a verified individual text/media reply API and inbound 24-hour conversation status. Drafts are local to this open page; use Copy reply and send from SocialBerries meanwhile. Attached files are not uploaded.</div>'+
+      '<div class="grwx-send-unavailable" title="Direct Send requires verified SocialBerries reply and media API. Selected files are not uploaded.">Send unavailable · Draft only; attachments are not uploaded.</div>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
