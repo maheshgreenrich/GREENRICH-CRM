@@ -19,7 +19,7 @@ const settings={
 const mount=w.document.getElementById('grwx-inbox-host');
 w.GreenRichInbox.mount(mount,settings);
 assert.ok(mount.textContent.includes('Inbox'),'Inbox should render');
-assert.ok(mount.textContent.includes('v9'),'New UI build marker must show');
+assert.ok(mount.textContent.includes('v10'),'New UI build marker must show');
 assert.equal(mount.querySelector('.grwx-contact-name')?.textContent,'kumar');
 assert.equal(mount.querySelector('.grwx-contact-phone')?.textContent,'+91 9150014040');
 assert.ok(mount.querySelector('#grwx-compose'),'Bottom typing textarea absent');
