@@ -11,8 +11,8 @@ for(const phrase of ['#grwx-inbox-host .grwx-grid','overflow-y:auto','min-height
  'grwx-compose-row','grwx-customer-profile','grwx-users']) assert.ok(css.includes(phrase),phrase);
 for(const phrase of ['id="grwx-compose"','id="grwx-attachment"','data-grwx-action="send-draft"',
  'data-grwx-action="copy-draft"','data-grwx-action="template-draft"','drafts.set(selected',
- 'navigator.clipboard.writeText','openTemplateFor?.(person)','file.size>25*1024*1024',
- 'No file has been uploaded','24-hour']) assert.ok(inbox.includes(phrase),phrase);
+ 'navigator.clipboard.writeText','openTemplateFor?.(person)','file.size>8*1024*1024',
+ 'No file has been uploaded','24 hours']) assert.ok(inbox.includes(phrase),phrase);
 assert.ok(crm.includes('openTemplateFor:person=>'),'Individual contact template draft should be prepared without send');
 assert.ok(provider.includes('template_name:')&&provider.includes('attachment_type:'),'Show provider media/template metadata');
 assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-send-v7'));
