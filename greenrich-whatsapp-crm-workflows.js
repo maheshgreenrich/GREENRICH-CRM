@@ -440,9 +440,10 @@
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Approved templates and their message fields can sync automatically once the company Meta WABA is connected. No JSON editing is needed.')+
    '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Use Sync Approved Templates to retrieve full approved message content directly from the connected company Meta WABA. Existing approved templates remain available; no repeat approval is necessary.</p>'+
    '<button type="button" data-sync-approved-templates>Sync Approved Templates</button> '+
-   '<details class="grwc-span"><summary>Advanced · Manual template recovery</summary><p class="grwc-muted">Normally no JSON import is needed.</p>'+
-   '<button type="button" data-import-template-metadata>Link existing template by ID</button> '+
-   '<button type="button" data-import-provider-template>Import template JSON</button></details>'+
+   '<button type="button" data-import-provider-template>Manual Sync Approved Template</button> '+
+   '<p class="grwc-muted">Manual sync imports the full existing SocialBerries-approved template and records admin evidence in one step. It does not create or resubmit a template to Meta.</p>'+
+   '<details class="grwc-span"><summary>Advanced · Template recovery tools</summary><p class="grwc-muted">Link metadata only if you do not have the approved template JSON.</p>'+
+   '<button type="button" data-import-template-metadata>Link existing template by ID</button></details>'+
    (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(t.provider_source==='verified_provider'?'Verified directly with Meta':t.provider_source==='admin_confirmed'?'Admin-confirmed approved':t.body&&Array.isArray(t.provider_preview?.components)?'JSON imported · approval not yet verified':t.provider_preview?.status==='APPROVED'?'Meta APPROVED reported · body missing':'Awaiting automatic sync')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
@@ -868,44 +869,53 @@
  }
  function importProviderTemplate(company,container){
   const choices=rows.connections.filter(x=>x.company_id===company&&x.provider.toLowerCase()==='socialberries');
-  if(!choices.length)return alert('First save a SocialBerries provider for this company.','warning');
-  dialog('Import existing SocialBerries template JSON',
+  if(!app.admin)return alert('Only company administrators can manually sync approved templates.','warning');
+  if(!choices.length)return alert('Save a SocialBerries provider for this company first.','warning');
+  dialog('Manual Sync — Existing Approved Template',
    field('SocialBerries provider','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose connection'),true)+
-   '<p class="grwc-notice grwc-span">Use the actual approved template JSON from SocialBerries, with exact ID, name, language, category and components. Screenshot-created JSON must still be checked against the provider-approved template, especially button types and URLs.</p>'+
-   '<label class="grwc-span">Choose a JSON file<input name="json_file" type="file" accept=".json,application/json"></label>'+
-   note('Or paste complete JSON (single template or array)','preview_json'),
+   '<p class="grwc-notice grwc-span">This imports an <b>existing</b> Meta-approved MARKETING template. Copy the COMPLETE approved template JSON from SocialBerries, including ID, language, BODY, HEADER and CTA BUTTONS. This is an administrator confirmation, not a fresh Meta approval or API verification. No message is sent.</p>'+
+   '<label class="grwc-span">Approved template JSON file<input name="json_file" type="file" accept=".json,application/json"></label>'+
+   note('Or paste ONE complete approved template JSON','preview_json')+
+   note('Where you checked approval (SocialBerries template name, status and date)','confirmation_note','')+
+   '<label class="grwc-span"><input type="checkbox" name="attested" required> I checked this exact template ID, language, message text and CTA buttons against the approved SocialBerries template.</label>',
    async fd=>{
     const connectionId=String(fd.get('connection_id')||'');
-    if(!choices.some(x=>x.id===connectionId))throw Error('Choose the correct SocialBerries provider');
+    if(!choices.some(x=>x.id===connectionId))throw Error('Choose the correct SocialBerries connection');
+    if(fd.get('attested')!=='on')throw Error('Confirm the template against SocialBerries first');
+    const noteText=String(fd.get('confirmation_note')||'').trim();
+    if(noteText.length<10)throw Error('Provide at least 10 characters of approval evidence');
     const file=fd.get('json_file');let content=String(fd.get('preview_json')||'').trim();
     if(file&&typeof file.text==='function'&&file.size){
      if(file.size>100000)throw Error('JSON file must be smaller than 100 KB');
      content=await file.text();
     }
-    let parsed;try{parsed=JSON.parse(content)}catch{throw Error('Choose a valid JSON file or paste valid JSON')}
-    const list=Array.isArray(parsed)?parsed:[parsed];
-    if(!list.length||list.length>50)throw Error('Import 1–50 templates at once');
-    const existing=rows.templates.filter(t=>t.company_id===company&&t.connection_id===connectionId);
-    for(const item of list){
-     const t=item?.preview_template?.components?item.preview_template:item;
-     if(!t||typeof t!=='object'||!t.id||!t.name||!Array.isArray(t.components))
-      throw Error('Template JSON must contain id, name and components');
-     const prior=existing.find(x=>String(x.provider_template_id)===String(t.id));
-     if(prior&&prior.name!==t.name)
-      throw Error('Template ID '+t.id+' is already linked to "'+prior.name+'". Imported JSON says "'+t.name+'". Correct the name to match the approved provider template.');
-     if(prior&&['verified_provider','admin_confirmed'].includes(prior.provider_source))
-      throw Error('Template '+prior.name+' is already verified. Do not overwrite its approved content with unverified JSON.');
-    }
-    let imported=0;
-    for(const item of list){
-     const t=item?.preview_template?.components?item.preview_template:item;
-     const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
-     if(out.error)throw Error('Imported '+imported+' templates. '+out.error.message);
-     imported++;
-    }
+    let raw;try{raw=JSON.parse(content)}catch{throw Error('Paste valid template JSON or choose a JSON file')}
+    if(Array.isArray(raw))throw Error('Sync one approved template at a time to preserve an individual approval audit');
+    const t=raw?.preview_template?.components?raw.preview_template:raw;
+    if(!t||typeof t!=='object'||!/^[0-9]{5,25}$/.test(String(t.id||''))||
+       !/^[a-z][a-z0-9_]{0,511}$/.test(String(t.name||''))||
+       !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(String(t.language||''))||
+       t.status!=='APPROVED'||String(t.category||'').toUpperCase()!=='MARKETING'||
+       !Array.isArray(t.components)||!t.components.some(x=>String(x.type).toUpperCase()==='BODY'&&String(x.text||'').trim()))
+     throw Error('Provide complete APPROVED MARKETING template JSON: numeric ID, name, language, BODY and components');
+    const existing=rows.templates.filter(x=>x.company_id===company&&x.connection_id===connectionId);
+    const prior=existing.find(x=>String(x.provider_template_id)===String(t.id));
+    const sameName=existing.find(x=>x.name===t.name&&x.language===t.language&&String(x.provider_template_id)!==String(t.id));
+    if(sameName)throw Error('A template with this name/language already points to a different provider ID. Resolve that mismatch first.');
+    if(prior&&prior.name!==t.name)throw Error('The existing template ID points to a different name. Nothing changed.');
+    if(prior&&prior.provider_source==='verified_provider')throw Error('This template is already synced directly from Meta. No manual overwrite needed.');
+    const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
+    if(out.error)throw Error('Template import failed: '+out.error.message);
+    const q=await app.db.from('gr_wa_templates').select('id,name,language,provider_template_id')
+     .eq('company_id',company).eq('connection_id',connectionId)
+     .eq('provider_template_id',String(t.id)).limit(2);
+    if(q.error||q.data?.length!==1||q.data[0].name!==t.name||q.data[0].language!==t.language)
+     throw Error('Imported template identity could not be confirmed. Check template catalog; no message was sent.');
+    await secureSend('confirm_template',{connection_id:connectionId,template_id:q.data[0].id,
+     approved_json:JSON.stringify(t),confirmation_note:noteText,attested:true});
     await fetchAll();settingsDraw(container);
-    alert(imported+' JSON record(s) imported with message content. They still require confirmation against the approved provider template.','success');
-   },'Import JSON','Template JSON imported. See template status below.');
+    alert('Manual sync complete: '+t.name+' ('+t.language+'). Admin-confirmed approved content is saved with CTA buttons; no Meta reapproval or WhatsApp message sent.','success');
+   },'Sync Existing Approved Template','Template approval evidence recorded in CRM.');
  }
  function editProvider(c,slot,container){
   // A provider slot belongs permanently to one company. The former form
