@@ -15,7 +15,7 @@ const docs=['"https://api.antcrm.co"','"/whatsapp/messages/"','u.searchParams.se
 for(const token of docs)assert.ok(server.includes(token),'Missing server-side send requirement '+token);
 const dom=new JSDOM('<div id="inbox"></div>',{runScripts:'outside-only',url:'https://maheshgreenrich.github.io'});
 const w=dom.window;w.eval(src);
-const connection={id:'4eda2358-29d6-4b3e-8be8-f12d3f6f43db',provider:'socialberries',company_id:'grow-india'};
+const connection={id:'4eda2358-29d6-4b3e-8be8-f12d3f6f43db',provider:'socialberries',company_id:'grow-india',enabled:true,setup_state:'verified'};
 w.GreenRichInbox.mount(w.document.getElementById('inbox'),{
  admin:true,companies:['grow-india'],companyName:()=> 'GreenRich Grow India Pvt Ltd',
  getRows:()=>({connections:[connection],messages:[],templates:[],tags:[],profiles:[]}),
@@ -26,6 +26,6 @@ const button=w.document.querySelector('[data-grwx-action="send-draft"]');
 assert.ok(button&&!button.disabled,'Admin with verified provider should have clickable send control');
 assert.ok(w.document.querySelector('#grwx-compose'),'Text composer absent');
 assert.equal(w.document.querySelectorAll('.grwx-tool-icon').length,4);
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
 w.GreenRichInbox.unmount();w.close();
 console.log('PASS: direct reply endpoint contract, explicit 24-hour customer verification, admin send composer');

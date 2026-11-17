@@ -15,7 +15,7 @@ w.eval(js);
 const id='d659481e-63c6-4ce1-85fd-51029dd72b4e';
 const host=w.document.getElementById('grwx-inbox-host');
 let calls=[];
-const rows={messages:[],templates:[],profiles:[],tags:[],connections:[{id,company_id:'grow-india',provider:'socialberries'}]};
+const rows={messages:[],templates:[],profiles:[],tags:[],connections:[{id,company_id:'grow-india',provider:'socialberries',enabled:true,setup_state:'verified'}]};
 const targets=[
  {id:'L:grow-india:one',company_id:'grow-india',mobile:'9150014040',name:'Customer One',type:'Lead'},
  {id:'L:grow-india:two',company_id:'grow-india',mobile:'9655735712',name:'Customer Two',type:'Lead'}
@@ -57,7 +57,7 @@ async function main(){
  assert.ok(host.querySelector('[data-grwx-action="send-draft"]'),'Composer arrow missing');
  assert.ok(css.includes('.grwx-unread-badge'),'Unread CSS missing');
  assert.ok(css.includes('.grwx-media-preview img'),'Media thumbnail styling missing');
- assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'),'v9 asset marker missing');
+ assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'),'v9 asset marker missing');
  w.GreenRichInbox.unmount();w.close();
  console.log('PASS: background WhatsApp unread badge + reply snippet + opened chat read state + selected media preview and arrow sending contract');
 }

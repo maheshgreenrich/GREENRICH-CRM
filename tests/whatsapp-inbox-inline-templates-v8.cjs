@@ -17,7 +17,7 @@ const t={id:'bff0a251-d34b-4397-8a70-f9557320a3c7',company_id:'grow-india',
  provider_template_id:'2246803270052788',body:'Hello 🌱',
  provider_preview:{components:[{type:'HEADER',format:'IMAGE'},{type:'BODY',text:'Hello 🌱'},
    {type:'BUTTONS',buttons:[{text:'Buy Now',type:'URL',url:'https://mygreenbin.in'}]}]}};
-const rows={connections:[{id:selectedConnection,company_id:'grow-india',provider:'socialberries'}],
+const rows={connections:[{id:selectedConnection,company_id:'grow-india',provider:'socialberries',enabled:true,setup_state:'verified'}],
  templates:[t],messages:[],profiles:[],tags:[]};
 const element=w.document.getElementById('grwx-inbox-host');
 const settings={admin:true,companies:['grow-india'],companyName:()=> 'GreenRich Grow India Pvt Ltd',
@@ -43,7 +43,7 @@ assert.ok(js.includes("if(!draft&&!media)"),'Text or attachment required for sen
 assert.ok(server.includes('if(kind==="template")'),'Approved template send branch missing');
 assert.ok(server.includes('gr_wa_template_media'),'Template IMAGE header must be hosted for SocialBerries');
 assert.ok(server.includes('Recipient has no recorded marketing opt-in'),'Marketing consent check missing');
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
 assert.ok(css.includes('grwx-conversation.grwx-with-template'));
 w.GreenRichInbox.unmount();w.close();
 console.log('PASS: normal Send distinct from media, no Copy, same-chat approved template chooser, preview and guarded template send');

@@ -56,6 +56,7 @@ jobs:
           node tests/whatsapp-inbox-direct-send-v7.cjs
           node tests/whatsapp-inbox-inline-templates-v8.cjs
           node tests/whatsapp-inbox-media-unread-v9.cjs
+          node tests/whatsapp-inbox-legacy-company-link-v10.cjs
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
@@ -215,8 +216,8 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
                curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
                grep -q "20261104-gps-attendance-no-company-dropdown-1" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-media-unread-v9" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-company-v10" /tmp/gr-live-secure.html &&
                curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.js &&
                curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.css?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.css &&
                grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.js &&

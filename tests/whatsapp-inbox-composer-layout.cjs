@@ -15,7 +15,7 @@ for(const phrase of ['id="grwx-compose"','id="grwx-attachment"','data-grwx-actio
  'Selected attachment will be sent','24 hours']) assert.ok(inbox.includes(phrase),phrase);
 assert.ok(!inbox.includes('data-grwx-action="copy-draft"'),'Copy button must be removed from inbox');
 assert.ok(provider.includes('template_name:')&&provider.includes('attachment_type:'),'Show provider media/template metadata');
-assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-media-unread-v9'));
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-company-v10'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
 assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbox-grid-v4'));
 console.log('PASS: inbox alignment, fixed composer, safe provider-media metadata and reviewed template handoff');

@@ -14,5 +14,5 @@ assert.ok(css.includes('grid-template-rows:56px auto minmax(0,1fr) auto'),'Compo
 for(const t of ['template_buttons:templateButtons','template_image_expected:', 'media_url:mediaURL||templateImage','const publicMedia=','allowed?u.href:""'])
  assert.ok(gateway.includes(t),'Missing safe provider message media contract '+t);
 for(const p of ['greenrich-whatsapp-inbox.js','greenrich-whatsapp-inbox.css'])
- assert.ok(html.includes(p+'?v=20261117-inbox-media-unread-v9'),'New frontend cache bust missing '+p);
+ assert.ok(html.includes(p+'?v=20261117-inbox-company-v10'),'New frontend cache bust missing '+p);
 console.log('PASS: full mobile numbers, compact message spacing, professional composer, guarded real media/button preview');
