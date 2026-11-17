@@ -183,7 +183,7 @@
   const previousScroll=host.querySelector('#grwx-messages');
   const wasNearBottom=previousScroll?previousScroll.scrollHeight-previousScroll.scrollTop-previousScroll.clientHeight<100:true;
   host.innerHTML='<section class="grwx-shell">'+
-   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v6</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
+   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v9</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
     '<button type="button" data-grwx-action="refresh-directory">Refresh CRM</button></div>'+
    '<div class="grwx-grid">'+
     '<aside class="grwx-sidebar"><div class="grwx-side-controls"><strong>Chats & customers</strong><small>'+visible.length+' shown · '+all.length+' total contacts</small>'+
