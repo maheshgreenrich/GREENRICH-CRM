@@ -271,6 +271,50 @@
    if(action==='template-draft'){templateOpen=!templateOpen;chosenTemplateId='';render();return}
    if(action==='close-template'){templateOpen=false;chosenTemplateId='';render();return}
    if(action==='remove-attachment'){attachments.delete(selected);render();return}
+   if(action==='send-template'){
+    if(sending)return;
+    const person=customers().find(x=>x.key===selected);
+    const t=usableTemplates(person).find(x=>x.id===chosenTemplateId);
+    if(!ctx?.admin||!person?.connection||!readyTemplate(t))
+      return settings.notify('Choose a synced approved template for this sender first.','warning');
+    const spec=templateSpec(t),key=selected+":"+t.id;
+    const values=templateValues.get(key)||[];
+    if(values.length<spec.count||Array.from({length:spec.count},(_,i)=>values[i]).some(v=>!String(v||'').trim()))
+      return settings.notify('Complete all required template variables.','warning');
+    const file=templateMedia.get(key);
+    if(spec.image&&!file)return settings.notify('Select the approved template header image (JPEG or PNG) before sending.','warning');
+    if(file&&file.size>8*1024*1024)return settings.notify('Template image must be 8 MB or less.','warning');
+    if(!window.confirm('Send approved WhatsApp template "'+t.name+'" to '+person.name+' (+91 '+person.number+')? This may incur WhatsApp messaging charges.'))return;
+    const form=new FormData(),targetKey=selected;
+    form.set('connection_id',person.connection.id);
+    form.set('customer_key',person.key);
+    form.set('phone_number','91'+person.number);
+    form.set('request_id',crypto.randomUUID());
+    form.set('type','template');
+    form.set('template_id',t.id);
+    form.set('template_values',JSON.stringify(values.slice(0,spec.count)));
+    if(file)form.set('attachment',file,file.name);
+    sending=true;render();
+    try{
+      const sess=await settings.app.db.auth.getSession();
+      const jwt=sess.data?.session?.access_token;
+      if(!jwt)throw Error('Please sign in again before sending.');
+      const response=await fetch('https://uawgwkplkvahhmhvroul.supabase.co/functions/v1/greenrich-whatsapp-reply',{
+       method:'POST',headers:{Authorization:'Bearer '+jwt,apikey:settings.publishableKey||window.GREENRICH_PUBLIC_CONFIG?.publishableKey||''},body:form
+      });
+      const result=await response.json().catch(()=>({ok:false,error:'Invalid SocialBerries template reply'}));
+      if(!response.ok||!result.ok)throw Error(result.error||'WhatsApp template was not submitted');
+      if(result.status==='accepted_by_provider'){
+       templateMedia.delete(key);templateValues.delete(key);
+       chosenTemplateId='';templateOpen=false;
+       settings.notify('SocialBerries accepted the selected template. Delivery is still pending.','success');
+       if(selected===targetKey)void load(1);
+      }else settings.notify('Provider acceptance is not confirmed. Check provider history before resending.','warning');
+      await settings.refresh?.();
+    }catch(error){settings.notify(String(error.message||error)+'. Check provider history before retrying if sending may have started.','error')}
+    finally{sending=false;if(host?.isConnected)render()}
+    return;
+   }
    if(action==='send-draft'||action==='send-attachment'){
     if(sending)return;
     const person=customers().find(x=>x.key===selected);
