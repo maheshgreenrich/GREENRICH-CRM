@@ -38,11 +38,15 @@
  };
  const messageCard=(m,contact)=>{
   const template=previewFor(m,contact);
+  const actualButtons=Array.isArray(m.template_buttons)?m.template_buttons.slice(0,3):[];
+  const actualImage=safeMediaLink(m.media_url);
   let header='';
   if(m.media_url&&safeMediaLink(m.media_url)&&m.media_type==='image')header='<img class="grwx-template-image" loading="lazy" alt="WhatsApp message attachment" src="'+esc(safeMediaLink(m.media_url))+'">';
+  else if(actualImage&&m.template_name)header='<img class="grwx-template-image" loading="lazy" alt="WhatsApp template image" src="'+esc(actualImage)+'">';
   else if(template?.image)header='<img class="grwx-template-image" loading="lazy" alt="Approved template image" src="'+esc(template.image)+'">';
-  else if(template?.hasImage||m.has_attachment&&m.attachment_type==='image')header='<div class="grwx-media-missing">Image attached in WhatsApp · Media URL not available in provider response</div>';
-  const buttons=template?.buttons?.length?'<div class="grwx-template-buttons">'+template.buttons.map(b=>'<span>'+esc(b)+'</span>').join('')+'</div>':'';
+  else if(m.template_image_expected||template?.hasImage||m.has_attachment&&m.attachment_type==='image')header='<div class="grwx-media-missing">Image attached in WhatsApp · Provider did not supply a public image URL</div>';
+  const buttonsList=actualButtons.length?actualButtons:(template?.buttons||[]);
+  const buttons=buttonsList.length?'<div class="grwx-template-buttons">'+buttonsList.map(b=>'<span>'+esc(b)+'</span>').join('')+'</div>':'';
   return '<div class="grwx-bubble">'+header+'<div class="grwx-bubble-text">'+quote(m.text)+'</div>'+buttons+
    '<small>'+esc(date(m.when))+' · '+esc(m.status||m.origin)+'</small></div>';
  };
@@ -100,7 +104,7 @@
       x.has_attachment?'Attachment: '+(x.attachment_type||'media')+' (media URL unavailable from provider)':
       local?.body||'[Provider did not return readable message text]');
     return {text:content,direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',
-      when:x.event_at,status:x.status,id:x.provider_message_id||x.id,origin:'provider',template_name:x.template_name,has_attachment:x.has_attachment,attachment_type:x.attachment_type,media_url:x.media_url||'',media_type:x.media_type||''};
+      when:x.event_at,status:x.status,id:x.provider_message_id||x.id,origin:'provider',template_name:x.template_name,has_attachment:x.has_attachment,attachment_type:x.attachment_type,media_url:x.media_url||'',media_type:x.media_type||'',template_buttons:x.template_buttons||[],template_image_expected:!!x.template_image_expected};
    }),
     ...crm.filter(x=>!x.provider_message_id||!seen.has(x.provider_message_id))
       .map(x=>({text:x.body||'[CRM message text unavailable]',direction:x.direction,
