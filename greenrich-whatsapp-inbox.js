@@ -21,13 +21,17 @@
  };
  const previewFor=(m,contact)=>{
   const rows=data();
-  const name=String(m.template_name||m.template||'').trim().toLowerCase();
+  // CRM campaign records often store only "Marketing template: <name>" in body.
+  // Recover the exact saved template name for DISPLAY only, never for sending.
+  const localName=/^Marketing template:\s*([a-z0-9_]+)\s*$/i.exec(String(m.text||''));
+  const name=String(m.template_name||m.template||localName?.[1]||'').trim().toLowerCase();
   if(!name||!contact?.company_id)return null;
   const t=(rows.templates||[]).find(x=>x.company_id===contact.company_id&&
     String(x.name||'').toLowerCase()===name&&
     (x.language==='en_US'||!x.language));
-  if(!t||t.provider_approval!=='approved')return null;
-  const components=Array.isArray(t.provider_preview?.components)?t.provider_preview.components:[];
+  if(!t)return null; // Preview does not grant permission to send; never alter approval.
+  const pv=typeof t.provider_preview==='string'?(()=>{try{return JSON.parse(t.provider_preview)}catch{return {}}})():t.provider_preview||{};
+  const components=Array.isArray(pv.components)?pv.components:[];
   const header=components.find(c=>String(c.type).toUpperCase()==='HEADER');
   const buttons=components.find(c=>String(c.type).toUpperCase()==='BUTTONS');
   const links=[header?.example?.header_handle?.[0],header?.example?.header_url,
@@ -114,7 +118,7 @@
   const previousScroll=host.querySelector('#grwx-messages');
   const wasNearBottom=previousScroll?previousScroll.scrollHeight-previousScroll.scrollTop-previousScroll.clientHeight<100:true;
   host.innerHTML='<section class="grwx-shell">'+
-   '<div class="grwx-top"><div><h3>WhatsApp Inbox</h3><p>CRM customer directory and available SocialBerries chat history</p></div>'+
+   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v6</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
     '<button type="button" data-grwx-action="refresh-directory">Refresh CRM</button></div>'+
    '<div class="grwx-grid">'+
     '<aside class="grwx-sidebar"><div class="grwx-side-controls"><strong>Chats & customers</strong><small>'+visible.length+' shown · '+all.length+' total contacts</small>'+
@@ -125,9 +129,9 @@
     '<div class="grwx-users">'+(visible.length?visible.slice(0,1200).map(x=>
      '<button type="button" class="grwx-user '+(x.key===selected?'active':'')+'" data-grwx-contact="'+esc(x.key)+'">'+
        '<span class="grwx-avatar">'+esc((x.name||'?').charAt(0).toUpperCase())+'</span>'+
-       '<span class="grwx-user-copy"><b>'+esc(x.name)+'</b><small class="grwx-contact-phone">+91 '+esc(x.number)+'</small>'+
-       '<small class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</small></span>'+
-       '<time>'+esc(date(x.recent?.event_at||x.recent?.created_at).split(',')[0])+'</time></button>'
+       '<span class="grwx-user-copy"><strong class="grwx-contact-name">'+esc(x.name)+'</strong><span class="grwx-contact-phone">+91 '+esc(x.number)+'</span>'+
+       '<span class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</span></span>'+
+       '</button>'
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
     '<main class="grwx-conversation">'+
     (active?'<div class="grwx-chat-head"><span class="grwx-avatar">'+esc(title.charAt(0).toUpperCase())+'</span>'+
@@ -142,18 +146,19 @@
        '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'">'+messageCard(m,active)+'</div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
       '<div class="grwx-chat-footer">'+
-      '<div class="grwx-attachment-tools">'+
+      '<div class="grwx-composer-layout"><div class="grwx-attachment-tools">'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-image" aria-label="Select image" title="Select image">▧</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-video" aria-label="Select video" title="Select video">▣</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-document" aria-label="Select document" title="Select PDF or document">▤</button>'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-audio" aria-label="Select audio" title="Select audio">♫</button>'+
       '<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden aria-label="Choose attachment">'+
-      '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
+      '</div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
       '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
-      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required">Send</button></div>'+
-      '<div class="grwx-send-unavailable" title="Direct Send requires verified SocialBerries reply and media API. Selected files are not uploaded.">Send unavailable · Draft only; attachments are not uploaded.</div>'+
+      '<button type="button" data-grwx-action="send-draft" disabled title="Provider reply endpoint and customer-service window verification required" aria-label="Send unavailable">➤</button></div></div>'+
+      '<span id="grwx-attachment-name" class="grwx-attachment-meta">'+esc(attachments.get(active.key)?.name||'')+'</span>'+
+      '<p class="grwx-send-unavailable" title="Requires verified SocialBerries single-message API">Draft only — sending and uploads are not yet connected.</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
