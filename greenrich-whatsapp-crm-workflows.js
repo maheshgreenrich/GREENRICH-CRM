@@ -524,14 +524,14 @@
   let c=scope==='all'?(app.companies.includes('grow-india')?'grow-india':app.companies[0]):scope;
   const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c),opted=rows.consents.filter(w=>w.company_id===c&&w.consent_status==='opted_in'&&w.consent_source&&w.consent_at&&!w.opt_out_at).length,approved=templ.filter(validMarketingTemplate).length;
   container.innerHTML='<div class="grwc">'+
-   '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
+   '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Accounts</h2><p>Connected accounts, manual approved-template sync and lead-assignment rules. Technical setup is optional.</p></div><span class="grwc-chip">Admin only</span></div>'+
    '<div class="grwc-notice"><b>WhatsApp Marketing setup:</b> '+opted+' recorded opt-in(s) · '+approved+' confirmed MARKETING template(s) for '+esc(name(c))+'. Complete these one-time setup steps below. Marketing stays a simple Send Campaign page. API credentials stay in Supabase Secrets.</div>'+
    sel('Company','grwc-settings-company',app.companies.map(c=>[c,name(c)]),c,null)+
-   '<section class="grwc-panel">'+headers('1 · Your WhatsApp providers','GreenRich uses SocialBerries for existing templates and delivery. The second provider is optional.')+
+   '<section class="grwc-panel">'+headers('1 · WhatsApp accounts','Manage an existing account or prepare a second business number.')+
    '<div class="grwc-grid">'+[1,2].map(slot=>{
     const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
-    return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
-      '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
+    return '<div class="grwc-feature"><b>'+(slot===1?'Primary account':'Additional account')+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not connected')+'</p><p>Status: '+esc(p?.setup_state==='verified'&&p?.enabled?'Connected and enabled':'Setup required')+'</p>'+
+      '<button type="button" data-edit-provider="'+slot+'">'+(p?'View / manage details':'Connect another WhatsApp account')+'</button> '+
       (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-diagnose-provider="'+esc(p.id)+'">Check Sending Setup</button> <button type="button" data-verify-provider="'+esc(p.id)+'">Verify & Enable Provider</button> <button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
       '</div>';
    }).join('')+'</div>'+
@@ -545,10 +545,10 @@
    '<li><b>Bulk API documentation:</b> <code>POST /api/v1/whatsapp/messages/bulk/</code> requires multipart form fields and an uploaded CSV when using the file audience. The current CRM campaign sender uses the separate individual-message endpoint. Do not use the bulk code example as proof that an individual message succeeded. A bulk response with <code>status: pending</code> means queued, not delivered.</li>'+
    '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
-   '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Approved templates and their message fields can sync automatically once the company Meta WABA is connected. No JSON editing is needed.')+
-   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Use Sync Approved Templates to retrieve full approved message content directly from the connected company Meta WABA. Existing approved templates remain available; no repeat approval is necessary.</p>'+
-   '<button type="button" data-sync-approved-templates>Sync Approved Templates (optional Meta API)</button> '+
+   '<section class="grwc-panel">'+headers('2 · Approved templates','Manual sync existing Meta-approved templates once, then use them in Marketing. Automatic Meta API import is optional.')+
+   '<p class="grwc-muted">'+templ.length+' saved template reference(s). Use Manual Sync to save exact approved text, media type and buttons. No repeat approval is necessary.</p>'+
    '<button type="button" data-import-provider-template>Manual Sync Approved Template</button> '+
+   '<button type="button" data-sync-approved-templates>Optional: Sync via Meta API</button> '+
    '<p class="grwc-muted">Manual sync is the primary setup: enter exact approved header, body and buttons in a guided form, or paste full JSON if available. Automatic Meta sync is optional. No Meta resubmission.</p>'+
    '<details class="grwc-span"><summary>Advanced · Template recovery tools</summary><p class="grwc-muted">Link metadata only if you do not have the approved template JSON.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button></details>'+
@@ -574,6 +574,20 @@
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('6 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
    '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity & history</b><p>Read-only GET users, campaign batches and phone-specific WhatsApp messages. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
+  // Keep active account, template sync and lead routing visible. The rest is still
+  // accessible under one Advanced panel instead of overwhelming daily operators.
+  const panels=[...container.querySelectorAll('.grwc > .grwc-panel')];
+  if(panels.length>=7){
+   const providerHelp=panels[0].querySelector('.grwc-steps');
+   const extra=document.createElement('details');
+   extra.className='grwc-panel';extra.setAttribute('data-advanced-whatsapp','');
+   extra.innerHTML='<summary><b>Advanced tools, API diagnostics & documentation</b></summary>'+
+    '<p class="grwc-muted">Only use these settings for troubleshooting or connecting integrations. Current WhatsApp API credentials are stored securely in Supabase.</p>'+
+    '<p><a target="_blank" rel="noopener noreferrer" href="https://app.apidog.com/web/project/1359210/apis/api-41806354-run">SocialBerries bulk messaging API documentation</a></p>';
+   if(providerHelp)extra.append(providerHelp);
+   [panels[2],panels[3],panels[5],panels[6]].forEach(x=>{if(x)extra.append(x)});
+   container.querySelector('.grwc').append(extra);
+  }
   container.querySelectorAll('[data-sheet-template]').forEach(x=>{const sh=sheetRows.find(r=>r.id===x.dataset.sheetTemplate);x.value=sh?.welcome_template_id||''});
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
@@ -1127,14 +1141,25 @@
   if(!app.admin||!app.companies.includes(c)||![1,2].includes(slot))
    return alert('You do not have permission to edit this company/provider slot.','error');
   const old=rows.connections.find(p=>p.company_id===c&&p.slot===slot);
-  dialog('Configure WhatsApp Tool '+slot,
+  if(old&&old.setup_state==='verified'&&old.enabled){
+   const d=document.createElement('dialog');d.className='grwc-dialog';
+   d.innerHTML='<div class="grwc-dialog-head"><h3>Connected WhatsApp account</h3><button type="button" data-close>×</button></div>'+
+    '<div class="grwc-dialog-fields"><p><b>Provider:</b> '+esc(old.display_name)+'</p>'+
+    '<p><b>Business number:</b> '+esc(old.sender_phone)+'</p>'+
+    '<p><b>Company:</b> '+esc(name(c))+'</p>'+
+    '<p class="grwc-notice grwc-span">This account is already verified and connected. Editing it would reset a working provider setup. To add a different number use the second account slot. To change this number contact the provider administrator.</p></div>'+
+    '<div class="grwc-dialog-foot"><button type="button" data-close>Close</button></div>';
+   document.body.append(d);d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
+   d.onclose=()=>d.remove();d.showModal();return;
+  }
+  dialog(slot===2?'Connect additional WhatsApp business number':'Configure WhatsApp Tool '+slot,
    '<div class="grwc-feature grwc-span"><b>Company (fixed for Tool '+slot+')</b><p>'+esc(name(c))+'</p>'+
    '<p>To edit another company, close this form and change the Company selector in WhatsApp Settings.</p></div>'+
    input('Provider name','display_name',old?.display_name||(slot===1?'SocialBerries':''))+
-   input('Provider identifier','provider',old?.provider||(slot===1?'socialberries':''))+
+   field('WhatsApp API provider','provider',options([['socialberries','SocialBerries / Workaxis'],['other','Other provider']],'Select provider'),true)+
    input('Registered WhatsApp business sender (+91 followed by 10 digits)','sender_phone',old?.sender_phone||'')+
-   '<p class="grwc-muted grwc-span">Use the number registered to this company in SocialBerries. Campaign recipients are selected separately from CRM contacts.</p>'+
-   note('API documentation link / integration notes (no API keys)','notes',old?.notes||''),
+   '<p class="grwc-muted grwc-span">This registers the company/number in CRM only. API credentials remain in Supabase, and a new number is not active until its provider connection is verified.</p>'+
+   note('Provider account reference / notes (do not paste API tokens)','notes',old?.notes||''),
    async fd=>{
     const x={
      company_id:c,slot,
