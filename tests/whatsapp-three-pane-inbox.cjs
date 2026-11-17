@@ -14,8 +14,12 @@ for(const token of ['grwx-sidebar','grwx-conversation','grwx-customer-profile','
  assert.ok(inbox.includes(token),'Missing three-pane WhatsApp feature: '+token);
 }
 assert.ok(marketing.includes('window.GreenRichInbox?.mount('),'The WhatsApp tab must mount the separate inbox');
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-layout-1'),'New inbox script missing from live HTML');
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-composer-2'),'New inbox script missing from live HTML');
 assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-layout-1'),'New inbox CSS missing from live HTML');
 assert.ok(style.includes('grid-template-columns')&&style.includes('grwx-customer-profile'),'Three-column layout missing');
+assert.ok(inbox.includes('data-grwx-action="template-draft"'),'Selected contact must open reviewed template campaign');
+assert.ok(inbox.includes('data-grwx-action="send-draft" disabled'),'Unverified direct replies cannot be sent');
+assert.ok(inbox.includes('id="grwx-compose"'),'Composer must be pinned below the chat');
+assert.ok(inbox.includes('id="grwx-attachment"'),'Attachment selection must be available');
 assert.ok(!inbox.includes('send_campaign'),'Inbox must not simulate WhatsApp sending');
 console.log('PASS: three-pane CRM WhatsApp inbox, selected conversation history, admin-gated provider lookup, 60-second refresh');
