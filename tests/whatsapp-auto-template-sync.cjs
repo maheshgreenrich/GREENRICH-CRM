@@ -21,5 +21,5 @@ assert.ok(block.includes('if(t?.status!=="APPROVED"'),'Only Meta-approved templa
 assert.ok(block.includes('parsed.hostname!=="graph.facebook.com"'),'Never follow untrusted pagination URLs');
 assert.ok(block.includes('if(duplicate)continue'),'Do not silently remap existing template metadata');
 assert.ok(!ui.includes('Auto-sync Templates (provider endpoint needed)'),'Old disabled placeholder must disappear');
-assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-whatsapp-ops-hub-5'));
+assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbox-grid-v4'));
 console.log('PASS: optional Meta catalog sync, no JSON, manual-first company Settings sync, read-only API and dynamic CRM variables');
