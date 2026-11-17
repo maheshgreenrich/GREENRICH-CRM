@@ -291,7 +291,7 @@
    (can('create')?'<button data-create-service>+ Individual follow-up</button>':'')+'</div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th>Select</th><th>Name</th><th>Type</th><th>Company</th><th>Mobile</th><th>Sales Order</th><th>Delivery</th></tr></thead><tbody>'+
    matches.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-service-select="'+esc(x.id)+'" '+(serviceSelected.has(x.id)?'checked':'')+' '+(x.type!=='Customer'||!x.company_id?'disabled title="Link the customer to one company first"':'')+'></td><td>'+esc(x.name)+'</td><td>'+esc(x.type)+'</td><td>'+esc(name(x.company_id)||'Unassigned')+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.orders.map(y=>y.order_id).slice(0,3).join(', ')||'—')+'</td><td>'+esc(x.orders.map(y=>y.status).slice(0,3).join(', ')||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Showing 250 of '+matches.length+' loaded matches. Customers without a unique company assignment cannot be bulk-targeted. Saving a repeat rule does not send any WhatsApp messages.</p></section>'+
+   '<p class="grwc-muted">Showing 250 of '+matches.length+' loaded matches. Customers without a unique company assignment cannot be bulk-targeted. Saving a repeat rule does not send any WhatsApp messages. Use Product Guidance for day-specific instructions.</p></section>'+
    '<section class="grwc-panel">'+headers('Scheduled after-sales rules','Company-scoped drafts; intervals are retained as days, weeks or calendar months for future scheduling.')+
    (list.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Customer</th><th>Purpose</th><th>Template</th><th>Every</th><th>Next date</th><th>State</th></tr></thead><tbody>'+
    list.slice(0,200).map(r=>'<tr><td>'+esc(rows.customers.find(c=>c.id===r.customer_id)?.name||r.customer_id)+'</td><td>'+esc(r.service_reason||'service')+'</td><td>'+esc(rows.templates.find(t=>t.id===r.template_id)?.name||'—')+'</td><td>'+esc(r.interval_value||r.interval_days)+' '+esc(r.interval_unit||'days')+'</td><td>'+esc(date(r.next_due))+'</td><td>Draft · not sending</td></tr>').join('')+'</tbody></table></div>':empty('No after-sales follow-up rules saved yet.'))+
@@ -1172,13 +1172,13 @@
   const cons=rows.connections.filter(p=>p.company_id===c);
   dialog('Inbound lead assignment rule',companyFieldWith(c)+
    field('Provider','connection_id',options(cons.map(p=>[p.id,p.display_name]),'Choose provider'),true)+
-   field('Incoming event','event_type',options([['whatsapp_enquiry','WhatsApp customer enquiry'],['website_enquiry','Website enquiry']]),true)+
+   field('Incoming event','event_type',options([['whatsapp_enquiry','WhatsApp new incoming message'],['website_enquiry','Website enquiry'],['website_whatsapp_otp','Website WhatsApp OTP verified login']]),true)+
    input('CRM source label','source_name','WhatsApp Enquiry')+
    field('Salesperson','assigned_to',options(rows.profiles.filter(p=>p.company_ids?.includes(c)).map(p=>[p.id,p.full_name]),'Common sales queue'))+
-   input('Tags (approved tag IDs, comma-separated)','tag_ids','')+
+   field('Lead tag','tag_selector',options(rows.tags.map(t=>[t.id,t.name]),'No tag'))+
    '<p class="grwc-muted grwc-span">Draft only: provider webhook receiver must be configured and authenticated before it can create CRM leads.</p>',
    async fd=>{
-    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=x.tag_ids.split(',').map(v=>v.trim()).filter(Boolean);x.status='draft';
+    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=x.tag_selector?[x.tag_selector]:[];delete x.tag_selector;x.status='draft';
     if(!cons.some(p=>p.id===x.connection_id))throw Error('Invalid company provider');
     const r=await app.db.from('gr_wa_inbound_rules').insert(x);if(r.error)throw Error(r.error.message);
    });
@@ -1245,28 +1245,21 @@
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
   current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;campaignParamValues={};
-  startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
+  startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';inboxNeedle='';guidanceCompany=app.companies.includes('grow-india')?'grow-india':app.companies[0];guidanceProduct='all';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
   try{
    await fetchAll();marketingDraw();
-   // Attempt a read-only sync once per company/session on entering Marketing.
-   // Missing Meta credentials are reported in the UI only when user requests refresh.
-   const last=window.GreenRichWaMarketingLastSync||{};
-   for(const c of app.companies){
-    const conn=rows.connections.find(x=>x.company_id===c&&x.provider==='socialberries'&&x.enabled);
-    if(!app.admin||!conn||Date.now()-(last[c]||0)<30*60*1000)continue;
-    last[c]=Date.now();
-    window.GreenRichWaMarketingLastSync=last;
-    void secureSend('sync_approved_templates',{connection_id:conn.id}).then(async result=>{
-     if(result?.configured&&root?.isConnected){
-      await fetchAll();marketingDraw();
-     }
-    }).catch(()=>{});
-   }
+   // Manual sync is primary. No unsolicited Meta API call on page load.
   }catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
   element.onclick=async e=>{
    const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
+   if(e.target.closest('[data-new-guide]')){guidanceDialog();return}
+   const editGuide=e.target.closest('[data-guide-edit]');
+   if(editGuide){guidanceDialog(editGuide.dataset.guideEdit);return}
+   const history=e.target.closest('[data-inbox-history]');
+   if(history){if(!app.admin)return alert('Only Admin can look up provider chat history.','warning');
+    openMessageHistory(history.dataset.inboxHistory,history.dataset.inboxPhone);return}
    if(e.target.closest('[data-marketing-sync-templates]')){
     const form=element.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id?.value;
     const conn=campaignConnection(connectionId);
@@ -1362,7 +1355,8 @@
      'grwc-product':'product','grwc-stage':'leadStage','grwc-date-from':'startDate','grwc-date-to':'endDate',
      'grwc-service-company':'serviceCompany','grwc-service-type':'serviceType','grwc-service-source':'serviceSource',
      'grwc-service-tag':'serviceTag','grwc-service-product':'serviceProduct','grwc-service-order':'serviceOrder',
-     'grwc-service-delivery':'serviceDelivery','grwc-service-from':'serviceStart','grwc-service-to':'serviceEnd'};
+     'grwc-service-delivery':'serviceDelivery','grwc-service-from':'serviceStart','grwc-service-to':'serviceEnd',
+     'grwc-guide-company':'guidanceCompany','grwc-guide-product':'guidanceProduct'};
    if(!map[e.target.id])return;
    const v=e.target.value;
    switch(e.target.id){
@@ -1384,6 +1378,8 @@
     case 'grwc-service-delivery':serviceDelivery=v;break;
     case 'grwc-service-from':serviceStart=v;break;
     case 'grwc-service-to':serviceEnd=v;break;
+    case 'grwc-guide-company':guidanceCompany=v;guidanceProduct='all';break;
+    case 'grwc-guide-product':guidanceProduct=v;break;
    }
    marketingDraw();
   };
