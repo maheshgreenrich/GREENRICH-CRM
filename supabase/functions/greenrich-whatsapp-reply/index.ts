@@ -75,7 +75,7 @@ Deno.serve(async(request:Request)=>{
   const file=form.get("attachment");
   if(!uuid(connectionId)||!uuid(requestId)||!phone)return out(400,{ok:false,error:"Valid provider, message ID and customer mobile are required"});
   if(!["text","image","video","audio","document"].includes(kind))return out(400,{ok:false,error:"Unsupported message type"});
-  if(text.length>4096||(!text&&kind==="text"))return out(400,{ok:false,error:"Enter a message of up to 4096 characters"});
+  if(!text||text.length>4096)return out(400,{ok:false,error:"Enter a message or media caption (required by SocialBerries), maximum 4096 characters"});
   if(kind==="text"&&file instanceof File)return out(400,{ok:false,error:"Text messages cannot include an attachment"});
   if(kind!=="text"&&!(file instanceof File))return out(400,{ok:false,error:"Choose the attachment first"});
   if(file instanceof File&&(file.size===0||file.size>8*1024*1024||!formats[kind]?.includes(file.type)))
