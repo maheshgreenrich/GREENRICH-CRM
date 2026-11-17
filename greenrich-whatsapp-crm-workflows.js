@@ -363,6 +363,16 @@
   const steps=(rows.guidance||[]).filter(x=>x.company_id===guidanceCompany&&
    (guidanceProduct==='all'||x.product_label===guidanceProduct)).sort((a,b)=>a.day_offset-b.day_offset);
   const products=[...new Set((rows.guidance||[]).filter(x=>x.company_id===guidanceCompany).map(x=>x.product_label))].sort().map(x=>[x,x]);
+  const due=[];
+  for(const order of rows.dispatches.filter(o=>o.company_id===guidanceCompany&&o.delivered_at)){
+   for(const step of steps){
+    if(String(step.product_label).trim().toLowerCase()!==String(order.product_name||'').trim().toLowerCase())continue;
+    const d=new Date(order.delivered_at);if(Number.isNaN(d.getTime()))continue;
+    d.setDate(d.getDate()+step.day_offset);
+    due.push({order,step,due:d.toISOString().slice(0,10)});
+   }
+  }
+  due.sort((a,b)=>a.due.localeCompare(b.due));
   return '<section class="grwc-panel">'+headers('Product-wise WhatsApp Composting Guidance',
    'Create an editable instruction plan for each product, with days counted from confirmed delivery. Guidance is saved as draft content only.')+
    '<div class="grwc-notice"><b>Draft planner — not automatically sending.</b> Order dispatch/delivery dates are in GreenRich CRM, but scheduled WhatsApp delivery still requires an approved matching service template, documented opt-in where required, and an authenticated scheduler/provider delivery integration. Message content is not auto-approved by Meta.</div>'+
@@ -375,7 +385,14 @@
      '<td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'Not linked')+'</td><td>Draft — not sent</td><td>'+
      (app.admin?'<button type="button" data-guide-edit="'+esc(x.id)+'">Edit</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':
     empty('No product guidance steps saved. Add instructions for installation, adding waste, microbes, bin switching and manure harvesting at the day offsets appropriate for each product.'))+
-   '<p class="grwc-muted">Suggested planning checkpoints to customize (not automatic composting claims): delivery day, day 1, 10, 15, 20, 30, 33, 45, 60. Delivery + N is a draft scheduling rule; use actual product guidance and approved templates before activation.</p></section>';
+   '<p class="grwc-muted">Suggested planning checkpoints to customize (not automatic composting claims): delivery day, day 1, 10, 15, 20, 30, 33, 45, 60. Delivery + N is a draft scheduling rule; use actual product guidance and approved templates before activation.</p></section>'+
+   '<section class="grwc-panel">'+headers('Guidance schedule preview from delivered orders',
+    'Preview dates calculated from real GreenRich dispatch delivered timestamps. These are not WhatsApp sends or scheduled jobs.')+
+   (due.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Instruction</th><th>Due date</th><th>State</th></tr></thead><tbody>'+
+    due.slice(0,100).map(x=>'<tr><td>'+esc(x.order.order_id)+'</td><td>'+esc(x.order.customer_name||'—')+'</td>'+
+     '<td>'+esc(x.order.product_name)+'</td><td>'+esc(x.step.title)+'</td><td>'+esc(x.due)+'</td><td>Draft, not sent</td></tr>').join('')+
+    '</tbody></table></div>':empty('No matching delivered orders and guidance steps. Confirm that guidance product name exactly matches the dispatch product name, and that a delivery date is recorded.'))+
+   '</section>';
  }
  function guidanceDialog(id=''){
   if(!app.admin)return alert('Admin permission required to manage product guidance.','warning');
