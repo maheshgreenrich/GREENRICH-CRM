@@ -213,8 +213,8 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
                curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
                grep -q "20261104-gps-attendance-no-company-dropdown-1" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-send-v7" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-send-v7" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-inline-templates-v8" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-inline-templates-v8" /tmp/gr-live-secure.html &&
                curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.js &&
                curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.css?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.css &&
                grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.js &&
