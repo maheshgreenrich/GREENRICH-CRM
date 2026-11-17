@@ -48,6 +48,7 @@ jobs:
           node tests/inventory-wms-bom.cjs
           node --check greenrich-inventory.js
           node --check greenrich-whatsapp-crm-workflows.js
+          node tests/whatsapp-inbound-crm-source-v11.cjs
           node --check greenrich-whatsapp-inbox.js
           node tests/whatsapp-inbox-composer-layout.cjs
           node tests/whatsapp-inbox-sticky-composer-v4.cjs
