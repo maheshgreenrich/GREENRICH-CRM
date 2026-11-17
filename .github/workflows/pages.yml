@@ -56,6 +56,7 @@ jobs:
           node tests/whatsapp-inbox-direct-send-v7.cjs
           node tests/whatsapp-inbox-inline-templates-v8.cjs
           node tests/whatsapp-inbox-media-unread-v9.cjs
+          node tests/whatsapp-inbox-legacy-company-link-v10.cjs
           node tests/whatsapp-send-diagnostics.cjs
           node tests/whatsapp-template-payload.cjs
           node tests/socialberries-bulk-batch-sync.cjs
