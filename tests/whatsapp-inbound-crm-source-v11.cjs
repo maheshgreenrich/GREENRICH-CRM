@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const s=fs.readFileSync('greenrich-whatsapp-crm-workflows.js','utf8');
+const html=fs.readFileSync('secure.html','utf8');
+assert.ok(s.includes("db.from('gr_crm_sources').select('name,active').eq('active',true).order('name')"),'Active CRM Sources must be loaded from canonical settings table');
+assert.ok(s.includes("field('Lead source','source_name'"),'Inbound rule must show Lead Source dropdown');
+assert.ok(s.includes("options((rows.sources||[]).filter(s=>s.active===true).map(s=>[s.name,s.name])"),'Dropdown must use actual active CRM sources');
+assert.ok(!s.includes("field('Lead tag','tag_selector'"),'No Lead Tag input in inbound assignment');
+assert.ok(!s.includes("input('CRM source label','source_name'"),'No unrestricted free-text source input');
+assert.ok(s.includes("x.tag_ids=[];x.status='draft'"),'New rule must not apply tags');
+assert.ok(s.includes("s.name===x.source_name"),'Saved source must be validated against CRM settings');
+assert.ok(html.includes('greenrich-whatsapp-crm-workflows.js?v=20261117-inbound-source-v11'),'Published JS version missing');
+console.log('PASS: inbound rule uses CRM sources with no auto-applied tags');
