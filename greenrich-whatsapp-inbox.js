@@ -4,7 +4,8 @@
    number. "Live" implies verified provider webhooks; this UI never invents them. */
 (()=>{
  let ctx=null,host=null,selected='',filter='',kind='all',company='all',page=1,fetchSerial=0,ticker=null;
- const history=new Map(),drafts=new Map(),attachments=new Map();
+ const history=new Map(),drafts=new Map(),attachments=new Map(),templateValues=new Map(),templateMedia=new Map();
+ let templateOpen=false,chosenTemplateId='';
  let sending=false;
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const clean=x=>String(x||'').replace(/\D/g,'').replace(/^91(?=[6-9]\d{9}$)/,'');
@@ -40,6 +41,27 @@
   const image=links.map(safeMediaLink).find(Boolean)||'';
   return {image,hasImage:String(header?.format||'').toUpperCase()==='IMAGE',
     buttons:Array.isArray(buttons?.buttons)?buttons.buttons.slice(0,3).map(b=>String(b.text||'').slice(0,70)).filter(Boolean):[]};
+ };
+ const usableTemplates=person=>{
+  if(!person?.connection)return [];
+  return (data().templates||[]).filter(t=>t.connection_id===person.connection.id&&t.company_id===person.company_id)
+   .filter(t=>['marketing','utility','authentication'].includes(String(t.category||'').toLowerCase()))
+   .sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+ };
+ const readyTemplate=t=>!!t&&t.provider_approval==='approved'&&
+  ['verified_provider','admin_confirmed'].includes(t.provider_source)&&
+  /^\d{5,25}$/.test(String(t.provider_template_id||''))&&
+  Array.isArray(t.provider_preview?.components)&&
+  t.provider_preview.components.some(c=>String(c.type).toUpperCase()==='BODY')&&
+  !!String(t.body||'').trim();
+ const templateSpec=t=>{
+  const parts=t?.provider_preview?.components||[];
+  const head=parts.find(c=>String(c.type).toUpperCase()==='HEADER');
+  const buttons=parts.find(c=>String(c.type).toUpperCase()==='BUTTONS');
+  const body=String(parts.find(c=>String(c.type).toUpperCase()==='BODY')?.text||t?.body||'');
+  const nums=[...body.matchAll(/\{\{(\d+)\}\}/g)].map(x=>Number(x[1]));
+  return {body,image:String(head?.format||'').toUpperCase()==='IMAGE',
+   count:Math.max(0,...nums),buttons:Array.isArray(buttons?.buttons)?buttons.buttons.map(x=>x.text).filter(Boolean):[]};
  };
  const messageCard=(m,contact)=>{
   const template=previewFor(m,contact);
@@ -96,6 +118,9 @@
   if(!selected&&visible.length)selected=visible[0].key;
   const active=all.find(x=>x.key===selected);
   const state=history.get(selected)||{};
+  const currentTemplates=usableTemplates(active);
+  const pickedTemplate=currentTemplates.find(t=>t.id===chosenTemplateId);
+  const pickedSpec=pickedTemplate?templateSpec(pickedTemplate):null;
   const provider=state.messages||[];
   const crm=active?.messages||[];
   // Provider UUID and WhatsApp wamid may differ. Prefer the actual wamid
@@ -134,7 +159,7 @@
        '<span class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</span></span>'+
        '</button>'
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
-    '<main class="grwx-conversation">'+
+    '<main class="grwx-conversation '+(templateOpen?'grwx-with-template':'')+'">'+
     (active?'<div class="grwx-chat-head"><span class="grwx-avatar">'+esc(title.charAt(0).toUpperCase())+'</span>'+
       '<span class="grwx-heading-person"><strong>'+esc(title)+'</strong><small>+91 '+esc(active.number)+' · '+esc(companyName(active.company_id))+'</small></span>'+
       '<button type="button" data-grwx-action="refresh-chat" '+(!ctx.admin||!active.connection?'disabled':'')+'>'+ (state.loading?'Loading…':'Refresh chat')+'</button></div>'+
@@ -146,6 +171,22 @@
       '<div class="grwx-messages" id="grwx-messages">'+(rendered.length?rendered.map(m=>
        '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'">'+messageCard(m,active)+'</div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
+      (templateOpen?'<section class="grwx-template-picker" aria-label="Choose an approved WhatsApp template">'+
+        '<div class="grwx-template-picker-heading"><b>Approved WhatsApp templates</b><button type="button" data-grwx-action="close-template" aria-label="Close template picker">✕</button></div>'+
+        '<div class="grwx-template-options">'+(currentTemplates.length?currentTemplates.map(t=>
+          '<button type="button" data-grwx-template="'+esc(t.id)+'" '+(!readyTemplate(t)?'disabled title="Existing approval details must be synced in CRM"':'')+
+          ' class="'+(chosenTemplateId===t.id?'active':'')+'">'+esc(t.name)+' · '+esc(t.language)+' '+(readyTemplate(t)?'':' · Pending CRM sync')+'</button>'
+        ).join(''):'<span>No templates found for this sender</span>')+'</div>'+
+        (pickedTemplate&&readyTemplate(pickedTemplate)?'<div class="grwx-template-content">'+
+          '<p class="grwx-template-body">'+quote(pickedSpec.body)+'</p>'+
+          (pickedSpec.buttons.length?'<p class="grwx-template-cta">Buttons: '+esc(pickedSpec.buttons.join(' · '))+'</p>':'')+
+          (Array.from({length:Math.min(20,pickedSpec.count)},(_,i)=>'<label>Variable '+(i+1)+
+           '<input type="text" data-grwx-variable="'+i+'" maxlength="512" placeholder="Value for {{'+(i+1)+'}}" value="'+esc((templateValues.get(selected+":"+pickedTemplate.id)||[])[i]||'')+'"></label>').join(''))+
+          (pickedSpec.image?'<label>Approved template header image (JPEG or PNG required)<input type="file" id="grwx-template-image" accept="image/jpeg,image/png"></label>'+
+            '<span class="grwx-template-upload-name">'+esc(templateMedia.get(selected+":"+pickedTemplate.id)?.name||'No image selected')+'</span>':'')+
+          '<button type="button" data-grwx-action="send-template" '+(sending?'disabled':'')+'>Send selected template</button>'+
+        '</div>':'<small>Select an approved template. Pending CRM sync templates cannot be sent until their existing approved details are recorded.</small>')+
+      '</section>':'')+
       '<div class="grwx-chat-footer">'+
       '<div class="grwx-composer-layout"><div class="grwx-attachment-tools">'+
       '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-image" aria-label="Select image" title="Select image">▧</button>'+
@@ -155,11 +196,14 @@
       '<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden aria-label="Choose attachment">'+
       '</div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
-      '<button type="button" data-grwx-action="template-draft">Template</button>'+
-      '<button type="button" class="grwx-composer-copy" data-grwx-action="copy-draft">Copy</button>'+
-      '<button type="button" data-grwx-action="send-draft" '+(!ctx?.admin||!active.connection||sending?'disabled':'')+' title="Reply only within 24 hours of a customer message; provider verifies again before sending" aria-label="Send WhatsApp message">'+(sending?'…':'➤')+'</button></div></div>'+
-      '<span id="grwx-attachment-name" class="grwx-attachment-meta">'+esc(attachments.get(active.key)?.name||'')+'</span>'+
-      '<p class="grwx-send-unavailable">Replies require a verified incoming message within 24 hours. Provider acceptance is not delivery.</p>'+
+      '<button type="button" data-grwx-action="template-draft" aria-expanded="'+(templateOpen?'true':'false')+'">Template</button>'+
+      '<button type="button" data-grwx-action="send-draft" '+(!ctx?.admin||!active.connection||sending?'disabled':'')+' title="Send text reply within 24 hours of the customer’s last incoming message" aria-label="Send WhatsApp text">'+(sending?'…':'➤')+'</button></div></div>'+
+      '<div class="grwx-attachment-selection">'+
+       (attachments.get(active.key)?'<span class="grwx-attachment-meta" title="'+esc(attachments.get(active.key).name)+'">'+esc(attachments.get(active.key).name)+'</span>'+
+       '<button type="button" data-grwx-action="remove-attachment" aria-label="Remove selected attachment" title="Remove attachment">✕</button>'+
+       '<button type="button" data-grwx-action="send-attachment" '+(sending?'disabled':'')+'>Send attachment</button>':'')+
+      '</div>'+
+      '<p class="grwx-send-unavailable">Text sends without attachments. Media requires a caption. Outside 24 hours, use Template.</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
@@ -212,7 +256,9 @@
   cleanup();ctx=settings;host=root;if(!host)return;
   if(!selected){const first=customers()[0];if(first)selected=first.key}
   host.onclick=async e=>{
-   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
+   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;templateOpen=false;chosenTemplateId='';page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
+   const templateChoice=e.target.closest('[data-grwx-template]');
+   if(templateChoice){chosenTemplateId=templateChoice.dataset.grwxTemplate;render();return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
    if(action==='refresh-chat')return void load(1);
    if(['attach-image','attach-video','attach-document','attach-audio'].includes(action)){
@@ -222,20 +268,64 @@
       'attach-document':'.pdf,.doc,.docx,.xls,.xlsx,.txt'};
     picker.accept=accepts[action];picker.click();return;
    }
-   if(action==='template-draft'){
+   if(action==='template-draft'){templateOpen=!templateOpen;chosenTemplateId='';render();return}
+   if(action==='close-template'){templateOpen=false;chosenTemplateId='';render();return}
+   if(action==='remove-attachment'){attachments.delete(selected);render();return}
+   if(action==='send-template'){
+    if(sending)return;
     const person=customers().find(x=>x.key===selected);
-    if(person)settings.openTemplateFor?.(person);
+    const t=usableTemplates(person).find(x=>x.id===chosenTemplateId);
+    if(!ctx?.admin||!person?.connection||!readyTemplate(t))
+      return settings.notify('Choose a synced approved template for this sender first.','warning');
+    const spec=templateSpec(t),key=selected+":"+t.id;
+    const values=templateValues.get(key)||[];
+    if(values.length<spec.count||Array.from({length:spec.count},(_,i)=>values[i]).some(v=>!String(v||'').trim()))
+      return settings.notify('Complete all required template variables.','warning');
+    const file=templateMedia.get(key);
+    if(spec.image&&!file)return settings.notify('Select the approved template header image (JPEG or PNG) before sending.','warning');
+    if(file&&file.size>8*1024*1024)return settings.notify('Template image must be 8 MB or less.','warning');
+    if(!window.confirm('Send approved WhatsApp template "'+t.name+'" to '+person.name+' (+91 '+person.number+')? This may incur WhatsApp messaging charges.'))return;
+    const form=new FormData(),targetKey=selected;
+    form.set('connection_id',person.connection.id);
+    form.set('customer_key',person.key);
+    form.set('phone_number','91'+person.number);
+    form.set('request_id',crypto.randomUUID());
+    form.set('type','template');
+    form.set('template_id',t.id);
+    form.set('template_values',JSON.stringify(values.slice(0,spec.count)));
+    if(file)form.set('attachment',file,file.name);
+    sending=true;render();
+    try{
+      const sess=await settings.app.db.auth.getSession();
+      const jwt=sess.data?.session?.access_token;
+      if(!jwt)throw Error('Please sign in again before sending.');
+      const response=await fetch('https://uawgwkplkvahhmhvroul.supabase.co/functions/v1/greenrich-whatsapp-reply',{
+       method:'POST',headers:{Authorization:'Bearer '+jwt,apikey:settings.publishableKey||window.GREENRICH_PUBLIC_CONFIG?.publishableKey||''},body:form
+      });
+      const result=await response.json().catch(()=>({ok:false,error:'Invalid SocialBerries template reply'}));
+      if(!response.ok||!result.ok)throw Error(result.error||'WhatsApp template was not submitted');
+      if(result.status==='accepted_by_provider'){
+       templateMedia.delete(key);templateValues.delete(key);
+       chosenTemplateId='';templateOpen=false;
+       settings.notify('SocialBerries accepted the selected template. Delivery is still pending.','success');
+       if(selected===targetKey)void load(1);
+      }else settings.notify('Provider acceptance is not confirmed. Check provider history before resending.','warning');
+      await settings.refresh?.();
+    }catch(error){settings.notify(String(error.message||error)+'. Check provider history before retrying if sending may have started.','error')}
+    finally{sending=false;if(host?.isConnected)render()}
     return;
    }
-   if(action==='send-draft'){
+   if(action==='send-draft'||action==='send-attachment'){
     if(sending)return;
     const person=customers().find(x=>x.key===selected);
     if(!ctx?.admin||!person?.connection)return settings.notify('An authorized provider connection is required.','warning');
-    const draft=(drafts.get(selected)||'').trim(),media=attachments.get(selected);
-    if(!draft&&!media)return settings.notify('Type a reply or choose an attachment first.','warning');
+    const draft=(drafts.get(selected)||'').trim();
+    const media=action==='send-attachment'?attachments.get(selected):null;
+    if(!draft)return settings.notify(media?'Enter a media caption before sending the selected attachment.':'Type a normal text reply before pressing Send.','warning');
+    if(action==='send-attachment'&&!media?.file)return settings.notify('Choose a file to attach first.','warning');
     if(media?.file?.size>8*1024*1024)return settings.notify('Attachment maximum is 8 MB. No message sent.','warning');
-    // No silent sending: one explicit customer-facing action and confirmation.
-    const confirmText='Send this '+(media?'attachment':'text message')+' to '+person.name+' (+91 '+person.number+') via SocialBerries? The backend will allow free-form replies only if the customer messaged within the last 24 hours.';
+    // The normal Send arrow always sends TEXT, even when an attachment was chosen earlier.
+    const confirmText='Send this '+(media?'attachment':'text message')+' to '+person.name+' (+91 '+person.number+') via SocialBerries? The backend verifies the WhatsApp 24-hour reply window.';
     if(!window.confirm(confirmText))return;
     const requestId=crypto.randomUUID();
     const form=new FormData();
@@ -274,7 +364,7 @@
       const data=await response.json().catch(()=>({ok:false,error:'Invalid reply response'}));
       if(!response.ok||!data.ok)throw Error(data.error||'Unable to submit WhatsApp reply');
       if(data.status==='accepted_by_provider'){
-        drafts.delete(targetKey);attachments.delete(targetKey);
+        drafts.delete(targetKey);if(media)attachments.delete(targetKey);
         if(selected===targetKey){render();void load(1)}
         settings.notify('SocialBerries accepted your reply. Delivery is not yet confirmed.','success');
       }else{
@@ -285,19 +375,16 @@
     finally{sending=false;if(host?.isConnected)render()}
     return;
    }
-   if(action==='copy-draft'){
-    const text=drafts.get(selected)||'';
-    if(!text.trim()){settings.notify('Type a message first.','warning');return}
-    try{await navigator.clipboard.writeText(text);settings.notify('Reply copied. Send it using your connected SocialBerries inbox. No CRM send was attempted.','success')}
-    catch{settings.notify('Copy not available in this browser. Select the draft text and copy it manually.','warning')}
-    return;
-   }
    if(action==='older'){const h=history.get(selected);if(h?.hasMore)void load((h.page||1)+1);return}
    if(action==='newer'){const h=history.get(selected);if(h?.page>1)void load(h.page-1);return}
    if(action==='refresh-directory'){try{await settings.refresh();render()}catch(err){settings.notify(String(err.message||err),'error')}return}
   };
   host.oninput=e=>{
    if(e.target.id==='grwx-compose'){drafts.set(selected,e.target.value.slice(0,4096));return}
+   if(e.target.dataset.grwxVariable!==undefined){
+    const key=selected+":"+chosenTemplateId;const values=templateValues.get(key)||[];
+    values[Number(e.target.dataset.grwxVariable)]=e.target.value.slice(0,512);templateValues.set(key,values);return;
+   }
    if(e.target.id!=='grwx-search')return;
    filter=e.target.value.toLowerCase();
    const cursor=e.target.selectionStart;render();
@@ -305,6 +392,17 @@
    try{input?.setSelectionRange(cursor,cursor)}catch{}
   };
   host.onchange=e=>{
+   if(e.target.id==='grwx-template-image'){
+    const t=usableTemplates(customers().find(x=>x.key===selected)).find(x=>x.id===chosenTemplateId);
+    if(!t)return;
+    const file=e.target.files?.[0];
+    const key=selected+":"+t.id;
+    if(file&&!['image/jpeg','image/png'].includes(file.type))return settings.notify('Template header must be a JPEG or PNG image.','warning');
+    if(file&&file.size>8*1024*1024)return settings.notify('Template image must be under 8 MB.','warning');
+    if(file)templateMedia.set(key,file);else templateMedia.delete(key);
+    const label=host.querySelector('.grwx-template-upload-name');if(label)label.textContent=file?.name||'No image selected';
+    return;
+   }
    if(e.target.id==='grwx-attachment'){
     const file=e.target.files?.[0];
     if(file&&file.size>8*1024*1024){settings.notify('Please choose a file under 8 MB. No file has been uploaded.','warning');e.target.value='';return}
