@@ -972,6 +972,17 @@
     if(conflict)throw Error('This name/language maps to another template ID. No changes saved.');
     if(prior&&prior.name!==t.name)throw Error('Template ID/name mismatch. No changes saved.');
     if(prior&&prior.provider_source==='verified_provider')throw Error('Already directly synced with Meta. No manual overwrite.');
+    // Known template observations are evidence of required components; never allow an
+    // incomplete manual entry to be marked send-ready by omitting them.
+    const observed=prior?.provider_preview?.observed_from_meta_screenshot;
+    if(observed){
+     const header=t.components.find(x=>String(x.type).toUpperCase()==='HEADER');
+     const buttons=t.components.find(x=>String(x.type).toUpperCase()==='BUTTONS')?.buttons||[];
+     if(observed.header_format_observed&&String(header?.format||'').toUpperCase()!==String(observed.header_format_observed).toUpperCase())
+      throw Error('This approved template has an IMAGE header. Select Image as the exact header type.');
+     if(observed.button_text_observed&&!buttons.some(x=>String(x.text||'').toLowerCase()===String(observed.button_text_observed).toLowerCase()))
+      throw Error('The approved Buy Now CTA is missing. Enter the exact website URL and button before sync.');
+    }
     const out=await app.db.rpc('gr_wa_import_template_preview',{p_connection:connectionId,p_preview:t});
     if(out.error)throw Error('Template import failed: '+out.error.message);
     const q=await app.db.from('gr_wa_templates').select('id,name,language,provider_template_id')
