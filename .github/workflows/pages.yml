@@ -85,6 +85,7 @@ jobs:
           node tests/whatsapp-send-failure-diagnostics.js
           node tests/whatsapp-template-import-errors.js
           node tests/whatsapp-campaign-selection.js
+          node tests/whatsapp-operations-hub.cjs
           node tests/whatsapp-guarded-sending.js
           node tests/customer-edit-lead-inline-marketing-filters.js
           node tests/whatsapp-provider-slot-edit.js

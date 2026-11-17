@@ -2,7 +2,7 @@
 /* CRM-led WhatsApp handoff, not a replacement for SocialBerries.
    No network calls to undocumented provider endpoints and no simulated sends. */
 (()=>{
- let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set();
+ let app=null,root=null,scope='all',kind='all',source='all',tag='all',owner='all',needle='',provider='all',current='audience',rows={},selected=new Set(),inboxNeedle='',guidanceCompany='grow-india',guidanceProduct='all';
  let startDate='',endDate='',product='all',leadStage='all',inboundNeedle='',serviceCompany='all',serviceSource='all',serviceTag='all',serviceProduct='all',serviceOrder='all',serviceDelivery='all',serviceType='all',serviceStart='',serviceEnd='',serviceNeedle='',serviceSelected=new Set(),campaignReportPage=1,sendBusy=false,lastPrepared=null,campaignImage=null,campaignParamValues={};
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
@@ -80,7 +80,7 @@
   const stored=campaignParamValues[id]||{};
   const hints=[];
   if(template.provider_source!=='verified_provider')
-   hints.push('This older template was manually confirmed. Automatic sync of its exact approved components is recommended before use.');
+   hints.push('This template was manually confirmed by an administrator; check that every approved component is accurate before sending.');
   if(spec.format==='IMAGE')hints.push('IMAGE header required. Choose a file above; a stored image preview is not sufficient unless its media is attached.');
   if(spec.body?.text)hints.push('BODY template variables: '+[...String(spec.body.text).matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]).join(', ')+'. Numeric 1–3 / named client fields are mapped from each contact.');
   region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
@@ -112,7 +112,7 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
@@ -124,9 +124,10 @@
    optional('gr_dispatch_orders','id,company_id,source_sale_id,order_id,order_date,customer_id,customer_name,customer_mobile,product_name,sku,status,dispatched_at,delivered_at,customer_email'),
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
    optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
-   optional('gr_wa_messages','id,company_id,campaign_id,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,created_at')
+   optional('gr_wa_messages','id,company_id,connection_id,campaign_id,direction,body,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,event_at,created_at'),
+   optional('gr_wa_guidance_steps'),optional('gr_wa_bulk_batches'),optional('gr_wa_inbound_events')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -179,7 +180,7 @@
  const header=()=>
  '<div class="grwc-hero"><div><small>GREENRICH ONE / MARKETING</small><h2>WhatsApp Marketing</h2><p>Filter CRM audiences, prepare provider templates, review enquiries and plan after-sales service.</p></div><span class="grwc-chip">Delivery verification pending</span></div>'+
  '<div class="grwc-notice">Select customers, the WhatsApp provider, an approved marketing template and an optional image. Click <b>Send Campaign</b>. The server checks marketing permission and sending readiness automatically.</div>'+
- '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['sync','Incoming Leads'],['welcome','Lead Welcome'],['recurring','Repeat Service']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
+ '<nav class="grwc-tabs">'+[['audience','Audience & Campaign'],['reports','Campaign History'],['inbox','WhatsApp Inbox'],['sync','Lead Assignment'],['welcome','Lead Welcome'],['recurring','After-Sales'],['guidance','Product Guidance']].map(([id,title])=>'<button data-view="'+id+'" class="'+(id===current?'active':'')+'">'+title+'</button>').join('')+'</nav>';
  function audienceView(){
   const list=audience(),tags=rows.tags,chosen=selectedStatus();
   return '<section class="grwc-panel">'+headers('CRM audience selection','Filter Leads and Customers from GreenRich ONE; no contact upload required to build an audience.')+
@@ -195,10 +196,10 @@
    '<label>To date<input id="grwc-date-to" type="date" value="'+esc(endDate)+'"></label>'+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
    '<div class="grwc-audience-summary"><b>'+list.length+'</b> matching records · <b data-grwc-selected-count>'+chosen.total+'</b> selected across filters'+(chosen.missing?' · '+chosen.missing+' no longer in loaded CRM':'')+'. Your selections remain checked when filters change.</div>'+
-   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
-   '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
-   list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Company is an optional filter. Previously unassigned customers can be selected. Showing the first 250 of '+list.length+' matching contacts. Selections are kept across filters; use Clear selection to start over. Valid numbers, sender-company leads and marketing permission are checked before sending.</p></section>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select matching contacts (up to 500)</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
+   '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Email</th><th>Source</th><th>Product</th><th>Tags</th><th>Assigned to</th></tr></thead><tbody>'+
+   list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.email||'—')+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.products.join(', ')||'—')+'</td><td>'+esc(x.tags.map(id=>rows.tags.find(t=>t.id===id)?.name||'').filter(Boolean).join(', ')||'—')+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all filtered contacts (maximum 500)</button><button type="button" data-clear-all-matching>Clear selection</button><strong><span data-grwc-selected-count>'+chosen.total+'</span> selected</strong></div>'+ '<p class="grwc-muted">Company is an optional filter. Previously unassigned customers can be selected. Showing the first 250 of '+list.length+' matching contacts. Selections are kept across filters. Campaigns are limited to 500 recipients, with documented consent checked before sending.</p></section>'+
    '<section class="grwc-panel">'+headers('Send WhatsApp campaign','Choose an approved marketing template and optional image.')+
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
@@ -207,17 +208,22 @@
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
    '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; No reapproval in Meta is needed.</p>'+
    '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh CRM template list</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
-   '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
+   '<button type="submit" class="grwc-primary" data-send-campaign>Review & Send Campaign</button></form></section>';
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
+  const providerBatches=(rows.batches||[]).filter(x=>scope==='all'||x.company_id===scope)
+    .slice().sort((a,b)=>String(b.synced_at).localeCompare(String(a.synced_at))).slice(0,100);
+  const stat=(b,key)=>Number.isFinite(Number(b.message_statistics?.[key]))?Number(b.message_statistics[key]):'—';
   const messages=rows.messages||[],completed=relevant.filter(x=>!!x.provider_batch_id);
   const tracked=messages.filter(m=>relevant.some(c=>c.id===m.campaign_id));
   return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
    'Provider acceptance is not WhatsApp delivery. Actual deliveries depend on reported provider events.')+
    '<div class="grwc-grid grwc-kpis">'+
    [['Campaigns',relevant.length],['Local attempts',tracked.length],
-    ['Awaiting provider delivery',tracked.filter(x=>x.delivery_status==='queued').length],
+    ['Delivered (confirmed)',tracked.filter(x=>['delivered','read'].includes(x.delivery_status)).length],
+    ['Read (confirmed)',tracked.filter(x=>x.delivery_status==='read').length],
+    ['Awaiting delivery status',tracked.filter(x=>['queued','sent'].includes(x.delivery_status)).length],
     ['Failed / uncertain',tracked.filter(x=>x.delivery_status==='failed').length],
     ['Provider batches linked',completed.length]].map(x=>'<div class="grwc-feature"><small>'+esc(x[0])+'</small><h3>'+esc(x[1])+'</h3></div>').join('')+'</div>'+
    (relevant.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Company</th><th>Template</th><th>Selected</th><th>Attempts</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
@@ -230,14 +236,17 @@
     const allAttempted=attempts.length>0&&attempts.length>=Number(x.audience?.selected_count||0);
     return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(state)+(last?'<div class="grwc-muted">Reason: '+esc(reason)+'</div>':'')+'</td><td>'+(allAttempted?'<small>Already attempted · do not automatically retry</small>':'<button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button>')+'</td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
-   '<p class="grwc-muted">Every send attempt is saved once to prevent duplicates. Pending means not yet verified delivered. Uncertain sends are not automatically retried. Provider READ may not prove a human saw the message.</p>'+
-   (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">Provider batch data is synchronised read-only; campaign processing status is not message delivery. Use one company at a time.</p>':'')+
+   '<p class="grwc-muted">Delivered and Read counts require provider-reported status. Meta website CTA click metrics are not yet available in this CRM API; zero is not displayed as a made-up click count. Uncertain attempts are never auto-retried. Read receipts can be disabled by recipients.</p>'+
+   (providerBatches.length?'<h4>SocialBerries provider campaign batches</h4><div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Provider status</th><th>Audience</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Failed</th><th>Button clicks</th></tr></thead><tbody>'+
+    providerBatches.map(b=>'<tr><td>'+esc(b.name)+'</td><td>'+esc(b.status)+'</td><td>'+esc(b.total_clients_count)+'</td><td>'+esc(stat(b,'sent'))+'</td><td>'+esc(stat(b,'delivered'))+'</td><td>'+esc(stat(b,'read'))+'</td><td>'+esc(stat(b,'failed'))+'</td><td>Not reported by available API</td></tr>').join('')+'</tbody></table></div>':
+    '<p class="grwc-muted">No synchronized provider batches. Use the read-only batch sync below for reports from SocialBerries.</p>')+
+   (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">SocialBerries reports are read-only snapshots. Campaign completed does not necessarily mean delivered; provider-reported Delivered/Read counts are labeled separately.</p>':'')+
    '</section>';
  }
  function welcomeView(){
   const rules=scoped(rows.welcomes),co=cd();
   return '<section class="grwc-panel">'+headers('Optional Welcome Template for New Leads','Choose a template while creating a lead, importing Excel/CSV, or mapping a Google Sheet. Blank means no welcome message.')+
-   '<div class="grwc-notice">If no welcome template is selected, no message preference is saved. Template choices are read from GreenRich provider references and can be refreshed; automatic SocialBerries Get Templates sync still needs the provider endpoint.</div>'+
+   '<div class="grwc-notice">If no welcome template is selected, no message preference is saved. Approved templates are managed using Manual Sync in WhatsApp Settings. Automatic Meta sync is optional.</div>'+
    '<button type="button" data-refresh-crm>Refresh available template references</button>'+
    '<div class="grwc-grid"><div class="grwc-feature"><b>1 · Manual Lead</b><p>Leads & CRM → New Lead → Assign salesperson → Welcome template (optional).</p></div>'+
    '<div class="grwc-feature"><b>2 · Excel / CSV</b><p>Leads & CRM → Import → Default welcome template or optional per-row template ID/name.</p></div>'+
@@ -288,7 +297,7 @@
    (can('create')?'<button data-create-service>+ Individual follow-up</button>':'')+'</div>'+
    '<div class="grwc-tablewrap"><table><thead><tr><th>Select</th><th>Name</th><th>Type</th><th>Company</th><th>Mobile</th><th>Sales Order</th><th>Delivery</th></tr></thead><tbody>'+
    matches.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-service-select="'+esc(x.id)+'" '+(serviceSelected.has(x.id)?'checked':'')+' '+(x.type!=='Customer'||!x.company_id?'disabled title="Link the customer to one company first"':'')+'></td><td>'+esc(x.name)+'</td><td>'+esc(x.type)+'</td><td>'+esc(name(x.company_id)||'Unassigned')+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.orders.map(y=>y.order_id).slice(0,3).join(', ')||'—')+'</td><td>'+esc(x.orders.map(y=>y.status).slice(0,3).join(', ')||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Showing 250 of '+matches.length+' loaded matches. Customers without a unique company assignment cannot be bulk-targeted. Saving a repeat rule does not send any WhatsApp messages.</p></section>'+
+   '<p class="grwc-muted">Showing 250 of '+matches.length+' loaded matches. Customers without a unique company assignment cannot be bulk-targeted. Saving a repeat rule does not send any WhatsApp messages. Use Product Guidance for day-specific instructions.</p></section>'+
    '<section class="grwc-panel">'+headers('Scheduled after-sales rules','Company-scoped drafts; intervals are retained as days, weeks or calendar months for future scheduling.')+
    (list.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Customer</th><th>Purpose</th><th>Template</th><th>Every</th><th>Next date</th><th>State</th></tr></thead><tbody>'+
    list.slice(0,200).map(r=>'<tr><td>'+esc(rows.customers.find(c=>c.id===r.customer_id)?.name||r.customer_id)+'</td><td>'+esc(r.service_reason||'service')+'</td><td>'+esc(rows.templates.find(t=>t.id===r.template_id)?.name||'—')+'</td><td>'+esc(r.interval_value||r.interval_days)+' '+esc(r.interval_unit||'days')+'</td><td>'+esc(date(r.next_due))+'</td><td>Draft · not sending</td></tr>').join('')+'</tbody></table></div>':empty('No after-sales follow-up rules saved yet.'))+
@@ -310,13 +319,122 @@
    empty('Search by mobile number to identify an existing lead or customer.'))+
    '<div class="grwc-grid"><div class="grwc-feature"><b>Existing contact</b><p>Match mobile → customer / lead record → view provider chat. Customer 360 also has an on-demand read-only chat lookup.</p></div>'+
    '<div class="grwc-feature"><b>New WhatsApp enquiry</b><p>Signed webhook → deduplicate mobile → create a WhatsApp-source lead → assign salesperson or common queue.</p></div></div>'+
-   '<div class="grwc-notice"><b>Automatic inbound lead creation is not active.</b> The supplied SocialBerries API documents message lookup by known number, but not the signed webhook payload for discovering new incoming senders. No incoming enquiry is silently lost or fabricated; configure verified events before switching it on.</div></section>'+
+   '<div class="grwc-notice"><b>Trusted inbound gateway deployed, source connection pending.</b> Website WhatsApp OTP and new-message lead assignment can run only after the server-to-server signing secret and the corresponding website / SocialBerries relay are configured. Messages cannot be discovered merely by listing contacts.</div></section>'+
    '<section class="grwc-panel">'+headers('Incoming lead assignment rules',
     'Select company, source, tags and assigned salesperson under Settings → WhatsApp Integration. Common queue is allowed.')+
    (rules.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Company</th><th>Event</th><th>Source</th><th>Salesperson</th><th>State</th></tr></thead><tbody>'+
     rules.map(r=>'<tr><td>'+esc(name(r.company_id))+'</td><td>'+esc(r.event_type)+'</td><td>'+esc(r.source_name)+'</td><td>'+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common sales queue')+'</td><td>Draft · webhook not connected</td></tr>').join('')+'</tbody></table></div>':
     empty('No incoming WhatsApp assignment rules have been saved.'))+
-   '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>';
+   '<button type="button" data-open-settings>Configure incoming lead assignment</button></section>'+
+   '<section class="grwc-panel">'+headers('Trusted incoming WhatsApp / website OTP event log',
+     'Signed server events are deduplicated, linked to existing customers/leads or assigned to the selected salesperson. No login OTP means marketing consent.')+
+   (scoped(rows.inboundEvents||[]).length?'<div class="grwc-tablewrap"><table><thead><tr><th>Received</th><th>Type</th><th>WhatsApp</th><th>Lead ID</th><th>Routing</th><th>Status</th></tr></thead><tbody>'+
+    scoped(rows.inboundEvents).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,100).map(e=>
+     '<tr><td>'+esc(date(e.created_at))+'</td><td>'+esc(e.event_type)+'</td><td>'+esc(e.mobile)+'</td><td>'+esc(e.lead_id||e.customer_id||'—')+'</td><td>'+esc(e.source_name||'Waiting for active assignment rule')+'</td><td>'+esc(e.status)+'</td></tr>').join('')+
+    '</tbody></table></div>':empty('No verified server events received yet. SocialBerries webhook relay / website OTP backend needs the authenticated inbound event endpoint and signing secret.'))+
+   '<p class="grwc-muted">This event log does not prove Meta has delivered messages. No inbound contacts are automatically opted in to marketing campaigns.</p></section>';
+ }
+ function inboxView(){
+  const source=scoped(rows.messages||[]).slice().sort((a,b)=>String(b.event_at||b.created_at).localeCompare(String(a.event_at||a.created_at)));
+  const chats=new Map();
+  for(const m of source){
+   const phone=digits(m.phone),key=m.company_id+':'+phone;
+   if(phone.length!==10)continue;
+   const entry=chats.get(key)||{company_id:m.company_id,connection_id:m.connection_id,phone:m.phone,latest:m,events:0,inbound:0};
+   entry.events++;
+   if(m.direction==='inbound')entry.inbound++;
+   chats.set(key,entry);
+  }
+  const all=targets();
+  const chatsFiltered=[...chats.values()].filter(c=>{
+   const contact=all.find(t=>t.company_id===c.company_id&&sameMobile(t.mobile,c.phone));
+   c.contact=contact;
+   return !inboxNeedle||[c.phone,contact?.name,contact?.type].some(x=>String(x||'').toLowerCase().includes(inboxNeedle));
+  });
+  return '<section class="grwc-panel">'+headers('WhatsApp Inbox & Conversation History',
+   'CRM-saved inbound/outbound events are shown below. For more history, open the connected SocialBerries provider conversation by phone.')+
+   '<div class="grwc-notice">Not all historical WhatsApp messages are currently stored in GREENRICH ONE. On-demand provider history is read-only and subject to the SocialBerries response. New-message notifications and automatic inbound lead creation require an authenticated provider webhook; this page does not claim live sync.</div>'+
+   '<div class="grwc-filters"><label>Find a contact / WhatsApp number<input id="grwc-inbox-lookup" type="search" value="'+esc(inboxNeedle)+'" placeholder="Customer name or mobile"></label></div>'+
+   '<div class="grwc-audience-summary"><b>'+chatsFiltered.length+'</b> conversations with local events · <b>'+source.filter(x=>x.direction==='inbound').length+'</b> recorded inbound events · <b>'+source.filter(x=>x.direction==='outbound').length+'</b> outbound events</div>'+
+   (chatsFiltered.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Contact</th><th>WhatsApp mobile</th><th>Company</th><th>Last recorded event</th><th>Status</th><th>History</th></tr></thead><tbody>'+
+    chatsFiltered.slice(0,250).map(c=>{
+     const conn=rows.connections.find(x=>x.company_id===c.company_id&&x.provider.toLowerCase()==='socialberries');
+     return '<tr><td>'+esc(c.contact?.name||'Not linked to CRM')+'</td><td>'+esc(c.phone)+'</td><td>'+esc(name(c.company_id))+'</td><td>'+esc(date(c.latest.event_at||c.latest.created_at))+
+      '</td><td>'+esc(c.latest.delivery_status||'unknown')+'</td><td>'+(app.admin&&conn?
+      '<button type="button" data-inbox-history="'+esc(conn.id)+'" data-inbox-phone="'+esc(c.phone)+'">Open provider chat history</button>':'Admin/provider access required')+'</td></tr>';
+    }).join('')+'</tbody></table></div>':empty('No recorded WhatsApp events match this search. Use Incoming Leads to locate an existing CRM contact; historical provider events cannot be invented.'))+
+   '<p class="grwc-muted">Customer consent, owner and tags remain managed in Leads & CRM / Customers. Provider chat lookup does not automatically import contacts or enable message sending.</p></section>';
+ }
+ function guidanceView(){
+  if(!app.companies.includes(guidanceCompany))guidanceCompany=app.companies[0];
+  const steps=(rows.guidance||[]).filter(x=>x.company_id===guidanceCompany&&
+   (guidanceProduct==='all'||x.product_label===guidanceProduct)).sort((a,b)=>a.day_offset-b.day_offset);
+  const products=[...new Set((rows.guidance||[]).filter(x=>x.company_id===guidanceCompany).map(x=>x.product_label))].sort().map(x=>[x,x]);
+  const due=[];
+  for(const order of rows.dispatches.filter(o=>o.company_id===guidanceCompany&&o.delivered_at)){
+   for(const step of steps){
+    if(String(step.product_label).trim().toLowerCase()!==String(order.product_name||'').trim().toLowerCase())continue;
+    const d=new Date(order.delivered_at);if(Number.isNaN(d.getTime()))continue;
+    d.setDate(d.getDate()+step.day_offset);
+    due.push({order,step,due:d.toISOString().slice(0,10)});
+   }
+  }
+  due.sort((a,b)=>a.due.localeCompare(b.due));
+  return '<section class="grwc-panel">'+headers('Product-wise WhatsApp Composting Guidance',
+   'Create an editable instruction plan for each product, with days counted from confirmed delivery. Guidance is saved as draft content only.')+
+   '<div class="grwc-notice"><b>Draft planner — not automatically sending.</b> Order dispatch/delivery dates are in GreenRich CRM, but scheduled WhatsApp delivery still requires an approved matching service template, documented opt-in where required, and an authenticated scheduler/provider delivery integration. Message content is not auto-approved by Meta.</div>'+
+   '<div class="grwc-filters">'+sel('Company','grwc-guide-company',app.companies.map(c=>[c,name(c)]),guidanceCompany,null)+
+   sel('Product guide','grwc-guide-product',products,guidanceProduct,'All products')+'</div>'+
+   (app.admin?'<div class="grwc-selection-toolbar"><button type="button" data-new-guide class="grwc-primary">+ Add instruction day</button></div>':'')+
+   (steps.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Product</th><th>When</th><th>Instruction</th><th>Media</th><th>Approved template</th><th>State</th><th></th></tr></thead><tbody>'+
+    steps.map(x=>'<tr><td>'+esc(x.product_label)+'</td><td>Delivery + '+esc(x.day_offset)+' days</td>'+
+     '<td><b>'+esc(x.title)+'</b><p>'+esc(x.instructions).slice(0,350)+'</p></td><td>'+esc(x.video_url?'Link saved':'—')+'</td>'+
+     '<td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'Not linked')+'</td><td>Draft — not sent</td><td>'+
+     (app.admin?'<button type="button" data-guide-edit="'+esc(x.id)+'">Edit</button>':'')+'</td></tr>').join('')+'</tbody></table></div>':
+    empty('No product guidance steps saved. Add instructions for installation, adding waste, microbes, bin switching and manure harvesting at the day offsets appropriate for each product.'))+
+   '<p class="grwc-muted">Suggested planning checkpoints to customize (not automatic composting claims): delivery day, day 1, 10, 15, 20, 30, 33, 45, 60. Delivery + N is a draft scheduling rule; use actual product guidance and approved templates before activation.</p></section>'+
+   '<section class="grwc-panel">'+headers('Guidance schedule preview from delivered orders',
+    'Preview dates calculated from real GreenRich dispatch delivered timestamps. These are not WhatsApp sends or scheduled jobs.')+
+   (due.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Instruction</th><th>Due date</th><th>State</th></tr></thead><tbody>'+
+    due.slice(0,100).map(x=>'<tr><td>'+esc(x.order.order_id)+'</td><td>'+esc(x.order.customer_name||'—')+'</td>'+
+     '<td>'+esc(x.order.product_name)+'</td><td>'+esc(x.step.title)+'</td><td>'+esc(x.due)+'</td><td>Draft, not sent</td></tr>').join('')+
+    '</tbody></table></div>':empty('No matching delivered orders and guidance steps. Confirm that guidance product name exactly matches the dispatch product name, and that a delivery date is recorded.'))+
+   '</section>';
+ }
+ function guidanceDialog(id=''){
+  if(!app.admin)return alert('Admin permission required to manage product guidance.','warning');
+  const old=(rows.guidance||[]).find(x=>x.id===id);
+  const company=old?.company_id||guidanceCompany;
+  const templatesFor=rows.templates.filter(x=>x.company_id===company&&validMarketingTemplate(x));
+  const productOptions=[...new Set([...rows.products.map(x=>x.name),...rows.dispatches.map(x=>x.product_name)].filter(Boolean))];
+  const body='<div class="grwc-notice grwc-span">Save editable product instructions only. No WhatsApp message or timer is activated by this action.</div>'+
+   '<div class="grwc-feature grwc-span"><b>Company:</b> '+esc(name(company))+'</div>'+
+   '<label>Product name<input name="product_label" list="grwc-guidance-products" required maxlength="120" value="'+esc(old?.product_label||'')+'" placeholder="e.g. MyGreenBin 25 L PP"></label>'+
+   '<datalist id="grwc-guidance-products">'+productOptions.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+
+   input('Days after confirmed delivery','day_offset',String(old?.day_offset??0),'number')+
+   input('Instruction title','title',old?.title||'')+
+   note('Instruction message / steps','instructions',old?.instructions||'')+
+   input('Installation or instruction video HTTPS URL (optional)','video_url',old?.video_url||'')+
+   field('Approved provider template (optional until ready)','template_id',options(templatesFor.map(t=>[t.id,t.name+' · '+t.language]),'Not assigned yet'))+
+   '<p class="grwc-muted grwc-span">Video links are stored for reference. WhatsApp media sending requires a compatible approved template and provider integration. Set dates/product instructions according to your actual bin guidance.</p>';
+  const d=dialog(old?'Edit product instruction':'Add product instruction',body,async fd=>{
+   const v=Object.fromEntries(fd),day=Number(v.day_offset);
+   if(!Number.isInteger(day)||day<0||day>365)throw Error('Day offset must be between 0 and 365');
+   if(String(v.product_label||'').trim().length<2||String(v.title||'').trim().length<2||
+      String(v.instructions||'').trim().length<5)throw Error('Product, instruction title and message are required');
+   const url=String(v.video_url||'').trim();
+   if(url){try{const u=new URL(url);if(u.protocol!=='https:')throw Error()}catch{throw Error('Use a valid HTTPS video URL or leave blank')}}
+   const templateId=String(v.template_id||'');
+   if(templateId&&!templatesFor.some(t=>t.id===templateId))throw Error('Selected template is unavailable for this company');
+   const payload={company_id:company,product_label:String(v.product_label).trim(),day_offset:day,
+    title:String(v.title).trim(),instructions:String(v.instructions).trim(),video_url:url,
+    template_id:templateId||null,status:'draft'};
+   const q=old?await app.db.from('gr_wa_guidance_steps').update(payload).eq('id',old.id).eq('company_id',company):
+    await app.db.from('gr_wa_guidance_steps').insert(payload);
+   if(q.error)throw Error(q.error.message);
+   await fetchAll();marketingDraw();
+  },old?'Save instruction':'Save instruction draft','Product instruction saved as a draft. No message sent.');
+  if(old){const field=d.querySelector('[name=template_id]');if(field)field.value=old.template_id||''}
  }
  function marketingDraw(){
   if(!root?.isConnected)return;
@@ -325,7 +443,7 @@
    connection:previous.elements.connection_id?.value||'',
    template:previous.elements.template_id?.value||''
   }:null;
-  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='welcome'?welcomeView():current==='recurring'?recurringView():inboundView())+'</div>';
+  root.innerHTML='<div class="grwc">'+header()+(current==='audience'?audienceView():current==='reports'?campaignReports():current==='inbox'?inboxView():current==='welcome'?welcomeView():current==='recurring'?recurringView():current==='guidance'?guidanceView():inboundView())+'</div>';
   const form=root.querySelector('#grwc-audience-form');
   if(form&&remembered){
    const prov=form.elements.connection_id;
@@ -436,14 +554,14 @@
   let c=scope==='all'?(app.companies.includes('grow-india')?'grow-india':app.companies[0]):scope;
   const providers=rows.connections.filter(p=>p.company_id===c),templ=rows.templates.filter(t=>t.company_id===c),sheetRows=rows.sheets.filter(s=>s.company_id===c),opted=rows.consents.filter(w=>w.company_id===c&&w.consent_status==='opted_in'&&w.consent_source&&w.consent_at&&!w.opt_out_at).length,approved=templ.filter(validMarketingTemplate).length;
   container.innerHTML='<div class="grwc">'+
-   '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Integration Settings</h2><p>Connect SocialBerries, sync existing templates, assign leads and configure service rules.</p></div><span class="grwc-chip">Admin only</span></div>'+
+   '<div class="grwc-hero"><div><small>SETTINGS / WHATSAPP</small><h2>WhatsApp Accounts</h2><p>Connected accounts, manual approved-template sync and lead-assignment rules. Technical setup is optional.</p></div><span class="grwc-chip">Admin only</span></div>'+
    '<div class="grwc-notice"><b>WhatsApp Marketing setup:</b> '+opted+' recorded opt-in(s) · '+approved+' confirmed MARKETING template(s) for '+esc(name(c))+'. Complete these one-time setup steps below. Marketing stays a simple Send Campaign page. API credentials stay in Supabase Secrets.</div>'+
    sel('Company','grwc-settings-company',app.companies.map(c=>[c,name(c)]),c,null)+
-   '<section class="grwc-panel">'+headers('1 · Your WhatsApp providers','GreenRich uses SocialBerries for existing templates and delivery. The second provider is optional.')+
+   '<section class="grwc-panel">'+headers('1 · WhatsApp accounts','Manage an existing account or prepare a second business number.')+
    '<div class="grwc-grid">'+[1,2].map(slot=>{
     const p=providers.find(p=>p.slot===slot),label=p?.display_name||(slot===1?'SocialBerries':'Second provider');
-    return '<div class="grwc-feature"><b>Tool '+slot+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not set')+'</p><p>Authentication: Server-side Basic Auth · Not verified</p>'+
-      '<button type="button" data-edit-provider="'+slot+'">Edit details</button> '+
+    return '<div class="grwc-feature"><b>'+(slot===1?'Primary account':'Additional account')+': '+esc(label)+'</b><p>Sender: '+esc(p?.sender_phone||'Not connected')+'</p><p>Status: '+esc(p?.setup_state==='verified'&&p?.enabled?'Connected and enabled':'Setup required')+'</p>'+
+      '<button type="button" data-edit-provider="'+slot+'">'+(p?'View / manage details':'Connect another WhatsApp account')+'</button> '+
       (p&&p.provider.toLowerCase()==='socialberries'?'<button type="button" data-diagnose-provider="'+esc(p.id)+'">Check Sending Setup</button> <button type="button" data-verify-provider="'+esc(p.id)+'">Verify & Enable Provider</button> <button type="button" data-test-provider="'+esc(p.id)+'">Test Connection (read-only)</button> <button type="button" data-batches-provider="'+esc(p.id)+'">Read Campaign Status</button> <button type="button" data-messages-provider="'+esc(p.id)+'">View Message History</button>':'')+
       '</div>';
    }).join('')+'</div>'+
@@ -457,10 +575,10 @@
    '<li><b>Bulk API documentation:</b> <code>POST /api/v1/whatsapp/messages/bulk/</code> requires multipart form fields and an uploaded CSV when using the file audience. The current CRM campaign sender uses the separate individual-message endpoint. Do not use the bulk code example as proof that an individual message succeeded. A bulk response with <code>status: pending</code> means queued, not delivered.</li>'+
    '<li>Existing templates: import their full provider-approved JSON until SocialBerries supplies a Get Templates endpoint. A guarded campaign-sending function is deployed but remains blocked without credentials, approved template details, marketing opt-in and server activation. Inbound webhooks are not active.</li>'+
    '</ol></div></section>'+
-   '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Approved templates and their message fields can sync automatically once the company Meta WABA is connected. No JSON editing is needed.')+
-   '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Use Sync Approved Templates to retrieve full approved message content directly from the connected company Meta WABA. Existing approved templates remain available; no repeat approval is necessary.</p>'+
-   '<button type="button" data-sync-approved-templates>Sync Approved Templates (optional Meta API)</button> '+
+   '<section class="grwc-panel">'+headers('2 · Approved templates','Manual sync existing Meta-approved templates once, then use them in Marketing. Automatic Meta API import is optional.')+
+   '<p class="grwc-muted">'+templ.length+' saved template reference(s). Use Manual Sync to save exact approved text, media type and buttons. No repeat approval is necessary.</p>'+
    '<button type="button" data-import-provider-template>Manual Sync Approved Template</button> '+
+   '<button type="button" data-sync-approved-templates>Optional: Sync via Meta API</button> '+
    '<p class="grwc-muted">Manual sync is the primary setup: enter exact approved header, body and buttons in a guided form, or paste full JSON if available. Automatic Meta sync is optional. No Meta resubmission.</p>'+
    '<details class="grwc-span"><summary>Advanced · Template recovery tools</summary><p class="grwc-muted">Link metadata only if you do not have the approved template JSON.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button></details>'+
@@ -468,7 +586,7 @@
    '<section class="grwc-panel">'+headers('Marketing readiness — one-time setup','Complete only when actual customer permission and approved Meta template details are available.')+
     '<div class="grwc-grid"><div class="grwc-feature"><b>Customer marketing permission</b><p>'+opted+' recorded opt-in(s) for '+esc(name(c))+'.</p><button type="button" data-settings-optin>Record genuine opt-in</button></div>'+
     '<div class="grwc-feature"><b>Approved Meta template</b><p>'+approved+' confirmed approved marketing template(s).</p><button type="button" data-sync-approved-templates>Refresh approved templates</button></div></div>'+
-    '<p class="grwc-muted">CRM contacts and Meta leads are not automatically opted in. Record genuine permission once for the correct sending company; future campaigns reuse it.</p></section>'+
+    '<p class="grwc-muted">CRM contacts, WhatsApp replies and website OTP logins are not automatically opted in to marketing. Record genuine permission for the appropriate company before sending campaigns.</p></section>'+
    '<section class="grwc-panel">'+headers('3 · SocialBerries Leads → GreenRich ONE','Sync provider leads into a secure review list, then import individual new leads into CRM. Existing leads and customers are checked for duplicate mobile numbers.')+
    '<div class="grwc-notice">Read-only SocialBerries API fetch. Synchronizing does not send WhatsApp messages and does not create GreenRich leads until an Admin reviews and imports each record.</div>'+
    '<div class="grwc-grid">'+providers.filter(p=>p.provider.toLowerCase()==='socialberries').map(p=>
@@ -480,12 +598,26 @@
     (l.imported_lead_id?'—':'<button type="button" data-import-provider-lead="'+esc(l.id)+'">Review & import</button>')+'</td></tr>').join('')+
     '</tbody></table></div>':empty('No staged SocialBerries leads yet. Configure the connection, then click Sync Leads.'))+
    '<p class="grwc-muted">The documented Get Leads API includes unusually required client fields in the GET request body. If its endpoint rejects page-only GET, ask SocialBerries for the correct GET request format; no records will be guessed or imported.</p></section>'+
-   '<section class="grwc-panel">'+headers('4 · WhatsApp and website enquiry → CRM Lead','Choose source, tags and salesperson for each inbound enquiry type. OTP-only login events must not create marketing leads.', '<button type="button" data-new-inbound>+ Mapping</button>')+
-   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common')+'</p><small>Awaiting verified webhook</small></div>').join(''):empty('No inbound assignment mappings.'))+'</section>'+
+   '<section class="grwc-panel">'+headers('4 · Incoming lead & website WhatsApp OTP assignment','Choose the employee and CRM tag for each event source. Activation only processes signed server events; no marketing opt-in is inferred.', '<button type="button" data-new-inbound>+ Assignment rule</button>')+
+   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common queue')+'</p><p>Tags: '+esc((r.tag_ids||[]).map(id=>rows.tags.find(t=>t.id===id)?.name||id).join(', ')||'None')+'</p><small>'+esc(r.status==='active'?'Active rule — signed source required':'Draft / paused')+'</small> <button type="button" data-inbound-rule-status="'+esc(r.id)+'" data-next-status="'+(r.status==='active'?'paused':'active')+'">'+(r.status==='active'?'Pause':'Activate')+'</button></div>').join(''):empty('No incoming lead assignment rules have been saved.'))+'</section>'+
    '<section class="grwc-panel">'+headers('5 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('6 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
    '<div class="grwc-grid"><div class="grwc-feature"><b>API connectivity & history</b><p>Read-only GET users, campaign batches and phone-specific WhatsApp messages. No messages sent.</p></div><div class="grwc-feature"><b>Template sending / bulk</b><p>Endpoints documented; production dispatch intentionally disabled until approved-template checks and consent mapping.</p></div><div class="grwc-feature"><b>Webhook lead capture</b><p>No authenticated webhook signature/payload specification supplied yet.</p></div><div class="grwc-feature"><b>Repeat follow-ups</b><p>Draft-only until provider and opt-in verification.</p></div></div></section></div>';
+  // Keep active account, template sync and lead routing visible. The rest is still
+  // accessible under one Advanced panel instead of overwhelming daily operators.
+  const panels=[...container.querySelectorAll('.grwc > .grwc-panel')];
+  if(panels.length>=7){
+   const providerHelp=panels[0].querySelector('.grwc-steps');
+   const extra=document.createElement('details');
+   extra.className='grwc-panel';extra.setAttribute('data-advanced-whatsapp','');
+   extra.innerHTML='<summary><b>Advanced tools, API diagnostics & documentation</b></summary>'+
+    '<p class="grwc-muted">Only use these settings for troubleshooting or connecting integrations. Current WhatsApp API credentials are stored securely in Supabase.</p>'+
+    '<p><a target="_blank" rel="noopener noreferrer" href="https://app.apidog.com/web/project/1359210/apis/api-41806354-run">SocialBerries bulk messaging API documentation</a></p>';
+   if(providerHelp)extra.append(providerHelp);
+   [panels[2],panels[3],panels[5],panels[6]].forEach(x=>{if(x)extra.append(x)});
+   container.querySelector('.grwc').append(extra);
+  }
   container.querySelectorAll('[data-sheet-template]').forEach(x=>{const sh=sheetRows.find(r=>r.id===x.dataset.sheetTemplate);x.value=sh?.welcome_template_id||''});
   container.querySelector('#grwc-settings-company').onchange=e=>{scope=e.target.value;settingsDraw(container)};
   container.onclick=async e=>{
@@ -507,6 +639,19 @@
    if(e.target.closest('[data-settings-confirm-template]'))return settingsTemplateApproval(c,container);
    if(e.target.closest('[data-import-template-metadata]'))return importTemplateMetadata(c,container);
    if(e.target.closest('[data-import-provider-template]'))return importProviderTemplate(c,container);
+   const ruleButton=e.target.closest('[data-inbound-rule-status]');
+   if(ruleButton){
+    const r=rows.inbound.find(x=>x.id===ruleButton.dataset.inboundRuleStatus&&x.company_id===c);
+    const next=ruleButton.dataset.nextStatus;
+    if(!app.admin||!r||!['active','paused'].includes(next))return alert('Invalid company assignment rule','error');
+    try{
+     const saved=await app.db.from('gr_wa_inbound_rules').update({status:next}).eq('id',r.id).eq('company_id',c);
+     if(saved.error)throw Error(saved.error.message);
+     await fetchAll();settingsDraw(container);
+     alert(next==='active'?'Assignment rule activated for trusted signed events. Connect your website/backend webhook source to receive leads.':'Assignment rule paused.','success');
+    }catch(error){alert(error.message,'error')}
+    return;
+   }
    if(edit)return editProvider(c,Number(edit.dataset.editProvider),container);
    if(add)return inboundDialog(c,container);
    if(sheet){
@@ -1039,14 +1184,25 @@
   if(!app.admin||!app.companies.includes(c)||![1,2].includes(slot))
    return alert('You do not have permission to edit this company/provider slot.','error');
   const old=rows.connections.find(p=>p.company_id===c&&p.slot===slot);
-  dialog('Configure WhatsApp Tool '+slot,
+  if(old&&old.setup_state==='verified'&&old.enabled){
+   const d=document.createElement('dialog');d.className='grwc-dialog';
+   d.innerHTML='<div class="grwc-dialog-head"><h3>Connected WhatsApp account</h3><button type="button" data-close>×</button></div>'+
+    '<div class="grwc-dialog-fields"><p><b>Provider:</b> '+esc(old.display_name)+'</p>'+
+    '<p><b>Business number:</b> '+esc(old.sender_phone)+'</p>'+
+    '<p><b>Company:</b> '+esc(name(c))+'</p>'+
+    '<p class="grwc-notice grwc-span">This account is already verified and connected. Editing it would reset a working provider setup. To add a different number use the second account slot. To change this number contact the provider administrator.</p></div>'+
+    '<div class="grwc-dialog-foot"><button type="button" data-close>Close</button></div>';
+   document.body.append(d);d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
+   d.onclose=()=>d.remove();d.showModal();return;
+  }
+  dialog(slot===2?'Connect additional WhatsApp business number':'Configure WhatsApp Tool '+slot,
    '<div class="grwc-feature grwc-span"><b>Company (fixed for Tool '+slot+')</b><p>'+esc(name(c))+'</p>'+
    '<p>To edit another company, close this form and change the Company selector in WhatsApp Settings.</p></div>'+
    input('Provider name','display_name',old?.display_name||(slot===1?'SocialBerries':''))+
-   input('Provider identifier','provider',old?.provider||(slot===1?'socialberries':''))+
+   (slot===2?field('WhatsApp API provider','provider',options([['socialberries','SocialBerries / Workaxis'],['other','Other provider']],'Select provider'),true):input('Provider identifier','provider',old?.provider||'socialberries'))+
    input('Registered WhatsApp business sender (+91 followed by 10 digits)','sender_phone',old?.sender_phone||'')+
-   '<p class="grwc-muted grwc-span">Use the number registered to this company in SocialBerries. Campaign recipients are selected separately from CRM contacts.</p>'+
-   note('API documentation link / integration notes (no API keys)','notes',old?.notes||''),
+   '<p class="grwc-muted grwc-span">This registers the company/number in CRM only. API credentials remain in Supabase, and a new number is not active until its provider connection is verified.</p>'+
+   note('Provider account reference / notes (do not paste API tokens)','notes',old?.notes||''),
    async fd=>{
     const x={
      company_id:c,slot,
@@ -1084,13 +1240,13 @@
   const cons=rows.connections.filter(p=>p.company_id===c);
   dialog('Inbound lead assignment rule',companyFieldWith(c)+
    field('Provider','connection_id',options(cons.map(p=>[p.id,p.display_name]),'Choose provider'),true)+
-   field('Incoming event','event_type',options([['whatsapp_enquiry','WhatsApp customer enquiry'],['website_enquiry','Website enquiry']]),true)+
+   field('Incoming event','event_type',options([['whatsapp_enquiry','WhatsApp new incoming message'],['website_enquiry','Website enquiry'],['website_whatsapp_otp','Website WhatsApp OTP verified login']]),true)+
    input('CRM source label','source_name','WhatsApp Enquiry')+
    field('Salesperson','assigned_to',options(rows.profiles.filter(p=>p.company_ids?.includes(c)).map(p=>[p.id,p.full_name]),'Common sales queue'))+
-   input('Tags (approved tag IDs, comma-separated)','tag_ids','')+
+   field('Lead tag','tag_selector',options(rows.tags.map(t=>[t.id,t.name]),'No tag'))+
    '<p class="grwc-muted grwc-span">Draft only: provider webhook receiver must be configured and authenticated before it can create CRM leads.</p>',
    async fd=>{
-    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=x.tag_ids.split(',').map(v=>v.trim()).filter(Boolean);x.status='draft';
+    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=x.tag_selector?[x.tag_selector]:[];delete x.tag_selector;x.status='draft';
     if(!cons.some(p=>p.id===x.connection_id))throw Error('Invalid company provider');
     const r=await app.db.from('gr_wa_inbound_rules').insert(x);if(r.error)throw Error(r.error.message);
    });
@@ -1157,28 +1313,21 @@
  async function mountMarketing(element,ctx){
   app=ctx;root=element;scope=ctx.selectedCompany&&ctx.companies.includes(ctx.selectedCompany)?ctx.selectedCompany:'all';
   current='audience';kind='all';source='all';tag='all';owner='all';needle='';provider='all';selected=new Set();campaignImage=null;campaignParamValues={};
-  startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';serviceCompany=scope;serviceSelected.clear();
+  startDate='';endDate='';product='all';leadStage='all';inboundNeedle='';inboxNeedle='';guidanceCompany=app.companies.includes('grow-india')?'grow-india':app.companies[0];guidanceProduct='all';serviceCompany=scope;serviceSelected.clear();
   root.innerHTML='<p>Loading CRM audience…</p>';
   try{
    await fetchAll();marketingDraw();
-   // Attempt a read-only sync once per company/session on entering Marketing.
-   // Missing Meta credentials are reported in the UI only when user requests refresh.
-   const last=window.GreenRichWaMarketingLastSync||{};
-   for(const c of app.companies){
-    const conn=rows.connections.find(x=>x.company_id===c&&x.provider==='socialberries'&&x.enabled);
-    if(!app.admin||!conn||Date.now()-(last[c]||0)<30*60*1000)continue;
-    last[c]=Date.now();
-    window.GreenRichWaMarketingLastSync=last;
-    void secureSend('sync_approved_templates',{connection_id:conn.id}).then(async result=>{
-     if(result?.configured&&root?.isConnected){
-      await fetchAll();marketingDraw();
-     }
-    }).catch(()=>{});
-   }
+   // Manual sync is primary. No unsolicited Meta API call on page load.
   }catch(e){root.innerHTML='<div class="grwc-empty">WhatsApp Marketing data unavailable: '+esc(e.message)+'</div>'}
   element.onclick=async e=>{
    const send=e.target.closest('[data-review-campaign]');if(send){const row=rows.campaigns.find(x=>x.id===send.dataset.reviewCampaign);if(row)await reviewCampaign(row);return}
    const v=e.target.closest('[data-view]');if(v){current=v.dataset.view;marketingDraw();return}
+   if(e.target.closest('[data-new-guide]')){guidanceDialog();return}
+   const editGuide=e.target.closest('[data-guide-edit]');
+   if(editGuide){guidanceDialog(editGuide.dataset.guideEdit);return}
+   const history=e.target.closest('[data-inbox-history]');
+   if(history){if(!app.admin)return alert('Only Admin can look up provider chat history.','warning');
+    openMessageHistory(history.dataset.inboxHistory,history.dataset.inboxPhone);return}
    if(e.target.closest('[data-marketing-sync-templates]')){
     const form=element.querySelector('#grwc-audience-form'),connectionId=form?.elements.connection_id?.value;
     const conn=campaignConnection(connectionId);
@@ -1231,15 +1380,16 @@
     return await checkProvider(conn.id,'batches');
    }
    if(e.target.closest('[data-select-all-matching]')){
-    const members=audience();
-    selected=new Set(members.map(x=>x.id));
+    const members=audience().filter(x=>!selected.has(x.id));
+    const free=Math.max(0,500-selected.size);
+    members.slice(0,free).forEach(x=>selected.add(x.id));
     marketingDraw();
-    alert(members.length+' currently loaded matching contacts selected.','info');
+    alert(Math.min(members.length,free)+' additional filtered contacts selected (maximum 500 per campaign).','info');
     return;
    }
    if(e.target.closest('[data-clear-all-matching]')){selected.clear();marketingDraw();return}
-   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
-   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
+   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);element.querySelectorAll('[data-grwc-selected-count]').forEach(x=>x.textContent=String(selectedStatus().total));return}
+   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);element.querySelectorAll('[data-grwc-selected-count]').forEach(x=>x.textContent=String(selectedStatus().total));return}
   };
   element.onchange=e=>{
    const form=e.target.closest?.('#grwc-audience-form');
@@ -1274,7 +1424,8 @@
      'grwc-product':'product','grwc-stage':'leadStage','grwc-date-from':'startDate','grwc-date-to':'endDate',
      'grwc-service-company':'serviceCompany','grwc-service-type':'serviceType','grwc-service-source':'serviceSource',
      'grwc-service-tag':'serviceTag','grwc-service-product':'serviceProduct','grwc-service-order':'serviceOrder',
-     'grwc-service-delivery':'serviceDelivery','grwc-service-from':'serviceStart','grwc-service-to':'serviceEnd'};
+     'grwc-service-delivery':'serviceDelivery','grwc-service-from':'serviceStart','grwc-service-to':'serviceEnd',
+     'grwc-guide-company':'guidanceCompany','grwc-guide-product':'guidanceProduct'};
    if(!map[e.target.id])return;
    const v=e.target.value;
    switch(e.target.id){
@@ -1296,16 +1447,19 @@
     case 'grwc-service-delivery':serviceDelivery=v;break;
     case 'grwc-service-from':serviceStart=v;break;
     case 'grwc-service-to':serviceEnd=v;break;
+    case 'grwc-guide-company':guidanceCompany=v;guidanceProduct='all';break;
+    case 'grwc-guide-product':guidanceProduct=v;break;
    }
    marketingDraw();
   };
   element.oninput=e=>{
-   const ids={'grwc-search':'needle','grwc-service-search':'serviceNeedle','grwc-inbound-lookup':'inboundNeedle'};
+   const ids={'grwc-search':'needle','grwc-service-search':'serviceNeedle','grwc-inbound-lookup':'inboundNeedle','grwc-inbox-lookup':'inboxNeedle'};
    if(!ids[e.target.id])return;
    const field=e.target.id,pos=e.target.selectionStart;
    if(field==='grwc-search')needle=e.target.value.toLowerCase();
    if(field==='grwc-service-search')serviceNeedle=e.target.value.toLowerCase();
    if(field==='grwc-inbound-lookup')inboundNeedle=e.target.value.toLowerCase();
+   if(field==='grwc-inbox-lookup')inboxNeedle=e.target.value.toLowerCase();
    marketingDraw();
    const input=element.querySelector('#'+field);
    input?.focus();
@@ -1404,13 +1558,7 @@
   element.innerHTML='<p>Loading WhatsApp integration settings…</p>';
   try{
    await fetchAll();settingsDraw(element);
-   // One read-only catalog sync on Settings entry; no WhatsApp message is sent.
-   const last=window.GreenRichWaLastSync||{};
-   const currentCompany=scope;
-   if(app.admin&&Date.now()-(last[currentCompany]||0)>30*60*1000){
-    last[currentCompany]=Date.now();window.GreenRichWaLastSync=last;
-    void syncApprovedTemplates(currentCompany,element,{quiet:true});
-   }
+   // Manual sync is the primary path. Optional Meta refresh runs only when requested.
   }catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
  }
  const configure=ctx=>{app=ctx};
