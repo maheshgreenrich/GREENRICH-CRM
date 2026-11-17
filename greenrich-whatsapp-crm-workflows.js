@@ -112,7 +112,7 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
@@ -125,9 +125,9 @@
    optional('gr_wa_contacts','id,company_id,customer_id,lead_id,mobile,consent_status,consent_source,consent_at,opt_out_at'),
    optional('gr_pilot_products','id,company_id,crm_product_id,name,sku'),
    optional('gr_wa_messages','id,company_id,connection_id,campaign_id,direction,body,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,event_at,created_at'),
-   optional('gr_wa_guidance_steps')
+   optional('gr_wa_guidance_steps'),optional('gr_wa_bulk_batches')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -212,6 +212,9 @@
  }
  function campaignReports(){
   const relevant=rows.campaigns.filter(x=>scope==='all'||x.company_id===scope).slice(0,100);
+  const providerBatches=(rows.batches||[]).filter(x=>scope==='all'||x.company_id===scope)
+    .slice().sort((a,b)=>String(b.synced_at).localeCompare(String(a.synced_at))).slice(0,100);
+  const stat=(b,key)=>Number.isFinite(Number(b.message_statistics?.[key]))?Number(b.message_statistics[key]):'—';
   const messages=rows.messages||[],completed=relevant.filter(x=>!!x.provider_batch_id);
   const tracked=messages.filter(m=>relevant.some(c=>c.id===m.campaign_id));
   return '<section class="grwc-panel">'+headers('Campaign reports & delivery tracking',
@@ -234,7 +237,10 @@
     return '<tr><td>'+esc(x.name)+'</td><td>'+esc(name(x.company_id))+'</td><td>'+esc(rows.templates.find(t=>t.id===x.template_id)?.name||'—')+'</td><td>'+esc(x.audience?.selected_count||0)+'</td><td>'+attempts.length+'</td><td>'+esc(state)+(last?'<div class="grwc-muted">Reason: '+esc(reason)+'</div>':'')+'</td><td>'+(allAttempted?'<small>Already attempted · do not automatically retry</small>':'<button type="button" data-review-campaign="'+esc(x.id)+'">Send remaining</button>')+'</td></tr>';
    }).join('')+'</tbody></table></div>':empty('No CRM marketing campaigns saved yet.'))+
    '<p class="grwc-muted">Delivered and Read counts require provider-reported status. Meta website CTA click metrics are not yet available in this CRM API; zero is not displayed as a made-up click count. Uncertain attempts are never auto-retried. Read receipts can be disabled by recipients.</p>'+
-   (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">Provider batch data is synchronised read-only; campaign processing status is not message delivery. Use one company at a time.</p>':'')+
+   (providerBatches.length?'<h4>SocialBerries provider campaign batches</h4><div class="grwc-tablewrap"><table><thead><tr><th>Campaign</th><th>Provider status</th><th>Audience</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Failed</th><th>Button clicks</th></tr></thead><tbody>'+
+    providerBatches.map(b=>'<tr><td>'+esc(b.name)+'</td><td>'+esc(b.status)+'</td><td>'+esc(b.total_clients_count)+'</td><td>'+esc(stat(b,'sent'))+'</td><td>'+esc(stat(b,'delivered'))+'</td><td>'+esc(stat(b,'read'))+'</td><td>'+esc(stat(b,'failed'))+'</td><td>Not reported by available API</td></tr>').join('')+'</tbody></table></div>':
+    '<p class="grwc-muted">No synchronized provider batches. Use the read-only batch sync below for reports from SocialBerries.</p>')+
+   (app.admin?'<button type="button" data-provider-report>Sync SocialBerries Bulk Batches</button> <button type="button" data-provider-history>Saved Bulk Campaign History</button><p class="grwc-muted">SocialBerries reports are read-only snapshots. Campaign completed does not necessarily mean delivered; provider-reported Delivered/Read counts are labeled separately.</p>':'')+
    '</section>';
  }
  function welcomeView(){
