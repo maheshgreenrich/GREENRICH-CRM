@@ -21,7 +21,10 @@
  };
  const previewFor=(m,contact)=>{
   const rows=data();
-  const name=String(m.template_name||m.template||'').trim().toLowerCase();
+  // CRM campaign records often store only "Marketing template: <name>" in body.
+  // Recover the exact saved template name for DISPLAY only, never for sending.
+  const localName=/^Marketing template:\s*([a-z0-9_]+)\s*$/i.exec(String(m.text||''));
+  const name=String(m.template_name||m.template||localName?.[1]||'').trim().toLowerCase();
   if(!name||!contact?.company_id)return null;
   const t=(rows.templates||[]).find(x=>x.company_id===contact.company_id&&
     String(x.name||'').toLowerCase()===name&&
