@@ -10,5 +10,5 @@ for(const fragment of ['const validMarketingTemplate=t=>','validMarketingTemplat
 }
 assert.ok(!ui.includes('data-verify-meta-template="'+"'"+'+esc(t.id)'), 'Repeated verification buttons should not show on catalog');
 assert.ok(ui.includes('No message sent.'),'Catalog refresh should not send');
-assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-manual-sync-visible-2'));
+assert.ok(read('secure.html').includes('greenrich-whatsapp-crm-workflows.js?v=20261117-manual-template-fields-3'));
 console.log('PASS: only complete marketing templates selectable, no per-template reapproval and automatic refresh without sending');
