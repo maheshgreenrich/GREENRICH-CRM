@@ -6,6 +6,43 @@
  let ctx=null,host=null,selected='',filter='',kind='all',company='all',page=1,fetchSerial=0,ticker=null;
  const history=new Map(),drafts=new Map(),attachments=new Map(),templateValues=new Map(),templateMedia=new Map();
  let templateOpen=false,chosenTemplateId='';
+ const latestByNumber=new Map(), readByNumber=new Map(), unreadByNumber=new Map();
+ let watchCursor=0,watchBusy=false,lastListRefresh=0;
+ const conversationKey=x=>String(x?.company_id||'')+':'+String(x?.number||'');
+ const seenKey=k=>'grwx-read-v9:'+k;
+ const lastRead=k=>{if(readByNumber.has(k))return readByNumber.get(k);let t=0;
+  try{t=Number(localStorage.getItem(seenKey(k)))||0}catch{}readByNumber.set(k,t);return t};
+ const markRead=x=>{const k=conversationKey(x),stamp=Date.now();
+   readByNumber.set(k,stamp);unreadByNumber.delete(k);
+   try{localStorage.setItem(seenKey(k),String(stamp))}catch{}
+ };
+ const rememberIncoming=(person,messages,opened=false)=>{
+  const key=conversationKey(person);
+  if(opened){markRead(person);}
+  const rows=messages.filter(x=>x.direction==='Incoming'&&Number.isFinite(Date.parse(x.event_at)));
+  const newest=rows.sort((a,b)=>Date.parse(b.event_at)-Date.parse(a.event_at))[0];
+  if(newest){
+   const old=latestByNumber.get(key);
+   if(!old||Date.parse(newest.event_at)>=Date.parse(old.event_at))
+     latestByNumber.set(key,{text:newest.text||newest.template_name||'Attachment received',event_at:newest.event_at,id:newest.provider_message_id||newest.id});
+   const cutoff=lastRead(key);
+   const unread=rows.filter(x=>Date.parse(x.event_at)>cutoff&&Date.parse(x.event_at)>Date.now()-7*86400000);
+   if(!opened&&unread.length)unreadByNumber.set(key,{count:unread.length,text:newest.text||'New attachment',when:newest.event_at});
+   else if(opened)unreadByNumber.delete(key);
+  }
+ };
+ const cleanupAttachment=x=>{if(x?.previewUrl)URL.revokeObjectURL(x.previewUrl)};
+ const attachmentView=x=>{
+  if(!x)return '';
+  let media='';
+  if(x.previewUrl&&x.type.startsWith('image/'))media='<img src="'+esc(x.previewUrl)+'" alt="Selected image preview">';
+  else if(x.previewUrl&&x.type.startsWith('video/'))media='<video controls preload="metadata" src="'+esc(x.previewUrl)+'"></video>';
+  else if(x.previewUrl&&x.type.startsWith('audio/'))media='<audio controls preload="none" src="'+esc(x.previewUrl)+'"></audio>';
+  const size=(x.size/1024).toFixed(0)+' KB';
+  return '<div class="grwx-media-preview">'+media+'<span title="'+esc(x.name)+'"><b>'+esc(x.name)+'</b><small>'+esc(size)+' · Ready to attach</small></span>'+
+   '<button type="button" data-grwx-action="remove-attachment" title="Remove attachment" aria-label="Remove selected attachment">✕</button></div>';
+ };
+
  let sending=false;
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const clean=x=>String(x||'').replace(/\D/g,'').replace(/^91(?=[6-9]\d{9}$)/,'');
@@ -105,8 +142,10 @@
    x.connection=(r.connections||[]).find(c=>c.company_id===x.company_id&&String(c.provider).toLowerCase()==='socialberries');
    x.salesperson=(r.profiles||[]).find(p=>p.id===x.owner)?.full_name||'Not assigned';
   }
-  return list.sort((a,b)=>String(b.recent?.event_at||b.recent?.created_at||b.created_at||'').localeCompare(
-   String(a.recent?.event_at||a.recent?.created_at||a.created_at||'')));
+  return list.sort((a,b)=>{
+   const time=x=>latestByNumber.get(conversationKey(x))?.event_at||x.recent?.event_at||x.recent?.created_at||x.created_at||'';
+   return String(time(b)).localeCompare(String(time(a)));
+  });
  };
  function render(){
   if(!host?.isConnected||!ctx)return;
@@ -144,7 +183,7 @@
   const previousScroll=host.querySelector('#grwx-messages');
   const wasNearBottom=previousScroll?previousScroll.scrollHeight-previousScroll.scrollTop-previousScroll.clientHeight<100:true;
   host.innerHTML='<section class="grwx-shell">'+
-   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v6</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
+   '<div class="grwx-top"><div><h3>WhatsApp Inbox <span class="grwx-release" title="UI version">v9</span></h3><p>CRM contacts and available SocialBerries messages</p></div>'+
     '<button type="button" data-grwx-action="refresh-directory">Refresh CRM</button></div>'+
    '<div class="grwx-grid">'+
     '<aside class="grwx-sidebar"><div class="grwx-side-controls"><strong>Chats & customers</strong><small>'+visible.length+' shown · '+all.length+' total contacts</small>'+
@@ -156,7 +195,8 @@
      '<button type="button" class="grwx-user '+(x.key===selected?'active':'')+'" data-grwx-contact="'+esc(x.key)+'">'+
        '<span class="grwx-avatar">'+esc((x.name||'?').charAt(0).toUpperCase())+'</span>'+
        '<span class="grwx-user-copy"><strong class="grwx-contact-name">'+esc(x.name)+'</strong><span class="grwx-contact-phone">+91 '+esc(x.number)+'</span>'+
-       '<span class="grwx-last-message">'+esc(x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</span></span>'+
+       '<span class="grwx-last-message">'+esc(unreadByNumber.get(conversationKey(x))?.text||latestByNumber.get(conversationKey(x))?.text||x.recent?.body||x.recent?.delivery_status||'No CRM messages yet')+'</span></span>'+
+       (unreadByNumber.has(conversationKey(x))?'<span class="grwx-unread-badge" aria-label="'+unreadByNumber.get(conversationKey(x)).count+' unread WhatsApp replies">'+Math.min(99,unreadByNumber.get(conversationKey(x)).count)+(unreadByNumber.get(conversationKey(x)).count>99?'+':'')+'</span>':'')+
        '</button>'
      ).join(''):'<p class="grwx-empty">No matching customers or leads</p>')+'</div></aside>'+
     '<main class="grwx-conversation '+(templateOpen?'grwx-with-template':'')+'">'+
@@ -198,12 +238,8 @@
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft" aria-expanded="'+(templateOpen?'true':'false')+'">Template</button>'+
       '<button type="button" data-grwx-action="send-draft" '+(!ctx?.admin||!active.connection||sending?'disabled':'')+' title="Send text reply within 24 hours of the customer’s last incoming message" aria-label="Send WhatsApp text">'+(sending?'…':'➤')+'</button></div></div>'+
-      '<div class="grwx-attachment-selection">'+
-       (attachments.get(active.key)?'<span class="grwx-attachment-meta" title="'+esc(attachments.get(active.key).name)+'">'+esc(attachments.get(active.key).name)+'</span>'+
-       '<button type="button" data-grwx-action="remove-attachment" aria-label="Remove selected attachment" title="Remove attachment">✕</button>'+
-       '<button type="button" data-grwx-action="send-attachment" '+(sending?'disabled':'')+'>Send attachment</button>':'')+
-      '</div>'+
-      '<p class="grwx-send-unavailable">Text sends without attachments. Media requires a caption. Outside 24 hours, use Template.</p>'+
+      '<div class="grwx-attachment-selection">'+attachmentView(attachments.get(active.key))+'</div>'+
+      '<p class="grwx-send-unavailable">'+(attachments.get(active.key)?'Selected attachment will be sent with the arrow. Caption optional; filename is used when blank. Remove ✕ to send text only.':'Text message: type and press ➤. Outside 24 hours, use an approved template.')+'</p>'+
       '<div class="grwx-pagination"><button type="button" data-grwx-action="newer" '+(!state.page||state.page<=1||state.loading?'disabled':'')+'>Newer</button>'+
       '<small>History page '+(state.page||1)+'</small><button type="button" data-grwx-action="older" '+(!state.hasMore||state.loading?'disabled':'')+'>Older</button></div></div>':
       '<div class="grwx-empty">Choose a contact to view chat history</div>')+'</main>'+
@@ -245,18 +281,44 @@
    const count=Number.isFinite(x.count)?x.count:null;
    history.set(identity,{messages,page:pageNumber,count,hasMore:messages.length>=15&&(count===null||pageNumber*15<count),
     checked:new Date().toISOString(),error:'',loading:false});
+   // Open conversation is considered read; sidebar preview updates from incoming provider records.
+   rememberIncoming(chosen,messages,pageNumber===1);
   }catch(err){
    if(seq!==fetchSerial)return;
    history.set(identity,{...prev,loading:false,error:String(err.message||err)});
   }
   if(ctx&&host?.isConnected)render();
  }
- const cleanup=()=>{if(ticker){clearInterval(ticker);ticker=null}fetchSerial++};
+ // Best-effort history polling while Inbox is visible. A proper provider webhook
+ // remains necessary for instant global notifications; never claim real-time delivery.
+ async function watchNewReplies(){
+  if(watchBusy||!ctx?.admin||!host?.isConnected||document.visibilityState==='hidden')return;
+  const list=customers().filter(x=>x.connection&&x.key!==selected);
+  if(!list.length)return;
+  watchBusy=true;
+  try{
+   const number=Math.min(3,list.length);
+   for(let i=0;i<number;i++){
+    const person=list[(watchCursor++)%list.length];
+    try{
+     const r=await ctx.app.db.functions.invoke('greenrich-socialberries',{body:{
+       connection_id:person.connection.id,action:'messages',phone_number:'91'+person.number,page:1}});
+     if(r.error||!r.data?.ok||!r.data.shape_known)continue;
+     const messages=Array.isArray(r.data.messages)?r.data.messages:[];
+     rememberIncoming(person,messages,false);
+    }catch{}
+   }
+   if(host?.isConnected)render();
+  }finally{watchBusy=false}
+ }
+ const cleanup=()=>{if(ticker){clearInterval(ticker);ticker=null}fetchSerial++;watchBusy=false};
  const mount=(root,settings)=>{
   cleanup();ctx=settings;host=root;if(!host)return;
   if(!selected){const first=customers()[0];if(first)selected=first.key}
   host.onclick=async e=>{
-   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;templateOpen=false;chosenTemplateId='';page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
+   const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;
+    const opened=customers().find(x=>x.key===selected);if(opened)markRead(opened);
+    templateOpen=false;chosenTemplateId='';page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
    const templateChoice=e.target.closest('[data-grwx-template]');
    if(templateChoice){chosenTemplateId=templateChoice.dataset.grwxTemplate;render();return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
@@ -270,7 +332,7 @@
    }
    if(action==='template-draft'){templateOpen=!templateOpen;chosenTemplateId='';render();return}
    if(action==='close-template'){templateOpen=false;chosenTemplateId='';render();return}
-   if(action==='remove-attachment'){attachments.delete(selected);render();return}
+   if(action==='remove-attachment'){cleanupAttachment(attachments.get(selected));attachments.delete(selected);render();return}
    if(action==='send-template'){
     if(sending)return;
     const person=customers().find(x=>x.key===selected);
@@ -320,12 +382,12 @@
     const person=customers().find(x=>x.key===selected);
     if(!ctx?.admin||!person?.connection)return settings.notify('An authorized provider connection is required.','warning');
     const draft=(drafts.get(selected)||'').trim();
-    const media=action==='send-attachment'?attachments.get(selected):null;
-    if(!draft)return settings.notify(media?'Enter a media caption before sending the selected attachment.':'Type a normal text reply before pressing Send.','warning');
+    const media=attachments.get(selected)||null;
+    if(!draft&&!media)return settings.notify('Type a text reply or select an image, video, audio or document.','warning');
     if(action==='send-attachment'&&!media?.file)return settings.notify('Choose a file to attach first.','warning');
     if(media?.file?.size>8*1024*1024)return settings.notify('Attachment maximum is 8 MB. No message sent.','warning');
-    // The normal Send arrow always sends TEXT, even when an attachment was chosen earlier.
-    const confirmText='Send this '+(media?'attachment':'text message')+' to '+person.name+' (+91 '+person.number+') via SocialBerries? The backend verifies the WhatsApp 24-hour reply window.';
+    // Selection is explicit: arrow sends the selected media, else plain text.
+    const confirmText='Send '+(media?media.name+' as a WhatsApp attachment':'your text message')+' to '+person.name+' (+91 '+person.number+') via SocialBerries? The backend verifies the 24-hour reply window.';
     if(!window.confirm(confirmText))return;
     const requestId=crypto.randomUUID();
     const form=new FormData();
@@ -333,7 +395,7 @@
     form.set('customer_key',person.key);
     form.set('phone_number','91'+person.number);
     form.set('request_id',requestId);
-    form.set('message_text',draft);
+    form.set('message_text',draft||(media?'Attachment: '+media.name:''));
     if(media?.file){
       const types={'image/jpeg':'image','image/png':'image','video/mp4':'video',
         'audio/mpeg':'audio','audio/mp4':'audio','audio/ogg':'audio',
@@ -364,7 +426,7 @@
       const data=await response.json().catch(()=>({ok:false,error:'Invalid reply response'}));
       if(!response.ok||!data.ok)throw Error(data.error||'Unable to submit WhatsApp reply');
       if(data.status==='accepted_by_provider'){
-        drafts.delete(targetKey);if(media)attachments.delete(targetKey);
+        drafts.delete(targetKey);if(media){cleanupAttachment(attachments.get(targetKey));attachments.delete(targetKey)}
         if(selected===targetKey){render();void load(1)}
         settings.notify('SocialBerries accepted your reply. Delivery is not yet confirmed.','success');
       }else{
@@ -406,10 +468,12 @@
    if(e.target.id==='grwx-attachment'){
     const file=e.target.files?.[0];
     if(file&&file.size>8*1024*1024){settings.notify('Please choose a file under 8 MB. No file has been uploaded.','warning');e.target.value='';return}
-    if(file)attachments.set(selected,{name:file.name,size:file.size,type:file.type,file});
+    if(file){cleanupAttachment(attachments.get(selected));
+     const previewUrl=/^(image|video|audio)\//.test(file.type)?URL.createObjectURL(file):'';
+     attachments.set(selected,{name:file.name,size:file.size,type:file.type,file,previewUrl});
+    }
     else attachments.delete(selected);
-    const label=host.querySelector('#grwx-attachment-name');if(label)label.textContent=file?.name||'No file selected';
-    return;
+    render();return;
    }
    if(e.target.id==='grwx-company'){company=e.target.value;selected=''}
    else if(e.target.id==='grwx-kind'){kind=e.target.value;selected=''}
@@ -419,13 +483,15 @@
   render();
   const initial=customers().find(x=>x.key===selected);
   if(initial?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);
+  if(ctx.admin)void watchNewReplies();
   // Poll only the currently open contact, and only if its provider history was already requested.
   // This is a best-effort refresh, NOT proof of webhook-backed live synchronization.
   ticker=setInterval(()=>{
    if(!host?.isConnected){cleanup();return}
    if(document.visibilityState==='hidden'||!ctx?.admin)return;
    const h=history.get(selected);if(h?.checked&&!h?.loading&&h.page===1)void load(1,true);
-  },60000);
+   void watchNewReplies();
+  },30000);
  };
  window.GreenRichInbox={mount,unmount:cleanup};
 })();

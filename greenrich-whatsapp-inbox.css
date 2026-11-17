@@ -260,3 +260,40 @@
  #grwx-inbox-host .grwx-template-picker{padding:8px}
  #grwx-inbox-host .grwx-template-options button{max-width:100%}
 }
+
+/* Inbox v9: attachment preview and WhatsApp-style unread counts. */
+#grwx-inbox-host .grwx-shell .grwx-user{position:relative!important;padding-right:38px!important}
+#grwx-inbox-host .grwx-unread-badge{
+ position:absolute;right:9px;top:14px;display:inline-flex;align-items:center;justify-content:center;
+ min-width:21px;height:21px;padding:0 5px;border-radius:16px;background:#1fbd72;color:#fff;
+ font-size:11px;font-weight:750;line-height:1;box-shadow:0 1px 4px rgba(23,142,89,.15)
+}
+#grwx-inbox-host .grwx-shell .grwx-user:has(.grwx-unread-badge) .grwx-last-message{
+ color:#116d49!important;font-weight:700!important
+}
+#grwx-inbox-host .grwx-chat-footer:has(.grwx-media-preview){
+ max-height:245px!important;min-height:148px!important;overflow-y:auto!important;align-content:start!important
+}
+#grwx-inbox-host .grwx-attachment-selection:has(.grwx-media-preview){
+ display:flex!important;min-height:0!important;padding:4px 0 2px!important;overflow:visible!important
+}
+#grwx-inbox-host .grwx-media-preview{
+ display:flex;align-items:center;gap:11px;max-width:100%;width:100%;min-width:0;
+ padding:7px 9px;border-radius:12px;border:1px solid #cde6d9;background:#f0faf5;
+}
+#grwx-inbox-host .grwx-media-preview img,
+#grwx-inbox-host .grwx-media-preview video{
+ width:68px;height:58px;max-width:68px;object-fit:cover;border-radius:8px;background:#e1ecf3
+}
+#grwx-inbox-host .grwx-media-preview audio{width:155px;max-width:35%;height:36px}
+#grwx-inbox-host .grwx-media-preview>span{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+#grwx-inbox-host .grwx-media-preview b{color:#183f5c;font-size:11px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#grwx-inbox-host .grwx-media-preview small{font-size:10px;color:#528269;white-space:nowrap}
+#grwx-inbox-host .grwx-media-preview button{
+ flex:0 0 auto;border-radius:50%!important;width:27px!important;height:27px!important;
+ padding:0!important;display:flex!important;align-items:center;justify-content:center
+}
+@media(max-width:790px){
+ #grwx-inbox-host .grwx-chat-footer:has(.grwx-media-preview){max-height:295px!important}
+ #grwx-inbox-host .grwx-media-preview audio{max-width:32%}
+}
