@@ -56,7 +56,7 @@
   const provider=state.messages||[];
   const crm=active?.messages||[];
   const seen=new Set(provider.map(m=>m.id).filter(Boolean));
-  const rendered=[...provider.map(x=>({text:x.text||'[Provider did not return readable message text]',direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',when:x.event_at,status:x.status,id:x.id,origin:'provider'})),
+  const rendered=[...provider.map(x=>({text:x.text||(x.template_name?'Template: '+x.template_name:(x.has_attachment?'Attachment: '+(x.attachment_type||'media')+' (file preview unavailable through current API)':'[Provider did not return readable message text]')),direction:x.direction==='Outgoing'?'outbound':x.direction==='Incoming'?'inbound':'unknown',when:x.event_at,status:x.status,id:x.id,origin:'provider'})),
     ...crm.filter(x=>!x.provider_message_id||!seen.has(x.provider_message_id)).map(x=>({text:x.body||'[CRM message text unavailable]',direction:x.direction,when:x.event_at||x.created_at,status:x.delivery_status,id:x.id,origin:'crm'}))];
   rendered.sort((a,b)=>(Date.parse(a.when)||0)-(Date.parse(b.when)||0));
   const title=active?.name||'Choose a customer';
