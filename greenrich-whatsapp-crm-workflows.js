@@ -112,12 +112,13 @@
    return r.data||[];
   };
   const optional=async(table,cols='*',filter='company_id')=>{try{return await read(table,cols,filter)}catch{return []}};
-  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents]=await Promise.all([
+  const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,sources,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
    app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at,notes,next_followup'):Promise.resolve([]),
    app.canCustomers?db.from('gr_crm_customers').select('id,name,mobile,mobile2,email,source,type,owner,tag_ids,created_at,notes').limit(2000).then(r=>{if(r.error)throw r.error;return r.data||[]}):Promise.resolve([]),
    db.from('gr_crm_tags').select('id,name').limit(500).then(r=>r.data||[]),
+   db.from('gr_crm_sources').select('name,active').eq('active',true).order('name').limit(500).then(r=>{if(r.error)throw Error('CRM sources: '+r.error.message);return r.data||[]}),
    app.admin?db.from('gr_profiles').select('id,full_name,company_ids,active').eq('active',true).limit(300).then(r=>r.data||[]):Promise.resolve([]),
    app.admin?read('gr_sheet_connections'):Promise.resolve([]),
    app.admin?read('gr_wa_provider_leads'):Promise.resolve([]),
@@ -127,7 +128,7 @@
    optional('gr_wa_messages','id,company_id,connection_id,campaign_id,direction,body,delivery_status,phone,provider_message_id,provider_error_code,provider_error_message,event_at,created_at'),
    optional('gr_wa_guidance_steps'),optional('gr_wa_bulk_batches'),optional('gr_wa_inbound_events')
   ]);
-  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents};
+  rows={connections,templates:templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,sources,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents};
  }
  const byType=()=>{
   const sourceVals=[...new Set([...rows.leads.map(l=>l.source),...rows.customers.map(c=>c.source)].filter(Boolean))];
@@ -611,7 +612,7 @@
     '</tbody></table></div>':empty('No staged SocialBerries leads yet. Configure the connection, then click Sync Leads.'))+
    '<p class="grwc-muted">The documented Get Leads API includes unusually required client fields in the GET request body. If its endpoint rejects page-only GET, ask SocialBerries for the correct GET request format; no records will be guessed or imported.</p></section>'+
    '<section class="grwc-panel">'+headers('4 · Incoming lead & website WhatsApp OTP assignment','Choose the employee and CRM tag for each event source. Activation only processes signed server events; no marketing opt-in is inferred.', '<button type="button" data-new-inbound>+ Assignment rule</button>')+
-   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common queue')+'</p><p>Tags: '+esc((r.tag_ids||[]).map(id=>rows.tags.find(t=>t.id===id)?.name||id).join(', ')||'None')+'</p><small>'+esc(r.status==='active'?'Active rule — signed source required':'Draft / paused')+'</small> <button type="button" data-inbound-rule-status="'+esc(r.id)+'" data-next-status="'+(r.status==='active'?'paused':'active')+'">'+(r.status==='active'?'Pause':'Activate')+'</button></div>').join(''):empty('No incoming lead assignment rules have been saved.'))+'</section>'+
+   (rows.inbound.filter(r=>r.company_id===c).length?rows.inbound.filter(r=>r.company_id===c).map(r=>'<div class="grwc-feature"><b>'+esc(r.event_type)+'</b><p>Source: '+esc(r.source_name)+' · Person: '+esc(rows.profiles.find(p=>p.id===r.assigned_to)?.full_name||'Common queue')+'</p><small>'+esc(r.status==='active'?'Active rule — signed source required':'Draft / paused')+'</small> <button type="button" data-inbound-rule-status="'+esc(r.id)+'" data-next-status="'+(r.status==='active'?'paused':'active')+'">'+(r.status==='active'?'Pause':'Activate')+'</button></div>').join(''):empty('No incoming lead assignment rules have been saved.'))+'</section>'+
    '<section class="grwc-panel">'+headers('5 · Google Sheet default welcome templates','Each Sheet already has a salesperson. Choose which template belongs to newly imported leads; leave blank for no welcome.')+
    (sheetRows.length?sheetRows.map(sh=>'<div class="grwc-sheet"><div><b>'+esc(sh.tab_name)+'</b><small>'+esc(sh.source_name)+' · '+esc(rows.profiles.find(p=>p.id===sh.assigned_to)?.full_name||'Common queue')+'</small></div><select data-sheet-template="'+esc(sh.id)+'">'+options(templateOptions(c))+'</select><button type="button" data-save-sheet="'+esc(sh.id)+'">Save</button></div>').join(''):empty('No connected Sheets for this company. Configure them under Settings → Google Sheet Leads.'))+'</section>'+
    '<section class="grwc-panel">'+headers('6 · Security & sending status','API credentials belong exclusively in secure server-side secrets. Verify opt-in before any campaign.')+
@@ -1253,12 +1254,13 @@
   dialog('Inbound lead assignment rule',companyFieldWith(c)+
    field('Provider','connection_id',options(cons.map(p=>[p.id,p.display_name]),'Choose provider'),true)+
    field('Incoming event','event_type',options([['whatsapp_enquiry','WhatsApp new incoming message'],['website_enquiry','Website enquiry'],['website_whatsapp_otp','Website WhatsApp OTP verified login']]),true)+
-   input('CRM source label','source_name','WhatsApp Enquiry')+
+   field('Lead source','source_name',options((rows.sources||[]).filter(s=>s.active===true).map(s=>[s.name,s.name]),'Choose existing CRM source'),true)+
    field('Salesperson','assigned_to',options(rows.profiles.filter(p=>p.company_ids?.includes(c)).map(p=>[p.id,p.full_name]),'Common sales queue'))+
-   field('Lead tag','tag_selector',options(rows.tags.map(t=>[t.id,t.name]),'No tag'))+
+   '<p class="grwc-muted grwc-span">Lead tags can be added later after qualifying or converting the lead.</p>'+
    '<p class="grwc-muted grwc-span">Draft only: provider webhook receiver must be configured and authenticated before it can create CRM leads.</p>',
    async fd=>{
-    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=x.tag_selector?[x.tag_selector]:[];delete x.tag_selector;x.status='draft';
+    const x=Object.fromEntries(fd);x.assigned_to=x.assigned_to||null;x.tag_ids=[];x.status='draft';
+    if(!(rows.sources||[]).some(s=>s.active===true&&s.name===x.source_name))throw Error('Choose a source from CRM Settings → Lead Sources.');
     if(!cons.some(p=>p.id===x.connection_id))throw Error('Invalid company provider');
     const r=await app.db.from('gr_wa_inbound_rules').insert(x);if(r.error)throw Error(r.error.message);
    });
