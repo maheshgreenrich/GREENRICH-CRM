@@ -196,10 +196,10 @@
    '<label>To date<input id="grwc-date-to" type="date" value="'+esc(endDate)+'"></label>'+
    '<label>Name / phone / email<input id="grwc-search" type="search" value="'+esc(needle)+'" placeholder="Search CRM records"></label></div>'+
    '<div class="grwc-audience-summary"><b>'+list.length+'</b> matching records · <b data-grwc-selected-count>'+chosen.total+'</b> selected across filters'+(chosen.missing?' · '+chosen.missing+' no longer in loaded CRM':'')+'. Your selections remain checked when filters change.</div>'+
-   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all loaded matches</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
-   '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Source</th><th>Assigned to</th></tr></thead><tbody>'+
-   list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.source)+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
-   '<p class="grwc-muted">Company is an optional filter. Previously unassigned customers can be selected. Showing the first 250 of '+list.length+' matching contacts. Selections are kept across filters; use Clear selection to start over. Valid numbers, sender-company leads and marketing permission are checked before sending.</p></section>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select matching contacts (up to 500)</button><button type="button" data-clear-all-matching>Clear selection</button></div>'+
+   '<div class="grwc-tablewrap"><table><thead><tr><th><input type="checkbox" id="grwc-all"></th><th>Name</th><th>Type</th><th>Mobile</th><th>Email</th><th>Source</th><th>Product</th><th>Tags</th><th>Assigned to</th></tr></thead><tbody>'+
+   list.slice(0,250).map(x=>'<tr><td><input type="checkbox" data-select-contact="'+esc(x.id)+'" '+(selected.has(x.id)?'checked':'')+'></td><td>'+esc(x.name)+'</td><td>'+x.type+'</td><td>'+esc(x.mobile)+'</td><td>'+esc(x.email||'—')+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.products.join(', ')||'—')+'</td><td>'+esc(x.tags.map(id=>rows.tags.find(t=>t.id===id)?.name||'').filter(Boolean).join(', ')||'—')+'</td><td>'+esc(rows.profiles.find(p=>p.id===x.owner)?.full_name||'—')+'</td></tr>').join('')+'</tbody></table></div>'+
+   '<div class="grwc-selection-toolbar"><button type="button" data-select-all-matching>Select all filtered contacts (maximum 500)</button><button type="button" data-clear-all-matching>Clear selection</button><strong><span data-grwc-selected-count>'+chosen.total+'</span> selected</strong></div>'+ '<p class="grwc-muted">Company is an optional filter. Previously unassigned customers can be selected. Showing the first 250 of '+list.length+' matching contacts. Selections are kept across filters. Campaigns are limited to 500 recipients, with documented consent checked before sending.</p></section>'+
    '<section class="grwc-panel">'+headers('Send WhatsApp campaign','Choose an approved marketing template and optional image.')+
    '<form id="grwc-audience-form" class="grwc-form">'+
    '<label>WhatsApp provider<select name="connection_id" required>'+options(rows.connections.filter(c=>app.companies.includes(c.company_id)).map(c=>[c.id,c.display_name+' · '+name(c.company_id)]),'Choose WhatsApp provider')+'</select></label>'+
@@ -1380,15 +1380,16 @@
     return await checkProvider(conn.id,'batches');
    }
    if(e.target.closest('[data-select-all-matching]')){
-    const members=audience();
-    selected=new Set(members.map(x=>x.id));
+    const members=audience().filter(x=>!selected.has(x.id));
+    const free=Math.max(0,500-selected.size);
+    members.slice(0,free).forEach(x=>selected.add(x.id));
     marketingDraw();
-    alert(members.length+' currently loaded matching contacts selected.','info');
+    alert(Math.min(members.length,free)+' additional filtered contacts selected (maximum 500 per campaign).','info');
     return;
    }
    if(e.target.closest('[data-clear-all-matching]')){selected.clear();marketingDraw();return}
-   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
-   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);return}
+   const selectItem=e.target.closest('[data-select-contact]');if(selectItem){if(selectItem.checked)selected.add(selectItem.dataset.selectContact);else selected.delete(selectItem.dataset.selectContact);const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);element.querySelectorAll('[data-grwc-selected-count]').forEach(x=>x.textContent=String(selectedStatus().total));return}
+   if(e.target.id==='grwc-all'){element.querySelectorAll('[data-select-contact]').forEach(x=>{x.checked=e.target.checked;if(x.checked)selected.add(x.dataset.selectContact);else selected.delete(x.dataset.selectContact)});const n=element.querySelector('[data-grwc-selected-count]');if(n)n.textContent=String(selectedStatus().total);element.querySelectorAll('[data-grwc-selected-count]').forEach(x=>x.textContent=String(selectedStatus().total));return}
   };
   element.onchange=e=>{
    const form=e.target.closest?.('#grwc-audience-form');
