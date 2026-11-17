@@ -101,7 +101,8 @@
       ['Tags',(active.tags||[]).map(t=>(r.tags||[]).find(z=>z.id===t)?.name||'').filter(Boolean).join(', ')||'None'],
       ['Products',(active.products||[]).join(', ')||'Not recorded'],
       ['Orders',(active.orders||[]).map(o=>o.order_id+' · '+o.status).join('; ')||'None'],
-      ['CRM messages',crm.length+' recorded']].map(x=>'<div class="grwx-detail"><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>').join('')+
+      ['Lead stage',active.stage||'—'],['Next follow-up',active.next_followup||'Not scheduled'],
+      ['CRM notes',active.notes||'No notes recorded'],['CRM messages',crm.length+' recorded']].map(x=>'<div class="grwx-detail"><b>'+esc(x[0])+'</b><span>'+esc(x[1])+'</span></div>').join('')+
       '<p class="grwx-profile-hint">Edit ownership, notes, tags and follow-ups in Leads & CRM / Customers.</p>':
      '<p class="grwx-empty">Select a customer to show details</p>')+'</aside></div>'+
    '<div class="grwx-accuracy">All available CRM leads/customers appear in the directory, even without messages. Provider history is fetched by selected number only. Real-time updates for all SocialBerries conversations require authenticated incoming-message/status webhooks and a complete history API.</div>'+
