@@ -205,8 +205,8 @@
    '<label>Approved marketing template<select name="template_id" required>'+options([], 'Choose provider first')+'</select></label>'+
    '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
-   '<p class="grwc-muted grwc-span">Manual template sync is supported in Admin → WhatsApp Settings. Missing approved components are shown as pending, and cannot be sent until an approved full template is saved. No reapproval in Meta is needed.</p>'+
-   '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh approved templates</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
+   '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; no reapproval in Meta is needed.</p>'+
+   '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh CRM template list</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Send Campaign</button></form></section>'+campaignReports();
  }
  function campaignReports(){
@@ -451,9 +451,9 @@
    '</ol></div></section>'+
    '<section class="grwc-panel">'+headers('2 · Existing SocialBerries templates','Approved templates and their message fields can sync automatically once the company Meta WABA is connected. No JSON editing is needed.')+
    '<p class="grwc-muted">Template catalog: '+templ.length+' reference(s). Use Sync Approved Templates to retrieve full approved message content directly from the connected company Meta WABA. Existing approved templates remain available; no repeat approval is necessary.</p>'+
-   '<button type="button" data-sync-approved-templates>Sync Approved Templates</button> '+
+   '<button type="button" data-sync-approved-templates>Sync Approved Templates (optional Meta API)</button> '+
    '<button type="button" data-import-provider-template>Manual Sync Approved Template</button> '+
-   '<p class="grwc-muted">Manual sync imports the full existing SocialBerries-approved template and records admin evidence in one step. It does not create or resubmit a template to Meta.</p>'+
+   '<p class="grwc-muted">Manual sync is the primary setup: enter exact approved header, body and buttons in a guided form, or paste full JSON if available. Automatic Meta sync is optional. No Meta resubmission.</p>'+
    '<details class="grwc-span"><summary>Advanced · Template recovery tools</summary><p class="grwc-muted">Link metadata only if you do not have the approved template JSON.</p>'+
    '<button type="button" data-import-template-metadata>Link existing template by ID</button></details>'+
    (templ.length?'<div class="grwc-tablewrap"><table><thead><tr><th>Template</th><th>ID</th><th>Category</th><th>Provider</th><th>Language</th><th>CRM status</th></tr></thead><tbody>'+templ.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(t.provider_template_id||'—')+'</td><td>'+esc(t.category)+'</td><td>'+esc(connectionLabel(t.connection_id))+'</td><td>'+esc(t.language)+'</td><td>'+esc(validMarketingTemplate(t)?(t.provider_source==='verified_provider'?'Send-ready · Meta synced':'Send-ready · Admin confirmed'):t.provider_approval!=='approved'?'Not verified · manual sync required':t.body&&Array.isArray(t.provider_preview?.components)?'Incomplete approved template':'Missing approved components · manual sync required')+'</td></tr>').join('')+'</tbody></table></div>':empty('No templates loaded yet. Connect the company Meta WABA once, then Sync Approved Templates.'))+'</section>'+
@@ -1159,11 +1159,9 @@
     if(!conn)return alert('Choose your company WhatsApp sender first.','warning');
     const button=e.target.closest('[data-marketing-sync-templates]');button.disabled=true;
     try{
-     const out=await secureSend('sync_approved_templates',{connection_id:conn.id});
-     if(!out.configured)return alert('Automatic templates need one-time connection to this company Meta WABA. Ask your SocialBerries/Meta administrator for WABA ID and WhatsApp management access; do not re-approve templates or enter JSON.','warning');
      await fetchAll();marketingDraw();
-     alert('Approved templates synced: '+out.imported+' added, '+out.updated+' updated. No message sent.','success');
-    }catch(error){alert('Template synchronization failed: '+error.message,'error')}
+     alert('CRM template list refreshed. To add an approved template, use Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token or approval is required for manual sync. No message sent.','success');
+    }catch(error){alert('Could not refresh CRM template list: '+error.message,'error')}
     finally{if(button.isConnected)button.disabled=false}
     return;
    }
