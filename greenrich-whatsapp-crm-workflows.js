@@ -344,12 +344,20 @@
  const note=(label,key,v='')=>'<label class="grwc-span">'+esc(label)+'<textarea name="'+esc(key)+'" rows="3">'+esc(v)+'</textarea></label>';
  const field=(label,key,opts,required=false)=>'<label>'+esc(label)+'<select name="'+esc(key)+'" '+(required?'required':'')+'>'+opts+'</select></label>';
  function dialog(title,body,submit,buttonLabel='Save draft',successText='Saved successfully'){
-  const d=document.createElement('dialog');d.className='grwc-dialog';d.innerHTML='<form><div class="grwc-dialog-head"><h3>'+esc(title)+'</h3><button type="button" data-dismiss>×</button></div><div class="grwc-dialog-fields">'+body+'</div><div class="grwc-dialog-foot"><button type="button" data-dismiss>Cancel</button><button type="submit" class="grwc-primary">'+esc(buttonLabel)+'</button></div></form>';
+  const d=document.createElement('dialog');d.className='grwc-dialog';d.innerHTML='<form><div class="grwc-dialog-head"><h3>'+esc(title)+'</h3><button type="button" data-dismiss>×</button></div><div class="grwc-dialog-fields">'+body+'</div><p role="alert" data-dialog-error hidden style="margin:12px 20px;padding:12px;border:1px solid #c53030;border-radius:8px;color:#9b1c1c;background:#fff1f1;white-space:pre-wrap"></p><div class="grwc-dialog-foot"><button type="button" data-dismiss>Cancel</button><button type="submit" class="grwc-primary">'+esc(buttonLabel)+'</button></div></form>';
   document.body.append(d);d.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=()=>d.close());
   d.onclose=()=>d.remove();
-  d.querySelector('form').onsubmit=async e=>{e.preventDefault();let b=d.querySelector('[type=submit]');b.disabled=true;
-    try{await submit(new FormData(e.currentTarget));d.close();alert(successText,'success');await fetchAll();if(root?.isConnected)marketingDraw()}
-    catch(error){alert('Not saved: '+error.message,'error')}finally{b.disabled=false}};
+  const form=d.querySelector('form'),errorBox=d.querySelector('[data-dialog-error]');
+  const showError=message=>{errorBox.textContent=message;errorBox.hidden=false;errorBox.scrollIntoView({block:'nearest',behavior:'auto'});};
+  // Native required-field validation otherwise blocks submit with no visible CRM feedback.
+  form.addEventListener('invalid',e=>{showError('Please complete the required field: '+(e.target.closest('label')?.textContent?.trim()||e.target.name||'required field'));},{capture:true});
+  form.addEventListener('input',()=>{errorBox.hidden=true;});
+  form.onsubmit=async e=>{e.preventDefault();const b=form.querySelector('[type=submit]'),original=b.textContent;
+    b.disabled=true;b.textContent='Saving and checking approved template…';errorBox.hidden=true;
+    try{await submit(new FormData(form));d.close();alert(successText,'success');await fetchAll();if(root?.isConnected)marketingDraw()}
+    catch(error){showError('Template was not synced. '+(error instanceof Error?error.message:String(error))+'. Correct the fields above and try again. No WhatsApp message was sent.')}
+    finally{b.disabled=false;b.textContent=original}
+  };
   d.showModal();return d;
  }
  async function save(table,payload){
@@ -885,7 +893,7 @@
   if(!choices.length)return alert('Save a SocialBerries connection for this company first.','warning');
   const known=rows.templates.filter(x=>x.company_id===company&&choices.some(c=>c.id===x.connection_id)&&x.category==='marketing');
   const d=dialog('Manual Sync — Existing Meta-Approved Template',
-   '<div class="grwc-notice grwc-span"><b>No Meta access token or reapproval needed.</b> Copy the exact details from an already approved template in SocialBerries/WhatsApp Manager. This does not send a message. A missing required URL or header type must not be guessed.</div>'+
+   '<div class="grwc-notice grwc-span"><b>No Meta token or reapproval required.</b> First choose your existing template; confirm the exact approved IMAGE/TEXT header, full message and CTA. Website button URLs must begin with https:// and match Meta exactly. Any validation or API failure appears in this form; no message is sent.</div>'+
    field('SocialBerries provider','connection_id',options(choices.map(x=>[x.id,x.display_name]),'Choose connection'),true)+
    field('Existing template (optional)','existing_template',options(known.map(t=>[t.id,t.name+' · '+t.language+' · '+t.provider_template_id]),'Enter a new existing-approved template below'))+
    input('Exact approved template ID','provider_template_id','')+
@@ -949,7 +957,7 @@
       const b={type:kind,text:label};
       if(kind==='URL'){
        try{const url=new URL(value);if(url.protocol!=='https:'||!url.hostname)throw Error('HTTPS only')}
-       catch{throw Error('Enter the exact approved HTTPS website URL for button '+i)}
+       catch{throw Error('Button '+i+' needs the exact full approved HTTPS URL (example format: https://example.com). A domain without https:// is not valid.')}
        b.url=value;
       }else if(kind==='PHONE_NUMBER'){
        if(!/^\+?[0-9]{7,15}$/.test(value))throw Error('Enter the exact approved call number for button '+i);
@@ -1006,14 +1014,21 @@
    const comps=t.provider_preview?.components||[];
    const header=comps.find(x=>String(x.type).toUpperCase()==='HEADER');
    const footer=comps.find(x=>String(x.type).toUpperCase()==='FOOTER');
-   set('header_type',header?String(header.format||'').toUpperCase():'');
-   set('header_text',header?.text);set('approved_footer',footer?.text);
+   const observed=t.provider_preview?.observed_from_meta_screenshot||{};
+   set('header_type',header?String(header.format||'').toUpperCase():observed.header_format_observed||'');
+   set('header_text',header?.text);set('approved_footer',footer?.text||observed.footer_text_observed||'');
    const buttons=comps.find(x=>String(x.type).toUpperCase()==='BUTTONS')?.buttons||[];
    buttons.slice(0,2).forEach((b,i)=>{
     set('button'+(i+1)+'_kind',String(b.type||'').toUpperCase());
     set('button'+(i+1)+'_text',b.text);
     set('button'+(i+1)+'_value',b.url||b.phone_number||'');
    });
+   // Prepopulate only details actually observed, not an invented approved URL.
+   if(!buttons.length&&observed.button_text_observed){
+    set('button1_kind',observed.button_kind_observed?.includes('URL')?'URL':'');
+    set('button1_text',observed.button_text_observed);
+    set('button1_value','');
+   }
   };
   sel?.addEventListener('change',populate);
  }
