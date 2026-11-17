@@ -142,7 +142,12 @@
        '<div class="grwx-message '+(m.direction==='outbound'?'sent':m.direction==='inbound'?'received':'unknown')+'">'+messageCard(m,active)+'</div>').join(''):
         '<div class="grwx-empty">No saved messages for this customer. Refresh chat to request provider history.</div>')+'</div>'+
       '<div class="grwx-chat-footer">'+
-      '<div class="grwx-attachment-tools"><label class="grwx-attach-button" title="Select an image, video, audio or document">📎 Attach<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"></label>'+
+      '<div class="grwx-attachment-tools">'+
+      '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-image" aria-label="Select image" title="Select image">▧</button>'+
+      '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-video" aria-label="Select video" title="Select video">▣</button>'+
+      '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-document" aria-label="Select document" title="Select PDF or document">▤</button>'+
+      '<button type="button" class="grwx-tool-icon" data-grwx-action="attach-audio" aria-label="Select audio" title="Select audio">♫</button>'+
+      '<input id="grwx-attachment" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden aria-label="Choose attachment">'+
       '<span id="grwx-attachment-name">'+esc(attachments.get(active.key)?.name||'No file selected')+'</span></div>'+
       '<div class="grwx-compose-row"><textarea id="grwx-compose" rows="2" maxlength="4096" placeholder="Type a WhatsApp reply…" aria-label="WhatsApp message draft">'+esc(drafts.get(active.key)||'')+'</textarea>'+
       '<button type="button" data-grwx-action="template-draft">Template</button>'+
@@ -204,6 +209,13 @@
    const p=e.target.closest('[data-grwx-contact]');if(p){selected=p.dataset.grwxContact;page=1;fetchSerial++;render();const picked=customers().find(x=>x.key===selected);if(picked?.connection&&ctx.admin&&!history.get(selected)?.checked)void load(1);return}
    const action=e.target.closest('[data-grwx-action]')?.dataset.grwxAction;
    if(action==='refresh-chat')return void load(1);
+   if(['attach-image','attach-video','attach-document','attach-audio'].includes(action)){
+    const picker=host.querySelector('#grwx-attachment');
+    if(!picker)return;
+    const accepts={'attach-image':'image/*','attach-video':'video/*','attach-audio':'audio/*',
+      'attach-document':'.pdf,.doc,.docx,.xls,.xlsx,.txt'};
+    picker.accept=accepts[action];picker.click();return;
+   }
    if(action==='template-draft'){
     const person=customers().find(x=>x.key===selected);
     if(person)settings.openTemplateFor?.(person);
