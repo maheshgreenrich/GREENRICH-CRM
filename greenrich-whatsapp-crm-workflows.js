@@ -80,7 +80,7 @@
   const stored=campaignParamValues[id]||{};
   const hints=[];
   if(template.provider_source!=='verified_provider')
-   hints.push('This older template was manually confirmed. Automatic sync of its exact approved components is recommended before use.');
+   hints.push('This template was manually confirmed by an administrator; check that every approved component is accurate before sending.');
   if(spec.format==='IMAGE')hints.push('IMAGE header required. Choose a file above; a stored image preview is not sufficient unless its media is attached.');
   if(spec.body?.text)hints.push('BODY template variables: '+[...String(spec.body.text).matchAll(/\{\{([^{}]+)\}\}/g)].map(m=>m[1]).join(', ')+'. Numeric 1–3 / named client fields are mapped from each contact.');
   region.innerHTML='<h4>Required fields for '+esc(template.name)+' · '+esc(template.language)+'</h4>'+
@@ -1558,13 +1558,7 @@
   element.innerHTML='<p>Loading WhatsApp integration settings…</p>';
   try{
    await fetchAll();settingsDraw(element);
-   // One read-only catalog sync on Settings entry; no WhatsApp message is sent.
-   const last=window.GreenRichWaLastSync||{};
-   const currentCompany=scope;
-   if(app.admin&&Date.now()-(last[currentCompany]||0)>30*60*1000){
-    last[currentCompany]=Date.now();window.GreenRichWaLastSync=last;
-    void syncApprovedTemplates(currentCompany,element,{quiet:true});
-   }
+   // Manual sync is the primary path. Optional Meta refresh runs only when requested.
   }catch(e){element.textContent='WhatsApp settings unavailable: '+e.message}
  }
  const configure=ctx=>{app=ctx};
