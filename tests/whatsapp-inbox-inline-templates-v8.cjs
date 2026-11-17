@@ -43,7 +43,7 @@ assert.ok(js.includes("if(!draft&&!media)"),'Text or attachment required for sen
 assert.ok(server.includes('if(kind==="template")'),'Approved template send branch missing');
 assert.ok(server.includes('gr_wa_template_media'),'Template IMAGE header must be hosted for SocialBerries');
 assert.ok(server.includes('Recipient has no recorded marketing opt-in'),'Marketing consent check missing');
-assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-media-unread-v9'));
+assert.ok(html.includes('greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10'));
 assert.ok(css.includes('grwx-conversation.grwx-with-template'));
 w.GreenRichInbox.unmount();w.close();
 console.log('PASS: normal Send distinct from media, no Copy, same-chat approved template chooser, preview and guarded template send');
