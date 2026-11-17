@@ -308,11 +308,13 @@ Deno.serve(async request=>{
         receiver.replace(/\D/g,"")===phone?"Outgoing":"Unknown";
       return {
        id:String(x.id??x.message_id??"").slice(0,120),
+       provider_message_id:String(x.message_id??x.data?.messages?.[0]?.id??"").slice(0,180),
        direction,
        type:String(x.type??"unknown").slice(0,60),
        status:String(x.status??"unknown").slice(0,60),
        text:typeof x.message_text==="string"?x.message_text.slice(0,2000):"",
-       template_name:typeof x.template?.name==="string"?x.template.name.slice(0,180):"",
+       template_name:typeof x.template?.name==="string"?x.template.name.slice(0,180):
+         typeof x.template==="string"?x.template.slice(0,180):"",
        has_attachment:x.has_attachment===true,
        attachment_type:typeof x.attachment_type==="string"?x.attachment_type.slice(0,50):"",
        event_at:String(x.created_on??x.created_at??"").slice(0,50)
