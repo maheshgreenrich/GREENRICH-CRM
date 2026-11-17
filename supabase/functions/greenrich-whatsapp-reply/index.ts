@@ -74,11 +74,13 @@ Deno.serve(async(request:Request)=>{
   const kind=String(form.get("type")||"text");
   const file=form.get("attachment");
   if(!uuid(connectionId)||!uuid(requestId)||!phone)return out(400,{ok:false,error:"Valid provider, message ID and customer mobile are required"});
-  if(!["text","image","video","audio","document"].includes(kind))return out(400,{ok:false,error:"Unsupported message type"});
-  if(!text||text.length>4096)return out(400,{ok:false,error:"Enter a message or media caption (required by SocialBerries), maximum 4096 characters"});
+  if(!["text","image","video","audio","document","template"].includes(kind))return out(400,{ok:false,error:"Unsupported message type"});
+  if(kind!=="template"&&(!text||text.length>4096))
+   return out(400,{ok:false,error:kind==="text"?"Type a text message before sending":"Enter a caption for the selected attachment (required by SocialBerries)"});
   if(kind==="text"&&file instanceof File)return out(400,{ok:false,error:"Text messages cannot include an attachment"});
-  if(kind!=="text"&&!(file instanceof File))return out(400,{ok:false,error:"Choose the attachment first"});
-  if(file instanceof File&&(file.size===0||file.size>8*1024*1024||!formats[kind]?.includes(file.type)))
+  if(kind!=="text"&&kind!=="template"&&!(file instanceof File))return out(400,{ok:false,error:"Choose the attachment first"});
+  if(file instanceof File&&(file.size===0||file.size>8*1024*1024||
+    !(kind==="template"?formats.image.includes(file.type):formats[kind]?.includes(file.type))))
    return out(400,{ok:false,error:"Invalid attachment type or size (maximum 8 MB)"});
   if(file instanceof File&&!/^[\w(). -]{1,120}$/.test(file.name))
    return out(400,{ok:false,error:"Please rename the file using letters, numbers and simple punctuation"});
@@ -105,16 +107,65 @@ Deno.serve(async(request:Request)=>{
   if(!valid)return out(403,{ok:false,error:"Recipient must match an existing company-associated CRM contact"});
   const cfg=providerSettings(c.company_id,c.slot);
   if(!cfg)return out(422,{ok:false,error:"SocialBerries Basic Auth is not configured on the server"});
-  // Never use local CRM timestamps as sufficient proof of an open 24-hour window.
-  let allowed=false;
-  try{allowed=await inWindow(cfg,phone)}
-  catch(e){return out(422,{ok:false,error:String(e instanceof Error?e.message:"Could not verify the customer-service window")})}
-  if(!allowed)return out(422,{ok:false,error:"No verified incoming customer message in the past 24 hours. Use an approved WhatsApp template instead."});
+  // Template messages can be sent outside the 24-hour window, but ONLY
+  // using the approved template held in our database for this sender.
+  // Clients cannot provide the template definition, name, status or category.
+  let approvedTemplate:any=null;
+  let approvedComponents:any[]=[];
+  let bodyValues:string[]=[];
+  let imageUrl="";
+  if(kind==="template"){
+   const selectedTemplateId=String(form.get("template_id")||"");
+   if(!uuid(selectedTemplateId))return out(400,{ok:false,error:"Select an approved template"});
+   const lookup=await server.from("gr_wa_templates").select(
+    "id,company_id,connection_id,name,language,category,body,provider_template_id,provider_approval,provider_source,provider_preview"
+   ).eq("id",selectedTemplateId).eq("connection_id",c.id).eq("company_id",c.company_id).maybeSingle();
+   if(lookup.error||!lookup.data)return out(404,{ok:false,error:"Template was not found for the selected WhatsApp account"});
+   approvedTemplate=lookup.data;
+   const t=approvedTemplate,pv=t.provider_preview;
+   approvedComponents=Array.isArray(pv?.components)?pv.components:[];
+   const bodyPart=approvedComponents.find((x:any)=>String(x.type).toUpperCase()==="BODY");
+   if(t.provider_approval!=="approved"||!["verified_provider","admin_confirmed"].includes(t.provider_source)||
+    !bodyPart||!String(t.body||"").trim()||!/^\d{5,25}$/.test(t.provider_template_id||"")||
+    !/^[a-z][a-z0-9_]{0,119}$/.test(t.name||"")||
+    !/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(t.language||""))
+    return out(422,{ok:false,error:"This template is not ready for sending. Sync its existing Meta-approved details first; do not resubmit to Meta."});
+   const headerPart=approvedComponents.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
+   const format=String(headerPart?.format||"").toUpperCase();
+   if(!["","TEXT","IMAGE"].includes(format))return out(422,{ok:false,error:"Unsupported approved template header format"});
+   if(format==="TEXT"&&/\{\{\d+\}\}/.test(String(headerPart?.text||"")))
+    return out(422,{ok:false,error:"Dynamic header variables are not supported by this composer yet"});
+   const buttons=approvedComponents.find((x:any)=>String(x.type).toUpperCase()==="BUTTONS");
+   if(Array.isArray(buttons?.buttons)&&buttons.buttons.some((b:any)=>
+    !["URL","QUICK_REPLY","PHONE_NUMBER","COPY_CODE"].includes(String(b?.type||"").toUpperCase())||
+     /\{\{\d+\}\}/.test(String(b?.url||""))))
+    return out(422,{ok:false,error:"Dynamic or unsupported template buttons require a supported provider configuration"});
+   const nums=[...String(bodyPart.text||t.body||"").matchAll(/\{\{(\d+)\}\}/g)].map((m:any)=>Number(m[1]));
+   const max=Math.max(0,...nums);
+   if(max>20||nums.some((n:number)=>n<1)||new Set(nums).size!==max)
+    return out(422,{ok:false,error:"Template variables are not sequential or exceed the supported limit"});
+   try{bodyValues=JSON.parse(String(form.get("template_values")||"[]"))}catch{
+    return out(400,{ok:false,error:"Invalid template variables"})}
+   if(!Array.isArray(bodyValues)||bodyValues.length!==max||
+     bodyValues.some((v:any)=>typeof v!=="string"||!v.trim()||v.length>512))
+    return out(400,{ok:false,error:"Complete all template variable fields before sending"});
+   if(format==="IMAGE"){
+    if(!(file instanceof File)||!formats.image.includes(file.type))
+     return out(400,{ok:false,error:"This approved template requires a JPEG or PNG header image. Select an image before sending."});
+   }else if(file instanceof File)return out(400,{ok:false,error:"This template does not require an image attachment"});
+  }else{
+   // Free-form messages must remain inside the verified WhatsApp 24-hour window.
+   let allowed=false;
+   try{allowed=await inWindow(cfg,phone)}
+   catch(e){return out(422,{ok:false,error:String(e instanceof Error?e.message:"Could not verify the customer-service window")})}
+   if(!allowed)return out(422,{ok:false,error:"No verified incoming customer message in the past 24 hours. Use an approved WhatsApp template instead."});
+  }
   // Claim request UUID before attempting delivery to guard double-click/retries.
   recordId=requestId;
   const claim=await server.from("gr_wa_messages").insert({
    id:requestId,company_id:c.company_id,connection_id:c.id,
-   direction:"outbound",phone,body:kind==="text"?text:("["+kind+" attachment] "+text).slice(0,4096),
+   direction:"outbound",phone,body:kind==="text"?text:kind==="template"?("Marketing template: "+approvedTemplate.name):
+     ("["+kind+" attachment] "+text).slice(0,4096),
    delivery_status:"queued"
   }).select("id").single();
   if(claim.error)return out(409,{ok:false,error:"This message was already submitted or could not be claimed. Check chat history before retrying."});
@@ -123,7 +174,31 @@ Deno.serve(async(request:Request)=>{
    const url=new URL(cfg.root);url.searchParams.set("phone_number",phone);
    let body:BodyInit;const headers:Record<string,string>={Authorization:cfg.auth,Accept:"application/json"};
    if(kind==="text"){headers["Content-Type"]="application/json";body=JSON.stringify({type:"text",message_text:text})}
-   else{
+   else if(kind==="template"){
+    const pv=approvedTemplate.provider_preview;
+    const headerPart=approvedComponents.find((x:any)=>String(x.type).toUpperCase()==="HEADER");
+    const params:any[]=[];
+    if(String(headerPart?.format||"").toUpperCase()==="IMAGE"){
+     // The provider requires a publicly reachable HTTPS image URL, not a local file path.
+     // Upload through the service role into a dedicated media bucket; never expose the auth token.
+     const image=file as File;
+     const extension=image.type==="image/png"?"png":"jpg";
+     const storagePath=approvedTemplate.company_id+"/"+crypto.randomUUID()+"."+extension;
+     const uploaded=await server.storage.from("gr_wa_template_media").upload(storagePath,image,{
+      contentType:image.type,upsert:false,cacheControl:"3600"
+     });
+     if(uploaded.error)throw Error("Template image upload failed; provider send was not attempted");
+     imageUrl=server.storage.from("gr_wa_template_media").getPublicUrl(storagePath).data.publicUrl;
+     if(!imageUrl.startsWith("https://"))throw Error("No public HTTPS URL for the template header image");
+     params.push({type:"header",parameters:[{type:"image",image:{link:imageUrl}}]});
+    }
+    if(bodyValues.length)params.push({type:"body",parameters:bodyValues.map(v=>({type:"text",text:v}))});
+    headers["Content-Type"]="application/json";
+    body=JSON.stringify({type:"template",template:approvedTemplate.name,
+     template_id:approvedTemplate.provider_template_id,language:approvedTemplate.language,
+     category:String(approvedTemplate.category||"MARKETING").toUpperCase(),
+     preview_template:pv,components:params});
+   }else{
     const formBody=new FormData();formBody.set("type",kind);formBody.set("message_text",text);
     formBody.set("attachment",file as File,(file as File).name);body=formBody;
    }
