@@ -1199,7 +1199,7 @@
    '<div class="grwc-feature grwc-span"><b>Company (fixed for Tool '+slot+')</b><p>'+esc(name(c))+'</p>'+
    '<p>To edit another company, close this form and change the Company selector in WhatsApp Settings.</p></div>'+
    input('Provider name','display_name',old?.display_name||(slot===1?'SocialBerries':''))+
-   field('WhatsApp API provider','provider',options([['socialberries','SocialBerries / Workaxis'],['other','Other provider']],'Select provider'),true)+
+   (slot===2?field('WhatsApp API provider','provider',options([['socialberries','SocialBerries / Workaxis'],['other','Other provider']],'Select provider'),true):input('Provider identifier','provider',old?.provider||'socialberries'))+
    input('Registered WhatsApp business sender (+91 followed by 10 digits)','sender_phone',old?.sender_phone||'')+
    '<p class="grwc-muted grwc-span">This registers the company/number in CRM only. API credentials remain in Supabase, and a new number is not active until its provider connection is verified.</p>'+
    note('Provider account reference / notes (do not paste API tokens)','notes',old?.notes||''),
