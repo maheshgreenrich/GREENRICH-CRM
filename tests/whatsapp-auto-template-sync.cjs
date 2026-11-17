@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const read=p=>fs.readFileSync(path.resolve(__dirname,'..',p),'utf8');
 const ui=read('greenrich-whatsapp-crm-workflows.js'),api=read('supabase/functions/greenrich-whatsapp-send/index.ts');
 assert.doesNotThrow(()=>new vm.Script(ui));
-for(const t of ['data-dialog-error','Saving and checking approved template','header_format_observed','Button '+"'+'"+' needs the exact full approved HTTPS URL','Manual Sync — Existing Meta-Approved Template','Exact approved template ID','Exact approved message BODY','button1_kind','approval evidence','sync_approved_templates','Sync Approved Templates','data-sync-approved-templates',
+for(const t of ['data-dialog-error','Saving and checking approved template','header_format_observed','needs the exact full approved HTTPS URL','Manual Sync — Existing Meta-Approved Template','Exact approved template ID','Exact approved message BODY','button1_kind','approval evidence','sync_approved_templates','Sync Approved Templates','data-sync-approved-templates',
  'syncApprovedTemplates(company,container','Manual Sync Approved Template',
  'No reapproval in Meta is needed','window.GreenRichWaLastSync','30*60*1000','data-wa-custom',
  'Customer name','Customer mobile','Customer email','Enter my own text / order number'])
