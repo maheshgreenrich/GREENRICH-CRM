@@ -212,6 +212,15 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
                curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
                grep -q "20261104-gps-attendance-no-company-dropdown-1" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-v6-proof" /tmp/gr-live-secure.html &&
+               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-v6-proof" /tmp/gr-live-secure.html &&
+               curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.js &&
+               curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.css?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.css &&
+               grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.js &&
+               grep -q 'grwx-contact-name' /tmp/gr-live-inbox.js &&
+               grep -q 'grwx-template-buttons' /tmp/gr-live-inbox.js &&
+               grep -q 'grwx-contact-name' /tmp/gr-live-inbox.css &&
+               grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.css &&
                curl -fsSL --max-time 15 "$base/greenrich-sales-ops.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-dispatch.js &&
                curl -fsSL --max-time 15 "$base/greenrich-document-designer.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-designer.js &&
                grep -q "Packing Slip PDF" /tmp/gr-live-dispatch.js &&
@@ -236,6 +245,6 @@ jobs:
             sleep 10
           done
           if [ "$verified" -ne 1 ]; then
-            echo "::error::Published CRM is stale or inaccessible; GPS Access Panel must not be marked deployed."
+            echo "::error::Published CRM is stale or inaccessible: Settings/GPS or WhatsApp Inbox v6 public assets were not verified."
             exit 1
           fi
