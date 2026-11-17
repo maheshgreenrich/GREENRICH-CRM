@@ -177,3 +177,9 @@
  #grwx-inbox-host #grwx-compose{flex-basis:100%!important}
  #grwx-inbox-host .grwx-chat-footer{max-height:220px!important}
 }
+
+/* Compact WhatsApp-inspired attachment shortcuts; selected files stay local. */
+#grwx-inbox-host .grwx-attachment-tools{gap:5px!important;min-height:29px!important}
+#grwx-inbox-host .grwx-attachment-tools .grwx-tool-icon{width:31px!important;height:29px!important;min-width:31px!important;min-height:29px!important;border-radius:50%!important;padding:0!important;background:#f2f6fa!important;color:#436581!important;font-size:17px!important;border:0!important;line-height:1!important}
+#grwx-inbox-host #grwx-attachment{display:none!important}
+#grwx-inbox-host #grwx-attachment-name{margin-left:7px!important;max-width:260px!important}
