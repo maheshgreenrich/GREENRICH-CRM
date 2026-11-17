@@ -1,0 +1,21 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const css=fs.readFileSync('greenrich-whatsapp-inbox.css','utf8');
+const html=fs.readFileSync('secure.html','utf8');
+const js=fs.readFileSync('greenrich-whatsapp-inbox.js','utf8');
+assert.doesNotThrow(()=>new vm.Script(js));
+assert.ok(css.startsWith('/* WhatsApp Inbox v4'));
+assert.ok(!css.includes('#content #grwx-inbox-host'),'Styles must not depend on missing #content wrapper');
+assert.ok(css.includes('grid-template-rows:64px auto minmax(0,1fr) auto'),'Composer must occupy dedicated final grid row');
+assert.ok(css.includes('#grwx-inbox-host .grwx-messages'),'Chat messages need scroll area');
+assert.ok(css.includes('overflow-y:auto!important'),'Nested panels must scroll independently');
+assert.ok(css.includes('#grwx-inbox-host #grwx-compose'),'Textarea must be visible with unique ID');
+assert.ok(css.includes('visibility:visible!important'),'Textarea must not be hidden by global CRM styles');
+assert.ok(css.includes('#grwx-inbox-host .grwx-accuracy{display:none!important}'),'Long status explanation must not overlap composer');
+for(const asset of ['greenrich-whatsapp-inbox.css','greenrich-whatsapp-inbox.js','greenrich-whatsapp-crm-workflows.js'])
+ assert.ok(html.includes(asset+'?v=20261117-inbox-grid-v4'),'Cache buster must match new release: '+asset);
+assert.ok(js.includes('id="grwx-compose"'),'Composer exists in active chat');
+assert.ok(js.includes('data-grwx-action="template-draft"'),'Template shortcut exists');
+assert.ok(js.includes('id="grwx-attachment"'),'File selector exists');
+assert.ok(js.includes('data-grwx-action="send-draft" disabled'),'Do not enable unverified direct send');
+console.log('PASS: composer anchored below scrolling messages and three-pane styles independent of page wrapper');

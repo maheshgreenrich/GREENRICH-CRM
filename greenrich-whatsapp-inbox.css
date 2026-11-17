@@ -1,172 +1,138 @@
-/* GreenRich ONE — SocialBerries-style three-pane Inbox */
-#content .grwx-shell{background:#fff;border:1px solid #dfe8f2;border-radius:17px;overflow:hidden;box-shadow:0 6px 18px #17395b08;color:#243f5d}
-#content .grwx-shell *{box-sizing:border-box}
-#content .grwx-top{padding:15px 20px;border-bottom:1px solid #e5ebf3;display:flex;align-items:center;justify-content:space-between;gap:12px}
-#content .grwx-top h3{font-size:18px!important;margin:0 0 3px!important;color:#173e5d!important}
-#content .grwx-top p{font-size:11px;margin:0;color:#7890a9}
-#content .grwx-shell button{border:1px solid #d6e7f7!important;background:#eff7ff!important;color:#225e97!important;border-radius:8px!important;font-size:11px!important;font-weight:700!important;padding:8px 10px!important;cursor:pointer}
-#content .grwx-shell button:disabled{opacity:.45;cursor:not-allowed}
-#content .grwx-grid{display:grid;grid-template-columns:minmax(245px,27%) minmax(260px,1fr) minmax(225px,24%);min-height:570px;height:min(69vh,790px)}
-#content .grwx-sidebar{display:flex;flex-direction:column;min-width:0;border-right:1px solid #e0e8f0;background:#fff}
-#content .grwx-side-controls{display:grid;gap:8px;padding:13px;border-bottom:1px solid #e8eef5}
-#content .grwx-side-controls strong{font-size:13px;color:#264864}
-#content .grwx-side-controls small{font-size:10px;color:#8a9aab}
-#content .grwx-shell input,#content .grwx-shell select{width:100%;min-width:0;min-height:37px!important;background:#fbfdff!important;border:1px solid #dae5f0!important;border-radius:8px!important;padding:7px 9px!important;font-size:11px!important;color:#34536e!important}
-#content .grwx-filter-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.8fr);gap:6px}
-#content .grwx-users{flex:1;overflow-y:auto;min-height:0}
-#content .grwx-shell .grwx-user{display:flex!important;align-items:flex-start;gap:9px;width:100%!important;min-height:74px!important;border:0!important;border-bottom:1px solid #eef2f7!important;border-radius:0!important;background:#fff!important;text-align:left!important;padding:12px 10px!important}
-#content .grwx-shell .grwx-user:hover{background:#f4f9ff!important}
-#content .grwx-shell .grwx-user.active{background:#eaf6ff!important;border-left:3px solid #2e79b5!important}
-#content .grwx-avatar{width:38px;height:38px;flex-shrink:0;display:flex;justify-content:center;align-items:center;border-radius:9px;background:#ffe8c9;color:#e38d04;font-weight:850;font-size:16px}
-#content .grwx-user-copy{min-width:0;display:grid;gap:3px;flex:1}
-#content .grwx-user-copy b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
-#content .grwx-user-copy small{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:10px;color:#627d99}
-#content .grwx-user-copy .grwx-last-message{font-size:10px;color:#9aabbb}
-#content .grwx-user time{flex:0 0 auto;font-size:9px;color:#9aabc0}
-#content .grwx-conversation{display:flex;flex-direction:column;min-width:0;background:#f6f8fa}
-#content .grwx-chat-head{min-height:72px;padding:12px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e0e8f0;background:white}
-#content .grwx-heading-person{display:grid;gap:2px;flex:1;min-width:0}
-#content .grwx-heading-person strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#content .grwx-heading-person small{font-size:10px;color:#6c879f}
-#content .grwx-provider-note{min-height:34px;padding:8px 12px;background:#f0f6ff;color:#5e7896;font-size:10px;border-bottom:1px solid #dfeaf6}
-#content .grwx-error{color:#b54637}
-#content .grwx-messages{flex:1;min-height:0;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:10px}
-#content .grwx-message{display:flex}
-#content .grwx-message.sent{justify-content:flex-end}
-#content .grwx-message.received{justify-content:flex-start}
-#content .grwx-message.unknown{justify-content:center}
-#content .grwx-bubble{max-width:min(85%,510px);white-space:normal;overflow-wrap:anywhere;padding:11px 13px;border-radius:13px 13px 13px 4px;background:#fff;border:1px solid #e4e9ed;color:#293846;font-size:12px;line-height:1.55;box-shadow:0 2px 4px #1c385008}
-#content .grwx-message.sent .grwx-bubble{background:#e9f8e8;border-color:#d1edce;border-radius:13px 13px 4px 13px}
-#content .grwx-message.unknown .grwx-bubble{background:#f5f0e5}
-#content .grwx-bubble small{display:block;font-size:9px;color:#8b9aab;text-align:right;margin-top:8px}
-#content .grwx-linebreak{display:block}
-#content .grwx-chat-footer{padding:10px 13px;border-top:1px solid #dce5ed;background:#fff;display:grid;gap:6px}
-#content .grwx-chat-footer p{font-size:10px;color:#8b6f45;margin:0}
-#content .grwx-pagination{display:flex;align-items:center;justify-content:flex-end;gap:9px}
-#content .grwx-pagination small{font-size:10px;color:#8197ac}
-#content .grwx-customer-profile{overflow-y:auto;border-left:1px solid #e0e8f0;background:white;min-width:0;padding:0 14px 18px}
-#content .grwx-profile-head{text-align:center;padding:17px 0 16px;border-bottom:1px solid #eaf0f4}
-#content .grwx-profile-head>b{display:block;text-align:left;font-size:13px;color:#246094;margin-bottom:14px}
-#content .grwx-profile-avatar{width:61px;height:61px;border-radius:12px;margin:0 auto 8px;background:#ffe8c9;display:flex;align-items:center;justify-content:center;color:#e38d04;font-size:28px;font-weight:800}
-#content .grwx-profile-head h4{margin:0!important;font-size:14px!important;color:#25405e!important}
-#content .grwx-profile-head span{font-size:10px;color:#8197ad}
-#content .grwx-detail{display:grid;gap:2px;border-bottom:1px solid #edf2f7;padding:10px 0;overflow-wrap:anywhere}
-#content .grwx-detail b{font-size:10px;color:#697f9c}
-#content .grwx-detail span{font-size:11px;color:#365370}
-#content .grwx-profile-hint{color:#8294aa;font-size:10px;line-height:1.5}
-#content .grwx-empty{margin:auto!important;padding:30px 18px;text-align:center;color:#889caf;font-size:12px}
-#content .grwx-accuracy{border-top:1px solid #e7edf3;background:#f9fbfd;padding:10px 15px;color:#8292a5;font-size:10px;line-height:1.5}
-@media(max-width:1180px){#content .grwx-grid{grid-template-columns:250px minmax(260px,1fr) 215px}}
-@media(max-width:960px){#content .grwx-grid{grid-template-columns:250px minmax(260px,1fr)}#content .grwx-customer-profile{grid-column:1/-1;display:none}}
-@media(max-width:660px){#content .grwx-top{padding:11px;flex-wrap:wrap}#content .grwx-grid{grid-template-columns:minmax(115px,38%) minmax(0,62%);height:66vh;min-height:480px}#content .grwx-side-controls{padding:8px}#content .grwx-filter-row{grid-template-columns:1fr}#content .grwx-shell .grwx-user{padding:7px 5px!important;gap:5px}#content .grwx-user time,#content .grwx-user-copy .grwx-last-message{display:none}#content .grwx-avatar{width:28px;height:28px;font-size:12px}#content .grwx-user-copy b{font-size:10px}#content .grwx-user-copy small{font-size:9px}#content .grwx-chat-head{padding:7px;gap:6px}#content .grwx-chat-head button{padding:5px!important}#content .grwx-messages{padding:9px 5px}#content .grwx-bubble{max-width:93%;font-size:11px}}
-
-/* Inbox layout hotfix: desktop aligned header/sidebar/chat/profile and persistent composer */
-#content #grwx-inbox-host{width:100%;min-width:0;max-width:100%;display:block;overflow:visible}
-#content #grwx-inbox-host .grwx-shell{width:100%;max-width:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:15px}
-#content #grwx-inbox-host .grwx-top{flex:0 0 auto;min-height:68px}
-#content #grwx-inbox-host .grwx-grid{display:grid;flex:1 1 auto;min-height:0;height:clamp(570px,calc(100dvh - 260px),850px);max-height:none;grid-template-columns:minmax(245px,25%) minmax(360px,1fr) minmax(235px,23%);align-items:stretch}
-#content #grwx-inbox-host .grwx-sidebar,#content #grwx-inbox-host .grwx-conversation,#content #grwx-inbox-host .grwx-customer-profile{min-height:0;min-width:0;max-height:100%;overflow:hidden;position:relative}
-#content #grwx-inbox-host .grwx-sidebar{display:flex;flex-direction:column}
-#content #grwx-inbox-host .grwx-side-controls{flex:0 0 auto;gap:8px}
-#content #grwx-inbox-host .grwx-users{flex:1 1 auto;height:auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-#content #grwx-inbox-host .grwx-user{min-height:70px!important;height:auto!important;max-height:82px!important;padding:10px 9px!important;align-items:center!important;overflow:hidden}
-#content #grwx-inbox-host .grwx-user-copy{display:block!important;min-width:0!important;flex:1!important;overflow:hidden}
-#content #grwx-inbox-host .grwx-user-copy b,#content #grwx-inbox-host .grwx-user-copy small{display:block!important;max-width:100%;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;line-height:1.4}
-#content #grwx-inbox-host .grwx-user time{max-width:70px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;align-self:flex-start}
-#content #grwx-inbox-host .grwx-conversation{display:flex;flex-direction:column;background:#f4f8fb}
-#content #grwx-inbox-host .grwx-chat-head,#content #grwx-inbox-host .grwx-provider-note,#content #grwx-inbox-host .grwx-chat-footer{flex:0 0 auto}
-#content #grwx-inbox-host .grwx-messages{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:18px 14px}
-#content #grwx-inbox-host .grwx-customer-profile{overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-bottom:20px}
-#content #grwx-inbox-host .grwx-bubble{max-width:min(82%,510px);font-size:12px;line-height:1.45}
-#content #grwx-inbox-host .grwx-chat-footer{padding:10px 12px;background:#fff;z-index:1;border-top:1px solid #dae5ef}
-#content #grwx-inbox-host .grwx-compose-row{display:flex;align-items:flex-end;gap:7px;width:100%}
-#content #grwx-inbox-host .grwx-compose-row textarea{flex:1 1 auto;min-width:0;max-width:100%;min-height:39px!important;max-height:110px;resize:vertical;padding:9px 12px!important;background:#fbfdff!important;color:#18334f!important;border:1px solid #d1dfed!important;border-radius:12px!important;font-size:12px!important;line-height:1.4}
-#content #grwx-inbox-host .grwx-compose-row button{flex:0 0 auto}
-#content #grwx-inbox-host .grwx-composer-copy{white-space:nowrap}
-#content #grwx-inbox-host .grwx-attachment-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-#content #grwx-inbox-host .grwx-attachment-tools label{display:flex;align-items:center;gap:6px;font-size:11px;color:#4e6680;max-width:100%;cursor:pointer}
-#content #grwx-inbox-host .grwx-attachment-tools input{max-width:180px!important;width:auto!important;min-height:28px!important;height:auto!important;padding:3px!important}
-#content #grwx-inbox-host .grwx-send-unavailable{color:#a2672d;font-size:10px;margin-top:5px;line-height:1.45}
-#content #grwx-inbox-host .grwx-accuracy{flex:0 0 auto;font-size:10px}
-#content #grwx-inbox-host .grwx-pagination{margin-top:5px}
-#content #grwx-inbox-host .grwx-message.sent .grwx-bubble{background:#e5f6e9}
-@media(max-width:1220px){
- #content #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(225px,28%) minmax(340px,1fr) minmax(200px,22%)}
+/* WhatsApp Inbox v4: a single layout definition with an always-visible composer.
+   Scope to the actual mount ID, not the legacy #content element, which does not
+   exist in every GreenRich workspace route. */
+#grwx-inbox-host,
+#grwx-inbox-host *{box-sizing:border-box}
+#grwx-inbox-host{min-width:0;width:100%;max-width:100%;overflow:hidden}
+#grwx-inbox-host .grwx-shell{
+ display:grid!important;grid-template-rows:64px minmax(0,1fr)!important;
+ height:clamp(500px,calc(100dvh - 235px),780px)!important;
+ max-height:calc(100dvh - 160px)!important;
+ min-height:0!important;width:100%!important;max-width:100%!important;
+ border:1px solid #dce5ef;border-radius:14px;background:#fff;
+ overflow:hidden!important;box-shadow:0 3px 16px #153e5a0a;
+ color:#1f3955;font-family:inherit
 }
-@media(max-width:990px){
- #content #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(210px,31%) minmax(300px,1fr)}
- #content #grwx-inbox-host .grwx-customer-profile{display:none}
+#grwx-inbox-host .grwx-top{
+ display:flex!important;align-items:center;justify-content:space-between;
+ gap:12px;min-width:0;min-height:0!important;padding:9px 16px;
+ border-bottom:1px solid #e1e8ef;background:#fff;overflow:hidden
 }
-@media(max-width:640px){
- #content #grwx-inbox-host .grwx-grid{height:calc(100dvh - 235px);min-height:480px;grid-template-columns:minmax(115px,38%) minmax(0,1fr)}
- #content #grwx-inbox-host .grwx-user{min-height:58px!important;padding:7px 4px!important}
- #content #grwx-inbox-host .grwx-user-copy b{font-size:10px}
- #content #grwx-inbox-host .grwx-user-copy small{font-size:9px}
- #content #grwx-inbox-host .grwx-attachment-tools{gap:4px}
- #content #grwx-inbox-host .grwx-compose-row textarea{font-size:11px!important}
- #content #grwx-inbox-host .grwx-top{min-height:54px}
+#grwx-inbox-host .grwx-top h3{font-size:18px!important;font-weight:700!important;line-height:1.25!important;margin:0!important;color:#163f60}
+#grwx-inbox-host .grwx-top p{font-size:11px!important;margin:3px 0 0!important;color:#70869d}
+#grwx-inbox-host .grwx-shell button{border:1px solid #cddff1;border-radius:8px;background:#eef6ff;color:#1c5d92;font-size:11px;font-weight:650;padding:7px 9px;cursor:pointer;line-height:1.25}
+#grwx-inbox-host .grwx-shell button:disabled{opacity:.5;cursor:not-allowed}
+#grwx-inbox-host .grwx-grid{
+ display:grid!important;min-height:0!important;height:100%!important;
+ grid-template-columns:minmax(250px,25%) minmax(0,1fr) minmax(240px,23%)!important;
+ overflow:hidden!important;align-items:stretch!important
 }
-
-
-/* Final containment: constrain the SHELL rather than the grid, so chat history
-   cannot expand the conversation past the fixed bottom composer. */
-#content #grwx-inbox-host .grwx-shell{
-  height:clamp(540px,calc(100dvh - 170px),890px)!important;
-  max-height:calc(100dvh - 110px)!important;
-  min-height:500px!important;
-  display:flex!important;flex-direction:column!important;overflow:hidden!important;
+#grwx-inbox-host .grwx-sidebar{
+ display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;
+ min-height:0!important;height:100%!important;overflow:hidden!important;
+ min-width:0;border-right:1px solid #e1e8ef;background:#fff
 }
-#content #grwx-inbox-host .grwx-top{
-  height:64px!important;min-height:64px!important;max-height:64px!important;
-  flex:0 0 64px!important;overflow:hidden!important;
+#grwx-inbox-host .grwx-side-controls{display:grid;gap:8px;align-content:start;padding:13px 12px;border-bottom:1px solid #e7edf4;min-width:0}
+#grwx-inbox-host .grwx-side-controls strong{font-size:13px;color:#254967}
+#grwx-inbox-host .grwx-side-controls small{font-size:10px;color:#8195a9}
+#grwx-inbox-host .grwx-side-controls input,
+#grwx-inbox-host .grwx-side-controls select{display:block;width:100%!important;min-width:0;height:36px!important;min-height:36px!important;border:1px solid #d6e3f0!important;border-radius:8px;background:#fff!important;color:#34516d!important;font:inherit;font-size:11px!important;padding:6px 8px!important}
+#grwx-inbox-host .grwx-filter-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.75fr);gap:7px;min-width:0}
+#grwx-inbox-host .grwx-users{min-height:0!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;scrollbar-gutter:stable}
+#grwx-inbox-host .grwx-shell .grwx-user{
+ width:100%!important;max-width:100%!important;min-width:0!important;
+ min-height:65px!important;max-height:75px!important;height:70px!important;
+ display:flex!important;gap:9px;align-items:center!important;
+ padding:8px 10px!important;border:0!important;border-bottom:1px solid #eef1f6!important;
+ border-radius:0!important;background:#fff!important;text-align:left!important;overflow:hidden!important;
 }
-#content #grwx-inbox-host .grwx-grid{
-  flex:1 1 0%!important;
-  height:0!important;min-height:0!important;max-height:none!important;
-  overflow:hidden!important;align-items:stretch!important;
-  grid-template-columns:minmax(235px,26%) minmax(0,1fr) minmax(215px,23%)!important;
+#grwx-inbox-host .grwx-shell .grwx-user.active{border-left:3px solid #2682be!important;background:#eaf4fe!important}
+#grwx-inbox-host .grwx-shell .grwx-user:hover{background:#f3f8ff!important}
+#grwx-inbox-host .grwx-avatar{
+ display:flex;flex:0 0 38px;align-items:center;justify-content:center;
+ width:38px;height:38px;border-radius:9px;background:#ffe9cb;color:#ce7e00;font-weight:750;font-size:16px
 }
-#content #grwx-inbox-host .grwx-sidebar{
-  display:flex!important;flex-direction:column!important;height:100%!important;min-height:0!important;
-  overflow:hidden!important;
+#grwx-inbox-host .grwx-user-copy{display:block!important;flex:1 1 0%!important;min-width:0!important;overflow:hidden!important;line-height:1.35!important}
+#grwx-inbox-host .grwx-user-copy b,
+#grwx-inbox-host .grwx-user-copy small{display:block!important;margin:0!important;max-width:100%;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+#grwx-inbox-host .grwx-user-copy b{font-size:12px;color:#1b4a72}
+#grwx-inbox-host .grwx-user-copy small{font-size:10px;color:#71859a}
+#grwx-inbox-host .grwx-user-copy .grwx-last-message{margin-top:3px!important;color:#8b9db0}
+#grwx-inbox-host .grwx-user time{flex:0 0 auto;max-width:65px;align-self:flex-start;font-size:9px;color:#859db5;white-space:nowrap}
+#grwx-inbox-host .grwx-conversation{
+ display:grid!important;grid-template-rows:64px auto minmax(0,1fr) auto!important;
+ min-width:0!important;min-height:0!important;height:100%!important;
+ max-height:100%!important;overflow:hidden!important;background:#f5f8fb
 }
-#content #grwx-inbox-host .grwx-users{height:0!important;min-height:0!important;max-height:none!important;flex:1 1 0%!important;overflow-y:auto!important;}
-#content #grwx-inbox-host .grwx-conversation{
-  display:flex!important;flex-direction:column!important;height:100%!important;
-  min-height:0!important;max-height:none!important;overflow:hidden!important;
+#grwx-inbox-host .grwx-chat-head{
+ display:flex;min-height:0!important;height:64px!important;overflow:hidden;
+ align-items:center;gap:10px;padding:8px 12px;background:#fff;border-bottom:1px solid #e3eaf2
 }
-#content #grwx-inbox-host .grwx-chat-head{flex:0 0 auto!important;height:68px!important;min-height:68px!important;overflow:hidden!important}
-#content #grwx-inbox-host .grwx-provider-note{flex:0 0 auto!important;min-height:28px!important;max-height:60px!important;overflow:auto!important}
-#content #grwx-inbox-host .grwx-messages{
-  display:flex!important;flex:1 1 0%!important;height:0!important;min-height:0!important;
-  max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;
-  flex-direction:column!important;align-items:stretch!important;
+#grwx-inbox-host .grwx-heading-person{display:grid;min-width:0;flex:1;gap:3px}
+#grwx-inbox-host .grwx-heading-person strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#grwx-inbox-host .grwx-heading-person small{font-size:10px;color:#71899e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#grwx-inbox-host .grwx-provider-note{min-height:25px;max-height:50px;overflow-y:auto;padding:7px 12px;background:#eef5fc;color:#6c85a0;font-size:10px;line-height:1.4}
+#grwx-inbox-host .grwx-error{color:#b34536}
+#grwx-inbox-host .grwx-messages{
+ min-height:0!important;height:auto!important;max-height:100%!important;
+ overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;
+ padding:12px 15px!important;display:flex!important;flex-direction:column!important;gap:9px!important
 }
-#content #grwx-inbox-host .grwx-chat-footer{
-  display:flex!important;flex:0 0 auto!important;flex-direction:column!important;
-  position:relative!important;bottom:auto!important;max-height:210px!important;
-  overflow-y:auto!important;background:#fff!important;z-index:3!important;
+#grwx-inbox-host .grwx-message{display:flex;flex:0 0 auto;min-width:0}
+#grwx-inbox-host .grwx-message.sent{justify-content:flex-end}
+#grwx-inbox-host .grwx-message.received{justify-content:flex-start}
+#grwx-inbox-host .grwx-message.unknown{justify-content:center}
+#grwx-inbox-host .grwx-bubble{
+ max-width:min(82%,530px);min-width:0;border:1px solid #e1e8ee;border-radius:12px 12px 12px 4px;
+ background:#fff;padding:9px 12px;color:#273b4c;font-size:12px;line-height:1.5;
+ overflow-wrap:anywhere;box-shadow:0 1px 3px #1234
 }
-#content #grwx-inbox-host .grwx-customer-profile{height:100%!important;max-height:none!important;overflow-y:auto!important}
-#content #grwx-inbox-host .grwx-accuracy{flex:0 0 auto!important;max-height:34px!important;overflow:hidden!important}
-#content #grwx-inbox-host .grwx-user{flex:0 0 68px!important;min-height:68px!important;max-height:68px!important;padding:7px 9px!important}
-#content #grwx-inbox-host .grwx-user-copy{flex:1!important;min-width:0!important;overflow:hidden!important}
-#content #grwx-inbox-host .grwx-user-copy b,#content #grwx-inbox-host .grwx-user-copy small{
-  overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;
+#grwx-inbox-host .grwx-message.sent .grwx-bubble{background:#e8f8ea;border-color:#ccebcf;border-radius:12px 12px 4px 12px}
+#grwx-inbox-host .grwx-bubble small{display:block;margin-top:6px;color:#8395a8;font-size:9px;text-align:right}
+#grwx-inbox-host .grwx-linebreak{display:block}
+#grwx-inbox-host .grwx-chat-footer{
+ display:grid!important;position:relative!important;grid-template-rows:auto auto auto!important;
+ min-height:118px!important;max-height:200px!important;height:auto!important;
+ overflow-y:auto!important;align-content:center;gap:7px;padding:9px 12px!important;
+ background:#fff!important;border-top:1px solid #dce5f0;z-index:2
 }
-#content #grwx-inbox-host .grwx-user .grwx-last-message{margin:1px 0 0!important}
-#content #grwx-inbox-host .grwx-person-date{display:none!important}
-@media(max-width:1050px){
-  #content #grwx-inbox-host .grwx-grid{
-    grid-template-columns:minmax(210px,34%) minmax(0,1fr)!important;
-  }
-  #content #grwx-inbox-host .grwx-customer-profile{display:none!important}
+#grwx-inbox-host .grwx-attachment-tools{display:flex!important;align-items:center;flex-wrap:wrap;gap:7px;min-width:0}
+#grwx-inbox-host .grwx-attachment-tools label{display:flex;align-items:center;gap:6px;min-width:0;font-size:10px;color:#526c83;cursor:pointer}
+#grwx-inbox-host .grwx-attachment-tools input{width:190px!important;max-width:100%!important;height:auto!important;min-height:26px!important;font-size:10px!important;padding:2px!important}
+#grwx-inbox-host #grwx-attachment-name{max-width:170px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#8293a6;font-size:10px}
+#grwx-inbox-host .grwx-compose-row{display:flex!important;align-items:center;gap:6px;min-width:0}
+#grwx-inbox-host #grwx-compose{display:block!important;flex:1 1 0%!important;width:100%!important;min-width:0!important;min-height:40px!important;height:44px!important;max-height:92px!important;resize:vertical;border:1px solid #cbdff0!important;border-radius:10px!important;background:#fff!important;font:inherit;font-size:12px!important;line-height:1.4;padding:10px!important;color:#18364e!important;visibility:visible!important;opacity:1!important}
+#grwx-inbox-host .grwx-send-unavailable{color:#8c6b43;font-size:9px;line-height:1.3}
+#grwx-inbox-host .grwx-pagination{display:flex;gap:7px;align-items:center;justify-content:flex-end}
+#grwx-inbox-host .grwx-pagination small{font-size:10px;color:#71859d}
+#grwx-inbox-host .grwx-customer-profile{min-height:0!important;height:100%!important;max-height:100%!important;overflow-y:auto!important;overflow-x:hidden;border-left:1px solid #e1e8ef;background:#fff;padding:0 14px 16px}
+#grwx-inbox-host .grwx-profile-head{text-align:center;padding:13px 0;border-bottom:1px solid #e9eff5}
+#grwx-inbox-host .grwx-profile-head>b{display:block;text-align:left;font-size:13px;color:#245c8a;margin-bottom:12px}
+#grwx-inbox-host .grwx-profile-avatar{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 8px;border-radius:12px;background:#ffe8c6;color:#c98100;font-size:27px;font-weight:750}
+#grwx-inbox-host .grwx-profile-head h4{font-size:14px!important;color:#27425d!important;margin:0!important}
+#grwx-inbox-host .grwx-profile-head span{font-size:10px;color:#879aab}
+#grwx-inbox-host .grwx-detail{display:grid;gap:2px;border-bottom:1px solid #eef2f5;padding:9px 0;overflow-wrap:anywhere}
+#grwx-inbox-host .grwx-detail b{font-size:10px;color:#657e9a}
+#grwx-inbox-host .grwx-detail span{font-size:11px;color:#31506e}
+#grwx-inbox-host .grwx-empty{margin:auto!important;padding:18px;text-align:center;color:#8fa0b1;font-size:11px}
+#grwx-inbox-host .grwx-profile-hint{font-size:10px;color:#8192a5;line-height:1.5}
+#grwx-inbox-host .grwx-accuracy{display:none!important}
+@media(max-width:1100px){
+ #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(210px,31%) minmax(0,1fr)!important}
+ #grwx-inbox-host .grwx-customer-profile{display:none!important}
 }
-@media(max-width:640px){
-  #content #grwx-inbox-host .grwx-shell{min-height:420px!important;height:calc(100dvh - 110px)!important}
-  #content #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(110px,35%) minmax(0,1fr)!important}
-  #content #grwx-inbox-host .grwx-top{height:55px!important;min-height:55px!important;max-height:55px!important;flex-basis:55px!important}
-  #content #grwx-inbox-host .grwx-user{flex-basis:55px!important;min-height:55px!important;max-height:55px!important}
-  #content #grwx-inbox-host .grwx-chat-head{min-height:52px!important;height:52px!important}
-  #content #grwx-inbox-host .grwx-chat-footer{max-height:220px!important}
+@media(max-width:650px){
+ #grwx-inbox-host .grwx-shell{height:calc(100dvh - 170px)!important}
+ #grwx-inbox-host .grwx-top{padding:7px 9px}
+ #grwx-inbox-host .grwx-grid{grid-template-columns:minmax(116px,36%) minmax(0,1fr)!important}
+ #grwx-inbox-host .grwx-side-controls{padding:7px;gap:5px}
+ #grwx-inbox-host .grwx-filter-row{grid-template-columns:1fr}
+ #grwx-inbox-host .grwx-user time,#grwx-inbox-host .grwx-user-copy .grwx-last-message{display:none!important}
+ #grwx-inbox-host .grwx-avatar{flex-basis:28px;width:28px;height:28px;font-size:12px}
+ #grwx-inbox-host .grwx-shell .grwx-user{padding:5px!important;gap:5px;height:58px!important;min-height:58px!important}
+ #grwx-inbox-host .grwx-chat-head{padding:6px;gap:5px}
+ #grwx-inbox-host .grwx-chat-footer{padding:7px!important}
+ #grwx-inbox-host .grwx-attachment-tools input{width:95px!important}
+ #grwx-inbox-host .grwx-compose-row{flex-wrap:wrap}
+ #grwx-inbox-host #grwx-compose{flex-basis:100%!important}
 }
