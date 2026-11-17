@@ -12,7 +12,7 @@ for(const phrase of ['#grwx-inbox-host .grwx-grid','overflow-y:auto','min-height
 for(const phrase of ['id="grwx-compose"','id="grwx-attachment"','data-grwx-action="send-draft"',
  'data-grwx-action="send-template"','data-grwx-action="template-draft"','drafts.set(selected',
  'grwx-template-picker','grwx-media-preview','file.size>8*1024*1024',
- 'Text sends without attachments','24 hours']) assert.ok(inbox.includes(phrase),phrase);
+ 'Selected attachment will be sent','24 hours']) assert.ok(inbox.includes(phrase),phrase);
 assert.ok(!inbox.includes('data-grwx-action="copy-draft"'),'Copy button must be removed from inbox');
 assert.ok(provider.includes('template_name:')&&provider.includes('attachment_type:'),'Show provider media/template metadata');
 assert.ok(html.includes('greenrich-whatsapp-inbox.css?v=20261117-inbox-media-unread-v9'));
