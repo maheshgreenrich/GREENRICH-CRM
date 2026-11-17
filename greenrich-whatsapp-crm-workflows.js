@@ -115,8 +115,8 @@
   const [connections,templatesList,campaigns,recurring,inbound,welcomes,leads,customers,tags,profiles,sheets,providerLeads,dispatches,consents,products,messages,guidance,batches,inboundEvents]=await Promise.all([
    read('gr_wa_connections'),read('gr_wa_templates'),read('gr_wa_campaigns'),read('gr_wa_recurring_rules'),
    read('gr_wa_inbound_rules'),read('gr_wa_lead_welcome'),
-   app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at'):Promise.resolve([]),
-   app.canCustomers?db.from('gr_crm_customers').select('id,name,mobile,mobile2,email,source,type,owner,tag_ids,created_at').limit(2000).then(r=>{if(r.error)throw r.error;return r.data||[]}):Promise.resolve([]),
+   app.canLeads?read('gr_lead_pipeline','company_id,lead_id,contact,title,mobile,email,source,tag_ids,assigned_to,stage,customer_id,product_id,created_at,notes,next_followup'):Promise.resolve([]),
+   app.canCustomers?db.from('gr_crm_customers').select('id,name,mobile,mobile2,email,source,type,owner,tag_ids,created_at,notes').limit(2000).then(r=>{if(r.error)throw r.error;return r.data||[]}):Promise.resolve([]),
    db.from('gr_crm_tags').select('id,name').limit(500).then(r=>r.data||[]),
    app.admin?db.from('gr_profiles').select('id,full_name,company_ids,active').eq('active',true).limit(300).then(r=>r.data||[]):Promise.resolve([]),
    app.admin?read('gr_sheet_connections'):Promise.resolve([]),
@@ -147,12 +147,12 @@
  const customerTarget=c=>({id:'C:'+c.id,type:'Customer',name:c.name||'Unnamed customer',
   mobile:/^[6-9][0-9]{9}$/.test(digits(c.mobile))?c.mobile:(/^[6-9][0-9]{9}$/.test(digits(c.mobile2))?c.mobile2:(c.mobile||c.mobile2||'')),email:c.email||'',source:c.source||'',tags:c.tag_ids||[],
   company_id:customerCompany(c),owner:c.owner||'',customer_id:c.id,lead_id:null,
-  stage:'',product_id:'',created_at:c.created_at||'',products:ordersFor(c).map(o=>o.product_name),
+  stage:'',product_id:'',created_at:c.created_at||'',notes:c.notes||'',next_followup:'',products:ordersFor(c).map(o=>o.product_name),
   orders:ordersFor(c)});
  const leadTarget=l=>({id:'L:'+l.company_id+':'+l.lead_id,type:'Lead',name:l.contact||l.title||'Lead',
   mobile:l.mobile||'',email:l.email||'',source:l.source||'',tags:l.tag_ids||[],
   company_id:l.company_id,owner:l.assigned_to||'',customer_id:l.customer_id,lead_id:l.lead_id,
-  stage:l.stage||'',product_id:l.product_id||'',created_at:l.created_at||'',
+  stage:l.stage||'',product_id:l.product_id||'',created_at:l.created_at||'',notes:l.notes||'',next_followup:l.next_followup||'',
   products:rows.products.filter(p=>p.crm_product_id===l.product_id||p.id===l.product_id).map(p=>p.name),
   orders:[]});
  const targets=()=>[...rows.leads.map(leadTarget),...rows.customers.map(customerTarget)];
