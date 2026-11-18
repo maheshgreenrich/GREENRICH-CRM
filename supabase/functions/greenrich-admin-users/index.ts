@@ -91,11 +91,13 @@ Deno.serve(async req=>{
    const authUpdates:Record<string,string>={};
    if(email!==null&&email!==target.email)authUpdates.email=email;
    if(password)authUpdates.password=password;
-   if(Object.keys(authUpdates).length){
-    const changedAuth=await admin.auth.admin.updateUserById(id,{...authUpdates,email_confirm:true});
-    if(changedAuth.error)return response({error:'Login update failed: '+changedAuth.error.message},400);
-   }
+   // Update the login email only when it actually changes. Never pass
+   // email_confirm on a password-only update.
    if(email!==null)fields.email=email;
+   if(Object.keys(authUpdates).length){
+    const changedAuth=await admin.auth.admin.updateUserById(id,authUpdates.email?{...authUpdates,email_confirm:true}:authUpdates);
+    if(changedAuth.error)return response({error:'Login credentials were not changed: '+changedAuth.error.message+'. Employee profile was not modified.',code:changedAuth.error.code||null},400);
+   }
    if(Object.keys(fields).length){const updated=await admin.from('gr_profiles').update(fields).eq('id',id);if(updated.error)return response({error:'Employee profile update failed: '+updated.error.message},400);}
    await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'UPDATE',new_value:{...fields,password_changed:!!password}});
    return response({message:'Employee details updated'+(password?' and password changed':'')+'. No email sent.'});
