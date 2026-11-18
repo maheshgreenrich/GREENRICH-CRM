@@ -21,7 +21,8 @@
  }
  async function attendanceBody(db,mode='in'){
   const permitted=await enabledCompanies(db);
-  // Only Admin-enabled field staff require GPS. Other employees use time-only attendance.\n  if(!permitted.length)return {};
+  // Only Admin-enabled field staff require GPS. Other employees use time-only attendance.
+  if(!permitted.length)return {};
   const u=(await db.auth.getUser()).data.user;
   const choice=window.GreenRichCompanies?.selected?.(u?.id);
   const companyId=permitted.includes(choice)?choice:permitted[0]||null;
