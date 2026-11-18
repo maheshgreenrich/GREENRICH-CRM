@@ -42,8 +42,8 @@ function greenrichInstallTrigger(){
  greenrichTestConnection();
  ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='greenrichSyncNow')
    .forEach(t=>ScriptApp.deleteTrigger(t));
- ScriptApp.newTrigger('greenrichSyncNow').timeBased().everyMinutes(5).create();
- Logger.log('One central 5-minute sync trigger installed. No Web App deployment required.');
+ ScriptApp.newTrigger('greenrichSyncNow').timeBased().everyMinutes(1).create();
+ Logger.log('One central 1-minute sync trigger installed. No Web App deployment required.');
 }
 function greenrichSyncSource_(s){
  const c=greenrichProps_();
@@ -92,6 +92,7 @@ function greenrichSyncNow(){
  try{
   const list=greenrichManifest_();
   let passed=0,errors=0;
+  list.sort((a,b)=>Number(Boolean(b.manual_sync_requested_at))-Number(Boolean(a.manual_sync_requested_at)));
   for(const src of list){
    try{greenrichSyncSource_(src);passed++}
    catch(err){
