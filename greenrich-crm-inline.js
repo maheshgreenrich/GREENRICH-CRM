@@ -1065,6 +1065,7 @@ window.GreenRichCRM={
     products:()=>scopeRows('products').map(p=>({...p,company_id:p.company_id||p._companyId})),companyIds:permittedCompanies,selectedCompany:()=>companyScope,companyLabel,notify:toast,
     openProfile:id=>openCustomerProfile(id),
     afterCustomerSave:()=>{attachSharedCustomers(data);render()},
+    admin:isAdmin===true,
     permission:(kind,action)=>Boolean(isAdmin||contactCapabilities[kind]?.[action])
   });
   if(!window.GreenRichSalesOps||!window.GreenRichActionMenu)throw Error('CRM actions module missing. Refresh GreenRich ONE.');
