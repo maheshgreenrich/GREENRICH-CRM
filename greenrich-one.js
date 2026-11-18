@@ -305,7 +305,7 @@ async function users(c){
   '<div class="panel"><div class="row"><h2>Manage Users</h2><span class="pill">'+people.length+' profiles</span></div><div class="tablewrap"><table><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Company Access</th><th>Status</th><th>Admin Actions</th></tr></thead><tbody>'+
   people.map(p=>'<tr><td>'+esc(p.full_name)+'</td><td>'+esc(p.username)+'</td><td>'+esc(p.email)+'</td><td>'+esc(roles.find(x=>x.id===p.role_id)?.name)+'</td><td>'+fields(Array.isArray(p.company_ids)?p.company_ids:active.map(c=>c.id),'companyAccess')+
   '<button class="secondary gr-save-companies" type="button" data-emp-companies="'+esc(p.id)+'" '+(p.id===user.id?'disabled title="Your own assignment cannot be changed"':'')+'>Save Access</button></td><td>'+esc(p.active?'Active':'Disabled')+'</td>'+
-  '<td class="gr-user-actions"><button class="secondary" data-emp-edit="'+esc(p.id)+'">Edit / Role</button><button class="secondary" data-emp-reset="'+esc(p.id)+'">Reset Password</button><button class="secondary" data-emp-toggle="'+esc(p.id)+'" '+(p.id===user.id?'disabled':'')+'>'+(p.active?'Deactivate':'Reactivate')+'</button><button class="gr-delete-user" data-emp-delete="'+esc(p.id)+'" '+(p.id===user.id?'disabled title="You cannot delete your own account"':'')+'>Delete User</button></td></tr>').join('')+
+  '<td class="gr-user-actions"><button class="secondary" data-emp-edit="'+esc(p.id)+'">Edit / Role</button><button class="secondary" data-emp-reset="'+esc(p.id)+'">Set Password</button><button class="secondary" data-emp-toggle="'+esc(p.id)+'" '+(p.id===user.id?'disabled':'')+'>'+(p.active?'Deactivate':'Reactivate')+'</button><button class="gr-delete-user" data-emp-delete="'+esc(p.id)+'" '+(p.id===user.id?'disabled title="You cannot delete your own account"':'')+'>Archive User</button></td></tr>').join('')+
   '</tbody></table></div></div>';
  const roleButton=c.querySelector('#openRoleSettings');if(roleButton)roleButton.onclick=()=>c.closest('#gr-company-admin')?.querySelector('[data-settings-tab="roles"]')?.click();
  const refresh=async()=>{people=await query('gr_profiles');permissions=await query('gr_role_permissions');await users(c)};
@@ -337,8 +337,14 @@ async function users(c){
  });
  c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;
-  if(!confirm('Send a password reset email to '+p.email+'?'))return;
-  try{const out=await employeeAction({action:'reset',userId:p.id});toast(out.message)}catch(e){toast(e.message)}
+  const password=prompt('Admin: enter a NEW password (minimum 12 characters) for '+p.username+'. No email will be sent.');
+  if(password===null)return;
+  if(password.length<12)return toast('Password must contain at least 12 characters');
+  const again=prompt('Confirm the new password for '+p.username);
+  if(again!==password)return toast('Passwords do not match');
+  if(!confirm('Change the login password for '+p.username+' now?'))return;
+  button.disabled=true;
+  try{const out=await employeeAction({action:'reset',userId:p.id,password});toast(out.message)}catch(e){toast(e.message)}finally{button.disabled=false}
  });
  c.querySelectorAll('[data-emp-toggle]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empToggle);if(!p||p.id===user.id)return;
@@ -348,9 +354,9 @@ async function users(c){
  });
  c.querySelectorAll('[data-emp-delete]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empDelete);if(!p||p.id===user.id)return;
-  const answer=prompt('Permanently delete '+p.full_name+'? This is irreversible. Employee records with attendance or audit history are protected. Type the exact username to confirm:',p.username);
+  const answer=prompt('Archive '+p.full_name+'? Login will be disabled and active assignments moved to Admin. Historical attendance, sales and audit records remain preserved. Type the exact username to confirm:',p.username);
   if(answer!==p.username)return toast('Deletion cancelled: username confirmation did not match');
-  if(!confirm('Final confirmation: permanently delete '+p.username+'?'))return;
+  if(!confirm('Archive '+p.username+' and transfer active assignments to your Admin account?'))return;
   button.disabled=true;
   try{const out=await employeeAction({action:'delete',userId:p.id});toast(out.message||'Employee deleted');await refresh()}
   catch(e){toast('Delete blocked: '+e.message)}finally{button.disabled=false}
