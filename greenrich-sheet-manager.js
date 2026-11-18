@@ -162,6 +162,19 @@ window.GreenRichSheetManager=(function(){
  }
  async function act(st,a,id){
   if(a==='refresh'){await st.refresh();return}
+  if(a==='sync'){
+   const s=st.data.sources.find(x=>x.id===id);if(!s)return;
+   if(!s.enabled){alert('Resume this sheet before syncing.');return;}
+   const button=st.root.querySelector('[data-act="sync"][data-id="'+id+'"]');
+   if(button){button.disabled=true;button.textContent='Requesting…';}
+   try{
+    const r=await st.ctx.db.rpc('gr_sheet_admin_request_sync',{p_connection:id});
+    if(r.error)throw r.error;
+    alert('Sync requested for '+s.tab_name+'. The Google Apps Script worker will process it on its next scheduled run (up to about one minute).');
+    await st.refresh();
+   }catch(e){alert('Sync request failed: '+e.message);if(button){button.disabled=false;button.textContent='Sync Now';}}
+   return;
+  }
   if(a.startsWith('tab-')){st.tab=a.slice(4);draw(st);return}
   if(a==='add'){edit(st);return}
   if(a==='edit'){edit(st,st.data.sources.find(x=>x.id===id));return}
