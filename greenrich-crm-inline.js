@@ -1013,7 +1013,7 @@ async function removeRecord(k,id){
  }
  if(k==='products'&&loadCompanyData(owner).sales.some(s=>s.product_id===id))return toast('Product is used in sales. Mark it inactive instead.');
  if(k==='channels'&&loadCompanyData(owner).sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
- if(!confirm('Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
+ if(!confirm(k==='sales'?'Permanently delete cancelled sales order '+(item.internal_order_id||item.order_id||'')+'? This cannot be undone. Its number will become available for a future order.':'Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
  const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
  if(k==='sales'&&!isVoidedSale(item))return toast('Cancel this sales order first. Delete becomes available after cancellation.','error');
   if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
@@ -1097,7 +1097,7 @@ window.GreenRichCRM={
   if(!client||!window.GreenRichSharedCustomers)throw Error('Shared customer service is unavailable. Refresh the page.');
   try{await window.GreenRichFormBuilder?.ready?.(client,permittedCompanies)}
   catch(error){toast('Form Builder settings unavailable: '+error.message,'warning')}
-  activeCompany=workingId;activeCompanyName=companyName;adminMode=adminTools===true;allowDashboardExport=exportAllowed===true||isAdmin===true;allowInvoiceIssue=issueAllowed===true||isAdmin===true;
+  activeCompany=workingId;activeCompanyName=companyName;adminMode=adminTools===true||isAdmin===true;allowDashboardExport=exportAllowed===true||isAdmin===true;allowInvoiceIssue=issueAllowed===true||isAdmin===true;
   if(!container||!document.getElementById('grCrmTemplate'))throw Error('CRM workspace template is missing');
   charts.forEach(chart=>{try{chart.destroy()}catch(_){}});charts=[];
   allowedTabs=(Array.isArray(allowed)?allowed:Object.keys(titles)).filter(x=>Object.hasOwn(titles,x)&&(adminMode||!['channels','reports'].includes(x)));
