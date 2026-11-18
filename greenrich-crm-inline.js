@@ -616,6 +616,35 @@ function openEditor(k,id=''){
  $('#price-summary').hidden=k!=='sales';
  if(k==='sales'){
   const fields=$('#editor-fields');
+  // Native Sales Person control: stores the selected active Sales-role user ID
+  // on the sales order, and participates in Settings > Sales Order Form Editor.
+  const salesPersonLabel=el('label',{class:'gr-sales-person-field'});
+  salesPersonLabel.append(document.createTextNode('Sales Person'));
+  const salesPersonSelect=el('select',{id:'f-salesperson_id',name:'salesperson_id'});
+  salesPersonSelect.append(new Option('Select sales person',''));
+  salesPersonLabel.append(salesPersonSelect);
+  fields.insertBefore(salesPersonLabel,$('#f-channel_id')?.closest('label')?.nextSibling||null);
+  const salespersonOriginal=existing?.salesperson_id||'';
+  void (async()=>{
+   try{
+    const client=pipelineConfig.client;
+    const roles=await client.from('gr_roles').select('id,name').eq('name','Sales');
+    if(roles.error)throw roles.error;
+    const salesRoleIds=(roles.data||[]).map(role=>role.id);
+    if(!salesRoleIds.length)return;
+    const staff=await client.from('gr_profiles').select('id,full_name,username,email,company_ids,active').in('role_id',salesRoleIds).eq('active',true);
+    if(staff.error)throw staff.error;
+    if(!salesPersonSelect.isConnected)return;
+    const currentCompany=$('#f-company_id')?.value||activeCompany;
+    const available=(staff.data||[]).filter(p=>!Array.isArray(p.company_ids)||!p.company_ids.length||p.company_ids.includes(currentCompany));
+    available.sort((a,b)=>String(a.full_name||a.username||'').localeCompare(String(b.full_name||b.username||'')));
+    salesPersonSelect.replaceChildren(new Option('Select sales person',''));
+    for(const person of available)salesPersonSelect.append(new Option(person.full_name||person.username||person.email||person.id,person.id));
+    if(salespersonOriginal&&!available.some(p=>p.id===salespersonOriginal))
+      salesPersonSelect.append(new Option('Previously assigned sales person',salespersonOriginal));
+    salesPersonSelect.value=salespersonOriginal;
+   }catch(error){console.warn('Sales Person directory unavailable:',error);toast('Sales Person list could not load: '+error.message,'warning')}
+  })();
   const customerField=$('#f-customer_id').closest('label');
   customerField.classList.add('wide','gr-existing-customer-select');
   customerField.style.display='none';
