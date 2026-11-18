@@ -1,0 +1,19 @@
+{
+  "name": "GreenRich ONE ERP",
+  "short_name": "GreenRich ONE",
+  "description": "GreenRich ONE CRM and ERP workspace",
+  "id": "./secure.html",
+  "start_url": "./secure.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#102b50",
+  "icons": [
+    {
+      "src": "./greenrich-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
