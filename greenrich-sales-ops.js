@@ -82,7 +82,7 @@
  }
  const orderId=s=>s.internal_order_id||s.order_id||'Legacy order';
  const report=rows=>{
-  const orderIds=new Set(rows.map(orderKey)),approved=rows.filter(s=>!!dispatchFor(s)||s.approval_status==='Approved');
+  const orderIds=new Set(rows.map(orderKey)),approved=rows.filter(s=>!['Cancelled','Returned'].includes(s.status)&&(!!dispatchFor(s)||s.approval_status==='Approved'));
   const pending=rows.filter(s=>!dispatchFor(s)&&s.approval_status!=='Approved'&&!['Cancelled','Returned'].includes(s.status));
   const cancelled=rows.filter(s=>['Cancelled','Returned'].includes(s.status));
   const todaySales=rows.filter(s=>s.date===date());
@@ -121,7 +121,7 @@
    case 'product':return '<strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small>';
    case 'channel':return '<span class="pill">'+esc(channelName(s))+'</span>';
    case 'qty':return num(s.qty);
-   case 'status':return stockBlocked(s)?
+   case 'status':return ['Cancelled','Returned'].includes(s.status)?'<span class="gr-order-approval-tag" data-state="'+esc(s.status)+'">'+esc(s.status)+'</span>':stockBlocked(s)?
     '<span role="alert" style="display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:20px;padding:6px 12px;font-weight:800">⚠ Low Stock Alert</span>'+
     '<small style="display:block;color:#b91c1c;font-weight:700;margin-top:5px">Required: '+num(s.qty)+' · Allocated: '+num(Math.max(0,Number(s.stock_allocated_qty)||0))+' · Balance needed: '+num(stockShortage(s))+' units</small>':
     '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+
