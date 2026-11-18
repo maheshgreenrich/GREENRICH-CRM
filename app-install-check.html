@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GreenRich ONE · App Install Check</title><style>body{font:15px system-ui;max-width:720px;margin:30px auto;padding:16px;color:#123}h1{font-size:22px}.item{padding:12px;border-bottom:1px solid #ddd;overflow-wrap:anywhere}.ok{color:#16794e}.bad{color:#c02b2b}button{padding:12px;border:0;background:#123f71;color:white;border-radius:8px}</style><link rel="manifest" href="./manifest.webmanifest"></head><body><h1>GreenRich ONE · Android Install Check</h1><p>This page checks files and browser support without reading customer data or location.</p><div id="results">Checking…</div><button id="copy">Copy diagnostic report</button><script>
+(async()=>{
+const rows=[],add=(name,ok,detail)=>rows.push({name,ok,detail});
+add('HTTPS',isSecureContext,location.origin);
+add('Standalone mode',matchMedia('(display-mode: standalone)').matches,'');
+add('Service worker supported','serviceWorker' in navigator,navigator.userAgent);
+if('serviceWorker' in navigator){try{const reg=await navigator.serviceWorker.register('./greenrich-app-sw.js?v=20261119-v3',{scope:'./'});await navigator.serviceWorker.ready;add('Service worker active',!!reg.active,reg.active?.scriptURL||'No active worker')}catch(e){add('Service worker active',false,e.message)}}
+for(const [name,path,kind] of [['Manifest','manifest.webmanifest','json'],['192 PNG icon','greenrich-app-192.png','image'],['512 PNG icon','greenrich-app-512.png','image']]){
+try{const res=await fetch('./'+path+'?pwa_check=20261119',{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);if(kind==='json'){const j=await res.json();add(name,!!j.name&&!!j.start_url&&j.icons?.length>0,'App: '+j.name+', icons: '+j.icons?.length)}else{const blob=await res.blob();const bmp=await createImageBitmap(blob);const expected=name.startsWith('192')?192:512;add(name,bmp.width===expected&&bmp.height===expected,bmp.width+'x'+bmp.height+', '+blob.type+', '+blob.size+' bytes');bmp.close()}}catch(e){add(name,false,e.message)}}
+const div=document.getElementById('results');div.textContent='';for(const row of rows){const el=document.createElement('div');el.className='item '+(row.ok?'ok':'bad');el.textContent=(row.ok?'PASS':'FAIL')+' · '+row.name+' · '+row.detail;div.append(el)}
+document.getElementById('copy').onclick=()=>{const report=rows.map(r=>(r.ok?'PASS':'FAIL')+' '+r.name+': '+r.detail).join('\n');navigator.clipboard?.writeText(report).then(()=>alert('Report copied')).catch(()=>prompt('Copy report',report))};
+})();
+</script></body></html>
