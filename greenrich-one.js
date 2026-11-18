@@ -1,5 +1,5 @@
 'use strict';
-(()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles','#field-location-access','#settings-field-access'].includes(location.hash)?'settings':location.hash==='#live-staff-gps'?'service':'dashboard'),company=null;
+(()=>{const $=s=>document.querySelector(s);let db=null,user=null,profile=null,roles=[],permissions=[],people=[],page=(['#users','#roles','#settings-users','#settings-roles','#field-location-access','#settings-field-access'].includes(location.hash)?'settings':location.hash==='#live-staff-gps'?'service':(['dashboard','crm','attendance','leads','customers','tasks','orders','quotations','dispatch','stock','marketing','operations','service','purchase','accounts','settings'].includes(location.hash.slice(1))?location.hash.slice(1):'dashboard')),company=null;
 let settingsInitialTab=({'#users':'users','#roles':'roles','#settings-users':'users','#settings-roles':'roles','#field-location-access':'fieldaccess','#settings-field-access':'fieldaccess'})[location.hash]||'fieldaccess';
 const modules=['dashboard','crm','attendance','users','roles','leads','customers','tasks','orders','quotations','dispatch','stock','marketing','operations','service','purchase','accounts','settings'];
 const labels={dashboard:'Dashboard',crm:'Sales & CRM Overview',tasks:'Follow-ups',channels:'Sales Channels',attendance:'Attendance',users:'Users',roles:'Create & Manage Roles',leads:'Leads & CRM',customers:'Customers',sales:'Sales',marketing:'Marketing',orders:'Sales Orders',quotations:'Quotations & PDF',dispatch:'Dispatch',stock:'Inventory',operations:'Operations & Production',service:'Service and Installation',purchase:'Purchase Orders',accounts:'Accounts',settings:'Settings',reports:'Reports'};
@@ -100,7 +100,7 @@ function configureCompanySelector(){
 function navigation(){
  const visible=modules.filter(canOpenPage);
  $('#nav').innerHTML=visible.map(m=>'<button type="button" data-page="'+m+'" aria-label="'+esc(labels[m])+'" title="'+esc(labels[m])+'" aria-current="'+(page===m?'page':'false')+'" class="'+(page===m?'active':'')+'"><svg class="gr-menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(menuIcons[m]||menuIcons.dashboard)+'</svg><span>'+labels[m]+'</span></button>').join('');
- $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){window.GreenRichSidebar?.collapseMobile();return}page=b.dataset.page;window.GreenRichSidebar?.collapseMobile();navigation();void render()});
+ $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{if(page===b.dataset.page){window.GreenRichSidebar?.collapseMobile();return}page=b.dataset.page;history.replaceState(null,'','#'+page);window.GreenRichSidebar?.collapseMobile();navigation();void render()});
 }
 async function attendanceQuick(){
  const area=$('#attendanceQuick');
@@ -196,7 +196,7 @@ async function removeAttendance(id,date){
 }
 function card(t,v,sub=''){return '<div class="card"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(sub)+'</small></div>'}
 async function render(){
- if(!canOpenPage(page)){page='dashboard';navigation()}
+ if(!canOpenPage(page)){page='dashboard';history.replaceState(null,'','#dashboard');navigation()}
  // The persistent #content element does not tell background dashboard
  // refreshes whether Dashboard is still open. Stop them on page changes.
  if(page!=='dashboard')window.GreenRichDashboardV2?.stop?.();
@@ -362,15 +362,15 @@ async function users(c){
   if(!confirm((p.active?'Deactivate':'Reactivate')+' '+p.username+'?'))return;
   try{const out=await employeeAction({action,userId:p.id});toast(out.message);await refresh()}catch(e){toast(e.message)}
  });
- c.querySelectorAll('[data-emp-delete]').forEach(button=>button.onclick=async()=>{
+ c.querySelectorAll('[data-emp-delete]').forEach(button=>button.onclick=()=>{
   const p=people.find(x=>x.id===button.dataset.empDelete);if(!p||p.id===user.id)return;
-  const answer=prompt('Archive '+p.full_name+'? Login will be disabled and active assignments moved to Admin. Historical attendance, sales and audit records remain preserved. Type the exact username to confirm:',p.username);
-  if(answer!==p.username)return toast('Deletion cancelled: username confirmation did not match');
-  if(!confirm('Archive '+p.username+' and transfer active assignments to your Admin account?'))return;
-  button.disabled=true;
-  try{const out=await employeeAction({action:'delete',userId:p.id});toast(out.message||'Employee deleted');await refresh()}
-  catch(e){toast('Delete blocked: '+e.message)}finally{button.disabled=false}
+  const overlay=document.createElement('div');overlay.className='gr-employee-modal-backdrop';
+  overlay.innerHTML='<section class="gr-employee-modal" role="dialog" aria-modal="true"><div class="gr-employee-modal-head"><h2>Archive Employee</h2><button class="secondary" type="button" data-close>✕</button></div><p>Disable this employee login and transfer active assignments to your Admin account. Attendance, sales and audit history will remain preserved. This is not permanent deletion.</p><form class="gr-employee-edit-form" style="grid-template-columns:1fr"><label>Type the username to confirm: <strong>'+esc(p.username)+'</strong><input name="confirmation" required autocomplete="off"></label><div class="gr-employee-modal-actions"><button class="secondary" type="button" data-close>Cancel</button><button class="gr-delete-user" type="submit">Archive Employee</button></div></form></section>';
+  document.body.append(overlay);const close=()=>overlay.remove();overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);
+  overlay.onclick=e=>{if(e.target===overlay)close()};
+  overlay.querySelector('form').onsubmit=async e=>{e.preventDefault();if(new FormData(e.currentTarget).get('confirmation')!==p.username)return toast('Username does not match');const submit=e.currentTarget.querySelector('[type="submit"]');submit.disabled=true;try{const out=await employeeAction({action:'delete',userId:p.id});toast(out.message||'Employee archived');close();await refresh()}catch(err){toast(err.message)}finally{submit.disabled=false}};
  });
+
 }
 async function permissionPage(c){
  if(roleName()!=='Admin')throw Error('Admin only');
