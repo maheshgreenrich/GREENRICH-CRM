@@ -1,13 +1,7 @@
 'use strict';
 window.GreenRichSheetManager=(function(){
- const F=[['name','Name'],['phone','Mobile'],['email','Email'],['city','City'],['requirement','Product requirement'],
- ['product_interest','Product interest'],['household_size','Household size'],['composting_status','Composting experience'],
- ['buying_timeline','Buying timeline'],['remarks','Remarks'],['external_id','Platform lead ID'],['campaign','Campaign'],
- ['form_name','Form name'],['created_time','Lead submitted at']];
- const preset={
-  simple:{name:'A',phone:'B',email:'C',product_interest:'D'},
-  home:{name:'G',phone:'H',email:'F',city:'I',requirement:'B',household_size:'C',composting_status:'D',buying_timeline:'E',remarks:'J'}
- };
+ const F=[['name','Name'],['company_name','Company name'],['address','Address'],['city','City'],['pincode','Pincode'],['phone','Mobile number'],['email','Email'],['enquiry','Enquiry'],['product_interest','Interested product'],['information_1','Information 1'],['information_2','Information 2'],['information_3','Information 3'],['information_4','Information 4']];
+ const preset={simple:{name:'A',phone:'B',email:'C',product_interest:'D'}};
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const day=x=>x?new Date(x).toLocaleString('en-IN'):'Never';
  const coName=c=>c==='grow-india'?'GreenRich Grow India':'GreenRich Enviro Solutions';
@@ -132,9 +126,9 @@ window.GreenRichSheetManager=(function(){
    select('Initial import behavior','mode',[['new_only','New rows only'],['historical','Import existing history']],s?.import_mode||'new_only')+
    select('Status','enabled',[['true','Active'],['false','Paused']],String(s?.enabled??true))+'</div>'+
    '<div class="panel"><h3>Map Sheet columns to CRM</h3>'+
-   select('Use a template','template',[['custom','Custom'],['simple','Simple A–D'],['home','Home Composter actual report B–J']],'custom')+
+   select('Use a template','template',[['custom','Custom'],['simple','Simple A–D']],'custom')+
    '<div class="mapping">'+F.map(([key,label])=>input(label+' — Sheet column', 'map_'+key,m[key]||'')).join('')+'</div>'+
-   '<p class="muted">Required: Name and Mobile. Examples: G, H. Leave optional fields empty. Existing data is not removed when mapping changes.</p></div>';
+   '<p class="muted">Required: Name and Mobile. Examples: G, H. Leave optional fields empty. Information 1–4 can map additional sheet columns. Existing data is not removed when mapping changes.</p></div>';
   const d=modal(st,s?'Edit Sheet Integration':'Add Google Sheet',html,async f=>{
    const map={};F.forEach(([key])=>{const v=String(f.get('map_'+key)||'').trim().toUpperCase();if(v)map[key]=v});
    if(!map.name||!map.phone)throw Error('Please map Name and Mobile');
