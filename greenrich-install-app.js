@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
  if(!('serviceWorker' in navigator)||!window.isSecureContext)return;
- navigator.serviceWorker.register('./greenrich-app-sw.js',{scope:'./'}).catch(err=>console.info('App installation service unavailable:',err.message));
+ navigator.serviceWorker.register('./greenrich-app-sw.js?v=20261119-v3',{scope:'./'}).catch(err=>console.info('App installation service unavailable:',err.message));
  let installEvent=null;
  const isInstalled=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
  const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent);
