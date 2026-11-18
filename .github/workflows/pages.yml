@@ -213,7 +213,7 @@ jobs:
             curl -fsSL --max-time 15 "$base/secure.html?commit=${GITHUB_SHA}" -o /tmp/gr-customer-secure.html || true
             curl -fsSL --max-time 15 "$base/greenrich-shared-customers.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-shared.js || true
             curl -fsSL --max-time 15 "$base/greenrich-contacts.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-contacts.js || true
-            if grep -q "20261118-sale-cancel-v3" /tmp/gr-customer-secure.html &&
+            if grep -q "20261118-sale-cancel-v4" /tmp/gr-customer-secure.html &&
                grep -q "gr_contact_delete_customer" /tmp/gr-customer-shared.js &&
                grep -q "gr_contact_delete_lead" /tmp/gr-customer-contacts.js; then
               echo "Verified: published CRM uses safe customer and lead deletion RPCs"
