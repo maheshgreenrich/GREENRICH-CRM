@@ -470,7 +470,7 @@ async function exportOverviewPdf(){
  toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
 }
 
-const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(k==='sales'?'<button class="action-button" data-cancel-sale="'+id+'">Cancel Order</button>':'')+(adminMode?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
+const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(k==='sales'?'<button class="action-button" data-cancel-sale="'+id+'">Cancel Order</button>':'')+(adminMode&&(k!=='sales'||find('sales',id)?.status==='Cancelled')?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
  const act=(k,id)=>window.GreenRichActionMenu.wrap(actButtons(k,id));
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
@@ -985,7 +985,7 @@ async function openSaleInvoice(id,ownerOverride=''){
 
 async function cancelSaleOrder(id){
  const item=find('sales',id);if(!item)return toast('Sales order not found','error');
- if(item.status==='Cancelled')return toast('This sales order is already cancelled');
+ if(item.status==='Cancelled')return toast('This sales order is already cancelled. Use Delete in Actions to remove it.');
  if(item.invoice_status==='Issued')return toast('Issued invoice cannot be cancelled here. Contact Accounts for a credit note.','error');
  const owner=ownerOf('sales',id);
  if(!confirm('Cancel sales order '+item.internal_order_id+'? Its order number will remain reserved and cannot be reused.'))return;
@@ -994,6 +994,10 @@ async function cancelSaleOrder(id){
  if(!order)return toast('Order no longer exists','error');
  try{adjustStockForSale(copy,order,{...order,status:'Cancelled'})}catch(error){return toast(error.message,'error')}
  order.status='Cancelled';
+ order.approval_status='Cancelled';
+ order.stock_allocated_qty=0;
+ order.stock_shortage=0;
+ order.stock_status='Cancelled';
  order.cancelled_at=new Date().toISOString();
  if(saveCompanyData(owner,copy)){render();toast('Sales order cancelled. Order ID '+order.internal_order_id+' remains reserved.','success')}
 }
@@ -1010,9 +1014,10 @@ async function removeRecord(k,id){
  if(k==='channels'&&loadCompanyData(owner).sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
  if(!confirm('Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
  const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
- if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
+ if(k==='sales'&&item.status!=='Cancelled')return toast('Cancel this sales order first. Delete becomes available after cancellation.','error');
+  if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
   if(k==='sales'&&window.GreenRichSalesOps?.isApproved?.(owner,id))return toast('Approved orders cannot be deleted after dispatch handoff.');
-  if(k==='sales'){try{adjustStockForSale(copy,item,null)}catch(error){return toast(error.message,'error')}}
+  if(k==='sales'&&consumesStock(item)){try{adjustStockForSale(copy,item,null)}catch(error){return toast(error.message,'error')}}
  copy[k]=copy[k].filter(r=>r.id!==id);
  if(saveCompanyData(owner,copy)){render();toast('Record deleted')}
 }
