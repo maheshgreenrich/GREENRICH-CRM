@@ -50,8 +50,8 @@
    customers:records.customers.filter(c=>customerIds.has(c.id)),from,to,restricted};
  }
  function draw(){
-  if(!isActive())return;const f=filtered(),sales=f.sales.filter(r=>!['Cancelled','Returned'].includes(r.status)),leads=f.leads,dispatch=f.dispatch;
-  const salesCount=new Set(f.sales.map(r=>r.company_id+'|'+(r.internal_order_id||r.id))).size;
+  if(!isActive())return;const f=filtered(),sales=f.sales.filter(r=>!['cancelled','canceled','returned'].includes(String(r.status||r.approval_status||'').trim().toLowerCase())),leads=f.leads,dispatch=f.dispatch;
+  const salesCount=new Set(sales.map(r=>r.company_id+'|'+(r.internal_order_id||r.id))).size;
   const linked=s=>dispatch.some(d=>d.company_id===s.company_id&&d.source_sale_id===s.id);
   const approved=f.sales.filter(s=>linked(s)||s.approval_status==='Approved').length;
   const pending=f.sales.filter(s=>!linked(s)&&s.approval_status!=='Approved'&&!['Cancelled','Returned'].includes(s.status)).length;
