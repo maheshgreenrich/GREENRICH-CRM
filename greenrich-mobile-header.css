@@ -35,3 +35,13 @@
  #app .main>header.gr-app-header #grAttendanceSwitch{font-size:12px!important;min-height:44px;gap:7px;padding:9px 11px}
  #grAccountPanel{top:calc(100% + 12px);padding:18px}
 }
+
+/* Signed-in identity in the mobile account dropdown; desktop header stays unchanged. */
+.gr-mobile-account-user{display:none}
+@media(max-width:1024px){
+ #grAccountPanel .gr-mobile-account-user{display:flex;align-items:center;gap:12px;min-width:0;padding:2px 0 14px;border-bottom:1px solid #e5ebf4}
+ #grAccountPanel .gr-mobile-account-avatar{display:grid;place-items:center;width:43px;height:43px;flex:0 0 43px;border-radius:50%;background:#e7effc;font-size:22px}
+ #grAccountPanel .gr-mobile-account-details{display:flex;flex-direction:column;gap:5px;min-width:0}
+ #grAccountPanel #grMobileUserName{font-size:15px;line-height:1.3;font-weight:700;color:#183b66;overflow-wrap:anywhere}
+ #grAccountPanel #grMobileUserRole{font-size:12px;line-height:1.3;color:#667891;overflow-wrap:anywhere}
+}
