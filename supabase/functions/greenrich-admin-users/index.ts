@@ -74,7 +74,7 @@ Deno.serve(async req=>{
   }
   const id=String(body.userId||'');
   if(!/^[0-9a-f-]{36}$/i.test(id))return response({error:'Invalid employee identifier'},400);
-  if(id===user.id&&action!=='reset')return response({error:'Cannot change your own Admin account here'},400);
+  if(id===user.id&&action!=='reset'&&action!=='edit')return response({error:'Cannot disable or archive your own Admin account'},400);
   const {data:target,error:te}=await admin.from('gr_profiles').select('id,username,active,email').eq('id',id).maybeSingle();
   if(te||!target)return response({error:'Employee not found'},404);
   if(action==='edit'){
@@ -82,6 +82,7 @@ Deno.serve(async req=>{
    const fields:Record<string,unknown>={};
    if(body.name!==undefined){fields.full_name=String(body.name).trim();if(String(fields.full_name).length<2)return response({error:'Name must have at least 2 characters'},400);}
    if(body.username!==undefined){fields.username=String(body.username).trim();if(String(fields.username).length<3)return response({error:'Username too short'},400);}
+   if(id===user.id&&body.role!==undefined&&String(body.role)!=='Admin')return response({error:'You cannot remove your own Admin role'},403);
    if(body.role!==undefined){const rr=await admin.from('gr_roles').select('id').eq('name',String(body.role)).maybeSingle();if(!rr.data)return response({error:'Invalid role'},400);fields.role_id=rr.data.id;}
    if(body.companyIds!==undefined){const ids=companyIds(body.companyIds);if(!ids)return response({error:'Choose one or both companies'},400);fields.company_ids=ids;}
    const email=body.email===undefined?null:String(body.email).trim().toLowerCase();
