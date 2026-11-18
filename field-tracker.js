@@ -122,7 +122,7 @@
  function startTracking(){
   stopTracking();if(!openSession||document.visibilityState==='hidden')return;
   try{hasGPS();watch=navigator.geolocation.watchPosition(async p=>{
-   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<29*60*1000)return;
+   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<9*60*1000)return;
    lastGpsSent=Date.now();const c=p.coords;
    try{await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy})}
    catch(err){notify('GPS history paused: '+err.message,true);stopTracking();}
@@ -338,7 +338,7 @@
    .sort((a,b)=>ownerName(a.userId).localeCompare(ownerName(b.userId)));
  }
  function monitorFresh(stamp){
-  return monitorDate===indiaDay()&&Date.now()-new Date(stamp).getTime()<40*60*1000&&
+  return monitorDate===indiaDay()&&Date.now()-new Date(stamp).getTime()<20*60*1000&&
    Date.now()-new Date(stamp).getTime()>-60000;
  }
  function drawMonitor(){
@@ -356,23 +356,23 @@
   const latestTable=groups.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Last recorded (IST)</th><th>GPS status</th><th>Accuracy</th><th>Location</th><th>Points</th></tr></thead><tbody>'+
    groups.map(g=>'<tr><td><span class="ft-table-dot" style="background:'+g.color+'"></span><b>'+e(ownerName(g.userId))+'</b></td>'+
    '<td>'+fmt(g.last.recorded_at)+'</td><td><span class="ft-pill '+(monitorFresh(g.last.recorded_at)?'online':'offline')+'">'+
-   (monitorFresh(g.last.recorded_at)?'Recent (within 40 min)':'Last known · not live')+'</span></td><td>±'+Math.round(g.last.accuracy_m)+' m</td>'+
+   (monitorFresh(g.last.recorded_at)?'Recent (within 20 min)':'Last known · not live')+'</span></td><td>±'+Math.round(g.last.accuracy_m)+' m</td>'+
    '<td>'+coord(g.last.lat,g.last.lng)+'</td><td>'+g.list.length+'</td></tr>').join('')+
    '</tbody></table></div>':'<div class="ft-empty">No GPS samples for the selected date and employee. Check Admin GPS assignment, staff attendance and browser Location permission.</div>';
   const log=monitoredPoints().sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at));
   const logTable=log.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Date & time (IST)</th><th>Accuracy</th><th>Map location</th></tr></thead><tbody>'+
    log.map(p=>'<tr><td><span class="ft-table-dot" style="background:'+staffColor(p.user_id)+'"></span>'+e(ownerName(p.user_id))+'</td>'+
    '<td>'+fmt(p.recorded_at)+'</td><td>±'+Math.round(p.accuracy_m)+' m</td><td>'+coord(p.lat,p.lng)+'</td></tr>').join('')+
-   '</tbody></table></div>':'<p class="ft-note">No half-hour GPS history for the selected day.</p>';
+   '</tbody></table></div>':'<p class="ft-note">No 10-minute GPS history for the selected day.</p>';
   return filter+'<div class="ft-cards"><div class="ft-card"><small>Employees with recorded GPS</small><strong>'+groups.length+'</strong></div>'+
    '<div class="ft-card"><small>Recent positions (within 40 min)</small><strong>'+fresh+'</strong></div>'+
-   '<div class="ft-card"><small>30-minute map samples</small><strong>'+total+'</strong></div></div>'+
+   '<div class="ft-card"><small>10-minute map samples</small><strong>'+total+'</strong></div></div>'+
    box('Field Staff Movement Map',
-    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded 30-minute samples; these are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
+    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded 10-minute samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
     legend+'<div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
     '<p class="ft-note">GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
    box('Employee Latest Recorded Positions',latestTable)+
-   box('Movement History · 30-minute GPS Snapshots',logTable);
+   box('Movement History · 10-minute GPS Snapshots',logTable);
  }
  async function drawMap(){
   if(tab!=='monitor'||!isSupervisor||!$('#ft-map'))return;
