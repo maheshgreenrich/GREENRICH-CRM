@@ -41,7 +41,7 @@
        '<label class="gr-gps-switch"><input type="checkbox" data-staff-id="'+esc(x.id)+'" '+(x.enabled?'checked':'')+
        ' aria-label="Capture GPS for '+esc(x.name)+' at '+esc(labels[companyId])+'"><span>Capture GPS</span></label></div>'
       ).join('')+'</div>'+
-      (!index?'<div class="gr-gps-help"><b>Tracking:</b> GPS ON records location with attendance and roughly every 30 minutes while GreenRich ONE stays open and visible. GPS OFF records attendance date and time only. GPS permission is required for enabled staff. No locked-phone/background tracking.</div>':'');
+      (!index?'<div class="gr-gps-help"><b>Tracking:</b> GPS ON records location with attendance and roughly every 10 minutes while GreenRich ONE stays open and visible. GPS OFF records attendance date and time only. GPS permission is required for enabled staff. No locked-phone/background tracking.</div>':'');
      content.querySelector('.gr-gps-search').oninput=event=>{
       const term=event.target.value.trim().toLowerCase();
       content.querySelectorAll('[data-person]').forEach(row=>{row.hidden=!row.dataset.person.includes(term)});
