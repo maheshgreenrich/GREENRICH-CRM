@@ -398,12 +398,65 @@
    detail.textContent=ownerName(g.userId)+' · Last recorded '+fmt(p.recorded_at)+(monitorFresh(p.recorded_at)?' · Recent':' · Not live');
    marker.bindPopup(detail);
   }
+  // Mark each customer's arrival and completion independently from travel GPS dots.
+  // Visit evidence is loaded on demand via short-lived private storage links.
   for(const v of filterCompany().filter(v=>(monitorPerson==='all'||v.assigned_to===monitorPerson)&&
-   v.arrival_at&&indiaDay(new Date(v.arrival_at))===monitorDate&&
-   Number.isFinite(v.arrival_lat)&&Number.isFinite(v.arrival_lng)).slice(0,100)){
-    const site=window.L.circleMarker([v.arrival_lat,v.arrival_lng],{radius:7,color:'#475569',weight:2,fillColor:'#fff',fillOpacity:.65}).addTo(map);
-    const label=document.createElement('div');label.textContent='Customer site: '+(v.contact_name||v.title)+' · '+v.visit_type+' · '+fmt(v.arrival_at);
-    site.bindPopup(label);marks.push([v.arrival_lat,v.arrival_lng]);
+   ((v.arrival_at&&indiaDay(new Date(v.arrival_at))===monitorDate)||
+    (v.completed_at&&indiaDay(new Date(v.completed_at))===monitorDate))).slice(0,150)){
+    const locations=[
+     {kind:'Check-in',at:v.arrival_at,lat:Number(v.arrival_lat),lng:Number(v.arrival_lng),color:'#16a34a'},
+     {kind:'Check-out',at:v.completed_at,lat:Number(v.completed_lat),lng:Number(v.completed_lng),color:'#d97706'}
+    ];
+    for(const loc of locations){
+     if(!loc.at||indiaDay(new Date(loc.at))!==monitorDate||
+      !Number.isFinite(loc.lat)||!Number.isFinite(loc.lng)||
+      Math.abs(loc.lat)>90||Math.abs(loc.lng)>180)continue;
+     const site=window.L.circleMarker([loc.lat,loc.lng],{
+      radius:10,color:loc.color,weight:3,fillColor:'#fff',fillOpacity:1
+     }).addTo(map);
+     site.bindTooltip((v.contact_name||v.title)+' · '+loc.kind+' · '+fmt(loc.at),{direction:'top'});
+     site.on('click',async()=>{
+      const panel=document.createElement('div');
+      panel.style.cssText='min-width:230px;max-width:310px;max-height:350px;overflow:auto;line-height:1.5';
+      const heading=document.createElement('strong');heading.textContent=v.contact_name||v.title;
+      panel.appendChild(heading);
+      const details=[
+       ['Employee',ownerName(v.assigned_to)],['Visit',v.visit_type+' · '+v.title],
+       ['Location',v.address||'GPS coordinates recorded'],
+       ['Check-in',v.arrival_at?fmt(v.arrival_at):'Not recorded'],
+       ['Check-out',v.completed_at?fmt(v.completed_at):'Not recorded'],
+       ['Service / conversation',v.completion_notes||v.notes||'Not recorded']
+      ];
+      for(const [label,value] of details){
+       const line=document.createElement('div');const key=document.createElement('b');
+       key.textContent=label+': ';line.appendChild(key);
+       line.appendChild(document.createTextNode(String(value)));panel.appendChild(line);
+      }
+      const next=followups.filter(f=>f.visit_id===v.id);
+      for(const f of next){
+       const line=document.createElement('div');line.textContent='Follow-up: '+fmt(f.due_at)+' · '+(f.notes||'');
+       panel.appendChild(line);
+      }
+      const evidence=photos.filter(p=>p.visit_id===v.id);
+      const title=document.createElement('div');title.style.marginTop='8px';
+      title.textContent='Visit photos ('+evidence.length+')';panel.appendChild(title);
+      site.bindPopup(panel,{maxWidth:340}).openPopup();
+      for(const photo of evidence.slice(0,8)){
+       try{
+        const signed=await db.storage.from('gr-field-visit-proofs').createSignedUrl(photo.object_path,180);
+        if(signed.error||!signed.data?.signedUrl)continue;
+        const link=document.createElement('a');link.href=signed.data.signedUrl;
+        link.target='_blank';link.rel='noopener noreferrer';
+        const img=document.createElement('img');img.src=signed.data.signedUrl;
+        img.alt='Customer visit photo';img.loading='lazy';
+        img.style.cssText='width:90px;height:70px;object-fit:cover;margin:4px;border-radius:6px';
+        link.appendChild(img);panel.appendChild(link);
+       }catch(error){console.info('Visit photo unavailable:',error.message)}
+      }
+      site.getPopup()?.update();
+     });
+     marks.push([loc.lat,loc.lng]);
+    }
   }
   if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.25),{maxZoom:15});
   else $('#ft-map').insertAdjacentHTML('afterend','<p class="ft-note">No map pins recorded for the selected date and employee.</p>');
