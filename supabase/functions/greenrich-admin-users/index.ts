@@ -36,7 +36,7 @@ Deno.serve(async req=>{
    const items=ids.map(x=>String(x));
    return items.every(x=>allowed.includes(x))&&new Set(items).size===items.length?items:null;
   };
-  if(['create','edit','delete'].includes(action)&&!superAdmin)return response({error:'Only an Admin can manage employee accounts'},403);
+  if(['create','edit','delete','reset'].includes(action)&&!superAdmin)return response({error:'Only an Admin can manage employee accounts'},403);
   if(action==='deleteRole'){
    if(!superAdmin)return response({error:'Only the built-in Admin can delete roles'},403);
    const roleId=String(body.roleId||'');
@@ -75,16 +75,30 @@ Deno.serve(async req=>{
   const id=String(body.userId||'');
   if(!/^[0-9a-f-]{36}$/i.test(id))return response({error:'Invalid employee identifier'},400);
   if(id===user.id&&action!=='reset')return response({error:'Cannot change your own Admin account here'},400);
-  const {data:target,error:te}=await admin.from('gr_profiles').select('id,username,active').eq('id',id).maybeSingle();
+  const {data:target,error:te}=await admin.from('gr_profiles').select('id,username,active,email').eq('id',id).maybeSingle();
   if(te||!target)return response({error:'Employee not found'},404);
   if(action==='edit'){
-   const fields={};if(body.name!==undefined){fields.full_name=String(body.name).trim();if(!fields.full_name)return response({error:'Name required'},400)}
-   if(body.username!==undefined){fields.username=String(body.username).trim();if(fields.username.length<3)return response({error:'Username too short'},400)}
-   if(body.role!==undefined){const rr=await admin.from('gr_roles').select('id').eq('name',String(body.role)).maybeSingle();if(!rr.data)return response({error:'Invalid role'},400);fields.role_id=rr.data.id}
-   if(body.companyIds!==undefined){const ids=companyIds(body.companyIds);if(!ids)return response({error:'Choose one or both companies'},400);fields.company_ids=ids}
-   const updated=await admin.from('gr_profiles').update(fields).eq('id',id);if(updated.error)return response({error:updated.error.message},400);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'UPDATE',new_value:fields});
-   return response({message:'Employee updated'});
+   if(!superAdmin)return response({error:'Only Admin can edit employees'},403);
+   const fields:Record<string,unknown>={};
+   if(body.name!==undefined){fields.full_name=String(body.name).trim();if(String(fields.full_name).length<2)return response({error:'Name must have at least 2 characters'},400);}
+   if(body.username!==undefined){fields.username=String(body.username).trim();if(String(fields.username).length<3)return response({error:'Username too short'},400);}
+   if(body.role!==undefined){const rr=await admin.from('gr_roles').select('id').eq('name',String(body.role)).maybeSingle();if(!rr.data)return response({error:'Invalid role'},400);fields.role_id=rr.data.id;}
+   if(body.companyIds!==undefined){const ids=companyIds(body.companyIds);if(!ids)return response({error:'Choose one or both companies'},400);fields.company_ids=ids;}
+   const email=body.email===undefined?null:String(body.email).trim().toLowerCase();
+   if(email!==null&&!/^\S+@\S+\.\S+$/.test(email))return response({error:'Invalid email address'},400);
+   const password=body.password===undefined?'':String(body.password);
+   if(password&&(password.length<12||password.length>128))return response({error:'Password must be 12 to 128 characters'},400);
+   const authUpdates:Record<string,string>={};
+   if(email!==null&&email!==target.email)authUpdates.email=email;
+   if(password)authUpdates.password=password;
+   if(Object.keys(authUpdates).length){
+    const changedAuth=await admin.auth.admin.updateUserById(id,{...authUpdates,email_confirm:true});
+    if(changedAuth.error)return response({error:'Login update failed: '+changedAuth.error.message},400);
+   }
+   if(email!==null)fields.email=email;
+   if(Object.keys(fields).length){const updated=await admin.from('gr_profiles').update(fields).eq('id',id);if(updated.error)return response({error:'Employee profile update failed: '+updated.error.message},400);}
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'UPDATE',new_value:{...fields,password_changed:!!password}});
+   return response({message:'Employee details updated'+(password?' and password changed':'')+'. No email sent.'});
   }
   if(action==='disable'||action==='enable'){
    const active=action==='enable';
