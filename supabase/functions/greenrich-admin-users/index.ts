@@ -86,6 +86,18 @@ Deno.serve(async req=>{
    if(body.companyIds!==undefined){const ids=companyIds(body.companyIds);if(!ids)return response({error:'Choose one or both companies'},400);fields.company_ids=ids;}
    const email=body.email===undefined?null:String(body.email).trim().toLowerCase();
    if(email!==null&&!/^\S+@\S+\.\S+$/.test(email))return response({error:'Invalid email address'},400);
+   if(email!==null&&email!==target.email){
+    // Supabase Auth requires login emails to be unique. Check before attempting
+    // an update so Admin receives a useful message instead of a generic 500.
+    let found=false;
+    for(let page=1;page<=20;page++){
+     const users=await admin.auth.admin.listUsers({page,perPage:1000});
+     if(users.error)return response({error:'Could not verify email availability: '+users.error.message},503);
+     if(users.data.users.some(u=>u.id!==id&&u.email?.toLowerCase()===email)){found=true;break;}
+     if(users.data.users.length<1000)break;
+    }
+    if(found)return response({error:'This email address is already used by another login. Please enter a unique email address.',code:'EMAIL_ALREADY_IN_USE'},409);
+   }
    const password=body.password===undefined?'':String(body.password);
    if(password&&(password.length<12||password.length>128))return response({error:'Password must be 12 to 128 characters'},400);
    const authUpdates:Record<string,string>={};
@@ -96,7 +108,7 @@ Deno.serve(async req=>{
    if(email!==null)fields.email=email;
    if(Object.keys(authUpdates).length){
     const changedAuth=await admin.auth.admin.updateUserById(id,authUpdates.email?{...authUpdates,email_confirm:true}:authUpdates);
-    if(changedAuth.error)return response({error:'Login credentials were not changed: '+changedAuth.error.message+'. Employee profile was not modified.',code:changedAuth.error.code||null},400);
+    if(changedAuth.error){const duplicate=/duplicate|already.*(registered|exists|used)|users_email_partial_key/i.test(changedAuth.error.message);return response({error:duplicate?'This email address is already used by another login. Please enter a unique email address.':'Login credentials were not changed: '+changedAuth.error.message+'. Employee profile was not modified.',code:duplicate?'EMAIL_ALREADY_IN_USE':changedAuth.error.code||null},duplicate?409:400);}
    }
    if(Object.keys(fields).length){const updated=await admin.from('gr_profiles').update(fields).eq('id',id);if(updated.error)return response({error:'Employee profile update failed: '+updated.error.message},400);}
    await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'UPDATE',new_value:{...fields,password_changed:!!password}});
