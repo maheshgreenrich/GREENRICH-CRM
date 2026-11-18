@@ -20,7 +20,7 @@ assert.ok(header.includes('openFieldSettings:host=>window.GreenRichFieldSettings
 assert.ok(settings.includes('data-staff-id')&&settings.includes('gr_field_assign_staff'));
 assert.ok(settings.includes('Capture GPS')&&settings.includes('Date & time only'));
 assert.ok(gps.includes('requiresAttendanceGPS')&&header.includes('GPS required'));
-assert.ok(gps.includes('if(!permitted.length)return {}'),'Office staff should not require GPS');
+assert.ok(gps.includes('if(!permitted.length&&!mobile)return {}')&&gps.includes("if(!permitted.length&&mode!=='in')return {}"),'Office desktop staff should not require GPS; mobile check-in should capture location');
 assert.ok(gps.includes('29*60*1000')&&gpsSql.includes("interval '29 minutes'"));
 assert.ok(gpsSql.includes('for update')&&gpsSql.includes('auth.uid()'),'GPS samples must be authorized and race-safe');
 assert.ok(service.includes("gr_field_monitor_day")&&service.includes('.range(offset,offset+999)'));
