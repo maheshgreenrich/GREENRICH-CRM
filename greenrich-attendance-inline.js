@@ -390,7 +390,7 @@ async function loadAdmin(){
   $('#adminPager').textContent='Page '+result.page+' of '+Math.max(1,result.pages)+' · '+result.total+' records';
   $('#adminPrev').disabled=adminPage<=1;$('#adminNext').disabled=adminPage>=result.pages;
   await Promise.all([drawAdminChart(),drawDailyRoster()]);
-  $('#adminRows [data-admin-checkout]').forEach(b=>b.onclick=()=>safe(async()=>{
+  $$('#adminRows [data-admin-checkout]').forEach(b=>b.onclick=()=>safe(async()=>{
    const record=adminItems.find(row=>row.id===b.dataset.adminCheckout);
    if(!record||!record.check_in||record.check_out)return;
    const employee=record.gr_profiles?.full_name||staff.find(p=>p.id===record.user_id)?.full_name||'this employee';
@@ -403,7 +403,7 @@ async function loadAdmin(){
     await Promise.all([loadAdmin(),loadMine()]);
    }finally{b.disabled=false}
   }));
-  $('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
+  $$('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
    const r=adminItems.find(x=>x.id===b.dataset.edit);if(!r)return;
    const f=$('#attendanceEditForm');
    f.elements.namedItem('recordId').value=r.id;
