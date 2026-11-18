@@ -29,7 +29,7 @@
  const orderKey=s=>(s._companyId||s.company_id)+'|'+s.id;
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
  const serviceFor=order=>serviceLinks.find(x=>x.dispatch_id===order.id);
- const approvalStatus=s=>['Cancelled','Returned'].includes(s.status)?s.status:stockBlocked(s)?'Low Stock Alert':dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
+ const approvalStatus=s=>isVoided(s)?s.status:stockBlocked(s)?'Low Stock Alert':dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
  const stockShortage=s=>Math.max(0,Number(s.stock_shortage)||0);
  const stockBlocked=s=>stockShortage(s)>0;
  const filterPeriod=(period,from,to,day)=>{
@@ -81,12 +81,13 @@
   }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
  }
  const orderId=s=>s.internal_order_id||s.order_id||'Legacy order';
+ const isVoided=s=>['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase());
  const report=rows=>{
-  const orderIds=new Set(rows.map(orderKey)),approved=rows.filter(s=>!['Cancelled','Returned'].includes(s.status)&&(!!dispatchFor(s)||s.approval_status==='Approved'));
-  const pending=rows.filter(s=>!dispatchFor(s)&&s.approval_status!=='Approved'&&!['Cancelled','Returned'].includes(s.status));
-  const cancelled=rows.filter(s=>['Cancelled','Returned'].includes(s.status));
-  const todaySales=rows.filter(s=>s.date===date());
-  const total=rows.filter(s=>!['Cancelled','Returned'].includes(s.status)).reduce((sum,s)=>sum+(Number(s.total)||0),0);
+  const orderIds=new Set(rows.map(orderKey)),approved=rows.filter(s=>!isVoided(s)&&(!!dispatchFor(s)||s.approval_status==='Approved'));
+  const pending=rows.filter(s=>!dispatchFor(s)&&s.approval_status!=='Approved'&&!isVoided(s));
+  const cancelled=rows.filter(s=>isVoided(s));
+  const todaySales=rows.filter(s=>s.date===date()&&!isVoided(s));
+  const total=rows.filter(s=>!isVoided(s)).reduce((sum,s)=>sum+(Number(s.total)||0),0);
   const metrics=[
    ['Total orders',orderIds.size,'In selected filters'],
    ['Awaiting approval',pending.length,'Need verification'],
@@ -121,7 +122,7 @@
    case 'product':return '<strong>'+esc(productName(s))+'</strong><small>'+esc(s.sku||'')+'</small>';
    case 'channel':return '<span class="pill">'+esc(channelName(s))+'</span>';
    case 'qty':return num(s.qty);
-   case 'status':return ['Cancelled','Returned'].includes(s.status)?'<span class="gr-order-approval-tag" data-state="'+esc(s.status)+'">'+esc(s.status)+'</span>':stockBlocked(s)?
+   case 'status':return isVoided(s)?'<span class="gr-order-approval-tag" data-state="'+esc(s.status)+'">'+esc(s.status)+'</span>':stockBlocked(s)?
     '<span role="alert" style="display:inline-block;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:20px;padding:6px 12px;font-weight:800">⚠ Low Stock Alert</span>'+
     '<small style="display:block;color:#b91c1c;font-weight:700;margin-top:5px">Required: '+num(s.qty)+' · Allocated: '+num(Math.max(0,Number(s.stock_allocated_qty)||0))+' · Balance needed: '+num(stockShortage(s))+' units</small>':
     '<span class="gr-order-approval-tag" data-state="'+esc(status)+'">'+esc(status)+'</span>'+
@@ -132,7 +133,7 @@
    case 'total':return '<strong>'+money(s.total)+'</strong>';
    case 'invoice':return adapter.invoiceAction(s);
    case 'actions':{
-    const cloud=dispatchFor(s),blocked=['Cancelled','Returned'].includes(s.status);
+    const cloud=dispatchFor(s),blocked=isVoided(s);
     const approve=canApprove&&!cloud&&!s.approval_status&&!blocked&&!stockBlocked(s)?
      '<button class="gr-order-approve" type="button" data-approve-order="'+esc(s.id)+'" data-approve-company="'+esc(s._companyId)+'">Approve</button>':
      (cloud?'<span class="gr-order-approved">✓ Sent to dispatch</span>':
