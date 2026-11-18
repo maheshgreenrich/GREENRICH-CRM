@@ -22,7 +22,7 @@ window.GreenRichFormBuilder=(()=>{
    fixed('address1','Address line 1','textarea',true,true),fixed('address2','Address line 2'),fixed('city','City'),fixed('state','State'),fixed('pincode','PIN code'),
    fixed('country','Country'),fixed('gstin','GSTIN'),fixed('source','Customer source','select'),fixed('owner','Account owner'),fixed('notes','Customer notes','textarea')];
   const sale=[fixed('date','Order date','date',true,true),fixed('internal_order_id','Sales Order number','text',true,true),
-   fixed('company_id','Company','select',true,true),fixed('channel_id','Sales channel','select',true,true),
+   fixed('company_id','Company','select',true,true),fixed('channel_id','Sales channel','select',true,true),fixed('salesperson_id','Sales Person','select'),
    fixed('customer_picker','Lead / Customer selection','select',true,true),fixed('product_id','Product','select',true,true),fixed('qty','Quantity','number',true,true),
    fixed('unit_price','Unit price','number',true,true),fixed('tax_rate','Product GST','number',true,true),fixed('inclusive','Includes GST','select',true,true),
    fixed('shipping_charge','Shipping charge','number'),fixed('shipping_gst_rate','Shipping GST rate','number'),fixed('payment_terms','Payment terms'),
