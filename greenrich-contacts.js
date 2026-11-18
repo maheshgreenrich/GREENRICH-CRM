@@ -95,7 +95,7 @@
   const tbody=root.querySelector('#gr-contact-rows');if(!tbody)return;
   tbody.innerHTML=rows.slice(0,countLimit).map(r=>{
    const id=esc(r.id),owner=esc(r._companyId||'');
-   const edit=context.permission(r._kind,'edit'),remove=context.permission(r._kind,'delete');
+   const edit=Boolean(context.admin||context.permission(r._kind,'edit')),remove=Boolean(context.admin||context.permission(r._kind,'delete'));
    const actions='<button type="button" data-contact-edit="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!edit?'disabled':'')+'>Edit</button>'+
     '<button type="button" data-contact-delete="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!remove?'disabled':'')+'>Delete</button>';
    return '<tr><td>'+mark(r._kind)+'</td>'+
@@ -281,7 +281,7 @@
   finally{busy=false;const button=form.querySelector('[type=submit]');if(button)button.disabled=false}
  }
  async function removeRecord(kind,id,company){
-  if(!context.permission(kind,'delete'))return notify('You do not have delete permission.');
+  if(!(context.admin||context.permission(kind,'delete')))return notify('You do not have delete permission.');
   const item=allRecords().find(x=>x._kind===kind&&x.id===id&&(kind==='customer'||x._companyId===company));
   if(!item)return;
   if(!confirm('Delete '+kind+' '+(item.name||item.title)+'? Related sales, quotations and follow-ups may reference this contact.'))return;
