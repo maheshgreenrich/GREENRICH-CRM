@@ -95,7 +95,7 @@
   const tbody=root.querySelector('#gr-contact-rows');if(!tbody)return;
   tbody.innerHTML=rows.slice(0,countLimit).map(r=>{
    const id=esc(r.id),owner=esc(r._companyId||'');
-   const edit=context.permission(r._kind,'edit'),remove=r._kind==='lead'?false:context.permission(r._kind,'delete');
+   const edit=context.permission(r._kind,'edit'),remove=context.permission(r._kind,'delete');
    const actions='<button type="button" data-contact-edit="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!edit?'disabled':'')+'>Edit</button>'+
     '<button type="button" data-contact-delete="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!remove?'disabled':'')+'>Delete</button>';
    return '<tr><td>'+mark(r._kind)+'</td>'+
@@ -288,7 +288,7 @@
   try{
    if(kind==='customer'){await window.GreenRichSharedCustomers.deleteCustomer(id);context.afterCustomerSave?.()}
    else{
-    const r=await db.from('gr_crm_records').delete().eq('company_id',company).eq('kind','leads').eq('record_id',id).select('record_id');
+    const r=await db.rpc('gr_contact_delete_lead',{p_company:company,p_lead:id});
     if(r.error)throw Error(r.error.message);
     await window.GreenRichCRMCloud?.refresh?.();
    }
@@ -446,7 +446,7 @@
    const btn=event.target.closest('button');if(!btn)return;
    if(btn.dataset.contactAdd){openForm(btn.dataset.contactAdd);return}
    if(btn.dataset.contactEdit){openForm(btn.dataset.contactKind,btn.dataset.contactEdit,btn.dataset.contactCompany);return}
-   if(btn.dataset.contactDelete){if(btn.dataset.contactKind==='lead')return notify('Lead deletion is disabled; move the lead to Lost in the pipeline.');await removeRecord(btn.dataset.contactKind,btn.dataset.contactDelete,btn.dataset.contactCompany);return}
+   if(btn.dataset.contactDelete){await removeRecord(btn.dataset.contactKind,btn.dataset.contactDelete,btn.dataset.contactCompany);return}
    if(btn.dataset.contactProfile){context.openProfile(btn.dataset.contactProfile);return}
    if(btn.dataset.contactLeadProfile){await openLeadProfile(btn.dataset.contactCompany,btn.dataset.contactLeadProfile);return}
    if(btn.dataset.contactClose!==undefined){container.querySelector('#gr-contact-dialog').close();return}
