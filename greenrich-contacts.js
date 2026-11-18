@@ -95,9 +95,9 @@
   const tbody=root.querySelector('#gr-contact-rows');if(!tbody)return;
   tbody.innerHTML=rows.slice(0,countLimit).map(r=>{
    const id=esc(r.id),owner=esc(r._companyId||'');
-   const edit=Boolean(context.admin||context.permission(r._kind,'edit')),remove=Boolean(context.admin||context.permission(r._kind,'delete'));
+   const edit=Boolean(context.admin||context.permission(r._kind,'edit'));
    const actions='<button type="button" data-contact-edit="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!edit?'disabled':'')+'>Edit</button>'+
-    '<button type="button" data-contact-delete="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'" '+(!remove?'disabled':'')+'>Delete</button>';
+    '<button type="button" data-contact-delete="'+id+'" data-contact-kind="'+r._kind+'" data-contact-company="'+owner+'">Delete</button>';
    return '<tr><td>'+mark(r._kind)+'</td>'+
     '<td>'+(r._kind==='customer'?'<button type="button" data-contact-profile="'+id+'" class="gr-contact-link">'+esc(r.name||'—')+'</button>':
       '<button type="button" data-contact-lead-profile="'+id+'" data-contact-company="'+owner+'" class="gr-contact-link">'+esc(r.name||r.contact||r.title||'—')+'</button>')+
