@@ -466,7 +466,7 @@ async function exportOverviewPdf(){
  toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
 }
 
-const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button><button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>';
+const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(adminMode?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
  const act=(k,id)=>window.GreenRichActionMenu.wrap(actButtons(k,id));
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
