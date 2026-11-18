@@ -9,8 +9,8 @@ const header=read('greenrich-one.js');
 const gps=read('greenrich-field-gps.js');
 const service=read('field-tracker.js');
 const html=read('field-tracker.html');
-const gpsSql=read('supabase/migrations/20261104041000_field_gps_30_minute_sampling.sql');
-const mapSql=read('supabase/migrations/20261104042000_field_supervisor_daily_30min_location_history.sql');
+const gpsSql=read('supabase/migrations/20261118190000_field_gps_ten_minute_timeline.sql');
+const mapSql=read('supabase/migrations/20261118190000_field_gps_ten_minute_timeline.sql');
 for(const p of ['greenrich-company-admin.js','greenrich-field-settings.js','greenrich-one.js','greenrich-field-gps.js','field-tracker.js'])
  new vm.Script(read(p),{filename:p});
 assert.ok(admin.includes("['fieldaccess','Field Location Access']"));
@@ -20,8 +20,9 @@ assert.ok(header.includes('openFieldSettings:host=>window.GreenRichFieldSettings
 assert.ok(settings.includes('data-staff-id')&&settings.includes('gr_field_assign_staff'));
 assert.ok(settings.includes('Capture GPS')&&settings.includes('Date & time only'));
 assert.ok(gps.includes('requiresAttendanceGPS')&&header.includes('GPS required'));
-assert.ok(gps.includes('if(!permitted.length&&!mobile)return {}')&&gps.includes("if(!permitted.length&&mode!=='in')return {}"),'Office desktop staff should not require GPS; mobile check-in should capture location');
-assert.ok(gps.includes('29*60*1000')&&gpsSql.includes("interval '29 minutes'"));
+assert.ok(gps.includes('if(!permitted.length)return {}'),'Only Admin-selected field staff should require GPS');
+assert.ok(gps.includes('9*60*1000')&&gpsSql.includes("interval '9 minutes'"));
+assert.ok(mapSql.includes("date_bin('10 minutes'"),'Supervisor map must group 10-minute samples');
 assert.ok(gpsSql.includes('for update')&&gpsSql.includes('auth.uid()'),'GPS samples must be authorized and race-safe');
 assert.ok(service.includes("gr_field_monitor_day")&&service.includes('.range(offset,offset+999)'));
 assert.ok(service.includes('id="ft-monitor-date"')&&service.includes('id="ft-monitor-person"'));
@@ -34,4 +35,4 @@ assert.ok(html.includes('Live Staff & GPS'));
 assert.ok(admin.includes('Open Live Staff & GPS Map'));
 assert.ok(header.includes('#field-location-access')&&header.includes('#live-staff-gps'));
 assert.ok(header.includes('grFieldTracker')&&service.includes("get('view')==='monitor'"));
-console.log('PASS: Field Location Access, attendance GPS opt-in, 30-minute samples, secure supervisor daily coloured map and history.');
+console.log('PASS: Field Location Access, attendance GPS opt-in, 10-minute samples, secure supervisor daily coloured map and history.');
