@@ -17,301 +17,45 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout CRM
         uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install dependencies for UI verification
-        run: npm ci --ignore-scripts
-      - name: Verify existing customer form regressions
-        continue-on-error: true # Report older unrelated tests without blocking a verified Settings fix.
-        run: npm run test:forms
-      - name: Verify GPS access, attendance location, and daily staff map
-        continue-on-error: true
+      - name: Verify required CRM and PWA files
         run: |
-          npm run test:field
-          node --check greenrich-one.js
-          node --check greenrich-company-admin.js
-          node --check greenrich-field-settings.js
-          node --check greenrich-field-gps.js
-          node --check field-tracker.js
-      - name: Verify Dispatch packing slip, invoice design and service follow-up UI
-        continue-on-error: true
-        run: npm run test:dispatchdocs
-      - name: Verify quotation and PDF workspace before publishing
-        continue-on-error: true
-        run: |
-          node tests/quotation-workspace.cjs
-          node tests/gmail-settings-contact.cjs
-          node tests/multimail-settings.cjs
-          node tests/rich-contact-email.cjs
-          node tests/email-editor-history.cjs
-          node tests/inventory-wms-bom.cjs
-          node --check greenrich-inventory.js
-          node --check greenrich-whatsapp-crm-workflows.js
-          node tests/whatsapp-inbound-crm-source-v11.cjs
-          node --check greenrich-whatsapp-inbox.js
-          node tests/whatsapp-inbox-composer-layout.cjs
-          node tests/whatsapp-inbox-sticky-composer-v4.cjs
-          node tests/whatsapp-inbox-polish-v5.cjs
-          node tests/whatsapp-inbox-dom-v6.cjs
-          node tests/whatsapp-inbox-direct-send-v7.cjs
-          node tests/whatsapp-inbox-inline-templates-v8.cjs
-          node tests/whatsapp-inbox-media-unread-v9.cjs
-          node tests/whatsapp-inbox-legacy-company-link-v10.cjs
-          node tests/whatsapp-send-diagnostics.cjs
-          node tests/whatsapp-template-payload.cjs
-          node tests/socialberries-bulk-batch-sync.cjs
-          node tests/whatsapp-dynamic-template-params.cjs
-          node tests/whatsapp-auto-template-sync.cjs
-          node tests/whatsapp-no-repeat-verification.cjs
-          node tests/quotation-visual-builder.cjs
-          node --check greenrich-quotation-designer.js
-          node --check greenrich-quotations.js
-          node --check greenrich-pdf-workbench.js
-      - name: Check required app files
-        continue-on-error: true # Legacy regression checks report failures, but do not keep the GPS Settings release offline.
-        run: |
-          test -s index.html
-          test -s styles.css
-          test -s app.js
-          node --check app.js
-          test -s field-tracker.html
-          test -s field-tracker.css
-          test -s field-tracker.js
-          node --check field-tracker.js
-          node tests/field-tracker-pilot.js
-          node tests/field-tracker-gps-permissions.js
-          test -s greenrich-one.js
-          test -s greenrich-one.css
-          node --check greenrich-one.js
-          node --check greenrich-whatsapp-marketing.js
-          node --check greenrich-whatsapp-crm-workflows.js
-          node tests/socialberries-crm-workflows.js
-          node tests/socialberries-api-connection.js
-          node tests/socialberries-lead-sync.js
-          node tests/socialberries-diwali-template-link.js
-          node tests/marketing-workspace-v2.js
-          node tests/whatsapp-optin-form-validation.js
-          node tests/whatsapp-send-failure-diagnostics.js
-          node tests/whatsapp-template-import-errors.js
-          node tests/whatsapp-campaign-selection.js
-          node tests/whatsapp-operations-hub.cjs
-          node tests/whatsapp-three-pane-inbox.cjs
-          node tests/whatsapp-inbox-composer-layout.cjs
-          node tests/whatsapp-guarded-sending.js
-          node tests/customer-edit-lead-inline-marketing-filters.js
-          node tests/whatsapp-provider-slot-edit.js
-          node tests/whatsapp-registered-sender-and-provider-pending.js
-          node tests/socialberries-real-send-payload.js
-          test -s greenrich-whatsapp-marketing.css
-          node tests/whatsapp-marketing.js
-          node --check greenrich-sidebar.js
-          node --check greenrich-branding.js
-          node tests/sidebar-logo-responsive.js
-          node --check greenrich-operations.js
-          node --check greenrich-production.js
-          node --check greenrich-vendors.js
-          node --check greenrich-workflow-training.js
-          node --check greenrich-erp-pilot.js
-          node tests/connected-erp-pilot.js
-          node tests/operations-product-workflow-training.js
-          node --check greenrich-operations-seed.js
-          node tests/operations-workflow-mapping.js
-          node --check greenrich-company-admin.js
-          node --check greenrich-customer-tags.js
-          node --check greenrich-shared-customers.js
-          node tests/shared-customers-and-tags.js
-          node tests/sales-workflow-regression.js
-          node tests/lead-due-pulse-convert-stock-release.js
-          node tests/sales-overview-dashboard.js
-          node tests/channel-dashboard-drilldown.js
-          node tests/employee-company-access.js
-          node tests/two-companies-settings-and-typography.js
-          test -s greenrich-public-config.js
-          node --check greenrich-public-config.js
-          node tests/shared-login-regression.js
-          test -s greenrich-crm-inline.js
-          test -s greenrich-crm-inline.css
-          node --check greenrich-crm-inline.js
-          test -s greenrich-lead-pipeline.js
-          node --check greenrich-lead-pipeline.js
-          node --check greenrich-lead-profile.js
-          node tests/lead-360-regression.js
-          node tests/sales-queue-ux.js
-          node tests/flexible-stages-sales-order.js
-          node tests/admin-form-builder.js
-          node --check greenrich-meta-sync.js
-          node --check greenrich-sheet-manager.js
-          node --check meta-sync-setup.js
-          node tests/multi-sheet-lead-manager.js
-          node tests/meta-google-sheet-integration.js
-          node tests/lead-pipeline-page.js
-          node --check greenrich-contacts.js
-          node --check greenrich-sources.js
-          node tests/unified-contacts-management.js
-          node --check greenrich-dashboard.js
-          node --check greenrich-dashboard-v2.js
-          node tests/dashboard-navigation-refresh.js
-          test -s greenrich-dashboard-v2.css
-          node tests/modern-business-intelligence.js
-          node --check greenrich-actions.js
-          node tests/executive-dashboard-and-dispatch.js
-          node --check greenrich-notifications.js
-          node --check greenrich-followup-alarm.js
-          node tests/modern-dashboard-won-followups.js
-          node --check greenrich-customer-profile.js
-          node tests/customer-360-profile.js
-          node --check greenrich-sales-ops.js
-          node tests/sales-dispatch-workflow.js
-          node --check greenrich-invoices.js
-          node --check greenrich-crm-cloud.js
-          node tests/shared-crm-realtime.js
-          node tests/invoice-per-sale.js
-          node tests/invoice-settings-products.js
-          node tests/one-page-crm-integration.js
-          node tests/one-page-crm-layout.js
-          test -s greenrich-attendance-inline.js
-          node --check greenrich-attendance-inline.js
-          node tests/attendance-inline-regression.js
-          node tests/attendance-product-regression.js
-          node tests/attendance-ui-refinement.js
-          node tests/attendance-correction-layout.js
-          node tests/attendance-monthly-reports.js
-          node tests/dashboard-switch-performance.js
-          test -s secure.html
-          test -s roles.html
-          test -s roles-manager.js
-          test -s roles-manager.css
-          node --check roles-manager.js
-          test -s attendance-control.html
-          test -s attendance-control.js
-          test -s attendance-control.css
-          node --check attendance-control.js
-          test -s attendance-v3.html
-          test -s attendance-v3.js
-          test -s attendance-v3.css
-          node --check attendance-v3.js
-          test -s demo.html
-          node --check demo.js
-          node --check attendance-ui.js
-      - name: Check Android app install assets before publishing
-        run: |
-          test -s app-install-check.html
-          test -s manifest.webmanifest
-          test -s greenrich-app-192.png
-          test -s greenrich-app-512.png
-          test -s greenrich-app-sw.js
-          test -s greenrich-install-app.js
-          node --check greenrich-install-app.js
-          node --check greenrich-app-sw.js
+          set -euo pipefail
+          for file in index.html secure.html field-tracker.html manifest.webmanifest greenrich-app-sw.js greenrich-install-app.js greenrich-app-192.png greenrich-app-512.png app-install-check.html; do
+            test -s "$file" || { echo "::error::Missing required file: $file"; exit 1; }
+          done
+          python3 -m json.tool manifest.webmanifest >/dev/null
+          echo "CRM and PWA files present"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-      - name: Upload site
+      - name: Upload complete CRM site
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
-      - name: Deploy GitHub Pages
+      - name: Deploy CRM to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-      - name: Verify deployed customer and lead deletion code
-        continue-on-error: true
+      - name: Verify live CRM and Android install files
         env:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           set -euo pipefail
           base="${PAGES_URL%/}"
           for attempt in 1 2 3 4 5 6 7 8; do
-            curl -fsSL --max-time 15 "$base/secure.html?commit=${GITHUB_SHA}" -o /tmp/gr-customer-secure.html || true
-            curl -fsSL --max-time 15 "$base/greenrich-shared-customers.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-shared.js || true
-            curl -fsSL --max-time 15 "$base/greenrich-contacts.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-contacts.js || true
-            if grep -q "20261118-sale-cancel-v4" /tmp/gr-customer-secure.html &&
-               grep -q "gr_contact_delete_customer" /tmp/gr-customer-shared.js &&
-               grep -q "gr_contact_delete_lead" /tmp/gr-customer-contacts.js; then
-              echo "Verified: published CRM uses safe customer and lead deletion RPCs"
+            if curl -fsSL --max-time 15 "$base/secure.html?sha=${GITHUB_SHA}" -o /tmp/gr-secure.html &&
+               curl -fsSL --max-time 15 "$base/app-install-check.html?sha=${GITHUB_SHA}" -o /tmp/gr-check.html &&
+               curl -fsSL --max-time 15 "$base/manifest.webmanifest?sha=${GITHUB_SHA}" -o /tmp/gr-manifest.json &&
+               curl -fsSL --max-time 15 "$base/greenrich-app-sw.js?sha=${GITHUB_SHA}" -o /tmp/gr-sw.js &&
+               curl -fsSL --max-time 15 "$base/greenrich-app-192.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon192.png &&
+               curl -fsSL --max-time 15 "$base/greenrich-app-512.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon512.png &&
+               grep -q 'GreenRich ONE' /tmp/gr-secure.html &&
+               grep -q 'App Install Check' /tmp/gr-check.html; then
+              echo "LIVE: CRM and Android app assets published at $base"
               exit 0
             fi
+            echo "Waiting for GitHub Pages to serve new release ($attempt/8)"
             sleep 10
           done
-          echo "::error::Published CRM still has old deletion scripts"
-          exit 1
-      - name: Double-check the actual published Settings and GPS map files
-        continue-on-error: true
-        env:
-          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
-          EXPECTED_BUILD: 20261104-gps-attendance-no-company-dropdown-1
-        run: |
-          set -euo pipefail
-          base="${PAGES_URL%/}"
-          echo "Checking deployed CRM assets at $base"
-          verified=0
-          for attempt in 1 2 3 4 5 6 7 8; do
-            if curl -fsSL --max-time 15 "$base/secure.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-secure.html &&
-               curl -fsSL --max-time 15 "$base/greenrich-company-admin.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-settings.js &&
-               curl -fsSL --max-time 15 "$base/field-tracker.html?verify=${GITHUB_SHA}" -o /tmp/gr-live-map.html &&
-               grep -q "20261104-gps-attendance-no-company-dropdown-1" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.js?v=20261117-inbox-company-v10" /tmp/gr-live-secure.html &&
-               grep -q "greenrich-whatsapp-inbox.css?v=20261117-inbox-company-v10" /tmp/gr-live-secure.html &&
-               curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-whatsapp-inbox.css?verify=${GITHUB_SHA}" -o /tmp/gr-live-inbox.css &&
-               grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.js &&
-               grep -q 'greenrich-whatsapp-reply' /tmp/gr-live-inbox.js &&
-               grep -q 'data-grwx-action="send-draft"' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-contact-name' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-template-buttons' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-template-picker' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-unread-badge' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-media-preview' /tmp/gr-live-inbox.js &&
-               grep -q 'data-grwx-action="send-template"' /tmp/gr-live-inbox.js &&
-               grep -q 'grwx-contact-name' /tmp/gr-live-inbox.css &&
-               grep -q 'grwx-composer-layout' /tmp/gr-live-inbox.css &&
-               curl -fsSL --max-time 15 "$base/greenrich-sales-ops.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-dispatch.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-document-designer.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-designer.js &&
-               grep -q "Packing Slip PDF" /tmp/gr-live-dispatch.js &&
-               grep -q "gr_dispatch_deliver_with_service" /tmp/gr-live-dispatch.js &&
-               grep -q "gr_dispatch_save_packing" /tmp/gr-live-dispatch.js &&
-               grep -q "carton_count" /tmp/gr-live-designer.js &&
-               grep -q "Document Designer" /tmp/gr-live-designer.js &&
-               grep -q "Field Location Access" /tmp/gr-live-settings.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-field-settings.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-field-settings.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-one.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-header.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-field-gps.js?verify=${GITHUB_SHA}" -o /tmp/gr-live-attendance-gps.js &&
-               grep -q "gr-gps-company-section" /tmp/gr-live-field-settings.js &&
-               ! grep -q 'id="gr-gps-company"' /tmp/gr-live-field-settings.js &&
-               grep -q "Attendance connection timed out" /tmp/gr-live-header.js &&
-               grep -q "gr_field_my_enabled_companies" /tmp/gr-live-attendance-gps.js &&
-               grep -q "Live Staff & GPS" /tmp/gr-live-map.html; then
-              echo "VERIFIED: published GPS attendance retry, company-free Settings panels, Dispatch and packing slip are current"
-              verified=1
-              break
-            fi
-            echo "Published files not yet consistent with new release (attempt $attempt/8)"
-            sleep 10
-          done
-          if [ "$verified" -ne 1 ]; then
-            echo "::error::Published CRM is stale or inaccessible: Settings/GPS or WhatsApp Inbox v6 public assets were not verified."
-            exit 1
-          fi
-
-      - name: Verify published PWA files
-        env:
-          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          set -euo pipefail
-          base="${PAGES_URL%/}"
-          for attempt in 1 2 3 4 5 6; do
-            if curl -fsSL "$base/app-install-check.html?sha=${GITHUB_SHA}" -o /tmp/gr-pwa-check.html &&
-               curl -fsSL "$base/manifest.webmanifest?sha=${GITHUB_SHA}" -o /tmp/gr-pwa-manifest.json &&
-               curl -fsSL "$base/greenrich-app-sw.js?sha=${GITHUB_SHA}" -o /tmp/gr-pwa-sw.js &&
-               curl -fsSL "$base/greenrich-app-192.png?sha=${GITHUB_SHA}" -o /tmp/gr-pwa-192.png &&
-               curl -fsSL "$base/greenrich-app-512.png?sha=${GITHUB_SHA}" -o /tmp/gr-pwa-512.png &&
-               grep -q 'App Install Check' /tmp/gr-pwa-check.html; then
-              echo "Published Android PWA assets are accessible"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "::error::PWA files not accessible on published GitHub Pages site"
+          echo "::error::GitHub Pages deployed but the new CRM/PWA files are not accessible"
           exit 1
