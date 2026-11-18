@@ -384,12 +384,26 @@ async function loadAdmin(){
   $('#adminRows').innerHTML=adminItems.map(r=>tRow([
    esc(r.date),esc(r.gr_profiles?.full_name||staff.find(p=>p.id===r.user_id)?.full_name||r.user_id),
    esc(r.status),esc(shortDate(r.check_in)),esc(shortDate(r.check_out)),gpsLink(r.check_in_lat,r.check_in_lng),gpsLink(r.check_out_lat,r.check_out_lng),
+   (canAdmin('edit')&&r.check_in&&!r.check_out?'<button class="blue" data-admin-checkout="'+esc(r.id)+'">Check Out Now</button> ':'')+
    (canAdmin('edit')?'<button class="secondary" data-edit="'+esc(r.id)+'">Edit</button> ':'')+(canAdmin('delete')?'<button class="secondary" data-delete="'+esc(r.id)+'">Delete</button>':'—')
   ])).join('')||'<tr><td colspan="8">No records match these filters.</td></tr>';
   $('#adminPager').textContent='Page '+result.page+' of '+Math.max(1,result.pages)+' · '+result.total+' records';
   $('#adminPrev').disabled=adminPage<=1;$('#adminNext').disabled=adminPage>=result.pages;
   await Promise.all([drawAdminChart(),drawDailyRoster()]);
-  $$('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
+  $('#adminRows [data-admin-checkout]').forEach(b=>b.onclick=()=>safe(async()=>{
+   const record=adminItems.find(row=>row.id===b.dataset.adminCheckout);
+   if(!record||!record.check_in||record.check_out)return;
+   const employee=record.gr_profiles?.full_name||staff.find(p=>p.id===record.user_id)?.full_name||'this employee';
+   if(!confirm('Check out '+employee+' using office server time?'))return;
+   b.disabled=true;
+   try{
+    const {error}=await db.rpc('grm_admin_checkout_now',{p_record:record.id,p_reason:'Manual checkout by Admin'});
+    if(error)throw Error(error.message);
+    notify('Checkout saved for '+employee+'. Action recorded in audit log.');
+    await Promise.all([loadAdmin(),loadMine()]);
+   }finally{b.disabled=false}
+  }));
+  $('#adminRows [data-edit]').forEach(b=>b.onclick=()=>{
    const r=adminItems.find(x=>x.id===b.dataset.edit);if(!r)return;
    const f=$('#attendanceEditForm');
    f.elements.namedItem('recordId').value=r.id;
