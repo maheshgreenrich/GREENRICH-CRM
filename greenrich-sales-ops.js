@@ -169,8 +169,26 @@
  function renderDispatch(){
   if(!root?.isConnected||!q('#dispatch-table')||!q('#dispatch-metrics')||!q('#dispatch-count'))return;
   const term=text(q('#dispatch-search')?.value).toLowerCase(),status=q('#dispatch-status-filter')?.value||'all',company=q('#dispatch-company-filter')?.value||'all';
-  const list=dispatchRows.filter(r=>allowed.includes(r.company_id)&&(status==='all'||r.status===status)&&(company==='all'||r.company_id===company)&&
-   (!term||[r.order_id,r.platform_order_id,r.company_id,r.customer_name,r.customer_mobile,r.customer_email,r.product_name,r.sku,r.courier_name,r.tracking_number,r.invoice_number].some(x=>String(x??'').toLowerCase().includes(term))));
+  const period=q('#dispatch-period')?.value||'all',from=q('#dispatch-from')?.value||'',to=q('#dispatch-to')?.value||'';
+  const source=q('#dispatch-source-filter')?.value||'all',channel=q('#dispatch-channel-filter')?.value||'all',product=q('#dispatch-product-filter')?.value||'all';
+  const cust=text(q('#dispatch-customer-filter')?.value).toLowerCase(),tag=text(q('#dispatch-tag-filter')?.value).toLowerCase(),employee=text(q('#dispatch-employee-filter')?.value).toLowerCase();
+  const min=text(q('#dispatch-min-amount')?.value),max=text(q('#dispatch-max-amount')?.value);
+  fill('#dispatch-source-filter','All sources',[...new Set(dispatchRows.map(r=>text(r.source)).filter(Boolean))].sort().map(v=>[v,v]));
+  fill('#dispatch-channel-filter','All channels',[...new Set(dispatchRows.map(r=>text(r.channel)).filter(Boolean))].sort().map(v=>[v,v]));
+  fill('#dispatch-product-filter','All products',[...new Set(dispatchRows.map(r=>text(r.product_name)).filter(Boolean))].sort().map(v=>[v,v]));
+  const list=dispatchRows.filter(r=>{
+   if(!allowed.includes(r.company_id)||(status!=='all'&&r.status!==status)||(company!=='all'&&r.company_id!==company))return false;
+   if(!filterPeriod(period,from,to,String(r.order_date||r.approved_at||'').slice(0,10)))return false;
+   if(source!=='all'&&text(r.source)!==source)return false;
+   if(channel!=='all'&&text(r.channel)!==channel)return false;
+   if(product!=='all'&&text(r.product_name)!==product)return false;
+   if(min!==''&&Number(r.order_total)<Number(min))return false;
+   if(max!==''&&Number(r.order_total)>Number(max))return false;
+   if(cust&&![r.customer_name,r.customer_mobile,r.customer_email].some(v=>String(v??'').toLowerCase().includes(cust)))return false;
+   if(tag&&!String(r.tags||r.customer_tags||r.lead_tags||'').toLowerCase().includes(tag))return false;
+   if(employee&&!String(r.employee_name||r.owner_name||r.assigned_to||'').toLowerCase().includes(employee))return false;
+   return !term||[r.order_id,r.platform_order_id,r.company_id,r.customer_name,r.customer_mobile,r.customer_email,r.product_name,r.sku,r.courier_name,r.tracking_number,r.invoice_number].some(v=>String(v??'').toLowerCase().includes(term));
+  });
   const count=k=>list.filter(r=>r.status===k).length;
   q('#dispatch-metrics').innerHTML=[['Pending',count('Pending')+count('Approved')],['Packed',count('Packed')],['Shipped',count('Shipped')],['Delivered',count('Delivered')]].map(([label,value])=>'<div class="gr-order-stat"><span>'+label+'</span><strong>'+num(value)+'</strong></div>').join('');
   q('#dispatch-table').innerHTML=list.length?list.map(r=>'<tr>'+
@@ -181,7 +199,7 @@
    '<td>'+esc(new Date(r.approved_at).toLocaleDateString('en-IN'))+'</td>'+
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
-   '<td><div class="gr-order-actions"><button class="btn soft gr-packing-direct" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
+   '<td><div class="gr-order-actions"><window.GreenRichActionMenu.wrap('<button class="btn soft" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+'<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
    (canDispatch&&r.status!=='Delivered'&&r.status!=='Cancelled'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update Status</button>':'')+(canDispatch&&!['Delivered','Cancelled'].includes(r.status)?'<button type="button" class="btn soft" data-dispatch-cancel="'+esc(r.id)+'">Cancel Dispatch</button>':'')+(canDispatch&&r.status==='Cancelled'?'<button type="button" class="btn soft" data-dispatch-delete="'+esc(r.id)+'">Delete Dispatch</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
    )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
@@ -480,6 +498,10 @@
   ['orders-from','orders-to'].forEach(id=>q('#'+id).onchange=()=>{
    if(q('#orders-from').value||q('#orders-to').value)q('#orders-period').value='custom';renderSales();
   });
+  ['dispatch-period','dispatch-status-filter','dispatch-company-filter','dispatch-source-filter','dispatch-channel-filter','dispatch-product-filter'].forEach(id=>{const el=q('#'+id);if(el)el.onchange=renderDispatch});
+  ['dispatch-from','dispatch-to'].forEach(id=>{const el=q('#'+id);if(el)el.onchange=()=>{q('#dispatch-period').value='custom';renderDispatch()}});
+  ['dispatch-search','dispatch-customer-filter','dispatch-tag-filter','dispatch-employee-filter','dispatch-min-amount','dispatch-max-amount'].forEach(id=>{const el=q('#'+id);if(el)el.oninput=renderDispatch});
+  q('#dispatch-clear-filters').onclick=()=>{['dispatch-period','dispatch-status-filter','dispatch-company-filter','dispatch-source-filter','dispatch-channel-filter','dispatch-product-filter'].forEach(id=>q('#'+id).value='all');['dispatch-from','dispatch-to','dispatch-search','dispatch-customer-filter','dispatch-tag-filter','dispatch-employee-filter','dispatch-min-amount','dispatch-max-amount'].forEach(id=>q('#'+id).value='');renderDispatch()};
   q('#sales-search').oninput=renderSales;
   q('#orders-export').onclick=exportFiltered;
   q('#orders-scroll-left').onclick=()=>q('#orders-horizontal-scroll').scrollBy({left:-440,behavior:'smooth'});
