@@ -6,7 +6,7 @@ window.GreenRichSheetManager=(function(){
  const day=x=>x?new Date(x).toLocaleString('en-IN'):'Never';
  const coName=c=>c==='grow-india'?'GreenRich Grow India':'GreenRich Enviro Solutions';
  const style='.gsi{font:13px/1.5 Inter,system-ui,sans-serif;color:#244463}.gsi *{box-sizing:border-box}.gsi h2{font-size:21px;margin:0}.gsi h3{font-size:16px;margin:0 0 12px}.gsi .panel{background:white;border:1px solid #d7e4f2;border-radius:12px;margin:12px 0;padding:17px}.gsi .muted{color:#61758b;font-size:12px}.gsi .bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}.gsi .actions{display:flex;gap:8px;flex-wrap:wrap}.gsi button{width:auto!important;padding:9px 12px!important;min-height:33px!important;font-size:12px!important;border-radius:8px!important;cursor:pointer}.gsi .primary{background:#2657ae;color:white;border:1px solid #2657ae}.gsi .secondary{background:white;color:#2657ae;border:1px solid #c5d5ea}.gsi .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.gsi .mapping{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.gsi label{display:block;margin:7px 0;font-size:12px}.gsi input,.gsi textarea,.gsi select{font:inherit;width:100%;border:1px solid #cbd8e8;border-radius:8px;padding:9px;background:#fff;color:#16324e}.gsi textarea{min-height:65px}.gsi table{width:100%;border-collapse:collapse;font-size:12px}.gsi th,.gsi td{padding:9px;border-bottom:1px solid #e7edf5;text-align:left;vertical-align:top}.gsi .scroll{overflow:auto}.gsi .warning{background:#fff5e6;padding:9px;border-radius:8px;color:#7e5b23}.gsi .tile{padding:12px;border:1px solid #d9e4f0;border-radius:9px;margin:9px 0}.gsi dialog{width:min(760px,95vw);max-height:89vh;overflow:auto;border:1px solid #d0deed;border-radius:14px;padding:20px}.gsi dialog::backdrop{background:#1327478c}@media(max-width:720px){.gsi .grid,.gsi .mapping{grid-template-columns:1fr}}';
- const menuCss='.gsi .sheet-actions{position:relative;display:inline-block;min-width:0}.gsi .sheet-actions summary{display:grid;place-items:center;width:36px;height:36px;cursor:pointer;border:1px solid #c5d5ea;color:#2657ae;border-radius:8px;background:#f3f7ff;list-style:none;font-size:22px;font-weight:700;line-height:1}.gsi .sheet-actions summary::-webkit-details-marker{display:none}.sheet-action-menu{display:none;position:fixed;z-index:100000;flex-direction:column;gap:5px;width:210px;padding:9px;background:white;border:1px solid #c5d5ea;border-radius:10px;box-shadow:0 12px 32px #142c4940;max-height:min(350px,80vh);overflow-y:auto}.gsi .sheet-actions[open] .sheet-action-menu{display:flex}.sheet-action-menu button{text-align:left}.sheet-delete{color:#b42318!important;border-color:#f1b6b0!important}.gsi td:last-child{min-width:65px}';
+ const menuCss='.gsi .sheet-actions{position:relative;display:inline-block;min-width:0}.gsi .sheet-actions summary{display:grid;place-items:center;width:36px;height:36px;cursor:pointer;border:1px solid #c5d5ea;color:#2657ae;border-radius:8px;background:#f3f7ff;list-style:none;font-size:22px;font-weight:700;line-height:1}.gsi .sheet-actions summary::-webkit-details-marker{display:none}.sheet-action-menu{display:none;position:fixed;z-index:100000;flex-direction:column;gap:5px;width:210px;padding:9px;background:white;border:1px solid #c5d5ea;border-radius:10px;box-shadow:0 12px 32px #142c4940;max-height:min(350px,80vh);overflow-y:auto}.gsi .sheet-actions[open] .sheet-action-menu{display:flex}.sheet-action-menu button{display:block;width:100%!important;box-sizing:border-box;text-align:left;white-space:nowrap;margin:0!important;line-height:1.3!important}.sheet-action-menu button:disabled{opacity:.55;cursor:wait}.sheet-action-menu .primary{background:#2657ae;color:#fff;border-color:#2657ae}.sheet-delete{color:#b42318!important;border-color:#f1b6b0!important}.gsi td:last-child{min-width:65px}';
  const option=(list,sel)=>list.map(([v,t])=>'<option value="'+esc(v)+'" '+(String(v)===String(sel)?'selected':'')+'>'+esc(t)+'</option>').join('');
  const input=(label,name,value='',type='text')=>'<label>'+label+'<input name="'+name+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const select=(label,name,list,val)=>'<label>'+label+'<select name="'+name+'">'+option(list,val)+'</select></label>';
@@ -32,13 +32,13 @@ window.GreenRichSheetManager=(function(){
   return {sources:r[0].data||[],imports:r[1].data||[],products:r[2].data||[],approvedSources:r[3].data||[],templates:r[4].error?[]:r[4].data||[],staff};
  }
  function mount(root,ctx){
-  const st={root,ctx,tab:'sources',data:null};
+  const st={root,ctx,tab:'sources',data:null,syncing:new Set(),syncNotice:''};
   st.refresh=async()=>{
    try{st.data=await data(ctx);draw(st)}
    catch(e){root.innerHTML=heading()+'<div class="gsi"><div class="panel warning">'+esc(e.message)+'</div></div>'}
   };
   root.innerHTML=heading()+'<div class="gsi"><div class="panel">Loading integration settings…</div></div>';
-  void st.refresh();return st;
+  void st.refresh();st.refreshTimer=setInterval(()=>{if(root.isConnected&&!st.syncing.size)void st.refresh();else if(!root.isConnected)clearInterval(st.refreshTimer)},120000);return st;
  }
  function draw(st){
   const d=st.data,dupes=d.imports.filter(x=>x.duplicate_type!=='none'),err=d.imports.filter(x=>x.import_error);
@@ -47,6 +47,7 @@ window.GreenRichSheetManager=(function(){
    '<button class="secondary" data-act="credentials">Connection token</button><button class="secondary" data-act="refresh">Refresh</button></div></div>'+
    '<div class="panel"><b>'+d.sources.filter(x=>x.enabled).length+' active sources</b> · '+dupes.length+' possible duplicates · '+err.length+' skipped rows'+
    '<p class="muted">Separate enquiries are retained even if phone/email matches. Same sheet-row retries are not duplicated.</p>'+
+   (st.syncNotice?'<p class="muted" role="status">'+esc(st.syncNotice)+'</p>':'')+
    '<div class="actions">'+[['sources','Connected Sheets'],['leads','Duplicate Leads'],['contacts','Duplicate Contacts'],['errors','Skipped Rows']].map(([id,label])=>'<button class="'+(st.tab===id?'primary':'secondary')+'" data-act="tab-'+id+'">'+label+'</button>').join('')+'</div></div>';
   if(st.menuAbort)st.menuAbort.abort();document.querySelectorAll('body > .sheet-action-menu').forEach(x=>x.remove());st.menuAbort=new AbortController();
   st.root.innerHTML=heading()+'<div class="gsi">'+head+(st.tab==='sources'?sources(st):st.tab==='errors'?skipped(st):st.tab==='history'?history(st):duplicates(st))+
@@ -87,7 +88,7 @@ window.GreenRichSheetManager=(function(){
     '<td><b>'+(s.enabled?'Active':'Paused')+'</b><br><span class="muted">Last sync: '+esc(day(s.last_sync_at))+'<br>Processed row: '+s.cursor_row+'</span>'+
     (s.last_error?'<p class="warning">'+esc(s.last_error)+'</p>':'')+'</td>'+
     '<td><details class="sheet-actions"><summary aria-label="Sheet actions" title="Sheet actions">⋮</summary><div class="sheet-action-menu">'+
-    '<button class="primary" data-act="sync" data-id="'+s.id+'">Sync Now</button>'+
+    '<button class="primary" data-act="sync" data-id="'+s.id+'" '+(st.syncing.has(s.id)?'disabled':'')+'>'+(st.syncing.has(s.id)?'Syncing…':'Sync Now')+'</button>'+
     '<button class="secondary" data-act="edit" data-id="'+s.id+'">Edit mapping</button>'+
     '<button class="secondary" data-act="history" data-id="'+s.id+'">History</button>'+
     '<button class="secondary" data-act="pause" data-id="'+s.id+'">'+(s.enabled?'Pause':'Resume')+'</button>'+
@@ -196,14 +197,28 @@ window.GreenRichSheetManager=(function(){
   if(a==='sync'){
    const s=st.data.sources.find(x=>x.id===id);if(!s)return;
    if(!s.enabled){alert('Resume this sheet before syncing.');return;}
-   const button=st.root.querySelector('[data-act="sync"][data-id="'+id+'"]');
-   if(button){button.disabled=true;button.textContent='Requesting…';}
+   if(st.syncing.has(id))return;
+   st.syncing.add(id);
+   st.syncNotice='Sync requested for '+s.tab_name+'… Waiting for the Google Sheet worker.';
+   draw(st);
    try{
     const r=await st.ctx.db.rpc('gr_sheet_admin_request_sync',{p_connection:id});
     if(r.error)throw r.error;
-    alert('Sync requested for '+s.tab_name+'. The Google Apps Script worker will process it on its next scheduled run (up to about one minute).');
-    await st.refresh();
-   }catch(e){alert('Sync request failed: '+e.message);if(button){button.disabled=false;button.textContent='Sync Now';}}
+    const requestedAt=Date.now();
+    let completed=false;
+    for(let attempt=0;attempt<15;attempt++){
+     await new Promise(resolve=>setTimeout(resolve,2000));
+     const check=await st.ctx.db.from('gr_sheet_connections').select('last_sync_at,last_error,cursor_row').eq('id',id).single();
+     if(check.error)throw check.error;
+     const current=check.data;
+     if(current.last_sync_at&&new Date(current.last_sync_at).getTime()>=requestedAt-1000){
+      st.syncNotice=current.last_error?'Sync completed with an error: '+current.last_error:'Sync completed for '+s.tab_name+'. Processed through row '+current.cursor_row+'.';
+      completed=true;break;
+     }
+    }
+    if(!completed)st.syncNotice='Sync queued for '+s.tab_name+'. The Google Apps Script worker has not confirmed completion yet. It may take until its next scheduled run.';
+   }catch(e){st.syncNotice='Sync request failed: '+e.message;}
+   finally{st.syncing.delete(id);await st.refresh();}
    return;
   }
   if(a.startsWith('tab-')){st.tab=a.slice(4);draw(st);return}
