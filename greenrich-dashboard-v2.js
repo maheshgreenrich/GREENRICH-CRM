@@ -97,7 +97,7 @@
  }
  function draw(){
   if(!isActive())return;
-  const f=filtered(),sale=f.sales.filter(s=>!['Cancelled','Returned'].includes(s.status)),won=f.leads.filter(l=>l.stage==='Won');
+  const f=filtered(),sale=f.sales.filter(s=>!['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase())),won=f.leads.filter(l=>l.stage==='Won');
   const orderCount=countUnique(sale,s=>s.company_id+'|'+(s.internal_order_id||s.order_id||s.id));
   const due=f.followups.filter(l=>new Date(l.next_followup_at).valueOf()<=Date.now());
   const awaiting=f.dispatch.filter(d=>!['Delivered','Shipped','Cancelled'].includes(d.status));
