@@ -12,7 +12,7 @@
  async function refresh(){
   requireDb();
   const [cr,tr]=await Promise.all([
-   db.from('gr_crm_customers').select('*').order('name'),
+   db.from('gr_crm_customers').select('*').is('deleted_at',null).order('name'),
    db.from('gr_crm_tags').select('*').order('name')
   ]);
   customers=check(cr)||[];tags=check(tr)||[];
@@ -125,7 +125,7 @@
  }
  async function deleteCustomer(id){
   requireDb();
-  check(await db.from('gr_crm_customers').delete().eq('id',id).select('id').single());
+  check(await db.rpc('gr_contact_delete_customer',{p_id:id}));
   customers=customers.filter(c=>c.id!==id);
  }
  async function createTag(name){
