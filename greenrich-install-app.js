@@ -25,5 +25,7 @@
  };
  window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installEvent=event;makeButton()});
  window.addEventListener('appinstalled',()=>{installEvent=null;document.getElementById('gr-install-app')?.remove()});
- if(isIOS())document.addEventListener('DOMContentLoaded',makeButton,{once:true});
+ // Always expose an install entry point; Chrome controls its own toolbar icon.
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',makeButton,{once:true});
+ else makeButton();
 })();
