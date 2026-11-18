@@ -94,32 +94,39 @@ Deno.serve(async req=>{
    return response({message:active?'Account enabled':'Account disabled'});
   }
   if(action==='delete'){
-   if(id===user.id)return response({error:'You cannot delete your own account'},403);
-   // Do not change or remove Attendance or audit records. Block deletion if linked history exists.
-   const refs=[
-    ['gr_attendance','user_id'],['gr_attendance','marked_by'],
-    ['grm_attendance','user_id'],['grm_attendance','marked_by'],
-    ['grm_corrections','user_id'],['grm_corrections','reviewed_by'],
-    ['grm_leaves','user_id'],['grm_leaves','reviewed_by'],
-    ['grm_audit_logs','actor_id'],['gr_profiles','manager_id']
+   if(!superAdmin)return response({error:'Admin only'},403);
+   if(id===user.id)return response({error:'You cannot archive your own account'},403);
+   // Archive the identity rather than deleting it: FK references, attendance,
+   // approvals and audit history must remain intact.
+   const ban=await admin.auth.admin.updateUserById(id,{ban_duration:'876000h'});
+   if(ban.error)return response({error:'Could not revoke employee login: '+ban.error.message},409);
+   const changed=await admin.from('gr_profiles').update({active:false}).eq('id',id);
+   if(changed.error)return response({error:'Login blocked, but employee archive failed: '+changed.error.message},500);
+   // Only live responsibility/assignment columns move. Creator and actor
+   // columns deliberately retain the original employee for audit integrity.
+   const assignments=[
+    ['gr_lead_pipeline','assigned_to'],['gr_dispatch_service_followups','assigned_to'],
+    ['gr_field_visit_followups','assigned_to'],['gr_field_visits','assigned_to'],
+    ['gr_meta_sheet_sources','assigned_to']
    ];
-   for(const [table,column] of refs){
-    const result=await admin.from(table).select(column,{count:'exact',head:true}).eq(column,id);
-    if(result.error)return response({error:'Unable to verify account history. Delete cancelled: '+result.error.message},409);
-    if(result.count)return response({error:'This employee has linked attendance, approval or staff history and cannot be permanently deleted. Use Deactivate to preserve records.'},409);
+   const failures:string[]=[];
+   for(const [table,column] of assignments){
+    const result=await admin.from(table).update({[column]:user.id}).eq(column,id);
+    if(result.error)failures.push(table+': '+result.error.message);
    }
-   const deleted=await admin.auth.admin.deleteUser(id);
-   if(deleted.error)return response({error:'Account deletion failed: '+deleted.error.message},409);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'DELETE',old_value:{username:target.username}});
-   return response({message:'Employee login and profile permanently deleted'});
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'ARCHIVE',old_value:{username:target.username},new_value:{active:false,transferred_to:user.id,assignment_failures:failures}});
+   if(failures.length)return response({error:'Employee login disabled and history preserved, but some assignments need manual transfer: '+failures.join('; ')},409);
+   return response({message:'Employee archived. Login disabled, active assignments transferred to Admin, and historical records preserved.'});
   }
   if(action==='reset'){
-   const {data:account,error:accountError}=await admin.auth.admin.getUserById(id);
-   if(accountError||!account?.user?.email)return response({error:'Email unavailable'},400);
-   const reset=await admin.auth.resetPasswordForEmail(account.user.email,{redirectTo:'https://maheshgreenrich.github.io/GREENRICH-CRM/secure.html'});
-   if(reset.error)return response({error:reset.error.message},400);
-   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'PASSWORD_RESET_REQUEST'});
-   return response({message:'Password reset email requested'});
+   if(!superAdmin)return response({error:'Only Admin can set employee passwords'},403);
+   const password=String(body.password||'');
+   if(password.length<12||password.length>128)return response({error:'Password must contain 12 to 128 characters'},400);
+   if(id===user.id)return response({error:'Change your own password in account settings'},403);
+   const updated=await admin.auth.admin.updateUserById(id,{password});
+   if(updated.error)return response({error:updated.error.message},400);
+   await admin.from('gr_audit_log').insert({actor_id:user.id,entity:'gr_profiles',entity_id:id,operation:'ADMIN_PASSWORD_CHANGE',new_value:{changed_by_admin:true}});
+   return response({message:'Employee password changed by Admin. No email sent.'});
   }
   return response({error:'Unsupported action'},400);
  }catch(error){return response({error:String(error?.message||error)},500)}
