@@ -6,10 +6,11 @@ window.GreenRichSheetManager=(function(){
  const day=x=>x?new Date(x).toLocaleString('en-IN'):'Never';
  const coName=c=>c==='grow-india'?'GreenRich Grow India':'GreenRich Enviro Solutions';
  const style='.gsi{font:13px/1.5 Inter,system-ui,sans-serif;color:#244463}.gsi *{box-sizing:border-box}.gsi h2{font-size:21px;margin:0}.gsi h3{font-size:16px;margin:0 0 12px}.gsi .panel{background:white;border:1px solid #d7e4f2;border-radius:12px;margin:12px 0;padding:17px}.gsi .muted{color:#61758b;font-size:12px}.gsi .bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}.gsi .actions{display:flex;gap:8px;flex-wrap:wrap}.gsi button{width:auto!important;padding:9px 12px!important;min-height:33px!important;font-size:12px!important;border-radius:8px!important;cursor:pointer}.gsi .primary{background:#2657ae;color:white;border:1px solid #2657ae}.gsi .secondary{background:white;color:#2657ae;border:1px solid #c5d5ea}.gsi .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.gsi .mapping{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.gsi label{display:block;margin:7px 0;font-size:12px}.gsi input,.gsi textarea,.gsi select{font:inherit;width:100%;border:1px solid #cbd8e8;border-radius:8px;padding:9px;background:#fff;color:#16324e}.gsi textarea{min-height:65px}.gsi table{width:100%;border-collapse:collapse;font-size:12px}.gsi th,.gsi td{padding:9px;border-bottom:1px solid #e7edf5;text-align:left;vertical-align:top}.gsi .scroll{overflow:auto}.gsi .warning{background:#fff5e6;padding:9px;border-radius:8px;color:#7e5b23}.gsi .tile{padding:12px;border:1px solid #d9e4f0;border-radius:9px;margin:9px 0}.gsi dialog{width:min(760px,95vw);max-height:89vh;overflow:auto;border:1px solid #d0deed;border-radius:14px;padding:20px}.gsi dialog::backdrop{background:#1327478c}@media(max-width:720px){.gsi .grid,.gsi .mapping{grid-template-columns:1fr}}';
+ const menuCss='.gsi .sheet-actions{position:relative;min-width:125px}.gsi .sheet-actions summary{display:inline-block;cursor:pointer;border:1px solid #c5d5ea;color:#2657ae;border-radius:8px;padding:8px 12px;font-weight:600;list-style:none}.gsi .sheet-actions summary::-webkit-details-marker{display:none}.gsi .sheet-action-menu{display:flex;flex-direction:column;gap:5px;min-width:150px;padding:8px;background:white;border:1px solid #c5d5ea;border-radius:9px;box-shadow:0 5px 16px #142c4930;margin-top:5px}.gsi .sheet-action-menu button{text-align:left}.gsi .sheet-delete{color:#b42318!important;border-color:#f1b6b0!important}.gsi td:last-child{min-width:155px}';
  const option=(list,sel)=>list.map(([v,t])=>'<option value="'+esc(v)+'" '+(String(v)===String(sel)?'selected':'')+'>'+esc(t)+'</option>').join('');
  const input=(label,name,value='',type='text')=>'<label>'+label+'<input name="'+name+'" type="'+type+'" value="'+esc(value)+'"></label>';
  const select=(label,name,list,val)=>'<label>'+label+'<select name="'+name+'">'+option(list,val)+'</select></label>';
- const heading=()=>'<style>'+style+'</style>';
+ const heading=()=>'<style>'+style+menuCss+'</style>';
  async function data(ctx){
   const cs=ctx.companyIds||[];
   if(!cs.length)throw Error('No working companies available');
@@ -48,7 +49,7 @@ window.GreenRichSheetManager=(function(){
    '<p class="muted">Separate enquiries are retained even if phone/email matches. Same sheet-row retries are not duplicated.</p>'+
    '<div class="actions">'+[['sources','Connected Sheets'],['leads','Duplicate Leads'],['contacts','Duplicate Contacts'],['errors','Skipped Rows']].map(([id,label])=>'<button class="'+(st.tab===id?'primary':'secondary')+'" data-act="tab-'+id+'">'+label+'</button>').join('')+'</div></div>';
   st.root.innerHTML=heading()+'<div class="gsi">'+head+(st.tab==='sources'?sources(st):st.tab==='errors'?skipped(st):st.tab==='history'?history(st):duplicates(st))+
-   '<div class="panel muted">Run the updated central Apps Script in your existing Google Apps Script project. The Google account running it needs access to every connected Sheet. Sync runs about every five minutes after the trigger is authorized.</div></div>';
+   '<div class="panel muted">Run the updated central Apps Script in your existing Google Apps Script project. The Google account running it needs access to every connected Sheet. Sync runs about every minute after the updated trigger is authorized. Use Actions → Sync Now to request a priority sync.</div></div>';
   st.root.querySelectorAll('[data-act]').forEach(el=>el.onclick=()=>void act(st,el.dataset.act,el.dataset.id));
  }
  function sources(st){
@@ -59,9 +60,13 @@ window.GreenRichSheetManager=(function(){
     '<td>'+esc(s.source_name)+'<br>'+esc(st.data.staff.find(p=>p.id===s.assigned_to)?.full_name||'Unassigned')+'</td>'+
     '<td><b>'+(s.enabled?'Active':'Paused')+'</b><br><span class="muted">Last sync: '+esc(day(s.last_sync_at))+'<br>Processed row: '+s.cursor_row+'</span>'+
     (s.last_error?'<p class="warning">'+esc(s.last_error)+'</p>':'')+'</td>'+
-    '<td><button class="secondary" data-act="edit" data-id="'+s.id+'">Edit mapping</button> '+
-    '<button class="secondary" data-act="pause" data-id="'+s.id+'">'+(s.enabled?'Pause':'Resume')+'</button> '+
-    '<button class="secondary" data-act="history" data-id="'+s.id+'">History</button></td></tr>').join('')+
+    '<td><details class="sheet-actions"><summary>Actions ▾</summary><div class="sheet-action-menu">'+
+    '<button class="primary" data-act="sync" data-id="'+s.id+'">Sync Now</button>'+
+    '<button class="secondary" data-act="edit" data-id="'+s.id+'">Edit mapping</button>'+
+    '<button class="secondary" data-act="history" data-id="'+s.id+'">History</button>'+
+    '<button class="secondary" data-act="pause" data-id="'+s.id+'">'+(s.enabled?'Pause':'Resume')+'</button>'+
+    '<button class="secondary sheet-delete" data-act="delete" data-id="'+s.id+'">Delete sheet</button>'+
+    '</div></details></td></tr>').join('')+
    '</tbody></table></div></div>';
  }
  function history(st){
@@ -177,6 +182,13 @@ window.GreenRichSheetManager=(function(){
   }
   if(a.startsWith('tab-')){st.tab=a.slice(4);draw(st);return}
   if(a==='add'){edit(st);return}
+  if(a==='delete'){
+   const s=st.data.sources.find(x=>x.id===id);if(!s)return;
+   if(!confirm('Delete the Google Sheet integration for "'+s.tab_name+'"? This stops future syncing and deletes this connection’s import history. Already imported CRM leads will remain. This cannot be undone.'))return;
+   const r=await st.ctx.db.rpc('gr_sheet_admin_delete_connection',{p_connection:id});
+   if(r.error){alert('Delete failed: '+r.error.message);return;}
+   await st.refresh();return;
+  }
   if(a==='edit'){edit(st,st.data.sources.find(x=>x.id===id));return}
   if(a==='credentials'){await window.GreenRichMetaSync.open(st.ctx);return}
   if(a==='history'){st.selectedSource=id;st.tab='history';draw(st);return}
