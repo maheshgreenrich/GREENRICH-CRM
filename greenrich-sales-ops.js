@@ -39,7 +39,7 @@
   if(period==='month')return String(day).slice(0,7)===date().slice(0,7);
   const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   if(period==='week')start.setDate(start.getDate()-((start.getDay()+6)%7));
-  else if(period==='last30')start.setDate(start.getDate()-29);
+  else if(period==='last30'||['7','30','60','90'].includes(period))start.setDate(start.getDate()-(period==='last30'?30:Number(period))+1);
   const stamp=[start.getFullYear(),String(start.getMonth()+1).padStart(2,'0'),String(start.getDate()).padStart(2,'0')].join('-');
   return day>=stamp&&day<=date();
  };
