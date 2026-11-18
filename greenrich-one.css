@@ -244,3 +244,15 @@ aside .logo{
 #gr-company-admin .gr-settings-tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #gr-company-admin .gr-settings-version{margin:12px 0 0;font-size:11px;color:#5c7598}
 @media(max-width:650px){#gr-company-admin .gr-gps-direct-link{width:100%;text-align:center}#gr-company-admin .gr-settings-tabs button{flex:1 1 140px;max-width:none}}
+
+/* Admin employee editor */
+.gr-employee-modal-backdrop{position:fixed;inset:0;z-index:99999;background:rgba(13,32,62,.58);display:flex;align-items:center;justify-content:center;padding:20px}
+.gr-employee-modal{background:#fff;color:#17345a;border-radius:18px;box-shadow:0 20px 70px rgba(0,0,0,.25);width:min(580px,100%);max-height:90vh;overflow:auto;padding:28px}
+.gr-employee-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.gr-employee-modal-head h2{margin:0;font-size:23px}
+.gr-employee-modal>p{color:#64748b;font-size:14px}
+.gr-employee-edit-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.gr-employee-edit-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:13px}
+.gr-employee-edit-form input,.gr-employee-edit-form select{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cddbf0;border-radius:9px;background:#fff;color:#17345a;font-size:14px}
+.gr-employee-modal-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
+@media(max-width:540px){.gr-employee-edit-form{grid-template-columns:1fr}.gr-employee-modal{padding:18px}}
