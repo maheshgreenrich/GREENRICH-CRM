@@ -29,7 +29,7 @@
  const orderKey=s=>(s._companyId||s.company_id)+'|'+s.id;
  const dispatchFor=s=>dispatchRows.find(d=>d.company_id===s._companyId&&d.source_sale_id===s.id);
  const serviceFor=order=>serviceLinks.find(x=>x.dispatch_id===order.id);
- const approvalStatus=s=>stockBlocked(s)?'Low Stock Alert':dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
+ const approvalStatus=s=>['Cancelled','Returned'].includes(s.status)?s.status:stockBlocked(s)?'Low Stock Alert':dispatchFor(s)?.status==='Pending'?'Pending dispatch':dispatchFor(s)?.status||s.approval_status||'Pending verification';
  const stockShortage=s=>Math.max(0,Number(s.stock_shortage)||0);
  const stockBlocked=s=>stockShortage(s)>0;
  const filterPeriod=(period,from,to,day)=>{
@@ -86,14 +86,14 @@
   const pending=rows.filter(s=>!dispatchFor(s)&&s.approval_status!=='Approved'&&!['Cancelled','Returned'].includes(s.status));
   const cancelled=rows.filter(s=>['Cancelled','Returned'].includes(s.status));
   const todaySales=rows.filter(s=>s.date===date());
-  const total=rows.reduce((sum,s)=>sum+(Number(s.total)||0),0);
+  const total=rows.filter(s=>!['Cancelled','Returned'].includes(s.status)).reduce((sum,s)=>sum+(Number(s.total)||0),0);
   const metrics=[
    ['Total orders',orderIds.size,'In selected filters'],
    ['Awaiting approval',pending.length,'Need verification'],
    ['Approved orders',approved.length,'Passed to Dispatch'],
    ['Dispatched',rows.filter(s=>['Shipped','Delivered'].includes(approvalStatus(s))).length,'Handed to courier'],
    ["Today's orders",todaySales.length,'Matching current filters'],
-   ['Sales value',money(total),'For filtered orders'],
+   ['Sales value',money(total),'Active orders only'],
    ['Cancelled / returned',cancelled.length,'Not eligible for approval']
   ];
   q('#orders-status-report').innerHTML=metrics.map(([label,value,note])=>
