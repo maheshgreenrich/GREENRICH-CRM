@@ -200,7 +200,7 @@
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
    '<td><div class="gr-order-actions">'+window.GreenRichActionMenu.wrap('<button class="btn soft" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+'<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
-   (canDispatch&&r.status!=='Delivered'&&r.status!=='Cancelled'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update Status</button>':'')+(canDispatch&&!['Delivered','Cancelled'].includes(r.status)?'<button type="button" class="btn soft" data-dispatch-cancel="'+esc(r.id)+'">Cancel Dispatch</button>':'')+(canDispatch&&r.status==='Cancelled'?'<button type="button" class="btn soft" data-dispatch-delete="'+esc(r.id)+'">Delete Dispatch</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
+   (canDispatch&&r.status!=='Delivered'&&r.status!=='Cancelled'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update Status</button>':'')+(canDispatch&&r.status!=='Cancelled'?'<button type="button" class="btn soft" data-dispatch-cancel="'+esc(r.id)+'">Cancel Dispatch</button>':'')+(canDispatch&&r.status==='Cancelled'?'<button type="button" class="btn soft" data-dispatch-delete="'+esc(r.id)+'">Delete Dispatch</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
    )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
@@ -454,10 +454,10 @@
   const order=dispatchRows.find(r=>r.id===id);
   if(!order||!validCompany(order.company_id))return actionMessage('Dispatch record not available');
   if(remove&&order.status!=='Cancelled')return actionMessage('Cancel dispatch before deleting it');
-  if(!remove&&['Delivered','Cancelled'].includes(order.status))return actionMessage('Delivered or cancelled dispatch cannot be cancelled again');
-  if(serviceFor(order))return actionMessage('Dispatch has linked service records. Resolve those records before removal');
-  if(order.invoice_number)return actionMessage('Dispatch has an invoice. Resolve the invoice before removal');
-  const message=remove?'Permanently delete cancelled dispatch '+order.order_id+'? This cannot be undone.':'Cancel dispatch '+order.order_id+'? The original Sales Order will remain in the system.';
+  if(!remove&&order.status==='Cancelled')return actionMessage('Dispatch is already cancelled');
+  if(remove&&serviceFor(order))return actionMessage('Dispatch has linked service records. Resolve those records before deletion');
+  if(remove&&order.invoice_number)return actionMessage('Invoice '+order.invoice_number+' must be voided and reconciled before permanent deletion. Dispatch cancellation remains available.');
+  const message=remove?'Permanently delete cancelled dispatch '+order.order_id+'? This cannot be undone.':('Cancel dispatch '+order.order_id+'?'+(order.invoice_number?' Invoice '+order.invoice_number+' will be retained and MUST be voided separately in Accounts; cancellation here does not void an issued invoice.':'')+' The original Sales Order will remain in the system.');
   if(!window.confirm(message))return;
   try{
    const query=remove?db.from('gr_dispatch_orders').delete():db.from('gr_dispatch_orders').update({status:'Cancelled',updated_at:new Date().toISOString()});
