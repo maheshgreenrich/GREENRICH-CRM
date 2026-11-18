@@ -21,12 +21,7 @@
  }
  async function attendanceBody(db,mode='in'){
   const permitted=await enabledCompanies(db);
-  const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  // Always capture actual check-in location for mobile attendance, regardless
-  // of whether continuous field-staff tracking is enabled.
-  if(!permitted.length&&!mobile)return {};
-  // Non-field staff need GPS only at check-in, not continuously at check-out.
-  if(!permitted.length&&mode!=='in')return {};
+  // Only Admin-enabled field staff require GPS. Other employees use time-only attendance.\n  if(!permitted.length)return {};
   const u=(await db.auth.getUser()).data.user;
   const choice=window.GreenRichCompanies?.selected?.(u?.id);
   const companyId=permitted.includes(choice)?choice:permitted[0]||null;
