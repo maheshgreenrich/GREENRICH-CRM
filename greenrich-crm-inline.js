@@ -22,7 +22,8 @@ const find=(k,id)=>k==='customers'?data.customers.find(x=>x.id===id):scopeRows(k
 const nameOf=(k,id)=>find(k,id)?.name||find(k,id)?.title||'—';
 const safeN=n=>Number.isFinite(Number(n))?Number(n):0;
 const getCalc=(qty,price,tax,inclusive)=>{qty=safeN(qty);price=safeN(price);tax=safeN(tax);let gross=qty*price;let base=inclusive?gross/(1+tax/100):gross;let gst=inclusive?gross-base:base*tax/100;return {base:round(base),gst:round(gst),total:round(base+gst)}};
-const saleGross=s=>Number(s.total)||0;
+const isVoidedSale=s=>['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase());
+const saleGross=s=>isVoidedSale(s)?0:Number(s.total)||0;
 const companyChoices=[{id:'grow-india',name:'GreenRich Grow India Pvt Ltd'},{id:'enviro-solutions',name:'GreenRich Enviro Solutions Pvt Ltd'}];
 const companyLabel=id=>window.GreenRichCompanies?.list?.().find(c=>c.id===id)?.name||companyChoices.find(c=>c.id===id)?.name||'Unknown company';
 const companyStorage=id=>id==='grow-india'?legacyKey:legacyKey+'::'+id;
@@ -189,7 +190,7 @@ function inPeriod(s){
 function filteredSales(){
  const company=$('#filter-company')?.value||'all',channel=$('#filter-channel')?.value||'all';
  const customer=$('#filter-customer')?.value||'all',product=$('#filter-product')?.value||'all';
- return overviewSales().filter(s=>inPeriod(s)
+ return overviewSales().filter(s=>!isVoidedSale(s)&&inPeriod(s)
   &&(company==='all'||companyForSale(s)===company)
   &&(channel==='all'||channelForSale(s)===channel)
   &&(customer==='all'||s.customer_id===customer)
@@ -470,7 +471,7 @@ async function exportOverviewPdf(){
  toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
 }
 
-const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(k==='sales'?'<button class="action-button" data-cancel-sale="'+id+'">Cancel Order</button>':'')+(adminMode&&(k!=='sales'||find('sales',id)?.status==='Cancelled')?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
+const actButtons=(k,id)=>{const sale=k==='sales'?find('sales',id):null;const cancelled=sale&&isVoidedSale(sale);return (cancelled?'':'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>')+(sale&&!cancelled?'<button class="action-button" data-cancel-sale="'+id+'">Cancel Order</button>':'')+(adminMode&&(!sale||cancelled)?'<button class="action-button delete" data-delete="'+k+':'+id+'">'+(sale?'Delete Order':'Delete')+'</button>':'');};
  const act=(k,id)=>window.GreenRichActionMenu.wrap(actButtons(k,id));
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
@@ -1014,7 +1015,7 @@ async function removeRecord(k,id){
  if(k==='channels'&&loadCompanyData(owner).sales.some(s=>s.channel_id===id))return toast('Channel is used in sales. Mark it inactive instead.');
  if(!confirm('Delete this '+k.slice(0,-1)+'? This cannot be undone.'))return;
  const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
- if(k==='sales'&&item.status!=='Cancelled')return toast('Cancel this sales order first. Delete becomes available after cancellation.','error');
+ if(k==='sales'&&!isVoidedSale(item))return toast('Cancel this sales order first. Delete becomes available after cancellation.','error');
   if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
   if(k==='sales'&&window.GreenRichSalesOps?.isApproved?.(owner,id))return toast('Approved orders cannot be deleted after dispatch handoff.');
   if(k==='sales'&&consumesStock(item)){try{adjustStockForSale(copy,item,null)}catch(error){return toast(error.message,'error')}}
