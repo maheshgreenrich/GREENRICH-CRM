@@ -182,7 +182,7 @@
    '<td><span class="gr-order-approval-tag" data-state="'+esc(r.status)+'">'+esc(r.status)+'</span></td>'+
    '<td>'+esc(r.courier_name||'Not assigned')+'<small>'+esc(r.tracking_number||'No tracking yet')+'</small></td>'+
    '<td><div class="gr-order-actions"><button class="btn soft gr-packing-direct" type="button" data-packing-slip="'+esc(r.id)+'">Packing Slip PDF</button>'+window.GreenRichActionMenu.wrap('<button type="button" class="btn soft" data-dispatch-details="'+esc(r.id)+'">Details</button>'+
-   (canDispatch&&r.status!=='Delivered'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
+   (canDispatch&&r.status!=='Delivered'&&r.status!=='Cancelled'?'<button class="gr-order-approve" type="button" data-dispatch-edit="'+esc(r.id)+'">Update Status</button>':'')+(canDispatch&&!['Delivered','Cancelled'].includes(r.status)?'<button type="button" class="btn soft" data-dispatch-cancel="'+esc(r.id)+'">Cancel Dispatch</button>':'')+(canDispatch&&r.status==='Cancelled'?'<button type="button" class="btn soft" data-dispatch-delete="'+esc(r.id)+'">Delete Dispatch</button>':'')+   (serviceFor(r)?.needs_service?'<button class="btn soft" type="button" data-open-service>Service Visit</button>':'')
    )+'</div></td></tr>').join(''):'<tr><td class="empty" colspan="8">No dispatch orders match these filters.</td></tr>';
   q('#dispatch-count').textContent=num(list.length)+' dispatch orders · shared with authorized operations employees';
  }
@@ -362,7 +362,7 @@
   const order=dispatchRows.find(item=>item.id===id);
   if(!order)return actionMessage('Dispatch record not found; refresh first');
   selectedDispatch=id;
-  const linked=serviceFor(order),locked=readonly||order.status==='Delivered';
+  const linked=serviceFor(order),locked=!canDispatch||order.status==='Delivered'||order.status==='Cancelled';
   q('#gr-dispatch-editor-title').textContent=(locked?'Dispatch details · ':'Update dispatch · ')+order.order_id;
   q('#gr-dispatch-editor-info').innerHTML='<p><strong>'+esc(order.customer_name||'Customer')+'</strong> · '+esc(order.product_name)+' · '+num(order.quantity)+' units</p><p>'+esc(adapter.companyLabel(order.company_id))+' · '+money(order.order_total)+' · '+esc(order.shipping_address||'Shipping address not recorded')+'</p>'+
    '<p>Approved: '+esc(new Date(order.approved_at).toLocaleString('en-IN'))+'</p>'+
@@ -392,7 +392,7 @@
   event.preventDefault();if(!canDispatch)return actionMessage('Your role cannot update Dispatch');
   const current=dispatchRows.find(r=>r.id===selectedDispatch);
   if(!current)return actionMessage('Dispatch order missing');
-  if(current.status==='Delivered')return actionMessage('Delivered orders are locked. Open Details to review.');
+  if(['Delivered','Cancelled'].includes(current.status))return actionMessage('Delivered or cancelled orders are locked. Open Details to review.');
   const form=event.currentTarget,values=Object.fromEntries(new FormData(form).entries());
   for(const key of Object.keys(values))values[key]=text(values[key]);
   if(!['Pending','Packed','Shipped','Delivered'].includes(values.status))return actionMessage('Invalid stage');
@@ -430,6 +430,25 @@
    q('#gr-dispatch-editor').close();await delayedRefresh();actionMessage('Dispatch updated: '+values.status);
   }catch(error){actionMessage('Dispatch update failed: '+error.message)}
   finally{button.disabled=false}
+ }
+ async function changeDispatchRecord(id,remove=false){
+  if(!canDispatch)return actionMessage('Dispatch management permission required');
+  const order=dispatchRows.find(r=>r.id===id);
+  if(!order||!validCompany(order.company_id))return actionMessage('Dispatch record not available');
+  if(remove&&order.status!=='Cancelled')return actionMessage('Cancel dispatch before deleting it');
+  if(!remove&&['Delivered','Cancelled'].includes(order.status))return actionMessage('Delivered or cancelled dispatch cannot be cancelled again');
+  if(serviceFor(order))return actionMessage('Dispatch has linked service records. Resolve those records before removal');
+  if(order.invoice_number)return actionMessage('Dispatch has an invoice. Resolve the invoice before removal');
+  const message=remove?'Permanently delete cancelled dispatch '+order.order_id+'? This cannot be undone.':'Cancel dispatch '+order.order_id+'? The original Sales Order will remain in the system.';
+  if(!window.confirm(message))return;
+  try{
+   const query=remove?db.from('gr_dispatch_orders').delete():db.from('gr_dispatch_orders').update({status:'Cancelled',updated_at:new Date().toISOString()});
+   const response=await query.eq('id',id).eq('company_id',order.company_id).eq('status',order.status).select('id');
+   if(response.error)throw Error(response.error.message);
+   if(!response.data?.length)throw Error('No record changed. Refresh and check permissions.');
+   await delayedRefresh();
+   actionMessage(remove?'Cancelled dispatch deleted':'Dispatch cancelled');
+  }catch(error){actionMessage('Dispatch operation failed: '+error.message)}
  }
  function exportFiltered(){
   const cols=dataColumns.filter(([id])=>getSelectedColumns().includes(id));
@@ -482,6 +501,8 @@
    if(packing&&root.contains(packing)){void openPacking(packing.dataset.packingSlip);return}
    const service=event.target.closest('[data-open-service]');
    if(service&&root.contains(service)){window.GreenRichShell?.openPage?.('service');return}
+   const cancel=event.target.closest('[data-dispatch-cancel]');if(cancel&&root.contains(cancel)){void changeDispatchRecord(cancel.dataset.dispatchCancel);return}
+   const del=event.target.closest('[data-dispatch-delete]');if(del&&root.contains(del)){void changeDispatchRecord(del.dataset.dispatchDelete,true);return}
    const edit=event.target.closest('[data-dispatch-edit]');
    if(edit&&root.contains(edit)){openDispatch(edit.dataset.dispatchEdit);return}
    const details=event.target.closest('[data-dispatch-details]');
