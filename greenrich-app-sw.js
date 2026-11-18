@@ -1,7 +1,7 @@
 /* GreenRich ONE app shell: never cache customer records, authenticated API responses or GPS. */
 'use strict';
-const CACHE='greenrich-one-shell-20261118-v1';
-const SHELL=['./greenrich-app-icon.svg','./manifest.webmanifest'];
+const CACHE='greenrich-one-shell-20261119-v2';
+const SHELL=['./greenrich-app-icon.svg','./greenrich-app-192.png','./greenrich-app-512.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
 });
