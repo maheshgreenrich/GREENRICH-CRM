@@ -19,6 +19,23 @@ jobs:
     steps:
       - name: Checkout CRM
         uses: actions/checkout@v4
+      - name: Generate branded Android and desktop app icons
+        env:
+          BRAND_LOGO_URL: https://uawgwkplkvahhmhvroul.supabase.co/storage/v1/object/public/greenrich-branding/workspace/logo-1793332914856-f5ujd3qi.jpg?v=logo-1793332914856-f5ujd3qi.jpg
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 40 "$BRAND_LOGO_URL" -o /tmp/greenrich-brand-logo.jpg
+          python3 -m pip install --quiet Pillow
+          python3 - <<'PY'
+          from PIL import Image,ImageOps
+          source=Image.open('/tmp/greenrich-brand-logo.jpg').convert('RGBA')
+          for size in (192,512):
+              # Preserve the full company logo without stretching or clipping.
+              icon=Image.new('RGBA',(size,size),'white')
+              logo=ImageOps.contain(source,(int(size*.88),int(size*.88)),Image.Resampling.LANCZOS)
+              icon.alpha_composite(logo,((size-logo.width)//2,(size-logo.height)//2))
+              icon.convert('RGB').save(f'greenrich-app-{size}.png',format='PNG')
+          PY
       - name: Verify required CRM and PWA files
         run: |
           set -euo pipefail
