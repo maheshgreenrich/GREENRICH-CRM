@@ -326,14 +326,24 @@ async function users(c){
   try{const out=await employeeAction({action:'edit',userId:p.id,companyIds});toast(out.message||'Company access updated');await refresh()}
   catch(e){toast('Unable to change company access: '+e.message)}finally{button.disabled=false}
  });
- c.querySelectorAll('[data-emp-edit]').forEach(button=>button.onclick=async()=>{
+ c.querySelectorAll('[data-emp-edit]').forEach(button=>button.onclick=()=>{
   const p=people.find(x=>x.id===button.dataset.empEdit);if(!p)return;
-  const name=prompt('Employee name',p.full_name);if(name===null)return;
-  const username=prompt('Username',p.username);if(username===null)return;
-  const selected=prompt('Role: '+roles.map(x=>x.name).join(', '),roles.find(x=>x.id===p.role_id)?.name||'Sales');if(selected===null)return;
-  const role=roles.find(r=>r.name.toLowerCase()===selected.trim().toLowerCase());if(!role)return toast('Role not found');
-  try{const out=await employeeAction({action:'edit',userId:p.id,name,username,role:role.name});toast(out.message||'User updated');await refresh()}
-  catch(e){toast(e.message)}
+  const overlay=document.createElement('div');
+  overlay.className='gr-employee-modal-backdrop';
+  overlay.innerHTML='<section class="gr-employee-modal" role="dialog" aria-modal="true" aria-labelledby="grEmployeeModalTitle"><div class="gr-employee-modal-head"><h2 id="grEmployeeModalTitle">Edit Employee</h2><button type="button" class="secondary" data-close aria-label="Close">✕</button></div><p>Update employee information, role and login password. Only Admin can save changes.</p><form class="gr-employee-edit-form"><label>Employee name<input name="name" required minlength="2" value="'+esc(p.full_name||'')+'"></label><label>Username<input name="username" required minlength="3" value="'+esc(p.username||'')+'"></label><label>Login email<input name="email" type="email" required value="'+esc(p.email||'')+'"></label><label>User role<select name="role" required>'+roles.map(role=>'<option value="'+esc(role.name)+'" '+(role.id===p.role_id?'selected':'')+'>'+esc(role.name)+'</option>').join('')+'</select></label><label>New password (optional)<input name="password" type="password" minlength="12" autocomplete="new-password" placeholder="Leave blank to keep current password"></label><label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat new password"></label><div class="gr-employee-modal-actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="blue">Save Changes</button></div></form></section>';
+  document.body.append(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)close()});
+  overlay.querySelector('form').onsubmit=async event=>{
+   event.preventDefault();const form=event.currentTarget,f=new FormData(form),password=String(f.get('password')||''),confirmPassword=String(f.get('confirmPassword')||'');
+   if(password!==confirmPassword)return toast('Passwords do not match');
+   if(password&&password.length<12)return toast('Password must be at least 12 characters');
+   const submit=form.querySelector('[type="submit"]');submit.disabled=true;
+   try{const out=await employeeAction({action:'edit',userId:p.id,name:f.get('name'),username:f.get('username'),email:f.get('email'),role:f.get('role'),...(password?{password}:{})});toast(out.message||'Employee updated');close();await refresh()}
+   catch(error){toast(error.message)}finally{submit.disabled=false}
+  };
+  overlay.querySelector('input[name="name"]').focus();
  });
  c.querySelectorAll('[data-emp-reset]').forEach(button=>button.onclick=async()=>{
   const p=people.find(x=>x.id===button.dataset.empReset);if(!p)return;
