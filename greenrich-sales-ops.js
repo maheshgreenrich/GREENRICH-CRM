@@ -456,8 +456,8 @@
   if(remove&&order.status!=='Cancelled')return actionMessage('Cancel dispatch before deleting it');
   if(!remove&&order.status==='Cancelled')return actionMessage('Dispatch is already cancelled');
   if(remove&&serviceFor(order))return actionMessage('Dispatch has linked service records. Resolve those records before deletion');
-  if(remove&&order.invoice_number)return actionMessage('Invoice '+order.invoice_number+' must be voided and reconciled before permanent deletion. Dispatch cancellation remains available.');
-  const message=remove?'Permanently delete cancelled dispatch '+order.order_id+'? This cannot be undone.':('Cancel dispatch '+order.order_id+'?'+(order.invoice_number?' Invoice '+order.invoice_number+' will be retained and MUST be voided separately in Accounts; cancellation here does not void an issued invoice.':'')+' The original Sales Order will remain in the system.');
+  if(remove&&order.invoice_number&&!window.confirm('Invoice '+order.invoice_number+' is linked to this cancelled dispatch. Deleting dispatch does NOT delete or void that invoice. Keep invoice records for accounts and statutory audit. Continue deleting dispatch only?'))return;
+  const message=remove?'Permanently delete cancelled dispatch '+order.order_id+'? The linked invoice, if any, will be retained. This cannot be undone.':('Cancel dispatch '+order.order_id+'?'+(order.invoice_number?' Invoice '+order.invoice_number+' will be retained and MUST be voided separately in Accounts; cancellation here does not void an issued invoice.':'')+' The original Sales Order will remain in the system.');
   if(!window.confirm(message))return;
   try{
    const query=remove?db.from('gr_dispatch_orders').delete():db.from('gr_dispatch_orders').update({status:'Cancelled',updated_at:new Date().toISOString()});
