@@ -97,8 +97,12 @@ function validateCustomer(store,person,ignore,configured=false){
 const tagChecks=(store,name,chosen)=>'<div class="gr-tag-picks">'+(store.tags.length?store.tags.map(t=>'<label><input type="checkbox" name="'+esc(name)+'" value="'+esc(t.id)+'" '+(chosen.includes(t.id)?'checked':'')+'><span>'+esc(t.name)+'</span></label>').join(''):'<span class="gr-crm-help">No tags available. An Admin can create tags in Settings → Customer Tags.</span>')+'</div>';
 function nextOrderId(store,companyId){
  const prefix=companyId==='enviro-solutions'?'GRE-ES-':'GRE-GI-';
- const last=Math.max(store.orderSequence||0,...store.sales.filter(s=>String(s.internal_order_id||'').startsWith(prefix)).map(s=>Number(s.internal_order_id.slice(prefix.length))||0));
- store.orderSequence=last+1;return prefix+String(store.orderSequence).padStart(6,'0');
+ const used=new Set(store.sales.filter(s=>String(s.internal_order_id||'').startsWith(prefix)).map(s=>Number(s.internal_order_id.slice(prefix.length))).filter(n=>Number.isSafeInteger(n)&&n>0));
+ // Only deleted numbers are reusable. Cancelled orders remain in sales and
+ // therefore keep their number reserved. New orders use the lowest gap.
+ let number=1;while(used.has(number))number++;
+ store.orderSequence=Math.max(Number(store.orderSequence)||0,number);
+ return prefix+String(number).padStart(6,'0');
 }
 function peekOrderId(store,companyId){
  const copy={orderSequence:store.orderSequence||0,sales:store.sales};
@@ -466,7 +470,7 @@ async function exportOverviewPdf(){
  toast('Visual dashboard PDF exported ('+page+' page'+(page===1?'':'s')+')');
 }
 
-const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(adminMode?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
+const actButtons=(k,id)=>'<button class="action-button" data-edit="'+k+':'+id+'">Edit</button>'+(k==='sales'?'<button class="action-button" data-cancel-sale="'+id+'">Cancel Order</button>':'')+(adminMode?'<button class="action-button delete" data-delete="'+k+':'+id+'">Delete</button>':'');
  const act=(k,id)=>window.GreenRichActionMenu.wrap(actButtons(k,id));
 const invoiceAction=s=>'<button type="button" class="action-button gr-sales-invoice-action" data-sale-invoice="'+esc(s.id)+'" title="Preview or download the invoice for this sales order">'+(s.invoice_status==='Issued'?'Invoice · Issued':s.invoice_number?'Invoice · Draft':'Create Invoice')+'</button>';
 const empty=cols=>`<tr><td class="empty" colspan="${cols}">No records yet. Use the Add button to begin.</td></tr>`;
@@ -979,6 +983,20 @@ async function openSaleInvoice(id,ownerOverride=''){
  }catch(error){toast('Unable to open invoice: '+error.message)}
 }
 
+async function cancelSaleOrder(id){
+ const item=find('sales',id);if(!item)return toast('Sales order not found','error');
+ if(item.status==='Cancelled')return toast('This sales order is already cancelled');
+ if(item.invoice_status==='Issued')return toast('Issued invoice cannot be cancelled here. Contact Accounts for a credit note.','error');
+ const owner=ownerOf('sales',id);
+ if(!confirm('Cancel sales order '+item.internal_order_id+'? Its order number will remain reserved and cannot be reused.'))return;
+ const copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));
+ const order=copy.sales.find(s=>s.id===id);
+ if(!order)return toast('Order no longer exists','error');
+ try{adjustStockForSale(copy,order,{...order,status:'Cancelled'})}catch(error){return toast(error.message,'error')}
+ order.status='Cancelled';
+ order.cancelled_at=new Date().toISOString();
+ if(saveCompanyData(owner,copy)){render();toast('Sales order cancelled. Order ID '+order.internal_order_id+' remains reserved.','success')}
+}
 async function removeRecord(k,id){
  const item=find(k,id);if(!item)return;
  const owner=ownerOf(k,id);
@@ -1036,7 +1054,7 @@ async function importSales(file){
  }catch(error){toast('Import error: '+error.message)}
  finally{$('#upload-sales').value=''}
 }
-function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>{if(page==='leads'){navigate('customers');window.GreenRichShell?.setPageWithoutRemount?.('customers');window.GreenRichContacts?.setMode('lead');window.GreenRichContacts?.openForm('lead');return}openEditor(titles[page][3])};$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{const customer=e.target.closest('[data-customer-profile]');if(customer){openCustomerProfile(customer.dataset.customerProfile);return}let b=e.target.closest('[data-edit],[data-delete],[data-export],[data-stock-update],[data-sale-invoice]');if(!b||!root.contains(b))return;if(b.dataset.saleInvoice){void openSaleInvoice(b.dataset.saleInvoice);return}if(b.dataset.stockUpdate){const current=find('products',b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const owner=ownerOf('products',current.id),copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(owner,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');if(k==='leads'){navigate('customers');window.GreenRichShell?.setPageWithoutRemount?.('customers');window.GreenRichContacts?.setMode('lead');window.GreenRichContacts?.openForm('lead',id,ownerOf('leads',id));return}if(k==='customers'){window.GreenRichContacts?.openForm('customer',id);return}openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','tasks-search','products-search'].forEach(id=>{const input=$('#'+id);if(input)input.oninput=renderTables});['sales-channel-filter','task-filter'].forEach(id=>{const input=$('#'+id);if(input)input.onchange=renderTables});['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
+function bind(){ all('#navigation button[data-page]').forEach(b=>b.onclick=()=>navigate(b.dataset.page));$('#mobile-menu').onclick=()=>{};$('#primary-action').onclick=()=>{if(page==='leads'){navigate('customers');window.GreenRichShell?.setPageWithoutRemount?.('customers');window.GreenRichContacts?.setMode('lead');window.GreenRichContacts?.openForm('lead');return}openEditor(titles[page][3])};$('#close-editor').onclick=$('#cancel-editor').onclick=()=>$('#editor').close();$('#editor-form').onsubmit=saveEditor;root.addEventListener('click',e=>{const customer=e.target.closest('[data-customer-profile]');if(customer){openCustomerProfile(customer.dataset.customerProfile);return}let b=e.target.closest('[data-edit],[data-delete],[data-cancel-sale],[data-export],[data-stock-update],[data-sale-invoice]');if(!b||!root.contains(b))return;if(b.dataset.cancelSale){void cancelSaleOrder(b.dataset.cancelSale);return}if(b.dataset.saleInvoice){void openSaleInvoice(b.dataset.saleInvoice);return}if(b.dataset.stockUpdate){const current=find('products',b.dataset.stockUpdate);if(!current)return;const entered=prompt('Enter new stock quantity for '+current.name,Number(current.stock||0));if(entered===null)return;const quantity=Number(entered);if(!Number.isInteger(quantity)||quantity<0)return toast('Stock quantity must be a whole number of 0 or more');const owner=ownerOf('products',current.id),copy=JSON.parse(JSON.stringify(loadCompanyData(owner)));copy.products.find(p=>p.id===current.id).stock=quantity;if(saveCompanyData(owner,copy)){render();toast('Stock updated for '+current.name)}return}if(b.dataset.edit){let[k,id]=b.dataset.edit.split(':');if(k==='leads'){navigate('customers');window.GreenRichShell?.setPageWithoutRemount?.('customers');window.GreenRichContacts?.setMode('lead');window.GreenRichContacts?.openForm('lead',id,ownerOf('leads',id));return}if(k==='customers'){window.GreenRichContacts?.openForm('customer',id);return}openEditor(k,id)}if(b.dataset.delete){let[k,id]=b.dataset.delete.split(':');removeRecord(k,id)}if(b.dataset.export){if(!adminMode)return toast('Only Admin can export data');doExport(b.dataset.export)}});['sales-search','customers-search','tasks-search','products-search'].forEach(id=>{const input=$('#'+id);if(input)input.oninput=renderTables});['sales-channel-filter','task-filter'].forEach(id=>{const input=$('#'+id);if(input)input.onchange=renderTables});['period','filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).onchange=renderDashboard);
  ['filter-from','filter-to'].forEach(id=>$('#'+id).onchange=()=>{if($('#filter-from').value||$('#filter-to').value)$('#period').value='custom';renderDashboard()});
  $('#clear-filters').onclick=()=>{
   $('#period').value='month';['filter-channel','filter-company','filter-customer','filter-product'].forEach(id=>$('#'+id).value='all');
