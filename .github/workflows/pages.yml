@@ -203,6 +203,26 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify deployed customer and lead deletion code
+        env:
+          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          base="${PAGES_URL%/}"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            curl -fsSL --max-time 15 "$base/secure.html?commit=${GITHUB_SHA}" -o /tmp/gr-customer-secure.html || true
+            curl -fsSL --max-time 15 "$base/greenrich-shared-customers.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-shared.js || true
+            curl -fsSL --max-time 15 "$base/greenrich-contacts.js?commit=${GITHUB_SHA}" -o /tmp/gr-customer-contacts.js || true
+            if grep -q "20261118-contact-delete-v4" /tmp/gr-customer-secure.html &&
+               grep -q "gr_contact_delete_customer" /tmp/gr-customer-shared.js &&
+               grep -q "gr_contact_delete_lead" /tmp/gr-customer-contacts.js; then
+              echo "Verified: published CRM uses safe customer and lead deletion RPCs"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Published CRM still has old deletion scripts"
+          exit 1
       - name: Double-check the actual published Settings and GPS map files
         env:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
