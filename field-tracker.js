@@ -122,7 +122,7 @@
  function startTracking(){
   stopTracking();if(!openSession||document.visibilityState==='hidden')return;
   try{hasGPS();watch=navigator.geolocation.watchPosition(async p=>{
-   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<9*60*1000)return;
+   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<30000)return;
    lastGpsSent=Date.now();const c=p.coords;
    try{await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy})}
    catch(err){notify('GPS history paused: '+err.message,true);stopTracking();}
@@ -177,7 +177,7 @@
  }
  async function monitorHistory(companyId=company){
   // Supabase Data API may limit one RPC page to 1,000 rows. Page through all
-  // half-hour samples so a full company/day is not silently cut off.
+  // GPS samples so a full company/day is not silently cut off.
   const result=[];
   for(let offset=0;offset<20000;offset+=1000){
    const page=await db.rpc('gr_field_monitor_day',{p_company:companyId,p_day:monitorDate}).range(offset,offset+999);
@@ -388,16 +388,16 @@
   const logTable=log.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Date & time (IST)</th><th>Accuracy</th><th>Map location</th></tr></thead><tbody>'+
    log.map(p=>'<tr><td><span class="ft-table-dot" style="background:'+staffColor(p.user_id)+'"></span>'+e(ownerName(p.user_id))+'</td>'+
    '<td>'+fmt(p.recorded_at)+'</td><td>±'+Math.round(p.accuracy_m)+' m</td><td>'+coord(p.lat,p.lng)+'</td></tr>').join('')+
-   '</tbody></table></div>':'<p class="ft-note">No 10-minute GPS history for the selected day.</p>';
+   '</tbody></table></div>':'<p class="ft-note">No GPS movement history for the selected day.</p>';
   return filter+'<div class="ft-cards"><div class="ft-card"><small>Employees with recorded GPS</small><strong>'+groups.length+'</strong></div>'+
    '<div class="ft-card"><small>Recent positions (within 20 min)</small><strong>'+fresh+'</strong></div>'+
-   '<div class="ft-card"><small>10-minute map samples</small><strong>'+total+'</strong></div></div>'+
+   '<div class="ft-card"><small>Recorded GPS positions</small><strong>'+total+'</strong></div></div>'+
    box('Field Staff Movement Map',
-    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded 10-minute samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
+    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded GPS samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
     legend+'<div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
-    '<p class="ft-note">GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
+    '<p class="ft-note">GPS samples are attempted every 30 seconds while the CRM is visible. GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
    box('Employee Latest Recorded Positions',latestTable)+
-   box('Movement History · 10-minute GPS Snapshots',logTable);
+   box('Movement History · Recorded GPS Timeline',logTable);
  }
  async function drawMap(){
   if(tab!=='monitor'||!isSupervisor||!$('#ft-map'))return;
