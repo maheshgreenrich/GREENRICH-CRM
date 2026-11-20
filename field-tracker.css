@@ -60,3 +60,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* Ensure redundant company picker stays hidden on GPS monitoring tab. */
 .ft-company-label[hidden]{display:none!important}
+
+.ft-timeline-controls{border:1px solid #d8e2f1;border-radius:12px;padding:14px;margin:12px 0;background:#f8fbff;color:#173c6a}.ft-timeline-actions{display:flex;align-items:center;gap:12px;margin:10px 0}.ft-timeline-actions input{flex:1;min-width:0;accent-color:#2355c6}.ft-timeline-actions button{border:1px solid #cad8ef;border-radius:8px;background:white;color:#204a84;padding:9px 13px;cursor:pointer}#ft-timeline-status{font-size:13px;overflow-wrap:anywhere}
