@@ -266,3 +266,48 @@
  #content .gr2-panels{grid-template-columns:minmax(0,1fr)}
  #content .gr2-panels>.gr2-panel{grid-column:1 / -1!important;width:100%}
 }
+
+/* GreenRich dashboard visual refresh — inspired by modern analytics workspaces.
+   Existing authorized Supabase metrics, filters and exports remain unchanged. */
+#content .gr2{--gr2-text:#162a40;--gr2-border:#e3eaf2;--gr2-shadow:0 5px 24px rgba(30,66,100,.045);gap:20px}
+#content .gr2-heading{background:linear-gradient(115deg,#effbf8 0%,#f3f8ff 60%,#faf4ff 100%);border-color:#dceeea;border-radius:22px;padding:25px 28px}
+#content .gr2-heading h2{color:#142e3b!important;font-size:clamp(21px,2.2vw,29px)!important}
+#content .gr2-toolbar{border-radius:20px;border-color:#e5ebf3}
+#content .gr2-kpi{border-radius:19px;min-height:146px;padding:20px;background:linear-gradient(135deg,#fff,#f8fbff)}
+#content .gr2-kpi:nth-child(4n+1){background:linear-gradient(125deg,#e6faf5,#f4fffc);border-color:#cdeee4}
+#content .gr2-kpi:nth-child(4n+2){background:linear-gradient(125deg,#eaf2ff,#f8fbff);border-color:#d8e7ff}
+#content .gr2-kpi:nth-child(4n+3){background:linear-gradient(125deg,#fff0f7,#fff9fc);border-color:#f7dfeb}
+#content .gr2-kpi:nth-child(4n){background:linear-gradient(125deg,#fff5e6,#fffdf6);border-color:#f4e7d2}
+#content .gr2-kpi strong{font-size:clamp(21px,2vw,29px)!important}
+#content .gr2-panel{border-radius:21px;padding:23px 24px;box-shadow:0 6px 24px rgba(24,55,94,.045);transition:box-shadow .2s ease}
+#content .gr2-panel-title{margin-bottom:20px}
+#content .gr2-panel-title h3{font-size:18px!important}
+#content .gr2-panel-icon{border-radius:13px;background:#e6f6f2;color:#148a71}
+#content .gr2-mini{background:#f5f9fc;border-color:#eaf0f5;border-radius:14px}
+#content .gr2-mini:nth-of-type(4n+1){background:#eaf8f5;border-color:#d7eee7}
+#content .gr2-mini:nth-of-type(4n+2){background:#edf4ff;border-color:#e1eafd}
+#content .gr2-mini:nth-of-type(4n+3){background:#fff2f8;border-color:#f7e4ed}
+#content .gr2-mini:nth-of-type(4n){background:#fff7e9;border-color:#f4e9d7}
+#content .gr2-donut{box-shadow:0 0 0 6px #f8fbff}
+#content .gr2-donut>div{box-shadow:0 0 0 4px #fff}
+#content .gr2-bar-track{height:12px;border-radius:20px;background:#edf2f7}
+#content .gr2-bar-track i{border-radius:20px}
+#content .gr2-chart-scroll,#content .gr2-table-wrap{border-radius:12px}
+#content .gr3-chart{max-width:100%;height:auto;overflow:visible}
+#content .gr3-grid{stroke:#e5edf4;stroke-dasharray:4 5}
+#content .gr3-chart text{fill:#8192a6;font-size:11px}
+#content .gr2-empty{background:repeating-linear-gradient(135deg,#f8fbff,#f8fbff 12px,#f5f9fd 12px,#f5f9fd 24px);border-radius:14px;min-height:110px;display:grid;place-items:center}
+#content .gr2-panel .gr2-table th{background:#f3f8fc}
+#content .gr2-panel .gr2-table tbody tr:nth-child(even){background:#fafcff}
+#content .gr2-panel .gr2-table tbody tr:hover{background:#edf9f6}
+#content .gr2-filter select:focus-visible,#content .gr2-filter input:focus-visible,#content .gr2-buttons button:focus-visible{outline:3px solid #7bcdbb;outline-offset:2px}
+@media(min-width:831px){#content .gr2-panels{grid-template-columns:repeat(12,minmax(0,1fr))}
+#content .gr2-panels>.gr2-panel{grid-column:span 6}
+#content .gr2-panels>.gr2-panel-day_sales,#content .gr2-panels>.gr2-panel-salespeople{grid-column:span 8}
+#content .gr2-panels>.gr2-panel-channel_sales,#content .gr2-panels>.gr2-panel-telecaller{grid-column:span 4}
+#content .gr2-panels>.gr2-panel-recent,#content .gr2-panels>.gr2-panel-accounts{grid-column:1/-1}}
+@media(min-width:831px) and (max-width:1250px){#content .gr2-panels>.gr2-panel{grid-column:span 6!important}
+#content .gr2-panels>.gr2-panel-recent,#content .gr2-panels>.gr2-panel-accounts{grid-column:1/-1!important}}
+@media(max-width:830px){#content .gr2{gap:13px}#content .gr2-panels{grid-template-columns:minmax(0,1fr)}#content .gr2-panels>.gr2-panel{grid-column:1/-1!important}#content .gr2-panel{padding:18px}#content .gr2-chart-scroll{overflow-x:auto}}
+@media(max-width:480px){#content .gr2-heading{padding:18px}#content .gr2-panel{padding:16px}#content .gr2-kpi{padding:15px;min-height:120px}#content .gr2-mini{width:100%;margin:0 0 9px}#content .gr2-donut-wrap{justify-content:center}}
+@media(prefers-reduced-motion:reduce){#content .gr2-panel{transition:none}}
