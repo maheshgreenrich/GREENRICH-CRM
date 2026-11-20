@@ -118,13 +118,13 @@
   displayNetworkFeedback();
  }
  function activeHere(){return openSession&&openSession.company_id===company}
- let gpsPollTimer=null,gpsPending=false;
+ let gpsPollTimer=null,gpsPending=false,gpsRequestPending=false;
  function stopTracking(){
   if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}
   if(gpsPollTimer!==null){clearInterval(gpsPollTimer);gpsPollTimer=null}
  }
  async function saveGpsPosition(p){
-  if(!openSession||document.visibilityState==='hidden'||gpsPending||Date.now()-lastGpsSent<28000)return;
+  if(!openSession||document.visibilityState==='hidden'||gpsPending||Date.now()-lastGpsSent<30000)return;
   const c=p.coords;
   if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||!Number.isFinite(c.accuracy))return;
   if(c.accuracy>150)return; // Do not plot very unreliable fixes as movement.
@@ -144,14 +144,21 @@
    watch=navigator.geolocation.watchPosition(p=>{void saveGpsPosition(p)},err=>{
     if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}
    },options);
-   // watchPosition does not promise a callback every 30 seconds. Request
-   // an additional fresh fix on a cadence while the page is foregrounded.
+   // A watchPosition callback is not guaranteed every 30 seconds. Check
+   // every five seconds and request a new fix whenever the last saved
+   // reading is >=30 seconds old. Retry after timeout rather than waiting
+   // another full 30-second interval. Browsers can still throttle/stop this.
    gpsPollTimer=setInterval(()=>{
-    if(!openSession||document.visibilityState==='hidden')return;
-    navigator.geolocation.getCurrentPosition(p=>{void saveGpsPosition(p)},err=>{
+    if(!openSession||document.visibilityState==='hidden'||gpsPending||gpsRequestPending)return;
+    if(Date.now()-lastGpsSent<30000)return;
+    gpsRequestPending=true;
+    navigator.geolocation.getCurrentPosition(p=>{
+     gpsRequestPending=false;void saveGpsPosition(p);
+    },err=>{
+     gpsRequestPending=false;
      if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}
-    },options);
-   },30000);
+    },{enableHighAccuracy:true,maximumAge:0,timeout:8000});
+   },5000);
   }catch(err){notify(err.message,true)}
  }
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')startTracking();else stopTracking()});
