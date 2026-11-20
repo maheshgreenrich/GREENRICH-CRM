@@ -57,3 +57,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .ft-map .leaflet-popup-content{font:500 12px/1.45 Inter,system-ui,sans-serif}
 .ft-map{min-height:420px}
 @media(max-width:640px){.ft-monitor-filters label{flex:1 1 135px;min-width:0}.ft-monitor-filters .ft-btn{flex:1 1 100%;justify-content:center}.ft-map{min-height:330px}}
+
+/* Ensure redundant company picker stays hidden on GPS monitoring tab. */
+.ft-company-label[hidden]{display:none!important}
