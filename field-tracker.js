@@ -118,8 +118,9 @@
   displayNetworkFeedback();
  }
  function activeHere(){return openSession&&openSession.company_id===company}
- let gpsPollTimer=null,gpsPending=false,gpsRequestPending=false;
+ let gpsPollTimer=null,gpsPending=false,gpsRequestPending=false,gpsGeneration=0;
  function stopTracking(){
+  gpsGeneration++;gpsRequestPending=false;
   if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}
   if(gpsPollTimer!==null){clearInterval(gpsPollTimer);gpsPollTimer=null}
  }
@@ -127,7 +128,9 @@
   if(!openSession||document.visibilityState==='hidden'||gpsPending||Date.now()-lastGpsSent<30000)return;
   const c=p.coords;
   if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||!Number.isFinite(c.accuracy))return;
-  if(c.accuracy>150)return; // Do not plot very unreliable fixes as movement.
+  // Retain real but low-accuracy fixes in the audit history; the map must
+  // display their uncertainty rather than silently creating time gaps.
+  if(c.accuracy>10000)return;
   gpsPending=true;
   try{
    await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy});
@@ -148,13 +151,16 @@
    // every five seconds and request a new fix whenever the last saved
    // reading is >=30 seconds old. Retry after timeout rather than waiting
    // another full 30-second interval. Browsers can still throttle/stop this.
+   const generation=gpsGeneration;
    gpsPollTimer=setInterval(()=>{
     if(!openSession||document.visibilityState==='hidden'||gpsPending||gpsRequestPending)return;
     if(Date.now()-lastGpsSent<30000)return;
     gpsRequestPending=true;
     navigator.geolocation.getCurrentPosition(p=>{
+     if(generation!==gpsGeneration)return;
      gpsRequestPending=false;void saveGpsPosition(p);
     },err=>{
+     if(generation!==gpsGeneration)return;
      gpsRequestPending=false;
      if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}
     },{enableHighAccuracy:true,maximumAge:0,timeout:8000});
