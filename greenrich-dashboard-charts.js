@@ -2,7 +2,7 @@
 /* Local SVG charts: authorized dashboard data only; exact values remain available. */
 (()=>{
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const colors=['#2355c6','#19a79b','#8b6bd9','#e6a13c','#d75a8c','#4599c9','#64748b'];
+ const colors=['#0c956f','#4e83ee','#9462ed','#f4a640','#ee6f9b','#2ab6c1','#64748b'];
  const fmt=n=>new Intl.NumberFormat('en-IN',{maximumFractionDigits:1,notation:'compact'}).format(n);
  const exact=n=>new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(n);
  const empty=()=>'<div class="gr2-empty">Not enough matching data for this chart.</div>';
@@ -14,9 +14,9 @@
   if(!items.length)return empty();const max=Math.max(1,...items.map(x=>x[1]));
   const points=items.map((r,i)=>[64+(items.length===1?236:i*472/(items.length-1)),225-r[1]/max*180]);
   let body=axes(max,xLabel,yLabel);
-  if(area)body+='<path d="M'+points[0][0]+' 225 L'+points.map(p=>p.join(' ')).join(' L')+' L'+points.at(-1)[0]+' 225Z" fill="#2355c6" opacity=".12"/>';
-  body+='<polyline points="'+points.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#2355c6" stroke-width="3" stroke-linejoin="round"/>';
-  points.forEach(([x,y],i)=>{body+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="#fff" stroke="#2355c6" stroke-width="2"><title>'+esc(items[i][0]+': '+exact(items[i][1]))+'</title></circle>'});
+  if(area)body+='<path d="M'+points[0][0]+' 225 L'+points.map(p=>p.join(' ')).join(' L')+' L'+points.at(-1)[0]+' 225Z" fill="#0c956f" opacity=".14"/>';
+  body+='<polyline points="'+points.map(p=>p.join(',')).join(' ')+'" fill="none" stroke="#0c956f" stroke-width="3" stroke-linejoin="round"/>';
+  points.forEach(([x,y],i)=>{body+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="#fff" stroke="#0c956f" stroke-width="2"><title>'+esc(items[i][0]+': '+exact(items[i][1]))+'</title></circle>'});
   [...new Set([0,Math.floor((items.length-1)/2),items.length-1])].forEach(i=>body+=text(points[i][0],247,items[i][0].length===10?items[i][0].slice(5):items[i][0],i===0?'start':i===items.length-1?'end':'middle'));
   return svg(yLabel+' by '+xLabel,body)+table([xLabel,yLabel],items.map(r=>[r[0],exact(r[1])]));
  }
