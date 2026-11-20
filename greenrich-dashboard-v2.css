@@ -253,3 +253,16 @@
 @media(prefers-reduced-motion:reduce){#content .gr2 *{transition:none!important;animation:none!important}}
 
 #content .gr2-donut b{font-size:clamp(13px,1.6vw,21px);max-width:100%;padding:0 4px;overflow-wrap:anywhere;text-align:center}
+
+/* Dashboard alignment: consistent two-column widget cards, regardless of
+   enabled widget combinations. Preserve full-width tables and mobile stack. */
+@media(min-width:831px){
+ #content .gr2-panels{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;grid-auto-flow:row}
+ #content .gr2-panels>.gr2-panel{grid-column:span 1;min-width:0;width:100%;height:100%}
+ #content .gr2-panels>.gr2-panel-recent,
+ #content .gr2-panels>.gr2-panel-accounts{grid-column:1 / -1}
+}
+@media(max-width:830px){
+ #content .gr2-panels{grid-template-columns:minmax(0,1fr)}
+ #content .gr2-panels>.gr2-panel{grid-column:1 / -1!important;width:100%}
+}
