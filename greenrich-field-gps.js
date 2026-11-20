@@ -1,5 +1,5 @@
 'use strict';
-/* GreenRich Admin-opt-in, 10-minute foreground GPS samples. Hidden or locked devices cannot be tracked reliably. */
+/* GreenRich Admin-opt-in, 30-second foreground movement samples. Hidden or locked devices cannot be tracked reliably. */
 (()=>{
  let client=null,timer=null,busy=false,lastSave=0;
  async function enabledCompanies(db){
@@ -29,7 +29,7 @@
   return {companyId,...await locate()};
  }
  async function tick(){
-  if(!client||document.visibilityState!=='visible'||busy||Date.now()-lastSave<9*60*1000)return;
+  if(!client||document.visibilityState!=='visible'||busy||Date.now()-lastSave<30000)return;
   busy=true;
   try{
    const permitted=await enabledCompanies(client);
@@ -43,7 +43,7 @@
    const saved=await client.rpc('gr_field_record_point',{p_session:session.id,p_lat:gps.latitude,p_lng:gps.longitude,p_accuracy:gps.accuracy});
    if(saved.error)throw Error(saved.error.message);
    // A second tab or the initial header check-in may already have saved this slot.
-   // Avoid repeatedly waking the GPS sensor for the same ten-minute interval.
+   // Avoid repeatedly waking the GPS sensor for the same short sampling interval.
    lastSave=Date.now();
   }catch(err){console.info('Field GPS update skipped:',err.message)}
   finally{busy=false}
@@ -51,7 +51,7 @@
  function start(db){
   client=db;
   if(timer)clearInterval(timer);
-  timer=setInterval(()=>void tick(),60000);
+  timer=setInterval(()=>void tick(),30000);
   document.removeEventListener('visibilitychange',onVisible);
   document.addEventListener('visibilitychange',onVisible);
   void tick();
