@@ -240,7 +240,10 @@
  }
  function render(){
   if(map){map.remove();map=null}
-  setupNav();const el=$('#ft-content');
+  setupNav();
+  // The GPS map has its own authorized-company filter; hide the redundant page-level company selector only here.
+  const topCompany=$('.ft-company-label');if(topCompany)topCompany.hidden=(tab==='monitor'&&isSupervisor);
+  const el=$('#ft-content');
   el.innerHTML=tab==='shift'?drawShift():tab==='visits'?drawVisits():tab==='new'?drawNew():tab==='history'?drawHistory():tab==='monitor'&&isSupervisor?drawMonitor():tab==='team'&&isAdmin?drawTeam():drawShift();
  }
  function drawShift(){
