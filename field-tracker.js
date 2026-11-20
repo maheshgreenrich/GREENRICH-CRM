@@ -397,7 +397,7 @@
    '<div class="ft-card"><small>Recorded GPS positions</small><strong>'+total+'</strong></div></div>'+
    box('Field Staff Movement Map',
     '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded GPS samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
-    legend+'<div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
+    legend+'<div class="ft-timeline-controls"><b>Recorded GPS timeline</b><div class="ft-timeline-actions"><button type="button" id="ft-timeline-prev">◀</button><input id="ft-timeline-scrub" type="range" min="0" max="0" value="0" step="1" aria-label="GPS timeline position"><button type="button" id="ft-timeline-next">▶</button></div><div id="ft-timeline-status" aria-live="polite">Select a recorded location</div></div><div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
     '<p class="ft-note">GPS samples are attempted every 30 seconds while the CRM is visible. GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
    box('Employee Latest Recorded Positions',latestTable)+
    box('Movement History · Recorded GPS Timeline',logTable);
@@ -406,10 +406,10 @@
   if(tab!=='monitor'||!isSupervisor||!$('#ft-map'))return;
   if(!window.L){$('#ft-map').textContent='Map tiles unavailable. Use the GPS location links in the table.';return}
   if(map){map.remove();map=null}
-  map=window.L.map('ft-map').setView([11.0,78.0],6);
+  map=window.L.map('ft-map',{maxZoom:22,zoomSnap:.5,zoomDelta:.5}).setView([11.0,78.0],6);
   window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-   {attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);
-  const marks=[];
+   {attribution:'© OpenStreetMap contributors',maxNativeZoom:19,maxZoom:22}).addTo(map);
+  const marks=[],timeline=[];
   for(const g of monitoredGroups()){
    const line=g.list.map(p=>[p.lat,p.lng]);
    if(line.length>1)window.L.polyline(line,{color:g.color,weight:3,opacity:.75,dashArray:'6 6'}).addTo(map);
@@ -417,7 +417,7 @@
     const dot=window.L.circleMarker([p.lat,p.lng],{radius:5,color:g.color,fillColor:g.color,fillOpacity:.9,weight:2}).addTo(map);
     const desc=document.createElement('div');
     desc.textContent=ownerName(g.userId)+' · '+fmt(p.recorded_at)+' · Accuracy ±'+Math.round(p.accuracy_m)+' m';
-    dot.bindPopup(desc);marks.push([p.lat,p.lng]);
+    dot.bindPopup(desc);marks.push([p.lat,p.lng]);timeline.push({p,dot,name:ownerName(g.userId)});
    }
    const p=g.last,initials=ownerName(g.userId).split(/\s+/).slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
    const pin=window.L.divIcon({className:'ft-staff-pin-wrap',html:'<div class="ft-staff-pin" style="--pin-color:'+g.color+'">'+e(initials||'●')+'</div>',iconSize:[40,48],iconAnchor:[20,46],popupAnchor:[0,-44]});
@@ -485,6 +485,25 @@
      });
      marks.push([loc.lat,loc.lng]);
     }
+  }
+  timeline.sort((a,b)=>new Date(a.p.recorded_at)-new Date(b.p.recorded_at));
+  const scrub=$('#ft-timeline-scrub'),status=$('#ft-timeline-status');
+  if(scrub&&status){
+   scrub.max=String(Math.max(0,timeline.length-1));
+   scrub.disabled=!timeline.length;
+   const show=index=>{
+    if(!timeline.length)return;
+    const i=Math.max(0,Math.min(timeline.length-1,index)),item=timeline[i];
+    scrub.value=String(i);
+    status.textContent=item.name+' · '+fmt(item.p.recorded_at)+' · '+Number(item.p.lat).toFixed(6)+', '+Number(item.p.lng).toFixed(6)+' · Accuracy ±'+Math.round(item.p.accuracy_m)+' m · '+(i+1)+'/'+timeline.length;
+    map.setView([item.p.lat,item.p.lng],Math.max(map.getZoom(),18),{animate:true});
+    item.dot.openPopup();
+   };
+   scrub.addEventListener('input',()=>show(Number(scrub.value)));
+   $('#ft-timeline-prev')?.addEventListener('click',()=>show(Number(scrub.value)-1));
+   $('#ft-timeline-next')?.addEventListener('click',()=>show(Number(scrub.value)+1));
+   if(timeline.length){scrub.value=String(timeline.length-1);status.textContent=timeline.length+' recorded GPS points · Latest '+fmt(timeline[timeline.length-1].p.recorded_at)+'. Move the slider to view the timeline.'}
+   else status.textContent='No GPS records for this date.';
   }
   if(marks.length)map.fitBounds(window.L.latLngBounds(marks).pad(.25),{maxZoom:15});
   else $('#ft-map').insertAdjacentHTML('afterend','<p class="ft-note">No map pins recorded for the selected date and employee.</p>');
