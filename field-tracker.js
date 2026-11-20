@@ -118,17 +118,41 @@
   displayNetworkFeedback();
  }
  function activeHere(){return openSession&&openSession.company_id===company}
- function stopTracking(){if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}}
+ let gpsPollTimer=null,gpsPending=false;
+ function stopTracking(){
+  if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}
+  if(gpsPollTimer!==null){clearInterval(gpsPollTimer);gpsPollTimer=null}
+ }
+ async function saveGpsPosition(p){
+  if(!openSession||document.visibilityState==='hidden'||gpsPending||Date.now()-lastGpsSent<28000)return;
+  const c=p.coords;
+  if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||!Number.isFinite(c.accuracy))return;
+  if(c.accuracy>150)return; // Do not plot very unreliable fixes as movement.
+  gpsPending=true;
+  try{
+   await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy});
+   lastGpsSent=Date.now();
+  }catch(err){notify('GPS history paused: '+err.message,true);stopTracking()}
+  finally{gpsPending=false}
+ }
  function startTracking(){
-  stopTracking();if(!openSession||document.visibilityState==='hidden')return;
-  try{hasGPS();watch=navigator.geolocation.watchPosition(async p=>{
-   if(!openSession||document.visibilityState==='hidden'||Date.now()-lastGpsSent<30000)return;
-   lastGpsSent=Date.now();const c=p.coords;
-   try{await rpc('gr_field_record_point',{p_session:openSession.id,p_lat:c.latitude,p_lng:c.longitude,p_accuracy:c.accuracy})}
-   catch(err){notify('GPS history paused: '+err.message,true);stopTracking();}
-  },err=>{if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}},
-  {enableHighAccuracy:true,maximumAge:15000,timeout:20000});}
-  catch(err){notify(err.message,true)}
+  stopTracking();
+  if(!openSession||document.visibilityState==='hidden')return;
+  try{
+   hasGPS();
+   const options={enableHighAccuracy:true,maximumAge:0,timeout:20000};
+   watch=navigator.geolocation.watchPosition(p=>{void saveGpsPosition(p)},err=>{
+    if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}
+   },options);
+   // watchPosition does not promise a callback every 30 seconds. Request
+   // an additional fresh fix on a cadence while the page is foregrounded.
+   gpsPollTimer=setInterval(()=>{
+    if(!openSession||document.visibilityState==='hidden')return;
+    navigator.geolocation.getCurrentPosition(p=>{void saveGpsPosition(p)},err=>{
+     if(err.code===1){stopTracking();notify('GPS tracking permission was revoked. Tracking has stopped.',true)}
+    },options);
+   },30000);
+  }catch(err){notify(err.message,true)}
  }
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')startTracking();else stopTracking()});
  window.addEventListener('pagehide',stopTracking);
@@ -364,7 +388,7 @@
    .sort((a,b)=>ownerName(a.userId).localeCompare(ownerName(b.userId)));
  }
  function monitorFresh(stamp){
-  return monitorDate===indiaDay()&&Date.now()-new Date(stamp).getTime()<20*60*1000&&
+  return monitorDate===indiaDay()&&Date.now()-new Date(stamp).getTime()<90*1000&&
    Date.now()-new Date(stamp).getTime()>-60000;
  }
  function drawMonitor(){
@@ -384,7 +408,7 @@
   const latestTable=groups.length?'<div class="ft-tablebox"><table class="ft-table"><thead><tr><th>Employee</th><th>Last recorded (IST)</th><th>GPS status</th><th>Accuracy</th><th>Location</th><th>Points</th></tr></thead><tbody>'+
    groups.map(g=>'<tr><td><span class="ft-table-dot" style="background:'+g.color+'"></span><b>'+e(ownerName(g.userId))+'</b></td>'+
    '<td>'+fmt(g.last.recorded_at)+'</td><td><span class="ft-pill '+(monitorFresh(g.last.recorded_at)?'online':'offline')+'">'+
-   (monitorFresh(g.last.recorded_at)?'Recent (within 20 min)':'Last known · not live')+'</span></td><td>±'+Math.round(g.last.accuracy_m)+' m</td>'+
+   (monitorFresh(g.last.recorded_at)?'Live GPS (within 90 sec)':'Last known · not live')+'</span></td><td>±'+Math.round(g.last.accuracy_m)+' m</td>'+
    '<td>'+coord(g.last.lat,g.last.lng)+'</td><td>'+g.list.length+'</td></tr>').join('')+
    '</tbody></table></div>':'<div class="ft-empty">No GPS samples for the selected date and employee. Check Admin GPS assignment, staff attendance and browser Location permission.</div>';
   const log=monitoredPoints().sort((a,b)=>new Date(b.recorded_at)-new Date(a.recorded_at));
@@ -396,7 +420,7 @@
    '<div class="ft-card"><small>Recent positions (within 20 min)</small><strong>'+fresh+'</strong></div>'+
    '<div class="ft-card"><small>Recorded GPS positions</small><strong>'+total+'</strong></div></div>'+
    box('Field Staff Movement Map',
-    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded GPS samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
+    '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded GPS samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible; GPS freshness expires after 90 seconds.</p>'+
     legend+'<div class="ft-timeline-controls"><b>Recorded GPS timeline</b><div class="ft-timeline-actions"><button type="button" id="ft-timeline-prev">◀</button><input id="ft-timeline-scrub" type="range" min="0" max="0" value="0" step="1" aria-label="GPS timeline position"><button type="button" id="ft-timeline-next">▶</button></div><div id="ft-timeline-status" aria-live="polite">Select a recorded location</div></div><div id="ft-map" class="ft-map" role="img" aria-label="Employee colour-coded field GPS location and movement history"></div>'+
     '<p class="ft-note">GPS samples are attempted every 30 seconds while the CRM is visible. GPS updates require an Admin-enabled employee, successful header attendance check-in, Location permission and an open/visible CRM page. Phone lock, backgrounding, device GPS or internet outages can cause missing points.</p>')+
    box('Employee Latest Recorded Positions',latestTable)+
@@ -420,7 +444,7 @@
     dot.bindPopup(desc);marks.push([p.lat,p.lng]);timeline.push({p,dot,name:ownerName(g.userId)});
    }
    const p=g.last,initials=ownerName(g.userId).split(/\s+/).slice(0,2).map(x=>x.charAt(0)).join('').toUpperCase();
-   const pin=window.L.divIcon({className:'ft-staff-pin-wrap',html:'<div class="ft-staff-pin" style="--pin-color:'+g.color+'">'+e(initials||'●')+'</div>',iconSize:[40,48],iconAnchor:[20,46],popupAnchor:[0,-44]});
+   const pin=window.L.divIcon({className:'ft-staff-pin-wrap',html:'<div class="ft-staff-pin" style="--pin-color:'+g.color+'">'+(monitorFresh(p.recorded_at)?'🏍️':e(initials||'●'))+'</div>',iconSize:[40,48],iconAnchor:[20,46],popupAnchor:[0,-44]});
    const marker=window.L.marker([p.lat,p.lng],{icon:pin,zIndexOffset:1000}).addTo(map);
    const detail=document.createElement('div');
    detail.textContent=ownerName(g.userId)+' · Last recorded '+fmt(p.recorded_at)+(monitorFresh(p.recorded_at)?' · Recent':' · Not live');
