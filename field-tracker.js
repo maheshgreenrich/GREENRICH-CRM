@@ -19,7 +19,7 @@
 
  const companies={'grow-india':'GreenRich Grow India Pvt Ltd','enviro-solutions':'GreenRich Enviro Solutions Pvt Ltd'};
  let db,user,profile,company='',tab=(new URLSearchParams(location.search).get('view')==='monitor'?'monitor':'visits'),isSupervisor=false,isAdmin=false,team=[],visits=[],sessions=[],photos=[],points=[],customers=[],leads=[],supervisors=[],visitRules={},followupTeam=[],followups=[],myFieldCompanies=[],openSession=null;
- let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null,monitorDate=indiaDay(),monitorPerson='all';
+ let watch=null,lastGpsSent=0,map=null,refreshing=false,monitorTimer=null,monitorDate=indiaDay(),monitorPerson='all',monitorScope='all',authorizedGpsCompanies=[];
  let gpsState={level:'info',message:'Not tested. Click Test GPS Access below. This does not check you in or save a GPS record.'};
  let networkState={level:'info',message:'If the app shows Failed to fetch, test its connection separately. This test does not save data.'};
  const isNetworkError=err=>/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(String(err?.message||err||''));
@@ -151,11 +151,12 @@
   if(p.error||!p.data?.active)throw Error('An active GreenRich employee profile is required.');
   profile=p.data;
   const ids=(profile.company_ids||[]).filter(x=>companies[x]);
+  authorizedGpsCompanies=(await Promise.all(ids.map(async id=>({id,allowed:await rpc('gr_field_supervisor',{p_company:id}).catch(()=>false)})))).filter(x=>x.allowed).map(x=>x.id);
   if(!ids.length)throw Error('Your employee account has no assigned GreenRich company.');
   company=ids.includes('grow-india')?'grow-india':ids[0];$('#ft-user').textContent=profile.full_name;
   $('#ft-company').innerHTML=ids.map(id=>'<option value="'+e(id)+'">'+e(companies[id])+'</option>').join('');
   $('#ft-company').value=company;
-  $('#ft-company').onchange=async ev=>{company=ev.target.value;await run(reload)};
+  $('#ft-company').onchange=async ev=>{company=ev.target.value;monitorScope='all';await run(reload)};
   $('#ft-refresh').onclick=()=>run(reload);
   $('#ft-nav').addEventListener('click',ev=>{const item=ev.target.closest('[data-tab]');if(!item)return;const target=item.dataset.tab;
    if((target==='monitor'&&!isSupervisor)||(target==='team'&&!isAdmin)||(target==='shift'&&!myFieldCompanies.includes(company)))return;
@@ -166,18 +167,20 @@
     const day=ev.target.value;
     if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(day)||day>indiaDay())return notify('Choose today or an earlier date.',true);
     monitorDate=day;void run(reload);
+   }else if(ev.target.id==='ft-monitor-scope'){
+    monitorScope=ev.target.value;monitorPerson='all';void run(reload);
    }else if(ev.target.id==='ft-monitor-person'){
     monitorPerson=ev.target.value;render();void run(drawMap);
    }
   });
   await reload();monitorTimer=setInterval(()=>{if(document.visibilityState==='visible'&&tab==='monitor'&&!refreshing)void run(reload)},30000);
  }
- async function monitorHistory(){
+ async function monitorHistory(companyId=company){
   // Supabase Data API may limit one RPC page to 1,000 rows. Page through all
   // half-hour samples so a full company/day is not silently cut off.
   const result=[];
   for(let offset=0;offset<20000;offset+=1000){
-   const page=await db.rpc('gr_field_monitor_day',{p_company:company,p_day:monitorDate}).range(offset,offset+999);
+   const page=await db.rpc('gr_field_monitor_day',{p_company:companyId,p_day:monitorDate}).range(offset,offset+999);
    if(page.error)throw Error(page.error.message);
    const batch=page.data||[];result.push(...batch);
    if(batch.length<1000)break;
@@ -205,6 +208,26 @@
      rpc('gr_field_my_enabled_companies',{})
    ]);
    team=dir||[];visits=allVisits;sessions=allSessions;photos=allPhotos;points=allPoints;customers=allCustomers;leads=allLeads;supervisors=allSupervisors;visitRules=allRules||{};followupTeam=allFollowupTeam||[];followups=allFollowups||[];myFieldCompanies=fieldCompanies||[];
+   if(tab==='monitor'&&isSupervisor){
+    const wanted=monitorScope==='all'?authorizedGpsCompanies:[monitorScope];
+    for(const id of wanted.filter(id=>id!==company&&authorizedGpsCompanies.includes(id))){
+     const [p,t,v,ph,f,ft]=await Promise.all([
+      monitorHistory(id),rpc('gr_field_directory',{p_company:id}),
+      q('gr_field_visits','*',x=>x.eq('company_id',id).order('due_at',{ascending:false}).limit(300)),
+      q('gr_field_photos','id,company_id,visit_id,uploaded_by,object_path,notes,lat,lng,accuracy_m,captured_at',x=>x.eq('company_id',id).order('captured_at',{ascending:false}).limit(250)),
+      q('gr_field_visit_followups','id,company_id,visit_id,assigned_to,due_at,notes,status',x=>x.eq('company_id',id).limit(200)),
+      rpc('gr_field_followup_directory',{p_company:id})
+     ]);
+     points.push(...p);team.push(...t.filter(x=>!team.some(y=>y.id===x.id)));
+     visits.push(...v);photos.push(...ph);followups.push(...f);
+     followupTeam.push(...ft.filter(x=>!followupTeam.some(y=>y.id===x.id)));
+    }
+    if(monitorScope!=='all'){
+     if(monitorScope!==company)points=points.filter(p=>p.company_id===monitorScope||!p.company_id);
+     visits=visits.filter(v=>v.company_id===monitorScope);
+    }
+   }
+
     if(tab==='shift'&&!myFieldCompanies.includes(company))tab='visits';
     if(tab==='monitor'&&!isSupervisor){tab='visits';notify('GPS monitoring is restricted to authorized Admins and supervisors.',true)};
    // Check across companies so a staff member cannot start a second shift.
@@ -347,6 +370,8 @@
   const staffed=[...new Set([...team.map(x=>x.id),...(points||[]).map(p=>p.user_id)])].sort((a,b)=>ownerName(a).localeCompare(ownerName(b)));
   const names=staffed.includes(monitorPerson)?staffed:monitorPerson==='all'?staffed:[monitorPerson,...staffed];
   const filter='<div class="ft-monitor-filters">'+
+   '<label>GPS map companies<select id="ft-monitor-scope"><option value="all" '+(monitorScope==='all'?'selected':'')+'>All authorized companies</option>'+
+   authorizedGpsCompanies.map(id=>'<option value="'+e(id)+'" '+(monitorScope===id?'selected':'')+'>'+e(companies[id])+'</option>').join('')+'</select></label>'+
    '<label>Attendance date (IST)<input type="date" id="ft-monitor-date" max="'+indiaDay()+'" value="'+e(monitorDate)+'"></label>'+
    '<label>Employee<select id="ft-monitor-person"><option value="all">All employees with GPS data</option>'+
    names.map(id=>'<option value="'+e(id)+'" '+(monitorPerson===id?'selected':'')+'>'+e(ownerName(id))+'</option>').join('')+
@@ -365,7 +390,7 @@
    '<td>'+fmt(p.recorded_at)+'</td><td>±'+Math.round(p.accuracy_m)+' m</td><td>'+coord(p.lat,p.lng)+'</td></tr>').join('')+
    '</tbody></table></div>':'<p class="ft-note">No 10-minute GPS history for the selected day.</p>';
   return filter+'<div class="ft-cards"><div class="ft-card"><small>Employees with recorded GPS</small><strong>'+groups.length+'</strong></div>'+
-   '<div class="ft-card"><small>Recent positions (within 40 min)</small><strong>'+fresh+'</strong></div>'+
+   '<div class="ft-card"><small>Recent positions (within 20 min)</small><strong>'+fresh+'</strong></div>'+
    '<div class="ft-card"><small>10-minute map samples</small><strong>'+total+'</strong></div></div>'+
    box('Field Staff Movement Map',
     '<p>Each employee has a distinct colour. Large pins show their latest <b>recorded</b> location for this date. Small dots and straight lines connect actual recorded 10-minute samples in time order; gaps may occur when GPS is unavailable. These are not a continuously measured route. Client site markers are shown as outlined circles. Map refreshes every 30 seconds while visible.</p>'+
@@ -400,7 +425,7 @@
   }
   // Mark each customer's arrival and completion independently from travel GPS dots.
   // Visit evidence is loaded on demand via short-lived private storage links.
-  for(const v of filterCompany().filter(v=>(monitorPerson==='all'||v.assigned_to===monitorPerson)&&
+  for(const v of visits.filter(v=>(monitorScope==='all'?authorizedGpsCompanies.includes(v.company_id):v.company_id===monitorScope)&&(monitorPerson==='all'||v.assigned_to===monitorPerson)&&
    ((v.arrival_at&&indiaDay(new Date(v.arrival_at))===monitorDate)||
     (v.completed_at&&indiaDay(new Date(v.completed_at))===monitorDate))).slice(0,150)){
     const locations=[
