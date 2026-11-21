@@ -125,25 +125,38 @@
    lowStock:min!==null&&onHand!==null&&onHand<min};
  }
  const showMetric=(value,uom='')=>value===null||value===undefined?'—':fmt(value)+(uom?' '+esc(uom):'');
+ function productStatusVisibility(item){
+  // Sales/Purchase flags control display, never physical stock or forecast math.
+  return ['stock','bom',...(item.saleable?['sales']:[]),
+   ...(item.purchasable?['purchases']:[]),'reorder','subcontract'];
+ }
  function stockSummary(item,metrics){
   const unit=item.unit||'nos';
-  const chip=(name,main,sub,tip,accent='')=>'<div class="gr-inv-metric '+accent+'" title="'+esc(tip)+'" role="group" aria-label="'+esc(name)+'">'+
+  const chip=(name,main,sub,tip,accent='')=>'<div class="gr-inv-metric '+accent+
+   '" data-inv-status="'+name+'" title="'+esc(tip)+'" role="group" aria-label="'+esc(name)+'">'+
    '<strong>'+main+'</strong>'+(sub?'<small>'+sub+'</small>':'')+'</div>';
+  const cards={
+   stock:chip('stock',showMetric(metrics.onHand,unit)+' <span>On Hand</span>',
+    showMetric(metrics.forecast,unit)+' Forecasted',
+    'Actual On Hand changes only on physical transactions. Forecast = On Hand + pending PO receipts − pending sales / dispatches.','gr-inv-metric-primary'),
+   bom:chip('bom',showMetric(metrics.bomCount)+' <span>Bill of Materials</span>',
+    metrics.bomLines+' component lines','BOM revisions and component lines'),
+   sales:chip('sales',showMetric(metrics.sold)+' <span>Sold</span>',
+    showMetric(metrics.outgoing,unit)+' Outgoing',
+    'Completed sales and pending dispatches; shown only when Sales is selected'),
+   purchases:chip('purchases',showMetric(metrics.purchaseOrders)+' <span>Purchase Orders</span>',
+    showMetric(metrics.incoming,unit)+' Incoming',
+    'Approved purchase orders and incoming quantities; shown only when Purchase is selected'),
+   reorder:chip('reorder','Min: '+showMetric(metrics.min),
+    'Max: '+showMetric(metrics.max),'Configured minimum and maximum reorder levels',metrics.lowStock?'gr-inv-metric-danger':''),
+   subcontract:chip('subcontract','In: '+showMetric(metrics.subcontractIn),
+    'Out: '+showMetric(metrics.subcontractOut),'Subcontracting incoming and outgoing quantities')
+  };
   return '<div class="gr-inv-summary" role="region" aria-label="Product inventory status">'+
-    chip('On hand and forecast',showMetric(metrics.onHand,unit)+' <span>On Hand</span>',
-      showMetric(metrics.forecast,unit)+' Forecasted','Forecast = On hand + pending approved PO receipts − unfulfilled sales and dispatches','gr-inv-metric-primary')+
-    chip('Bill of materials',showMetric(metrics.bomCount)+' <span>Bill of Materials</span>',
-      metrics.bomLines+' component lines','Count of BOM revisions for this product, not component lines')+
-    chip('Sold and outgoing',showMetric(metrics.sold)+' <span>Sold</span>',
-      showMetric(metrics.outgoing,unit)+' Outgoing','Completed sales / orders awaiting dispatch; a dash means orders data is not accessible')+
-    chip('Purchase orders',showMetric(metrics.purchaseOrders)+' <span>Purchase Orders</span>',
-      showMetric(metrics.incoming,unit)+' Incoming','Purchase orders with this exact product code; incoming excludes quantities already received')+
-    chip('Minimum and maximum','Min: '+showMetric(metrics.min),
-      'Max: '+showMetric(metrics.max),'Configured reorder minimum and maximum (dash means not configured)',metrics.lowStock?'gr-inv-metric-danger':'')+
-    chip('Subcontracting','In: '+showMetric(metrics.subcontractIn),
-      'Out: '+showMetric(metrics.subcontractOut),'Subcontract In is outstanding expected output only when recorded; Out is material still at vendor')+
-   '</div>'+
-   (metrics.lowStock?'<div class="gr-inv-low-stock" role="alert">⚠ Low stock: '+esc(item.name)+' has '+showMetric(metrics.onHand,unit)+' remaining, below the minimum of '+showMetric(metrics.min,unit)+'. Please check and replenish stock.</div>':'');
+   productStatusVisibility(item).map(name=>cards[name]).join('')+'</div>'+
+   (metrics.lowStock?'<div class="gr-inv-low-stock" role="alert">⚠ Low stock: '+esc(item.name)+
+    ' has '+showMetric(metrics.onHand,unit)+' remaining, below the minimum of '+
+    showMetric(metrics.min,unit)+'. Please check and replenish stock.</div>':'');
  }
  function layout(){
   const tabs=[['catalog','Product & Material Master'],['warehouses','Warehouse Stock'],['vendors','Vendor / Job Work Stock'],['bom','Multi-level BOM'],['purchasing','Purchase Shortages'],['activity','Stock Movement Audit']];
@@ -202,7 +215,7 @@
  return '<section class="gr-inv-new-page" data-inv-new-page><form data-inv-create-form novalidate>'+
   '<div class="gr-inv-new-bar"><div><button type="button" data-inv-create-cancel>‹ Products</button> <b>New Product</b></div>'+
   '<div><button type="button" data-inv-create-cancel>Discard</button> <button class="gr-inv-create-submit" type="submit">Save Product</button></div></div>'+
-  '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span>▥ 0 Sold</span><span>▤ 0 Purchased</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
+  '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span data-inv-new-stat="sales">▥ 0 Sold · 0 Outgoing</span><span data-inv-new-stat="purchases">▤ 0 Purchase Orders · 0 Incoming</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
   '<div class="gr-inv-new-panel"><div class="gr-inv-new-hero"><div class="gr-inv-new-titlewrap">'+
   '<label class="gr-inv-new-title">☆ <input name="name" type="text" placeholder="e.g. 25 L Home Composter" maxlength="180" required aria-label="Product Name"></label>'+
   '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. GRCOM25','text',true)+'</div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
@@ -606,7 +619,18 @@
     newPage.querySelectorAll('[data-inv-create-pane]').forEach(p=>p.hidden=p.dataset.invCreatePane!==id);
    };
    newPage.querySelectorAll('[data-inv-create-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.invCreateTab));
-   form.elements.namedItem('saleable').onchange=form.elements.namedItem('purchasable').onchange=()=>setTab(S.createTab);
+   const syncNewStatus=()=>{
+    const sale=form.elements.namedItem('saleable').checked;
+    const purchase=form.elements.namedItem('purchasable').checked;
+    const saleStatus=newPage.querySelector('[data-inv-new-stat="sales"]');
+    const purchaseStatus=newPage.querySelector('[data-inv-new-stat="purchases"]');
+    if(saleStatus)saleStatus.hidden=!sale;
+    if(purchaseStatus)purchaseStatus.hidden=!purchase;
+   };
+   const syncSalePurchase=()=>{setTab(S.createTab);syncNewStatus()};
+   form.elements.namedItem('saleable').onchange=syncSalePurchase;
+   form.elements.namedItem('purchasable').onchange=syncSalePurchase;
+   syncNewStatus();
    const track=form.elements.namedItem('track_inventory');
    const stockArea=newPage.querySelector('[data-inv-create-stock-area]');
    const stockField=form.elements.namedItem('opening_stock');
@@ -843,5 +867,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,productStatusVisibility,renderProductStatus:stockSummary,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm};
 })();
