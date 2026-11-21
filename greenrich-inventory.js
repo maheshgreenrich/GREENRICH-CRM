@@ -110,11 +110,11 @@
   const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
   const editable=S.ctx.can('stock','edit');
   const intro='<div class="gr-inv-product-hero"><div class="gr-inv-hero-main"><h2>☆ '+esc(item.name)+'</h2>'+
-   '<div class="gr-inv-flags"><label><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'> Sales</label>'+
-   '<label><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'> Purchase</label></div>'+
+   '<div class="gr-inv-flags"><label class="gr-inv-flag"><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Sales</span></label>'+
+   '<label class="gr-inv-flag"><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Purchase</span></label></div>'+
    '<p class="gr-inv-footnote">'+(item.saleable&&item.purchasable?'Purchased and resold, or manufactured and sold':item.saleable?'Manufactured / stocked for sales':item.purchasable?'Purchased for internal use or production':'Not enabled for sales or purchase')+'</p></div>'+
    '<div class="gr-inv-hero-photo">'+(image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">'+esc(item.code.slice(0,2))+'</div>')+
-   (editable?'<label class="gr-inv-photo-upload">✎ Add / Change Image<input type="file" data-inv-photo accept="image/png,image/jpeg,image/webp" hidden></label>':'')+'</div></div>';
+   (editable?'<button type="button" class="gr-inv-photo-upload" data-inv-photo-trigger>✎ Upload Image</button><input type="file" data-inv-photo accept="image/png,image/jpeg,image/webp" style="display:none" aria-label="Upload product image">':'')+'</div></div>';
   const tabs=[['general','General Information'],['sales','Sales'],['purchase','Purchase'],['inventory','Inventory']];
   let body='';
   if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
@@ -231,8 +231,8 @@
    const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
-  S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>void saveFlags(input).catch(err=>{draw();notify(err.message,true)}));
-  const photo=S.root.querySelector('[data-inv-photo]');if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
+  S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})};});
+  const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
   S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{S.detailTab=b.dataset.invDetailTab;draw()});
   S.root.querySelectorAll('[data-inv-detail-action]').forEach(b=>b.onclick=()=>{const dest=b.dataset.invDetailAction;if(dest==='warehouses'){S.detailTab='inventory';draw()}else{S.focus=null;S.tab=dest;layout();draw()}});
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});

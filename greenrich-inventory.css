@@ -89,3 +89,18 @@
 .gr-inv-odoo-general .gr-inv-field b{font-size:14px}
 .gr-inv-detail-tabs button.active{border-top-color:#aa4b91}
 @media(max-width:520px){.gr-inv-hero-photo{width:100px}.gr-inv-hero-photo img,.gr-inv-hero-photo .gr-inv-product-placeholder{width:86px;height:86px}.gr-inv-photo-upload{font-size:11px}.gr-inv-odoo-general .gr-inv-field{grid-template-columns:1fr;gap:2px}}
+
+/* 2026-11-21: high-specificity Odoo-style product header */
+.gr-inventory .gr-inv-product-hero{display:flex!important;flex-direction:row!important;align-items:flex-start!important;justify-content:space-between!important;padding:28px 30px 22px!important;gap:20px!important;min-height:205px}
+.gr-inventory .gr-inv-hero-main{flex:1 1 auto;min-width:0}
+.gr-inventory .gr-inv-hero-main h2{font-size:clamp(26px,3vw,40px);font-weight:500;line-height:1.2;margin:0 0 18px}
+.gr-inventory .gr-inv-flags{display:flex!important;gap:22px!important;align-items:center!important;margin:0!important}
+.gr-inventory .gr-inv-flags .gr-inv-flag{display:inline-flex!important;flex-direction:row!important;gap:8px!important;align-items:center!important;cursor:pointer;font-size:15px;font-weight:700;white-space:nowrap}
+.gr-inventory .gr-inv-flags .gr-inv-flag input[type=checkbox]{display:inline-block!important;position:static!important;appearance:auto!important;-webkit-appearance:checkbox!important;opacity:1!important;visibility:visible!important;width:18px!important;height:18px!important;min-width:18px!important;margin:0!important;padding:0!important;accent-color:#12b8a7!important;cursor:pointer}
+.gr-inventory .gr-inv-hero-photo{display:flex!important;flex-direction:column;align-items:center;gap:10px;width:154px!important;flex:0 0 154px!important}
+.gr-inventory .gr-inv-hero-photo img,.gr-inventory .gr-inv-hero-photo .gr-inv-product-placeholder{display:block;width:126px!important;height:126px!important;object-fit:contain;border-radius:8px;border:1px solid #dce3ed;background:#fff}
+.gr-inventory .gr-inv-hero-photo .gr-inv-product-placeholder{display:grid;place-items:center}
+.gr-inventory button.gr-inv-photo-upload{display:block!important;width:100%;font-size:12px;padding:8px 5px;border:1px solid #b77da7;background:#f9f1f8;color:#854273;border-radius:6px;cursor:pointer}
+.gr-inventory .gr-inv-detail-tabs{margin-top:0}
+.gr-inventory .gr-inv-odoo-general section h4{display:none}
+@media(max-width:560px){.gr-inventory .gr-inv-product-hero{padding:16px!important;gap:10px!important;min-height:155px}.gr-inventory .gr-inv-hero-photo{width:95px!important;flex-basis:95px!important}.gr-inventory .gr-inv-hero-photo img,.gr-inventory .gr-inv-hero-photo .gr-inv-product-placeholder{width:86px!important;height:86px!important}.gr-inventory .gr-inv-flags{gap:12px!important}.gr-inventory .gr-inv-flags .gr-inv-flag{font-size:13px}.gr-inventory .gr-inv-hero-main h2{font-size:24px}}
