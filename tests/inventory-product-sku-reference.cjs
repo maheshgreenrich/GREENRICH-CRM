@@ -21,5 +21,5 @@ assert.throws(()=>validateProductCodeChange(item,'GR-2',{items:[item,{id:'item-2
 assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:[{company_id:'grow-india',payload:{product_id:'item-1'}}],dispatch:[]}),/already used/);
 assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:[],dispatch:[],bom:[{company_id:'grow-india',payload:{parent_code:'GRCOM25'}}]}),/already used/);
 assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:null,dispatch:null}),/Cannot verify/);
-assert.match(html,/greenrich-inventory\.js\?v=20261121-new-inventory-page-v10/);
+assert.match(html,/greenrich-inventory\.js\?v=20261121-opening-stock-sku-v11/);
 console.log('PASS product SKU shown under title, reference editable, safe uniqueness/linkage validation.');
