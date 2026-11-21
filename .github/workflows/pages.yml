@@ -101,7 +101,8 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-inventory.js?sha=${GITHUB_SHA}" -o /tmp/gr-inventory.js &&
                node --check /tmp/gr-inventory.js &&
                grep -q 'GreenRichInventory' /tmp/gr-inventory.js &&
-               grep -q '20261121-inventory-syntax-fix-v5' /tmp/gr-secure.html &&
+               cmp -s greenrich-inventory.js /tmp/gr-inventory.js &&
+               cmp -s secure.html /tmp/gr-secure.html &&
                grep -q 'GreenRich ONE' /tmp/gr-secure.html &&
                grep -q 'App Install Check' /tmp/gr-check.html; then
               echo "LIVE: CRM and Android app assets published at $base"
