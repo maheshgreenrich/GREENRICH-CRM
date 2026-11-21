@@ -156,3 +156,27 @@
 .gr-inventory .gr-inv-low-stock{display:block;padding:11px 14px;margin:0 0 12px;border:1px solid #efb4ab;
   background:#fff3f1;color:#972b22;border-radius:9px;font-weight:700}
 @media(max-width:860px){.gr-inventory .gr-inv-summary{margin-right:0}.gr-inventory .gr-inv-metric{flex:0 0 165px}}
+
+/* Odoo-inspired product identifiers, directly below title. Blue / white theme. */
+.gr-inventory .gr-inv-product-identifiers{
+ display:flex;flex-wrap:wrap;gap:10px 22px;margin:3px 0 16px;align-items:flex-start;
+}
+.gr-inventory .gr-inv-identifier{display:flex;align-items:center;gap:10px;margin:0;
+ color:#456786;font-weight:650;font-size:13px;min-width:0}
+.gr-inventory .gr-inv-identifier>span{white-space:nowrap}
+.gr-inventory .gr-inv-identifier>strong{color:#114b90;font-weight:800;padding:4px 0}
+.gr-inventory .gr-inv-identifier input[type=text]{
+ width:clamp(125px,13vw,190px)!important;max-width:100%;
+ font-size:14px;font-weight:700;padding:6px 9px!important;min-height:33px!important;
+ background:#fff!important;border:1px solid #c7dbf3!important;color:#143c66!important;
+ border-radius:6px!important;box-shadow:none!important;text-transform:none
+}
+.gr-inventory .gr-inv-identifier input[type=text]:focus{
+ outline:2px solid #1972d4!important;outline-offset:1px;border-color:#1972d4!important
+}
+.gr-inventory .gr-inv-identifier input[type=text]::placeholder{color:#8598ae;font-weight:400}
+@media(max-width:720px){
+ .gr-inventory .gr-inv-product-identifiers{gap:10px;margin-bottom:14px}
+ .gr-inventory .gr-inv-identifier{flex-wrap:wrap;gap:4px 7px}
+ .gr-inventory .gr-inv-identifier input[type=text]{width:145px!important}
+}

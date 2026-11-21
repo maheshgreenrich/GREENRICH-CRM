@@ -190,6 +190,46 @@
  }
  const scopedItems=()=>S.items.filter(inScope).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
 
+ function renderProductIdentifiers(item,canEdit){
+  const code=String(item.code||'');
+  const reference=String(item.material?.reference||'');
+  const control=(key,label,value,placeholder,maxLength)=>{
+   return '<label class="gr-inv-identifier"><span>'+esc(label)+'</span>'+
+    (canEdit?'<input type="text" '+key+' maxlength="'+maxLength+'" aria-label="'+esc(label)+'" spellcheck="false" value="'+esc(value)+'" placeholder="'+esc(placeholder)+'">':
+      '<strong>'+esc(value||'—')+'</strong>')+'</label>';
+  };
+  return '<div class="gr-inv-product-identifiers">'+
+   control('data-inv-product-code','Product Code / SKU',code,'Enter product code',64)+
+   control('data-inv-edit="reference"','Reference No.',reference,'Optional reference number',100)+
+   '</div>';
+ }
+ function validateProductCodeChange(item,newCode,sources=S){
+  const code=String(newCode||'').trim().toUpperCase();
+  if(!code||code.length>64||!/^[A-Z0-9][A-Z0-9._\/-]*$/.test(code))
+   throw Error('Product code must be 1–64 characters: letters, numbers, hyphen, dot, slash or underscore.');
+  if((sources.items||[]).some(p=>p.company_id===item.company_id&&!(p.id===item.id&&p.original===item.original)&&
+      String(p.code||'').trim().toUpperCase()===code))
+   throw Error('This product code already exists in the selected company.');
+  if(String(item.code).toUpperCase()===code)return code;
+  const same=r=>r.company_id===item.company_id;
+  const old=String(item.code).toUpperCase();
+  const references=Array.isArray(sources.sales)&&sources.sales.some(r=>same(r)&&(String(r.payload?.product_id||'')===String(item.id)||
+    String(r.payload?.sku||'').toUpperCase()===old));
+  const dispatch=Array.isArray(sources.dispatch)&&sources.dispatch.some(r=>same(r)&&
+    (String(r.sku||'').toUpperCase()===old || String(r.source_snapshot?.sku||'').toUpperCase()===old));
+  const bom=(sources.bom||[]).some(r=>same(r)&&[r.payload?.parent_code,r.payload?.child_code]
+    .some(v=>String(v||'').toUpperCase()===old));
+  const purchase=(sources.pos||[]).some(r=>same(r)&&r.payload?.lines?.some(l=>
+    String(l.code||'').toUpperCase()===old || String(l.material_id||'')===String(item.id)));
+  const jobs=(sources.jobWork||[]).some(r=>same(r)&&[r.payload?.material?.code,r.payload?.material?.id,r.payload?.output_product_code]
+    .some(v=>String(v||'').toUpperCase()===old||String(v||'')===String(item.id)));
+  const requests=(sources.requisitions||[]).some(r=>same(r)&&String(r.payload?.material_code||'').toUpperCase()===old);
+  if(references||dispatch||bom||purchase||jobs||requests)
+   throw Error('This SKU is already used in sales, purchasing or BOM records. Keep the product code unchanged; use Reference No. for an additional identifier.');
+  if(!Array.isArray(sources.sales)||!Array.isArray(sources.dispatch))
+   throw Error('Cannot verify all linked orders. Please use Reference No. or ask an administrator to check the product code.');
+  return code;
+ }
  function detail(index){
   const item=S.items.find(i=>i.company_id===index.co&&i.id===index.id&&i.original===index.original);
   if(!item)return '<p>Product not found</p>';
@@ -249,7 +289,7 @@
     return '<label class="gr-inv-field gr-inv-inline-field"><b>'+esc(label)+'</b><span class="gr-inv-inline-control">'+control+'</span></label>';
   };
   const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
-  const intro='<div class="gr-inv-product-hero"><div class="gr-inv-hero-main"><h2>☆ '+esc(item.name)+'</h2>'+
+  const intro='<div class="gr-inv-product-hero"><div class="gr-inv-hero-main"><h2>☆ '+esc(item.name)+'</h2>'+renderProductIdentifiers(item,editable)+
    '<div class="gr-inv-flags"><label class="gr-inv-flag"><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Sales</span></label>'+
    '<label class="gr-inv-flag"><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Purchase</span></label></div>'+
    '<p class="gr-inv-footnote">'+(item.saleable&&item.purchasable?'Purchased and resold, or manufactured and sold':item.saleable?'Manufactured / stocked for sales':item.purchasable?'Purchased for internal use or production':'Not enabled for sales or purchase')+'</p></div>'+
@@ -371,6 +411,15 @@
   });
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})});
+  const productCodeInput=S.root.querySelector('[data-inv-product-code]');
+  if(productCodeInput){
+   productCodeInput.dataset.initial=productCodeInput.value;
+   productCodeInput.addEventListener('keydown',event=>{
+    if(event.key==='Escape'){productCodeInput.value=productCodeInput.dataset.initial;productCodeInput.blur()}
+    if(event.key==='Enter'){event.preventDefault();productCodeInput.blur()}
+   });
+   productCodeInput.onchange=()=>void saveProductCode(productCodeInput).catch(err=>{productCodeInput.disabled=false;notify(err.message,true)});
+  }
   const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
   S.root.querySelectorAll('[data-inv-edit]').forEach(el=>{
     el.dataset.initial=el.value;
@@ -391,6 +440,16 @@
 
  function currentItem(){
   return S.items.find(i=>S.focus&&i.company_id===S.focus.co&&i.id===S.focus.id&&i.original===S.focus.original);
+ }
+ async function saveProductCode(input){
+  const item=currentItem();
+  if(!item||!input.isConnected)return;
+  const next=validateProductCodeChange(item,input.value);
+  if(next===String(item.code).toUpperCase()){input.value=item.code;return}
+  input.disabled=true;
+  try{
+   await updateItem(item,{[item.original==='crm'?'sku':'code']:next});
+  }catch(e){input.disabled=false;throw e}
  }
  async function saveInlineField(el){
   const item=currentItem();
@@ -433,6 +492,7 @@
    if(error)throw Error(error.message);
    if(!data?.length)throw Error('Update was not authorised or no matching record was found');
    item.material=payload;
+   item.code=item.original==='crm'?(payload.sku||payload.code||item.code):(payload.code||item.code);
    if(item.original==='crm'&&Object.prototype.hasOwnProperty.call(changes,'stock'))item.aggregate=payload.stock;
    item.saleable=typeof payload.saleable==='boolean'?payload.saleable:item.saleable;
    item.purchasable=typeof payload.purchasable==='boolean'?payload.purchasable:item.purchasable;
@@ -540,5 +600,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange};
 })();

@@ -50,6 +50,7 @@ jobs:
           set -euo pipefail
           node --check greenrich-inventory.js
           node tests/inventory-product-summary.cjs
+          node tests/inventory-product-sku-reference.cjs
           node tests/crm-onhand-forecast.cjs
           node - <<'NODE'
           const fs = require('fs');
