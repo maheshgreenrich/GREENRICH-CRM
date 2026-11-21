@@ -33,3 +33,44 @@
 @media(max-width:700px){.gr-inv-head{display:block}.gr-inv-head label{display:block;margin-top:10px}.gr-inventory [data-inventory-content]{padding:10px}}
 
 .gr-inventory-return{display:inline-flex;margin:4px 0 12px;padding:10px 14px;color:#2057a6;background:white;border:1px solid #c4d5eb;border-radius:8px;cursor:pointer;font-weight:650}
+
+/* Odoo-inspired inventory product kanban and tabbed product details */
+.gr-inventory{--inv-accent:#9a417d;--inv-panel:#292b33;--inv-border:#41444d}
+.gr-inv-catalog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.gr-inv-catalog-head h3{font-size:22px;margin:0}
+.gr-inv-catalog-head small{color:#7f8da0}
+.gr-inv-catalog-actions{display:flex;gap:4px}
+.gr-inv-catalog-actions button.active{background:#894075;color:#fff;border-color:#894075}
+.gr-inv-product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;padding:8px 0}
+.gr-inventory .gr-inv-product-card{display:flex;justify-content:space-between;text-align:left;align-items:flex-start;gap:12px;min-width:0;min-height:118px;padding:14px;border-radius:10px;border:1px solid #d9e0eb;background:#f8f9fc;color:#20334a;transition:border-color .15s,box-shadow .15s}
+.gr-inventory .gr-inv-product-card:hover{background:#f2eff6;border-color:#ad6b9e;box-shadow:0 3px 12px #00000012}
+.gr-inv-product-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:5px}
+.gr-inv-product-copy>b{font-size:16px;line-height:1.3;overflow-wrap:anywhere}
+.gr-inv-product-copy>small{color:#738397;font-size:12px}
+.gr-inv-product-copy>strong{font-size:14px}
+.gr-inv-onhand{font-size:14px;font-weight:750}.gr-inv-onhand span{font-weight:400;color:#738397;font-size:12px}
+.gr-inv-product-card img,.gr-inv-product-placeholder{width:78px;height:78px;object-fit:contain;border-radius:8px;border:1px solid #e0e4ec;background:#fff;flex-shrink:0}
+.gr-inv-product-placeholder{display:grid;place-items:center;font-size:21px;font-weight:800;color:#94668c}
+.gr-inv-footnote{color:#7c8ba0;font-size:12px;margin:14px 0 0}
+.gr-inv-detail-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.gr-inv-detail-toolbar>span{font-weight:700}.gr-inv-detail-tools{display:flex;flex-wrap:wrap;gap:7px}
+.gr-inv-detail-panel{border:1px solid #d9e0e9;border-radius:12px;overflow:hidden;background:#fff}
+.gr-inv-product-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 26px}
+.gr-inv-product-hero h2{font-size:clamp(22px,3vw,34px);margin:0 0 12px;font-weight:500}
+.gr-inv-product-hero img{height:105px;width:105px;object-fit:contain;border-radius:8px}
+.gr-inv-pill{display:inline-block;border-radius:5px;background:#f2e9f2;color:#72436b;padding:3px 8px;margin:3px 4px 3px 0;font-size:12px}
+.gr-inv-detail-tabs{display:flex;overflow:auto;gap:0;border-bottom:1px solid #dfe2e9;padding:0 22px}
+.gr-inv-detail-tabs button{border-radius:6px 6px 0 0;border-bottom:none}
+.gr-inv-detail-tabs button.active{border-top:3px solid #a2498b;background:#f7f0f7;color:#853e73}
+.gr-inv-detail-body{padding:20px 26px;min-height:250px}
+.gr-inv-detail-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px}
+.gr-inv-detail-columns section{min-width:0}.gr-inv-detail-columns h4,.gr-inv-notes h4{text-transform:uppercase;color:#6c7585;border-bottom:1px solid #e4e7ed;padding-bottom:8px;font-size:12px;letter-spacing:.04em}
+.gr-inv-field{display:grid;grid-template-columns:minmax(110px,37%) 1fr;gap:8px;padding:9px 0}
+.gr-inv-field b{font-size:13px}.gr-inv-field span{min-width:0;overflow-wrap:anywhere}
+.gr-inv-notes{margin-top:25px}
+@media(prefers-color-scheme:dark){
+ .gr-inventory .gr-inv-product-card{background:#292b33;border-color:#42434d;color:#f2f1f6}
+ .gr-inventory .gr-inv-product-card:hover{background:#34303a;border-color:#a75a97}
+ .gr-inv-product-copy>small,.gr-inv-onhand span,.gr-inv-footnote{color:#a4a7b4}
+}
+@media(max-width:760px){.gr-inv-product-grid{grid-template-columns:1fr}.gr-inv-detail-columns{grid-template-columns:1fr;gap:8px}.gr-inv-detail-body{padding:14px}.gr-inv-product-hero{padding:16px}.gr-inv-detail-tabs{padding:0 10px}.gr-inv-detail-toolbar{align-items:flex-start}}

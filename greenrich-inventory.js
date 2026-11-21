@@ -9,7 +9,7 @@
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],requisitions:[],prodBalances:[],focus:null,filter:'',busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
@@ -73,31 +73,74 @@
   bind();
  }
  const kindCount=k=>S.items.filter(i=>inScope(i)&&i.stage===k).length;
+
  function catalog(){
-  const items=S.items.filter(inScope).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
-  return '<div class="gr-inv-stats">'+stages.map(k=>'<article><small>'+names[k]+'</small><strong>'+kindCount(k)+'</strong></article>').join('')+'</div>'+
-   '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search product, code, stage"><span>Click any item to see warehouses, BOM and sourcing.</span></div>'+
-   '<div class="gr-inv-scroll"><table><thead><tr><th>Code / Item</th><th>Level</th><th>Saleable</th><th>Purchasable</th><th>Aggregate stock</th><th>Verified locations</th><th></th></tr></thead><tbody>'+
+  const items=scopedItems();
+  const selected=items.length;
+  const cards=items.map((i,n)=>{
+   const image=i.material?.image_url||i.material?.image||i.material?.photo_url||'';
+   const price=i.material?.price||i.material?.selling_price||i.material?.sales_price;
+   const qty=i.aggregate===null||i.aggregate===undefined?'Not recorded':fmt(i.aggregate)+' '+esc(i.unit);
+   const initials=esc((i.name||i.code).slice(0,2).toUpperCase());
+   return '<button type="button" class="gr-inv-product-card" data-inv-item="'+n+'"><span class="gr-inv-product-copy"><b>'+esc(i.name)+'</b><small>'+esc(i.code)+' · '+esc(names[i.stage])+'</small>'+
+    (price!==undefined&&price!==null&&price!==''?'<strong>₹ '+fmt(price)+'</strong>':'')+
+    '<span class="gr-inv-onhand">'+qty+' <span>On Hand (aggregate)</span></span></span>'+
+    (image?'<img loading="lazy" alt="" src="'+esc(image)+'" onerror="this.hidden=true">':'<span class="gr-inv-product-placeholder">'+initials+'</span>')+'</button>';
+  }).join('');
+  const list='<div class="gr-inv-scroll"><table><thead><tr><th>Code / Item</th><th>Level</th><th>Saleable</th><th>Purchasable</th><th>Aggregate stock</th><th>Verified locations</th><th></th></tr></thead><tbody>'+
    (items.map((i,n)=>'<tr><td><strong>'+esc(i.code)+'</strong><small>'+esc(i.name)+'</small></td><td>'+esc(i.stage)+'</td><td>'+(i.saleable?'Yes':'—')+'</td><td>'+(i.purchasable?'Yes':'—')+
-    '</td><td>'+(i.aggregate===null||i.aggregate===undefined?'Not recorded':fmt(i.aggregate)+' '+esc(i.unit))+
-    '</td><td>'+fmt(getLocBalance(i))+' '+esc(i.unit)+'</td><td><button data-inv-item="'+n+'">View</button></td></tr>').join('')||
-    '<tr><td colspan="7">No products found.</td></tr>')+'</tbody></table></div>';
+   '</td><td>'+(i.aggregate===null||i.aggregate===undefined?'Not recorded':fmt(i.aggregate)+' '+esc(i.unit))+'</td><td>'+fmt(getLocBalance(i))+' '+esc(i.unit)+'</td><td><button data-inv-item="'+n+'">View</button></td></tr>').join('')||
+   '<tr><td colspan="7">No products found.</td></tr>')+'</tbody></table></div>';
+  return '<div class="gr-inv-catalog-head"><div><h3>Products</h3><small>'+selected+' products · '+S.items.filter(inScope).length+' total in selected company</small></div><div class="gr-inv-catalog-actions"><button type="button" data-inv-view="cards" class="'+(S.view==='cards'?'active':'')+'" aria-label="Card view">▦ Cards</button><button type="button" data-inv-view="list" class="'+(S.view==='list'?'active':'')+'" aria-label="List view">☷ List</button></div></div>'+
+   '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search products by name, code or stage" aria-label="Search products"></div>'+
+   '<div class="gr-inv-stats">'+stages.map(k=>'<article><small>'+names[k]+'</small><strong>'+kindCount(k)+'</strong></article>').join('')+'</div>'+
+   (S.view==='list'?list:'<div class="gr-inv-product-grid">'+(cards||'<p>No products found.</p>')+'</div>')+
+   '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>';
  }
  const scopedItems=()=>S.items.filter(inScope).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
+
  function detail(index){
   const item=S.items.find(i=>i.company_id===index.co&&i.id===index.id&&i.original===index.original);
   if(!item)return '<p>Product not found</p>';
-  const amounts=S.locations.filter(x=>x.company_id===item.company_id);
+  const m=item.material||{}, amounts=S.locations.filter(x=>x.company_id===item.company_id);
   const edges=S.bom.filter(x=>x.company_id===item.company_id&&String(x.payload.parent_code||'').toLowerCase()===item.code.toLowerCase());
   const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===item.stage&&x.item_id===item.id).slice(0,15);
-  return '<button data-inv-back>← Back to Inventory</button><h3>'+esc(item.code)+' · '+esc(item.name)+'</h3>'+
-   '<div class="gr-inv-stats"><article><small>Product stage</small><strong>'+esc(names[item.stage])+'</strong></article>'+
-   '<article><small>Aggregate record</small><strong>'+esc(item.aggregate===null?'Not recorded':fmt(item.aggregate)+' '+item.unit)+'</strong></article>'+
-   '<article><small>Verified across warehouses</small><strong>'+fmt(getLocBalance(item))+' '+esc(item.unit)+'</strong></article></div>'+
-   '<h4>Stock by actual location</h4>'+table(['Warehouse / Location','Verified stock'],amounts.map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+fmt(S.balances.find(b=>b.company_id===item.company_id&&b.location_id===l.id&&b.item_id===item.id&&b.item_kind===item.stage)?.quantity||0)+' '+esc(item.unit)+'</td></tr>'))+
-   '<h4>BOM children</h4>'+table(['Component code','Per parent','UOM','Revision'],edges.map(b=>'<tr><td>'+esc(b.payload.child_code)+'</td><td>'+esc(b.payload.qty)+'</td><td>'+esc(b.payload.uom)+'</td><td>'+esc(b.payload.revision)+'</td></tr>'))+
-   '<h4>Recent warehouse activity</h4>'+table(['Action','Quantity','From → To','Date'],recent.map(m=>'<tr><td>'+esc(m.action)+'</td><td>'+fmt(m.quantity)+' '+esc(m.uom)+'</td><td>'+esc(locName(m.from_location))+' → '+esc(locName(m.to_location))+'</td><td>'+esc(new Date(m.posted_at).toLocaleDateString('en-IN'))+'</td></tr>'))+
-   '<p class="gr-inv-warning">For manufacturing BOM routing and vendor job-work (issued, used, scrap, returned), open Operations & Production. Warehouse allocation is separate until reconciled.</p>';
+  const t=S.detailTab||'general', image=m.image_url||m.image||m.photo_url||'';
+  const field=(label,value)=>'<div class="gr-inv-field"><b>'+esc(label)+'</b><span>'+esc(value===null||value===undefined||value===''?'—':value)+'</span></div>';
+  const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
+  const intro='<div class="gr-inv-product-hero"><div><h2>☆ '+esc(item.name)+'</h2><p><span class="gr-inv-pill">'+esc(names[item.stage])+'</span> <span class="gr-inv-pill">'+(item.saleable?'✓ Saleable':'Not saleable')+'</span> <span class="gr-inv-pill">'+(item.purchasable?'✓ Purchasable':'Not purchasable')+'</span></p></div>'+
+   (image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">'+esc(item.code.slice(0,2))+'</div>')+'</div>';
+  const tabs=[['general','General Information'],['sales','Sales'],['purchase','Purchase'],['inventory','Inventory']];
+  let body='';
+  if(t==='general')body='<div class="gr-inv-detail-columns"><section><h4>Product details</h4>'+
+   field('Product code',item.code)+field('Product type',m.product_type||'Goods')+field('Stage',names[item.stage])+field('Unit of measure',item.unit)+field('Saleable',item.saleable?'Yes':'No')+field('Purchasable',item.purchasable?'Yes':'No')+
+   '</section><section><h4>Pricing & classification</h4>'+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+field('Cost',m.cost??m.cost_price??'Not recorded')+
+   field('Category',m.category||m.category_name)+field('Barcode',m.barcode)+field('Reference',m.reference||m.sku)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
+   '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4><p>'+esc(m.notes||m.description||'No internal notes recorded.')+'</p></section>';
+  if(t==='sales')body='<div class="gr-inv-detail-columns"><section><h4>Sales settings</h4>'+
+    field('Can be sold',item.saleable?'Yes':'No')+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+
+    field('Invoicing policy',m.invoicing_policy||'Not configured')+field('Sales taxes',m.sales_tax||m.tax_rate||'Not configured')+
+    '</section><section><h4>Upsell & cross-sell</h4>'+field('Optional products',Array.isArray(m.optional_products)?m.optional_products.join(', '):m.optional_products)+
+    field('Sales description',m.sales_description||m.description||'Not recorded')+'</section></div>';
+  if(t==='purchase')body='<div class="gr-inv-detail-columns"><section><h4>Purchase settings</h4>'+
+    field('Can be purchased',item.purchasable?'Yes':'No')+field('Preferred vendor',m.preferred_vendor||m.preferred_vendor_id)+
+    field('Lead time (days)',m.lead_time||m.delivery_time)+field('Vendor price',m.purchase_price||'Not recorded')+
+    '<p class="gr-inv-footnote">Vendor prices and purchase orders are not generated automatically without approved supplier information.</p></section>'+
+    '<section><h4>Purchase policy</h4>'+field('Bill control',m.bill_control||'On received quantities')+
+    field('Purchase description',m.purchase_description||m.description)+'</section></div>';
+  if(t==='inventory')body='<div class="gr-inv-detail-columns"><section><h4>Logistics</h4>'+
+    field('Responsible',m.responsible||'Not assigned')+field('Weight',m.weight?m.weight+' kg':'Not recorded')+
+    field('Volume',m.volume?m.volume+' m³':'Not recorded')+field('Delivery time',m.delivery_time?m.delivery_time+' days':'Not recorded')+
+    field('Aggregate on hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
+    field('Verified in locations',fmt(getLocBalance(item))+' '+item.unit)+'</section>'+
+    '<section><h4>Warehouse balances</h4>'+
+    table(['Location','Verified stock'],amounts.map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+fmt(S.balances.find(b=>b.company_id===item.company_id&&b.location_id===l.id&&b.item_id===item.id&&b.item_kind===item.stage)?.quantity||0)+' '+esc(item.unit)+'</td></tr>'))+
+    '</section></div><div class="gr-inv-detail-columns"><section><h4>Bill of materials</h4>'+
+    table(['Component','Quantity','Revision'],edges.map(b=>'<tr><td>'+esc(b.payload.child_code)+'</td><td>'+esc(b.payload.qty)+' '+esc(b.payload.uom)+'</td><td>'+esc(b.payload.revision)+'</td></tr>'))+
+    '</section><section><h4>Recent stock movements</h4>'+
+    table(['Action','Quantity','From → To'],recent.map(m=>'<tr><td>'+esc(m.action)+'</td><td>'+fmt(m.quantity)+' '+esc(m.uom)+'</td><td>'+esc(locName(m.from_location))+' → '+esc(locName(m.to_location))+'</td></tr>'))+'</section></div>'+
+    '<p class="gr-inv-warning">Verified locations do not automatically overwrite the CRM product stock balance.</p>';
+  return toolbar+'<div class="gr-inv-detail-panel">'+intro+'<div class="gr-inv-detail-tabs">'+tabs.map(([key,label])=>'<button type="button" data-inv-detail-tab="'+key+'" class="'+(key===t?'active':'')+'">'+label+'</button>').join('')+'</div><div class="gr-inv-detail-body">'+body+'</div></div>';
  }
  function table(heads,body){return '<div class="gr-inv-scroll"><table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+body.join('')+'</tbody></table></div>'}
  function warehouse(){
@@ -178,10 +221,13 @@
    table(['Date','Company','Item','Movement','Qty','Source','Destination','Reference'],S.movements.filter(inScope).map(m=>'<tr><td>'+esc(new Date(m.posted_at).toLocaleString('en-IN'))+'</td><td>'+esc(companyName(m.company_id))+'</td><td>'+esc(m.item_code)+'</td><td>'+esc(m.action)+'</td><td>'+fmt(m.quantity)+' '+esc(m.uom)+'</td><td>'+esc(locName(m.from_location))+'</td><td>'+esc(locName(m.to_location))+'</td><td>'+esc(m.reference||'—')+'</td></tr>'));
  }
  function bind(){
-  const input=S.root.querySelector('[data-inv-search]');if(input)input.oninput=e=>{S.filter=e.target.value;draw()};
+  const input=S.root.querySelector('[data-inv-search]');if(input)input.oninput=e=>{S.filter=e.target.value;const pos=input.selectionStart;draw();const next=S.root.querySelector('[data-inv-search]');if(next){next.focus();next.setSelectionRange(pos,pos)}};
   S.root.querySelectorAll('[data-inv-item]').forEach(b=>b.onclick=()=>{
-   const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};draw()}
+   const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
+  S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
+  S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{S.detailTab=b.dataset.invDetailTab;draw()});
+  S.root.querySelectorAll('[data-inv-detail-action]').forEach(b=>b.onclick=()=>{const dest=b.dataset.invDetailAction;if(dest==='warehouses'){S.detailTab='inventory';draw()}else{S.focus=null;S.tab=dest;layout();draw()}});
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});
   S.root.querySelectorAll('[data-inv-operations]').forEach(b=>b.onclick=()=>S.ctx.openOperations());
   const f=S.root.querySelector('[data-inv-form]');if(f)f.onsubmit=event=>void post(event).catch(e=>notify(e.message,true));
