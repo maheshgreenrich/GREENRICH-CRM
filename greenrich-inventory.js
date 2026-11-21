@@ -38,13 +38,13 @@
   ]);
   const list=[];
   for(const r of products)list.push({company_id:r.company_id,id:r.record_id,code:r.payload.sku||r.payload.code||r.record_id,
-   name:r.payload.name||'Untitled saleable product',stage:'FG',saleable:true,purchasable:!!r.payload.purchasable,
+   name:r.payload.name||'Untitled saleable product',stage:'FG',saleable:r.payload.saleable!==false,purchasable:!!r.payload.purchasable,
    unit:r.payload.uom||'nos',aggregate:r.payload.stock,material:r.payload,original:'crm'});
   for(const r of materials.filter(x=>x.kind==='material')){
    const p=r.payload||{};const stage=type(p.type),id=r.record_id;
    const overlap=list.some(i=>i.company_id===r.company_id&&i.code.trim().toLowerCase()===String(p.code||'').trim().toLowerCase());
-   list.push({company_id:r.company_id,id,code:p.code||id,name:p.name||id,stage,saleable:stage==='FG',
-    purchasable:stage==='RM'||p.source_type==='Buy',unit:p.uom||'nos',aggregate:aggregates.find(x=>x.company_id===r.company_id&&x.material_id===id)?.quantity??null,
+   list.push({company_id:r.company_id,id,code:p.code||id,name:p.name||id,stage,saleable:typeof p.saleable==='boolean'?p.saleable:stage==='FG',
+    purchasable:typeof p.purchasable==='boolean'?p.purchasable:stage==='RM'||p.source_type==='Buy',unit:p.uom||'nos',aggregate:aggregates.find(x=>x.company_id===r.company_id&&x.material_id===id)?.quantity??null,
     material:p,original:'ops',overlap});
   }
   S.items=list;S.bom=materials.filter(x=>x.kind==='bom');S.requisitions=materials.filter(x=>x.kind==='requisition');S.locations=locations;
@@ -108,14 +108,19 @@
   const t=S.detailTab||'general', image=m.image_url||m.image||m.photo_url||'';
   const field=(label,value)=>'<div class="gr-inv-field"><b>'+esc(label)+'</b><span>'+esc(value===null||value===undefined||value===''?'—':value)+'</span></div>';
   const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
-  const intro='<div class="gr-inv-product-hero"><div><h2>☆ '+esc(item.name)+'</h2><p><span class="gr-inv-pill">'+esc(names[item.stage])+'</span> <span class="gr-inv-pill">'+(item.saleable?'✓ Saleable':'Not saleable')+'</span> <span class="gr-inv-pill">'+(item.purchasable?'✓ Purchasable':'Not purchasable')+'</span></p></div>'+
-   (image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">'+esc(item.code.slice(0,2))+'</div>')+'</div>';
+  const editable=S.ctx.can('stock','edit');
+  const intro='<div class="gr-inv-product-hero"><div class="gr-inv-hero-main"><h2>☆ '+esc(item.name)+'</h2>'+
+   '<div class="gr-inv-flags"><label><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'> Sales</label>'+
+   '<label><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'> Purchase</label></div>'+
+   '<p class="gr-inv-footnote">'+(item.saleable&&item.purchasable?'Purchased and resold, or manufactured and sold':item.saleable?'Manufactured / stocked for sales':item.purchasable?'Purchased for internal use or production':'Not enabled for sales or purchase')+'</p></div>'+
+   '<div class="gr-inv-hero-photo">'+(image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">'+esc(item.code.slice(0,2))+'</div>')+
+   (editable?'<label class="gr-inv-photo-upload">✎ Add / Change Image<input type="file" data-inv-photo accept="image/png,image/jpeg,image/webp" hidden></label>':'')+'</div></div>';
   const tabs=[['general','General Information'],['sales','Sales'],['purchase','Purchase'],['inventory','Inventory']];
   let body='';
-  if(t==='general')body='<div class="gr-inv-detail-columns"><section><h4>Product details</h4>'+
-   field('Product code',item.code)+field('Product type',m.product_type||'Goods')+field('Stage',names[item.stage])+field('Unit of measure',item.unit)+field('Saleable',item.saleable?'Yes':'No')+field('Purchasable',item.purchasable?'Yes':'No')+
-   '</section><section><h4>Pricing & classification</h4>'+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+field('Cost',m.cost??m.cost_price??'Not recorded')+
-   field('Category',m.category||m.category_name)+field('Barcode',m.barcode)+field('Reference',m.reference||m.sku)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
+  if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
+   field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
+   '</section><section>'+field('Sales Price',m.price??m.selling_price??m.sales_price??'Not set')+field('Sales Taxes',m.sales_tax||m.tax_rate||'Not configured')+field('Cost',m.cost??m.cost_price??'Not recorded')+field('Purchase Taxes',m.purchase_tax||'Not configured')+
+   field('Category',m.category||m.category_name)+field('Reference',m.reference||m.sku)+field('Barcode',m.barcode)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
    '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4><p>'+esc(m.notes||m.description||'No internal notes recorded.')+'</p></section>';
   if(t==='sales')body='<div class="gr-inv-detail-columns"><section><h4>Sales settings</h4>'+
     field('Can be sold',item.saleable?'Yes':'No')+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+
@@ -226,6 +231,8 @@
    const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
+  S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>void saveFlags(input).catch(err=>{draw();notify(err.message,true)}));
+  const photo=S.root.querySelector('[data-inv-photo]');if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
   S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{S.detailTab=b.dataset.invDetailTab;draw()});
   S.root.querySelectorAll('[data-inv-detail-action]').forEach(b=>b.onclick=()=>{const dest=b.dataset.invDetailAction;if(dest==='warehouses'){S.detailTab='inventory';draw()}else{S.focus=null;S.tab=dest;layout();draw()}});
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});
@@ -233,6 +240,54 @@
   const f=S.root.querySelector('[data-inv-form]');if(f)f.onsubmit=event=>void post(event).catch(e=>notify(e.message,true));
   const bomForm=S.root.querySelector('[data-inv-bom]');if(bomForm)bomForm.onsubmit=e=>void saveBom(e).catch(err=>notify(err.message,true));
   const prForm=S.root.querySelector('[data-inv-pr]');if(prForm)prForm.onsubmit=e=>void savePr(e).catch(err=>notify(err.message,true));
+ }
+
+ function currentItem(){
+  return S.items.find(i=>S.focus&&i.company_id===S.focus.co&&i.id===S.focus.id&&i.original===S.focus.original);
+ }
+ async function updateItem(item,changes){
+  if(S.busy||!S.ctx.can('stock','edit'))throw Error('Inventory edit permission required');
+  if(!S.ctx.companies.includes(item.company_id))throw Error('Company access denied');
+  S.busy=true;
+  try{
+   const tableName=item.original==='crm'?'gr_crm_records':'gr_ops_records';
+   const kind=item.original==='crm'?'products':'material';
+   const {data:current,error:readError}=await S.ctx.db.from(tableName).select('payload').eq('company_id',item.company_id).eq('kind',kind).eq('record_id',item.id).single();
+   if(readError||!current)throw Error(readError?.message||'Product not found');
+   const payload={...(current.payload||{}),...changes};
+   const {data,error}=await S.ctx.db.from(tableName).update({payload}).eq('company_id',item.company_id).eq('kind',kind).eq('record_id',item.id).select('record_id');
+   if(error)throw Error(error.message);
+   if(!data?.length)throw Error('Update was not authorised or no matching record was found');
+   item.material=payload;
+   item.saleable=typeof payload.saleable==='boolean'?payload.saleable:item.saleable;
+   item.purchasable=typeof payload.purchasable==='boolean'?payload.purchasable:item.purchasable;
+   draw();notify('Product settings saved.');
+  }finally{S.busy=false}
+ }
+ async function saveFlags(input){
+  const item=currentItem();if(!item)throw Error('Select a product');
+  const flag=input.dataset.invFlag;
+  if(!['saleable','purchasable'].includes(flag))throw Error('Invalid product setting');
+  const changes={[flag]:input.checked};
+  await updateItem(item,changes);
+ }
+ async function savePhoto(input){
+  const item=currentItem(),file=input.files?.[0];
+  if(!item||!file)return;
+  if(!S.ctx.can('stock','edit'))throw Error('Inventory edit permission required');
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>3*1024*1024)throw Error('Select a PNG, JPG or WebP image up to 3 MB');
+  if(S.busy)throw Error('Another inventory update is in progress');
+  const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+  const path='inventory-products/'+item.company_id+'/'+uid()+'.'+ext;
+  const storage=S.ctx.db.storage.from('greenrich-branding');
+  S.busy=true;
+  try{
+   const {error}=await storage.upload(path,file,{contentType:file.type,upsert:false});
+   if(error)throw Error('Image upload failed: '+error.message);
+  }finally{S.busy=false}
+  const url=storage.getPublicUrl(path).data.publicUrl;
+  await updateItem(item,{image_url:url});
+  notify('Product image saved and visible on inventory cards.');
  }
  async function saveBom(event){
   event.preventDefault();if(S.busy||!S.ctx.can('stock','create'))throw Error('Stock create permission required');
