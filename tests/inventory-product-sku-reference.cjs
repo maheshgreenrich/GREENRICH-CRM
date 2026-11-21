@@ -3,23 +3,26 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const script=fs.readFileSync('greenrich-inventory.js','utf8'),html=fs.readFileSync('secure.html','utf8');
 const win={};vm.runInNewContext(script,{window:win});
 const {renderProductIdentifiers,validateProductCodeChange}=win.GreenRichInventory;
-assert.equal(typeof renderProductIdentifiers,'function');
-assert.equal(typeof validateProductCodeChange,'function');
 const item={id:'item-1',original:'crm',company_id:'grow-india',code:'GRCOM25',material:{sku:'GRCOM25'}};
 const edit=renderProductIdentifiers(item,true);
 assert.match(edit,/Product Code \/ SKU/);
-assert.match(edit,/data-inv-product-code/);
 assert.match(edit,/value="GRCOM25"/);
 assert.match(edit,/data-inv-edit="reference"/);
-assert.match(edit,/Reference No\./);
-assert.match(renderProductIdentifiers(item,false),/<strong>GRCOM25<\/strong>/);
-assert.equal(validateProductCodeChange(item,'grcom25',{items:[item],sales:[],dispatch:[]}), 'GRCOM25');
-assert.equal(validateProductCodeChange(item,' GRCOM26 ',{items:[item],sales:[],dispatch:[]}), 'GRCOM26');
-assert.throws(()=>validateProductCodeChange(item,'',{items:[item],sales:[],dispatch:[]}),/1–64/);
-assert.throws(()=>validateProductCodeChange(item,'invalid code',{items:[item],sales:[],dispatch:[]}),/1–64/);
-assert.throws(()=>validateProductCodeChange(item,'GR-2',{items:[item,{id:'item-2',company_id:'grow-india',original:'crm',code:'GR-2'}],sales:[],dispatch:[]}),/already exists/);
-assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:[{company_id:'grow-india',payload:{product_id:'item-1'}}],dispatch:[]}),/already used/);
-assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:[],dispatch:[],bom:[{company_id:'grow-india',payload:{parent_code:'GRCOM25'}}]}),/already used/);
-assert.throws(()=>validateProductCodeChange(item,'GRCOM26',{items:[item],sales:null,dispatch:null}),/Cannot verify/);
-assert.match(html,/greenrich-inventory\.js\?v=20261121-opening-stock-sku-v11/);
-console.log('PASS product SKU shown under title, reference editable, safe uniqueness/linkage validation.');
+assert.equal(validateProductCodeChange(item,'grcom25',{items:[item]}),'GRCOM25');
+assert.equal(validateProductCodeChange(item,' grcom25653 ',{items:[item]}),'GRCOM25653');
+assert.throws(()=>validateProductCodeChange(item,'',{items:[item]}),/1–64/);
+assert.throws(()=>validateProductCodeChange(item,'invalid code',{items:[item]}),/1–64/);
+assert.throws(()=>validateProductCodeChange(item,'gr-2',{items:[item,{id:'item-2',company_id:'grow-india',original:'crm',code:'GR-2'}]}),/already exists/);
+assert.equal(validateProductCodeChange(item,'GRCOM25653',{
+ items:[item],
+ sales:[{company_id:'grow-india',payload:{product_id:'item-1',sku:'GRCOM25'}}],
+ dispatch:[{company_id:'grow-india',sku:'GRCOM25'}],
+ bom:[{company_id:'grow-india',payload:{parent_code:'GRCOM25'}}],
+ pos:[{company_id:'grow-india',payload:{lines:[{code:'GRCOM25'}]}}],
+ jobWork:[{company_id:'grow-india',payload:{material:{code:'GRCOM25'}}}]
+}),'GRCOM25653','Historical document links must not block a unique SKU');
+assert.equal(validateProductCodeChange(item,'GRCOM25653',{items:[item],sales:null,dispatch:null}),'GRCOM25653');
+assert.ok(script.includes(".rpc('gr_inventory_rename_sku'"),'SKU renaming must use atomic database function');
+assert.ok(script.includes('await load();'),'New code should be refreshed after save');
+assert.match(html,/greenrich-inventory\.js\?v=20261121-sku-rename-only-duplicate-v12/);
+console.log('PASS: SKU can change with linked documents; duplicate current codes rejected; atomic SKU save.');

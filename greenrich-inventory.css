@@ -260,3 +260,7 @@
 .gr-inventory .gr-inv-new-opening .gr-inv-new-field{margin:0 0 7px}
 .gr-inventory .gr-inv-new-opening .gr-inv-new-stock-hint{margin:0;line-height:1.5}
 @media(max-width:650px){.gr-inventory .gr-inv-new-code{margin-left:0}.gr-inventory .gr-inv-new-code .gr-inv-new-field{grid-template-columns:1fr;gap:4px}}
+
+/* SKU rename: inline input indicates changes save on Enter or blur. */
+.gr-inventory .gr-inv-identifier input[data-inv-product-code]{border:1px solid #a9c9ed!important;background:#f8fbff!important}
+.gr-inventory .gr-inv-identifier input[data-inv-product-code]:focus{border-color:#1764bc!important;outline:2px solid #1764bc!important}

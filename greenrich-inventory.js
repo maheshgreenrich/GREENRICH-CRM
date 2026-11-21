@@ -71,15 +71,17 @@
   const id=p.product_id??p.item_id;
   const code=p.sku??p.code??p.product_code??p.material_code??p.material_id;
   if(id!==null&&id!==undefined&&String(id)===String(item.id))return true;
-  if(code!==null&&code!==undefined&&key(code))return key(code)===key(item.code);
-  if(id!==null&&id!==undefined&&key(id))return key(id)===key(item.code);
+  const aliases=Array.isArray(item.material?.sku_aliases)?item.material.sku_aliases:[];
+  const allCodes=[item.code,...aliases].map(key);
+  if(code!==null&&code!==undefined&&key(code))return allCodes.includes(key(code));
+  if(id!==null&&id!==undefined&&key(id))return allCodes.includes(key(id));
   const name=p.product_name??p.item_name??p.name;
   return !!name&&key(name)===key(item.name);
  }
  function productMetrics(item,sources){
   const material=item.material||{};
   const sameCompany=r=>r.company_id===item.company_id;
-  const bomLines=(sources.bom||[]).filter(r=>sameCompany(r)&&key(r.payload?.parent_code)===key(item.code));
+  const bomLines=(sources.bom||[]).filter(r=>sameCompany(r)&&[item.code,...(Array.isArray(material.sku_aliases)?material.sku_aliases:[])].some(code=>key(r.payload?.parent_code)===key(code)));
   const bomCount=new Set(bomLines.map(r=>String(r.payload?.revision||'Unversioned'))).size;
   const approvedPos=(sources.pos||[]).filter(d=>sameCompany(d)&&!['draft','cancelled','canceled','rejected','void'].includes(key(d.status)) &&
     Array.isArray(d.payload?.lines)&&d.payload.lines.some(line=>matchesMetricItem(item,line)));
@@ -394,34 +396,20 @@
   const code=String(newCode||'').trim().toUpperCase();
   if(!code||code.length>64||!/^[A-Z0-9][A-Z0-9._\/-]*$/.test(code))
    throw Error('Product code must be 1–64 characters: letters, numbers, hyphen, dot, slash or underscore.');
-  if((sources.items||[]).some(p=>p.company_id===item.company_id&&!(p.id===item.id&&p.original===item.original)&&
+  // Only the product SKU's current uniqueness is validated. Existing SO, PO, BOM
+  // and dispatch links do not block a rename. The server updates live BOM links
+  // atomically and retains old identifiers for historical-document lookups.
+  if((sources.items||[]).some(p=>p.company_id===item.company_id&&
+      !(p.id===item.id&&p.original===item.original)&&
       String(p.code||'').trim().toUpperCase()===code))
-   throw Error('This product code already exists in the selected company.');
-  if(String(item.code).toUpperCase()===code)return code;
-  const same=r=>r.company_id===item.company_id;
-  const old=String(item.code).toUpperCase();
-  const references=Array.isArray(sources.sales)&&sources.sales.some(r=>same(r)&&(String(r.payload?.product_id||'')===String(item.id)||
-    String(r.payload?.sku||'').toUpperCase()===old));
-  const dispatch=Array.isArray(sources.dispatch)&&sources.dispatch.some(r=>same(r)&&
-    (String(r.sku||'').toUpperCase()===old || String(r.source_snapshot?.sku||'').toUpperCase()===old));
-  const bom=(sources.bom||[]).some(r=>same(r)&&[r.payload?.parent_code,r.payload?.child_code]
-    .some(v=>String(v||'').toUpperCase()===old));
-  const purchase=(sources.pos||[]).some(r=>same(r)&&r.payload?.lines?.some(l=>
-    String(l.code||'').toUpperCase()===old || String(l.material_id||'')===String(item.id)));
-  const jobs=(sources.jobWork||[]).some(r=>same(r)&&[r.payload?.material?.code,r.payload?.material?.id,r.payload?.output_product_code]
-    .some(v=>String(v||'').toUpperCase()===old||String(v||'')===String(item.id)));
-  const requests=(sources.requisitions||[]).some(r=>same(r)&&String(r.payload?.material_code||'').toUpperCase()===old);
-  if(references||dispatch||bom||purchase||jobs||requests)
-   throw Error('This SKU is already used in sales, purchasing or BOM records. Keep the product code unchanged; use Reference No. for an additional identifier.');
-  if(!Array.isArray(sources.sales)||!Array.isArray(sources.dispatch))
-   throw Error('Cannot verify all linked orders. Please use Reference No. or ask an administrator to check the product code.');
+    throw Error('This product code already exists in the selected company.');
   return code;
  }
  function detail(index){
   const item=S.items.find(i=>i.company_id===index.co&&i.id===index.id&&i.original===index.original);
   if(!item)return '<p>Product not found</p>';
   const m=item.material||{}, amounts=S.locations.filter(x=>x.company_id===item.company_id);
-  const edges=S.bom.filter(x=>x.company_id===item.company_id&&String(x.payload.parent_code||'').toLowerCase()===item.code.toLowerCase());
+  const edges=S.bom.filter(x=>x.company_id===item.company_id&&[item.code,...(Array.isArray(m.sku_aliases)?m.sku_aliases:[])].some(code=>String(x.payload.parent_code||'').toLowerCase()===String(code).toLowerCase()));
   const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===item.stage&&x.item_id===item.id).slice(0,15);
   const t=(S.detailTab==='sales'&&!item.saleable)||(S.detailTab==='purchase'&&!item.purchasable)?'general':(S.detailTab||'general'), image=m.image_url||m.image||m.photo_url||'';
   const editable=S.ctx.can('stock','edit');
@@ -551,7 +539,7 @@
  function bom(){
   const mapped=S.bom.filter(inScope),all=S.items.filter(inScope);
   const edges=mapped.map(r=>({...r.payload,company_id:r.company_id}));
-  const index=new Map(all.map(x=>[x.company_id+'|'+x.code.toLowerCase(),x]));
+  const index=new Map(all.flatMap(x=>[x.code,...(Array.isArray(x.material?.sku_aliases)?x.material.sku_aliases:[])].map(code=>[x.company_id+'|'+String(code).toLowerCase(),x])));
   const assignable=all.filter(i=>i.original==='ops');
   const choices=assignable.map(x=>[x.company_id+'|'+x.id,x.code+' · '+x.name+' ['+x.stage+']']);
   const form=S.ctx.can('stock','create')?'<form data-inv-bom class="gr-inv-form"><h4>Add draft BOM component</h4><p>A BOM component is recorded as a draft and must be technically verified before production release.</p><div class="gr-inv-grid">'+
@@ -680,12 +668,31 @@
  async function saveProductCode(input){
   const item=currentItem();
   if(!item||!input.isConnected)return;
-  const next=validateProductCodeChange(item,input.value);
-  if(next===String(item.code).toUpperCase()){input.value=item.code;return}
-  input.disabled=true;
+  const previous=String(item.code||'').trim().toUpperCase();
+  let next;
   try{
-   await updateItem(item,{[item.original==='crm'?'sku':'code']:next});
-  }catch(e){input.disabled=false;throw e}
+    next=validateProductCodeChange(item,input.value);
+  }catch(error){input.value=previous;throw error;}
+  if(next===previous){input.value=item.code;return;}
+  if(S.busy||!S.ctx.can('stock','edit')){input.value=previous;throw Error('Inventory edit permission required');}
+  if(!S.ctx.companies.includes(item.company_id)){input.value=previous;throw Error('Company access denied');}
+  input.disabled=true;
+  S.busy=true;
+  try{
+   const {data,error}=await S.ctx.db.rpc('gr_inventory_rename_sku',{
+    p_company:item.company_id,
+    p_origin:item.original,
+    p_record_id:item.id,
+    p_expected_code:previous,
+    p_new_code:next
+   });
+   if(error)throw Error(error.message);
+   if(!data||data.sku!==next)throw Error('SKU could not be saved. Refresh this product and try again.');
+   await load();
+   draw();
+   notify('Product SKU changed from '+previous+' to '+next+'. Existing BOM links are preserved.');
+  }catch(err){if(input.isConnected){input.value=previous;input.disabled=false;}throw err;}
+  finally{S.busy=false;}
  }
  async function saveInlineField(el){
   const item=currentItem();
