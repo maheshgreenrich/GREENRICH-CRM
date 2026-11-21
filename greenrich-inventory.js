@@ -106,9 +106,58 @@
   const edges=S.bom.filter(x=>x.company_id===item.company_id&&String(x.payload.parent_code||'').toLowerCase()===item.code.toLowerCase());
   const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===item.stage&&x.item_id===item.id).slice(0,15);
   const t=(S.detailTab==='sales'&&!item.saleable)||(S.detailTab==='purchase'&&!item.purchasable)?'general':(S.detailTab||'general'), image=m.image_url||m.image||m.photo_url||'';
-  const field=(label,value)=>'<div class="gr-inv-field"><b>'+esc(label)+'</b><span>'+esc(value===null||value===undefined||value===''?'—':value)+'</span></div>';
-  const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
   const editable=S.ctx.can('stock','edit');
+  const inlineFields={
+    'product type':{key:'product_type',options:['Goods','Service','Combo']},
+    'invoicing policy':{key:'invoicing_policy',options:['Delivered quantities','Ordered quantities']},
+    'track inventory':{key:'track_inventory',options:['Yes','No']},
+    'quantity on hand':{key:'stock',kind:'number',crmOnly:true},
+    'sales price':{key:'price',kind:'number'},
+    'sales taxes':{key:'tax',kind:'number'},
+    'cost':{key:'cost',kind:'number'},
+    'purchase taxes':{key:'purchase_tax',kind:'number'},
+    'category':{key:'category'},
+    'reference':{key:'reference'},
+    'barcode':{key:'barcode'},
+    'tags':{key:'tags'},
+    'optional products':{key:'optional_products'},
+    'sales description':{key:'sales_description',kind:'textarea'},
+    'preferred vendor':{key:'preferred_vendor'},
+    'lead time (days)':{key:'lead_time',kind:'number'},
+    'vendor price':{key:'purchase_price',kind:'number'},
+    'bill control':{key:'bill_control',options:['On received quantities','On ordered quantities']},
+    'purchase description':{key:'purchase_description',kind:'textarea'},
+    'responsible':{key:'responsible'},
+    'weight':{key:'weight',kind:'number'},
+    'volume':{key:'volume',kind:'number'},
+    'delivery time':{key:'delivery_time',kind:'number'},
+    'aggregate on hand':{key:'stock',kind:'number',crmOnly:true},
+    'internal notes':{key:'notes',kind:'textarea'}
+  };
+  const field=(label,value)=>{
+    const spec=inlineFields[label.toLowerCase()];
+    const display=value===null||value===undefined||value===''?'—':String(value);
+    if(!editable||!spec||(spec.crmOnly&&item.original!=='crm'))
+      return '<div class="gr-inv-field"><b>'+esc(label)+'</b><span>'+esc(display)+'</span></div>';
+    const key=spec.key;
+    let raw=m[key];
+    if(key==='stock')raw=item.aggregate;
+    if(key==='price')raw=m.price??m.selling_price??m.sales_price;
+    if(key==='tax')raw=m.sales_tax??m.tax_rate??m.tax;
+    if(key==='cost')raw=m.cost??m.cost_price;
+    if(key==='track_inventory')raw=m.track_inventory===false?'No':'Yes';
+    if(key==='lead_time')raw=m.lead_time??m.delivery_time;
+    if(Array.isArray(raw))raw=raw.join(', ');
+    if(raw===null||raw===undefined)raw=(spec.options&&spec.options.includes(display))?display:'';
+    if(spec.kind==='number'&&typeof raw==='string')raw=raw.replace(/[^0-9.-]/g,'');
+    const attrs=' data-inv-edit="'+esc(key)+'" data-inv-kind="'+esc(spec.kind||'text')+'" aria-label="'+esc(label)+'"';
+    let control;
+    if(spec.options)control='<select'+attrs+'>'+spec.options.map(v=>'<option value="'+esc(v)+'"'+(String(raw)===v?' selected':'')+'>'+esc(v)+'</option>').join('')+'</select>';
+    else if(spec.kind==='textarea')control='<textarea'+attrs+' rows="2">'+esc(raw)+'</textarea>';
+    else control='<input'+attrs+' type="'+(spec.kind==='number'?'number':'text')+'"'+(spec.kind==='number'?' step="any" min="0"':'')+' value="'+esc(raw)+'" placeholder="Click to edit">';
+    return '<label class="gr-inv-field gr-inv-inline-field"><b>'+esc(label)+'</b><span class="gr-inv-inline-control">'+control+'</span></label>';
+  };
+  const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
   const intro='<div class="gr-inv-product-hero"><div class="gr-inv-hero-main"><h2>☆ '+esc(item.name)+'</h2>'+
    '<div class="gr-inv-flags"><label class="gr-inv-flag"><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Sales</span></label>'+
    '<label class="gr-inv-flag"><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Purchase</span></label></div>'+
@@ -118,12 +167,12 @@
   let body='';
   if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
    field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
-   '</section><section>'+field('Sales Price',m.price??m.selling_price??m.sales_price??'Not set')+field('Sales Taxes',m.sales_tax||m.tax_rate||'Not configured')+field('Cost',m.cost??m.cost_price??'Not recorded')+field('Purchase Taxes',m.purchase_tax||'Not configured')+
+   '</section><section>'+field('Sales Price',m.price??m.selling_price??m.sales_price??'Not set')+field('Sales Taxes',m.sales_tax??m.tax_rate??m.tax??'Not configured')+field('Cost',m.cost??m.cost_price??'Not recorded')+field('Purchase Taxes',m.purchase_tax||'Not configured')+
    field('Category',m.category||m.category_name)+field('Reference',m.reference||m.sku)+field('Barcode',m.barcode)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
-   '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4><p>'+esc(m.notes||m.description||'No internal notes recorded.')+'</p></section>';
+   '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4>'+field('Internal notes',m.notes||m.description||'')+'</section>';
   if(t==='sales')body='<div class="gr-inv-detail-columns"><section><h4>Sales settings</h4>'+
     field('Can be sold',item.saleable?'Yes':'No')+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+
-    field('Invoicing policy',m.invoicing_policy||'Not configured')+field('Sales taxes',m.sales_tax||m.tax_rate||'Not configured')+
+    field('Invoicing policy',m.invoicing_policy||'Not configured')+field('Sales taxes',m.sales_tax??m.tax_rate??m.tax??'Not configured')+
     '</section><section><h4>Upsell & cross-sell</h4>'+field('Optional products',Array.isArray(m.optional_products)?m.optional_products.join(', '):m.optional_products)+
     field('Sales description',m.sales_description||m.description||'Not recorded')+'</section></div>';
   if(t==='purchase')body='<div class="gr-inv-detail-columns"><section><h4>Purchase settings</h4>'+
@@ -232,6 +281,14 @@
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})});
   const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
+  S.root.querySelectorAll('[data-inv-edit]').forEach(el=>{
+    el.dataset.initial=el.value;
+    el.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){el.value=el.dataset.initial;el.blur()}
+      if(event.key==='Enter'&&el.tagName!=='TEXTAREA'){event.preventDefault();el.blur()}
+    });
+    el.onchange=()=>void saveInlineField(el).catch(err=>{notify(err.message,true);el.disabled=false});
+  });
   S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{const item=currentItem();if((b.dataset.invDetailTab==='sales'&&!item?.saleable)||(b.dataset.invDetailTab==='purchase'&&!item?.purchasable))return;S.detailTab=b.dataset.invDetailTab;draw()});
   S.root.querySelectorAll('[data-inv-detail-action]').forEach(b=>b.onclick=()=>{const dest=b.dataset.invDetailAction;if(dest==='warehouses'){S.detailTab='inventory';draw()}else{S.focus=null;S.tab=dest;layout();draw()}});
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});
@@ -243,6 +300,33 @@
 
  function currentItem(){
   return S.items.find(i=>S.focus&&i.company_id===S.focus.co&&i.id===S.focus.id&&i.original===S.focus.original);
+ }
+ async function saveInlineField(el){
+  const item=currentItem();
+  if(!item||!el.isConnected)return;
+  const key=el.dataset.invEdit;
+  const allowed=['product_type','invoicing_policy','track_inventory','stock','price','tax','cost','purchase_tax','category','reference','barcode','tags','optional_products','sales_description','preferred_vendor','lead_time','purchase_price','bill_control','purchase_description','responsible','weight','volume','delivery_time','notes'];
+  if(!allowed.includes(key))throw Error('This field cannot be edited');
+  if(key==='stock'&&item.original!=='crm')throw Error('Use verified warehouse movements for manufactured material stock');
+  if(el.value===el.dataset.initial)return;
+  let value=el.value.trim();
+  if(el.dataset.invKind==='number'){
+    if(value!==''){
+      const num=Number(value);
+      if(!Number.isFinite(num)||num<0)throw Error('Enter a valid non-negative number');
+      value=num;
+    }
+  }
+  if(key==='track_inventory')value=value==='Yes';
+  if(key==='tags')value=value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(key==='optional_products'&&Array.isArray(item.material?.optional_products))
+    value=value.split(',').map(x=>x.trim()).filter(Boolean);
+  let target=key;
+  if(key==='price')target=['price','selling_price','sales_price'].find(k=>Object.prototype.hasOwnProperty.call(item.material||{},k))||'price';
+  if(key==='cost')target=['cost','cost_price'].find(k=>Object.prototype.hasOwnProperty.call(item.material||{},k))||'cost';
+  if(key==='tax')target=['sales_tax','tax_rate','tax'].find(k=>Object.prototype.hasOwnProperty.call(item.material||{},k))||'tax';
+  el.disabled=true;
+  await updateItem(item,{[target]:value});
  }
  async function updateItem(item,changes){
   if(S.busy||!S.ctx.can('stock','edit'))throw Error('Inventory edit permission required');
@@ -258,6 +342,7 @@
    if(error)throw Error(error.message);
    if(!data?.length)throw Error('Update was not authorised or no matching record was found');
    item.material=payload;
+   if(item.original==='crm'&&Object.prototype.hasOwnProperty.call(changes,'stock'))item.aggregate=payload.stock;
    item.saleable=typeof payload.saleable==='boolean'?payload.saleable:item.saleable;
    item.purchasable=typeof payload.purchasable==='boolean'?payload.purchasable:item.purchasable;
    draw();notify('Product settings saved.');
@@ -278,8 +363,10 @@
   if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>3*1024*1024)throw Error('Select a PNG, JPG or WebP image up to 3 MB');
   if(S.busy)throw Error('Another inventory update is in progress');
   const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
-  const path='inventory-products/'+item.company_id+'/'+uid()+'.'+ext;
-  const storage=S.ctx.db.storage.from('greenrich-branding');
+  const {data:userData,error:userError}=await S.ctx.db.auth.getUser();
+  if(userError||!userData?.user?.id)throw Error('Please sign in again to upload an image');
+  const path=[item.company_id,item.original,item.id,userData.user.id,uid()+'.'+ext].join('/');
+  const storage=S.ctx.db.storage.from('gr-product-images');
   S.busy=true;
   try{
    const {error}=await storage.upload(path,file,{contentType:file.type,upsert:false});

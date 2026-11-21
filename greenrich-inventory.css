@@ -123,3 +123,20 @@
 .gr-inventory .gr-inv-product-card:hover{background:#eff6ff!important;border-color:#1764bc!important}
 .gr-inventory .gr-inv-stats article{background:#f6faff!important}
 @media(max-width:560px){.gr-inventory .gr-inv-photo-target{width:94px;min-height:104px}.gr-inventory .gr-inv-photo-target img{width:80px!important;height:80px!important}.gr-inventory .gr-inv-photo-target .gr-inv-product-placeholder{width:80px!important;height:60px!important}}
+
+/* In-place editing across product General, Sales, Purchase and Inventory tabs */
+.gr-inventory .gr-inv-inline-field{align-items:center;cursor:text}
+.gr-inventory .gr-inv-inline-control{display:block;min-width:0}
+.gr-inventory .gr-inv-inline-field input,.gr-inventory .gr-inv-inline-field select,.gr-inventory .gr-inv-inline-field textarea{
+  display:block!important;width:100%;min-height:34px;padding:6px 9px!important;border:1px solid transparent!important;border-radius:6px!important;
+  background:#fff!important;color:#142d50!important;font:inherit;font-size:14px;box-shadow:none;cursor:text;
+}
+.gr-inventory .gr-inv-inline-field select{cursor:pointer}
+.gr-inventory .gr-inv-inline-field input:hover,.gr-inventory .gr-inv-inline-field textarea:hover,.gr-inventory .gr-inv-inline-field select:hover{border-color:#b8d5f6!important;background:#f7fbff!important}
+.gr-inventory .gr-inv-inline-field input:focus,.gr-inventory .gr-inv-inline-field select:focus,.gr-inventory .gr-inv-inline-field textarea:focus{
+  outline:2px solid #3f8be5!important;outline-offset:0;border-color:#2c74c8!important;background:#fff!important
+}
+.gr-inventory .gr-inv-notes .gr-inv-inline-field{display:grid;grid-template-columns:160px 1fr}
+.gr-inventory .gr-inv-inline-field textarea{min-height:68px;resize:vertical}
+.gr-inventory .gr-inv-field span{overflow-wrap:anywhere}
+@media(max-width:650px){.gr-inventory .gr-inv-notes .gr-inv-inline-field{grid-template-columns:1fr}}
