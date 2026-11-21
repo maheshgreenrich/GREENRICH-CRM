@@ -208,7 +208,7 @@
    '<label>Campaign image (required when template has IMAGE header)<input type="file" name="image" accept="image/png,image/jpeg"><small data-campaign-image-status>'+(campaignImage?'Selected for sending: '+esc(campaignImage.name):'No image selected')+'</small></label>'+
    '<div class="grwc-span" data-wa-required-fields></div>'+ 
    '<p class="grwc-muted grwc-span">Manual Sync is the primary method: Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token needed. Missing approved components remain pending until completed; No reapproval in Meta is needed.</p>'+
-   '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh CRM template list</button> <small data-marketing-sync-status>Only templates with full approved content are selectable.</small></div>'+
+   '<div class="grwc-span"><button type="button" data-marketing-sync-templates>Refresh saved templates</button> <small data-marketing-sync-status>Refreshes CRM saved templates only; it does not fetch templates from Meta or SocialBerries.</small></div>'+
    '<button type="submit" class="grwc-primary" data-send-campaign>Review & Send Campaign</button></form></section>';
  }
  function campaignReports(){
@@ -1349,7 +1349,7 @@
     const button=e.target.closest('[data-marketing-sync-templates]');button.disabled=true;
     try{
      await fetchAll();marketingDraw();
-     alert('CRM template list refreshed. To add an approved template, use Admin → WhatsApp Settings → Manual Sync Approved Template. No Meta token or approval is required for manual sync. No message sent.','success');
+     alert('Saved CRM template list refreshed. This does not import new templates from Meta or SocialBerries. To import an already approved template, use Admin → WhatsApp Settings → Manual Sync Approved Template. No new Meta approval is required. No message sent.','success');
     }catch(error){alert('Could not refresh CRM template list: '+error.message,'error')}
     finally{if(button.isConnected)button.disabled=false}
     return;
@@ -1531,6 +1531,8 @@
     });
     if(!readiness.ready){
      const issues=readiness.blockers||[];
+     const missingConsent=issues.some(x=>/opt.in|permission|consent/i.test(x));
+     if(missingConsent){const notice=element.querySelector('[data-wa-required-fields]');if(notice){const note=document.createElement('p');note.setAttribute('role','alert');note.style.cssText='padding:12px;border:1px solid #e9bd6c;border-radius:8px;background:#fff8e8;color:#794510';note.textContent='Campaign blocked: '+eligible.length+' of '+matches.length+' selected recipients have documented marketing opt-in for this sender. Record the customer’s actual WhatsApp marketing consent (source and date) in WhatsApp Integration before sending. Existing approvals do not automatically grant customer consent.';notice.prepend(note)}}
      alert('Nothing sent. '+issues.map((x,i)=>(i+1)+'. '+x).join(' | ')+
       '. Complete provider, approved template and customer permission setup once in Settings → WhatsApp Integration.','warning');
      return;
