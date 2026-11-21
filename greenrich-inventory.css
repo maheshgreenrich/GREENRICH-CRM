@@ -210,3 +210,43 @@
 .gr-inventory .gr-inv-create-submit:disabled{opacity:.5;cursor:wait}
 @media(max-width:650px){.gr-inventory .gr-inv-catalog-head{flex-wrap:wrap}.gr-inventory .gr-inv-catalog-actions{justify-content:flex-start}
 .gr-inventory .gr-inv-create-dialog form{padding:16px}.gr-inventory .gr-inv-create-fields{grid-template-columns:1fr}}
+
+/* Unsaved product opens a full-width Odoo-inspired Greenrich form */
+.gr-inventory .gr-inv-new-page{background:#fff!important;color:#18395d!important;color-scheme:light}
+.gr-inventory .gr-inv-new-page form{background:#fff!important}
+.gr-inventory .gr-inv-new-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.gr-inventory .gr-inv-new-bar>div{display:flex;align-items:center;gap:12px}
+.gr-inventory .gr-inv-new-stats{display:flex;overflow:auto;border:1px solid #d4e1f3;border-radius:9px;margin-bottom:14px}
+.gr-inventory .gr-inv-new-stats>span{padding:10px 13px;flex:1 0 160px;white-space:nowrap;border-right:1px solid #d6e4f4;font-size:12px;color:#285b95}
+.gr-inventory .gr-inv-new-panel{border:1px solid #d4e1f3;border-radius:10px;overflow:hidden;min-height:500px;background:#fff!important}
+.gr-inventory .gr-inv-new-hero{display:flex;justify-content:space-between;gap:18px;padding:28px;min-height:210px}
+.gr-inventory .gr-inv-new-titlewrap{flex:1;min-width:0}
+.gr-inventory .gr-inv-new-title{display:flex;align-items:center;gap:12px;font-size:39px;color:#315f96}
+.gr-inventory .gr-inv-new-title input{width:100%!important;min-height:58px;font-size:clamp(24px,3vw,38px)!important;border:0!important;border-bottom:2px solid #b2d0f2!important;border-radius:0!important;padding:2px!important;box-shadow:none!important}
+.gr-inventory .gr-inv-new-title input:focus{outline:0!important;border-bottom-color:#1764bc!important}
+.gr-inventory .gr-inv-new-flags{display:flex;gap:18px;margin:16px 0 8px}
+.gr-inventory .gr-inv-new-flags label{display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer}
+.gr-inventory .gr-inv-new-flags input[type=checkbox],.gr-inventory .gr-inv-new-field input[type=checkbox]{appearance:auto!important;width:18px!important;height:18px!important;accent-color:#1764bc}
+.gr-inventory .gr-inv-new-titlewrap>small{color:#6785a6}
+.gr-inventory .gr-inv-new-photo{display:flex;flex-direction:column;gap:6px;align-items:center;flex:0 0 138px}
+.gr-inventory .gr-inv-new-photo button{width:133px;height:140px;background:#f7fbff!important;border:1px dashed #85aedc!important;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+.gr-inventory .gr-inv-new-photo>small{font-size:11px;color:#6c84a0;text-align:center}
+.gr-inventory .gr-inv-new-photo [hidden]{display:none!important}
+.gr-inventory .gr-inv-new-photo button span{font-size:41px}
+.gr-inventory .gr-inv-new-photo button img{max-width:118px;max-height:110px;object-fit:contain}
+.gr-inventory .gr-inv-new-tabs{display:flex;gap:0;overflow:auto;padding-left:25px;border-bottom:1px solid #d5e3f4}
+.gr-inventory .gr-inv-new-tabs button{border-radius:5px 5px 0 0;background:#f5f9ff!important;white-space:nowrap;border-bottom:0!important}
+.gr-inventory .gr-inv-new-tabs button.active{border-top:3px solid #1764bc!important;background:#eaf3ff!important}
+.gr-inventory .gr-inv-new-tabs [hidden],.gr-inventory [data-inv-create-pane][hidden]{display:none!important}
+.gr-inventory .gr-inv-new-body{min-height:320px;padding:25px 28px}
+.gr-inventory .gr-inv-new-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
+.gr-inventory .gr-inv-new-field{display:grid;grid-template-columns:minmax(115px,33%) minmax(0,1fr);gap:10px;align-items:center;margin-bottom:13px}
+.gr-inventory .gr-inv-new-field>b{font-size:13px;color:#3a5d7f}
+.gr-inventory .gr-inv-new-field input:not([type=checkbox]),.gr-inventory .gr-inv-new-field select,.gr-inventory .gr-inv-new-field textarea{width:100%;min-width:0;border:1px solid #c1d5ec!important;background:#fff!important;border-radius:7px;padding:9px!important;color:#163b65!important}
+.gr-inventory .gr-inv-new-field textarea{min-height:60px}
+.gr-inventory .gr-inv-new-stock-hint,.gr-inventory .gr-inv-new-page .gr-inv-create-note{color:#597b9c;font-size:12px}
+.gr-inventory .gr-inv-new-body h4{border-bottom:1px solid #e0eaf7;padding-bottom:8px;color:#54769d;text-transform:uppercase;font-size:12px;margin:15px 0}
+.gr-inventory .gr-inv-new-notes{margin-top:22px}.gr-inventory .gr-inv-new-notes .gr-inv-new-field{grid-template-columns:1fr}
+.gr-inventory .gr-inv-new-footer{display:flex;gap:10px;justify-content:flex-end;padding:15px}
+.gr-inventory .gr-inv-new-page .gr-inv-create-submit{background:#1764bc!important;border-color:#1764bc!important;color:white!important}
+@media(max-width:760px){.gr-inventory .gr-inv-new-hero{padding:14px;min-height:160px}.gr-inventory .gr-inv-new-photo{flex-basis:95px}.gr-inventory .gr-inv-new-photo button{width:95px;height:100px}.gr-inventory .gr-inv-new-body{padding:15px}.gr-inventory .gr-inv-new-cols{grid-template-columns:1fr;gap:8px}.gr-inventory .gr-inv-new-title{font-size:26px}.gr-inventory .gr-inv-new-tabs{padding-left:7px}}

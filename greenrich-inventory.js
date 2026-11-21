@@ -9,7 +9,7 @@
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',creating:false,createTab:'general',newPhotoUrl:null,busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
@@ -158,6 +158,7 @@
  }
  function draw(){
   const box=S.root.querySelector('[data-inventory-content]');if(!box)return;
+  if(S.creating){box.innerHTML=newInventoryForm();bind();return;}
   if(S.focus){box.innerHTML=detail(S.focus);bind();return;}
   box.innerHTML=S.tab==='catalog'?catalog():S.tab==='warehouses'?warehouse():S.tab==='vendors'?vendorStock():
    S.tab==='bom'?bom():S.tab==='purchasing'?purchase():audit();
@@ -186,30 +187,63 @@
    '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search products by name, code or stage" aria-label="Search products"></div>'+
    '<div class="gr-inv-stats">'+stages.map(k=>'<article><small>'+names[k]+'</small><strong>'+kindCount(k)+'</strong></article>').join('')+'</div>'+
    (S.view==='list'?list:'<div class="gr-inv-product-grid">'+(cards||'<p>No products found.</p>')+'</div>')+
-   '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>'+newInventoryForm();
+   '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>';
  }
 
- function newInventoryForm(){
-  const choices=S.ctx.companies.map(id=>'<option value="'+esc(id)+'"'+((S.scope==='all'?S.ctx.companies[0]:S.scope)===id?' selected':'')+'>'+esc(companyName(id))+'</option>').join('');
-  const input=(name,label,placeholder='',type='text',required=false)=>'<label><span>'+label+'</span><input name="'+name+'" type="'+type+'" placeholder="'+esc(placeholder)+'"'+(required?' required':'')+(type==='number'?' min="0" step="0.01"':'')+'></label>';
-  return '<dialog class="gr-inv-create-dialog" data-inv-create-dialog aria-label="Add New Inventory Product">'+
-   '<form data-inv-create-form method="dialog" novalidate><div class="gr-inv-create-head"><div><h3>Add New Inventory</h3><p>Create a new product or material in the selected company.</p></div><button type="button" data-inv-create-close aria-label="Close">✕</button></div>'+
-   '<div class="gr-inv-create-fields">'+
-   '<label><span>Company <em>*</em></span><select name="company_id" required>'+choices+'</select></label>'+
-   '<label><span>Inventory Level <em>*</em></span><select name="stage" data-inv-create-stage required><option value="FG">Final / Saleable (FG)</option><option value="SFG">Semi-finished (SFG)</option><option value="IM">Intermediate (IM)</option><option value="RM">Raw Material (RM)</option></select></label>'+
-   input('name','Product / Material Name *','e.g. 25 L Home Composter','text',true)+
-   input('code','Product Code / SKU *','e.g. GRCOM25','text',true)+
-   input('reference','Reference No. (optional)','Internal reference')+
-   input('category','Category (optional)','e.g. Compost Bin')+
-   '<label><span>Unit of Measure <em>*</em></span><select name="uom" required><option value="nos">nos (pieces)</option><option value="kg">kg</option><option value="g">g</option><option value="ltr">litres</option><option value="m">metres</option><option value="set">set</option></select></label>'+
-   '<label><span>Manufacturing Source</span><select name="source_type"><option value="Make">Manufacture in factory</option><option value="Buy">Purchase from vendor</option><option value="Subcontract">Vendor job work / subcontract</option></select></label>'+
-   '<label class="gr-inv-create-checkbox"><input type="checkbox" name="saleable" data-inv-create-sale checked><span>Sales / Saleable</span></label>'+
-   '<label class="gr-inv-create-checkbox"><input type="checkbox" name="purchasable" data-inv-create-buy><span>Purchase / Purchasable</span></label>'+
-   '<div data-inv-create-sales-fields class="gr-inv-create-sales">'+input('price','Sales Price (₹)','0.00','number')+
-   input('tax','Sales Tax (%)','0','number')+'</div>'+
-   '</div><p class="gr-inv-create-note">New saleable products start with 0 On Hand. Raw materials and manufactured components start without an opening quantity. Stock is changed only by an authorised count, receipt or adjustment; creating an item never posts a movement.</p>'+
-   '<p data-inv-create-error class="gr-inv-create-error" role="alert" hidden></p>'+
-   '<div class="gr-inv-create-footer"><button type="button" data-inv-create-close>Cancel</button><button type="submit" class="gr-inv-create-submit">Save Product</button></div></form></dialog>';
+ function newInventoryForm(ctx=S.ctx,scope=S.scope){
+ const opts=(arr,sel)=>arr.map(([id,name])=>'<option value="'+esc(id)+'"'+(id===sel?' selected':'')+'>'+esc(name)+'</option>').join('');
+ const input=(name,label,placeholder='',type='text',required=false)=>'<label class="gr-inv-new-field"><b>'+label+(required?' *':'')+'</b><input name="'+name+'" type="'+type+'" '+(type==='number'?'step="any" min="0"':'')+(required?'required':'')+' placeholder="'+esc(placeholder)+'" value=""></label>';
+ const select=(name,label,options,initial)=>'<label class="gr-inv-new-field"><b>'+label+'</b><select name="'+name+'">'+opts(options,initial)+'</select></label>';
+ const notes=(name,label)=>'<label class="gr-inv-new-field"><b>'+label+'</b><textarea rows="3" name="'+name+'" placeholder="Click to enter details"></textarea></label>';
+ const companies=opts(ctx.companies.map(id=>[id,ctx.companyName(id)]),scope==='all'?ctx.companies[0]:scope);
+ const tabs=[['general','General Information'],['sales','Sales'],['purchase','Purchase'],['inventory','Inventory']];
+ return '<section class="gr-inv-new-page" data-inv-new-page><form data-inv-create-form novalidate>'+
+  '<div class="gr-inv-new-bar"><div><button type="button" data-inv-create-cancel>‹ Products</button> <b>New Product</b></div>'+
+  '<div><button type="button" data-inv-create-cancel>Discard</button> <button class="gr-inv-create-submit" type="submit">Save Product</button></div></div>'+
+  '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span>▥ 0 Sold</span><span>▤ 0 Purchased</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
+  '<div class="gr-inv-new-panel"><div class="gr-inv-new-hero"><div class="gr-inv-new-titlewrap">'+
+  '<label class="gr-inv-new-title">☆ <input name="name" type="text" placeholder="e.g. 25 L Home Composter" maxlength="180" required aria-label="Product Name"></label>'+
+  '<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
+  '<small>All fields are new. The product is not created until you save.</small></div>'+
+  '<div class="gr-inv-new-photo"><button type="button" data-inv-create-photo-trigger aria-label="Click to select product image"><span data-inv-create-photo-icon>📷</span><img data-inv-create-preview hidden alt="New product image preview"><small>+ Add image</small></button>'+
+  '<input data-inv-create-photo type="file" accept="image/png,image/jpeg,image/webp" hidden><small>PNG, JPG, WebP · max 3 MB</small></div></div>'+
+  '<div class="gr-inv-new-tabs" role="tablist" aria-label="Product settings">'+tabs.map(([id,label])=>
+   '<button type="button" role="tab" data-inv-create-tab="'+id+'" class="'+(id==='general'?'active':'')+'" aria-selected="'+(id==='general'?'true':'false')+'">'+label+'</button>').join('')+'</div>'+
+  '<div class="gr-inv-new-body">'+
+  '<section data-inv-create-pane="general"><div class="gr-inv-new-cols"><div>'+
+  select('product_type','Product Type',[['Goods','Goods'],['Service','Service'],['Combo','Combo']],'Goods')+
+  select('invoicing_policy','Invoicing Policy',[['Ordered quantities','Ordered quantities'],['Delivered quantities','Delivered quantities']],'Ordered quantities')+
+  '<label class="gr-inv-new-field"><b>Track Inventory</b><span><input type="checkbox" name="track_inventory" checked> Enabled</span></label>'+
+  '<p class="gr-inv-new-stock-hint">Quantity On Hand: Not recorded yet. Actual stock is entered separately after creation.</p></div><div>'+
+  input('price','Sales Price (₹)','0.00','number')+input('tax','Sales Taxes (%)','0','number')+
+  input('cost','Cost (₹)','0.00','number')+input('purchase_tax','Purchase Taxes (%)','0','number')+
+  input('category','Category','e.g. Composting')+
+  input('code','Product Code / SKU','e.g. GRCOM25','text',true)+
+  input('reference','Reference No.','Optional reference')+
+  input('barcode','Barcode','Scan or enter barcode')+input('tags','Tags','Separate by comma')+'</div></div>'+
+  '<div class="gr-inv-new-notes"><h4>Internal Notes</h4>'+notes('notes','Notes')+'</div></section>'+
+  '<section data-inv-create-pane="sales" hidden><div class="gr-inv-new-cols"><div><h4>Upsell & Cross-Sell</h4>'+input('optional_products','Optional Products','Product codes separated by comma')+'</div>'+
+  '<div><h4>Short Description</h4>'+notes('sales_description','Sales Description')+'</div></div></section>'+
+  '<section data-inv-create-pane="purchase" hidden><h4>Vendors</h4><div class="gr-inv-new-cols"><div>'+
+  input('preferred_vendor','Vendor','Supplier name')+input('min_purchase_qty','Minimum Quantity','0','number')+
+  input('purchase_price','Vendor Unit Price (₹)','0.00','number')+input('lead_time','Lead Time (Days)','0','number')+'</div><div>'+
+  select('bill_control','Vendor Bills',[['On received quantities','On received quantities'],['On ordered quantities','On ordered quantities']],'On received quantities')+
+  notes('purchase_description','Purchase Description')+'</div></div>'+
+  '<p class="gr-inv-create-note">Purchase Orders require an approved vendor in Vendor Master.</p></section>'+
+  '<section data-inv-create-pane="inventory" hidden><div class="gr-inv-new-cols"><div><h4>Logistics</h4>'+
+  '<label class="gr-inv-new-field"><b>Company *</b><select name="company_id" required>'+companies+'</select></label>'+
+  select('stage','Inventory Level',[['FG','Final / Saleable'],['SFG','Semi-Finished'],['IM','Intermediate'],['RM','Raw Material']],'FG')+
+  select('uom','Unit of Measure',[['nos','nos'],['kg','kg'],['g','g'],['ltr','litres'],['m','metres'],['set','set']],'nos')+
+  select('source_type','Manufacturing Source',[['Make','Own Factory'],['Buy','Purchase from Vendor'],['Subcontract','Vendor Job Work']],'Make')+
+  input('responsible','Responsible','Employee')+input('weight','Weight (kg)','0','number')+
+  input('volume','Volume (m³)','0','number')+input('delivery_time','Delivery Time (Days)','0','number')+
+  '</div><div><h4>Counterpart Locations</h4>'+input('production_location','Production','Production location')+
+  input('inventory_adjustment_location','Inventory Adjustment','Adjustment location')+'</div></div>'+
+  '<div class="gr-inv-new-cols"><div><h4>Description for Receipts</h4>'+notes('receipt_description','Receipt Notes')+'</div>'+
+  '<div><h4>Description for Delivery Orders</h4>'+notes('delivery_description','Delivery Notes')+'</div></div></section>'+
+  '</div></div><p data-inv-create-error class="gr-inv-create-error" role="alert" hidden></p>'+
+  '<div class="gr-inv-new-footer"><button type="button" data-inv-create-cancel>Discard</button><button type="submit" class="gr-inv-create-submit">Save Product</button></div>'+
+  '</form></section>';
  }
  function prepareInventoryRecord(input,existing,recordId){
   const co=String(input.company_id||'').trim();
@@ -230,6 +264,23 @@
   if(reference.length>100||category.length>120)throw Error('Reference or category is too long');
   if((existing||[]).some(x=>x.company_id===co&&String(x.code||'').trim().toUpperCase()===code))
    throw Error('Product code '+code+' already exists in the selected company');
+  const extra={};
+  for(const name of ['cost','purchase_tax','purchase_price','min_purchase_qty','lead_time','weight','volume','delivery_time']){
+   const raw=input[name];
+   if(raw===undefined||raw===null||raw===''){extra[name]=null;continue;}
+   if(!Number.isFinite(Number(raw))||Number(raw)<0)throw Error(name+' must be non-negative');
+   extra[name]=Number(raw);
+  }
+  const settings={product_type:String(input.product_type||'Goods'),invoicing_policy:String(input.invoicing_policy||'Ordered quantities'),
+   track_inventory:input.track_inventory===true||input.track_inventory==='on',
+   barcode:String(input.barcode||'').trim(),tags:String(input.tags||'').split(',').map(x=>x.trim()).filter(Boolean),
+   optional_products:String(input.optional_products||'').split(',').map(x=>x.trim()).filter(Boolean),
+   sales_description:String(input.sales_description||'').trim(),notes:String(input.notes||'').trim(),
+   preferred_vendor:String(input.preferred_vendor||'').trim(),bill_control:String(input.bill_control||'On received quantities'),
+   purchase_description:String(input.purchase_description||'').trim(),
+   responsible:String(input.responsible||'').trim(),production_location:String(input.production_location||'').trim(),
+   inventory_adjustment_location:String(input.inventory_adjustment_location||'').trim(),
+   receipt_description:String(input.receipt_description||'').trim(),delivery_description:String(input.delivery_description||'').trim(),...extra};
   const price=Number(input.price||0),tax=Number(input.tax||0);
   if(!Number.isFinite(price)||price<0||!Number.isFinite(tax)||tax<0||tax>100)throw Error('Sales Price must be non-negative and Tax between 0 and 100');
   // FG products sold to customers use the existing CRM product master.
@@ -237,10 +288,10 @@
   const crm=stage==='FG'&&saleable;
   const payload=crm?
    {id:recordId,company_id:co,name,sku:code,reference,category,uom,price,tax,stock:0,active:true,inclusive:false,
-    product_type:'Goods',source_type,saleable,purchasable}:
+    product_type:'Goods',source_type,saleable,purchasable,...settings}:
    {id:recordId,name,code,reference,category,uom,type:stage,status:'Draft',qty:null,
     source_type,saleable,purchasable,needs_review:true,reorder_level:null,preferred_vendor:'',
-    has_job_work:source_type==='Subcontract'};
+    has_job_work:source_type==='Subcontract',price,tax,...settings};
   return {company_id:co,kind:crm?'products':'material',record_id:recordId,payload,original:crm?'crm':'ops',code,stage};
  }
  async function createInventory(event){
@@ -279,14 +330,34 @@
    }).select('record_id');
    if(error)throw Error(error.message);
    if(!data?.length)throw Error('Product was not created. Check user permissions.');
+   let photoWarning='';
+   const photo=form.querySelector('[data-inv-create-photo]')?.files?.[0];
+   if(photo){
+    try{
+     const ext=photo.type==='image/png'?'png':photo.type==='image/webp'?'webp':'jpg';
+     const {data:auth,error:authError}=await S.ctx.db.auth.getUser();
+     if(authError||!auth?.user?.id)throw Error('Sign in again for image upload');
+     const storage=S.ctx.db.storage.from('gr-product-images');
+     const path=[entry.company_id,entry.original,entry.record_id,auth.user.id,uid()+'.'+ext].join('/');
+     const {error:uploadError}=await storage.upload(path,photo,{contentType:photo.type,upsert:false});
+     if(uploadError)throw Error(uploadError.message);
+     const url=storage.getPublicUrl(path)?.data?.publicUrl;
+     if(!url)throw Error('Image URL unavailable');
+     const {error:imageError}=await S.ctx.db.from(table).update({payload:{...entry.payload,image_url:url}})
+      .eq('company_id',entry.company_id).eq('kind',entry.kind).eq('record_id',entry.record_id);
+     if(imageError)throw Error(imageError.message);
+    }catch(err){photoWarning='Product created, but photo upload failed: '+err.message}
+   }
+   if(S.newPhotoUrl){URL.revokeObjectURL(S.newPhotoUrl);S.newPhotoUrl=null}
    await load();
+   S.creating=false;S.createTab='general';
    S.scope=entry.company_id;
    S.filter='';
    S.tab='catalog';S.focus={id:entry.record_id,co:entry.company_id,original:entry.original};S.detailTab='general';
    const company=S.root.querySelector('[data-inv-company]');
    if(company)company.value=entry.company_id;
    draw();
-   notify('New inventory item '+entry.code+' created successfully. Opening stock has not been posted.');
+   notify(photoWarning||'New inventory item '+entry.code+' created. Opening stock has not been posted.',!!photoWarning);
   }catch(error){showError(error)}
   finally{S.busy=false;submit.disabled=false}
  }
@@ -512,22 +583,49 @@
    const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
-  const createDialog=S.root.querySelector('[data-inv-create-dialog]');
   S.root.querySelector('[data-inv-create-open]')?.addEventListener('click',()=>{
-   if(createDialog&&typeof createDialog.showModal==='function')createDialog.showModal();
+   if(!S.ctx.can('stock','create'))return notify('Create permission required',true);
+   S.creating=true;S.createTab='general';S.focus=null;draw();
+   S.root.querySelector('.gr-inv-new-title input')?.focus();
   });
-  createDialog?.querySelectorAll('[data-inv-create-close]').forEach(b=>b.onclick=()=>createDialog.close());
-  const createForm=createDialog?.querySelector('[data-inv-create-form]');
-  if(createForm){
-   createForm.onsubmit=e=>void createInventory(e);
-   const stageField=createForm.querySelector('[data-inv-create-stage]'),sales=createForm.querySelector('[data-inv-create-sale]'),buy=createForm.querySelector('[data-inv-create-buy]');
-   const saleFields=createForm.querySelector('[data-inv-create-sales-fields]');
-   const syncStage=()=>{
-    if(stageField.value==='RM'&&!buy.checked)buy.checked=true;
-    saleFields.hidden=stageField.value!=='FG'||!sales.checked;
+  const newPage=S.root.querySelector('[data-inv-new-page]');
+  if(newPage){
+   const form=newPage.querySelector('[data-inv-create-form]');
+   const setTab=id=>{
+    if(id==='sales'&&!form.elements.namedItem('saleable').checked)id='general';
+    if(id==='purchase'&&!form.elements.namedItem('purchasable').checked)id='general';
+    S.createTab=id;
+    newPage.querySelectorAll('[data-inv-create-tab]').forEach(b=>{
+     b.hidden=b.dataset.invCreateTab==='sales'&&!form.elements.namedItem('saleable').checked||
+      b.dataset.invCreateTab==='purchase'&&!form.elements.namedItem('purchasable').checked;
+     b.classList.toggle('active',b.dataset.invCreateTab===id);
+     b.setAttribute('aria-selected',b.dataset.invCreateTab===id?'true':'false');
+    });
+    newPage.querySelectorAll('[data-inv-create-pane]').forEach(p=>p.hidden=p.dataset.invCreatePane!==id);
    };
-   stageField.onchange=syncStage;sales.onchange=syncStage;buy.onchange=syncStage;syncStage();
-   createDialog.addEventListener('click',e=>{if(e.target===createDialog)createDialog.close()});
+   newPage.querySelectorAll('[data-inv-create-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.invCreateTab));
+   form.elements.namedItem('saleable').onchange=form.elements.namedItem('purchasable').onchange=()=>setTab(S.createTab);
+   setTab(S.createTab);
+   newPage.querySelectorAll('[data-inv-create-cancel]').forEach(b=>b.onclick=()=>{
+    if((form.elements.namedItem('name').value.trim()||form.elements.namedItem('code').value.trim()||
+      newPage.querySelector('[data-inv-create-photo]').files?.length)&&!window.confirm('Discard this unsaved product?'))return;
+    if(S.newPhotoUrl){URL.revokeObjectURL(S.newPhotoUrl);S.newPhotoUrl=null}
+    S.creating=false;S.createTab='general';draw();
+   });
+   form.onsubmit=e=>void createInventory(e);
+   const imageField=newPage.querySelector('[data-inv-create-photo]');
+   newPage.querySelector('[data-inv-create-photo-trigger]').onclick=()=>imageField.click();
+   imageField.onchange=()=>{
+    const file=imageField.files?.[0];if(!file)return;
+    const error=newPage.querySelector('[data-inv-create-error]');
+    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>3*1024*1024){
+     error.hidden=false;error.textContent='Only PNG, JPG, WebP up to 3 MB are supported.';imageField.value='';return;
+    }
+    if(S.newPhotoUrl)URL.revokeObjectURL(S.newPhotoUrl);
+    S.newPhotoUrl=URL.createObjectURL(file);
+    const img=newPage.querySelector('[data-inv-create-preview]');img.src=S.newPhotoUrl;img.hidden=false;
+    newPage.querySelector('[data-inv-create-photo-icon]').hidden=true;error.hidden=true;
+   };
   }
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})});
   const productCodeInput=S.root.querySelector('[data-inv-product-code]');
@@ -715,9 +813,9 @@
   }finally{S.busy=false;button.disabled=false}
  }
  async function mount(root,context){
-  S.root=root;S.ctx=context;S.scope=context.scope||context.companies[0];S.tab='catalog';S.focus=null;
+  S.root=root;S.ctx=context;S.scope=context.scope||context.companies[0];S.tab='catalog';S.focus=null;S.creating=false;S.createTab='general';
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm};
 })();
