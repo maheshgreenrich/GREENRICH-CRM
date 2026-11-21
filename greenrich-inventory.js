@@ -105,7 +105,7 @@
   const m=item.material||{}, amounts=S.locations.filter(x=>x.company_id===item.company_id);
   const edges=S.bom.filter(x=>x.company_id===item.company_id&&String(x.payload.parent_code||'').toLowerCase()===item.code.toLowerCase());
   const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===item.stage&&x.item_id===item.id).slice(0,15);
-  const t=S.detailTab||'general', image=m.image_url||m.image||m.photo_url||'';
+  const t=(S.detailTab==='sales'&&!item.saleable)||(S.detailTab==='purchase'&&!item.purchasable)?'general':(S.detailTab||'general'), image=m.image_url||m.image||m.photo_url||'';
   const field=(label,value)=>'<div class="gr-inv-field"><b>'+esc(label)+'</b><span>'+esc(value===null||value===undefined||value===''?'—':value)+'</span></div>';
   const toolbar='<div class="gr-inv-detail-toolbar"><button type="button" data-inv-back>‹ Products</button><span>'+esc(item.code)+'</span><div class="gr-inv-detail-tools"><button type="button" data-inv-detail-action="warehouses">▥ Warehouses</button><button type="button" data-inv-detail-action="bom">⚗ Bill of Materials <b>'+edges.length+'</b></button><button type="button" data-inv-detail-action="activity">▥ Movements <b>'+recent.length+'</b></button></div></div>';
   const editable=S.ctx.can('stock','edit');
@@ -113,9 +113,8 @@
    '<div class="gr-inv-flags"><label class="gr-inv-flag"><input type="checkbox" data-inv-flag="saleable" '+(item.saleable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Sales</span></label>'+
    '<label class="gr-inv-flag"><input type="checkbox" data-inv-flag="purchasable" '+(item.purchasable?'checked':'')+' '+(!editable?'disabled':'')+'><span>Purchase</span></label></div>'+
    '<p class="gr-inv-footnote">'+(item.saleable&&item.purchasable?'Purchased and resold, or manufactured and sold':item.saleable?'Manufactured / stocked for sales':item.purchasable?'Purchased for internal use or production':'Not enabled for sales or purchase')+'</p></div>'+
-   '<div class="gr-inv-hero-photo">'+(image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">'+esc(item.code.slice(0,2))+'</div>')+
-   (editable?'<button type="button" class="gr-inv-photo-upload" data-inv-photo-trigger>✎ Upload Image</button><input type="file" data-inv-photo accept="image/png,image/jpeg,image/webp" style="display:none" aria-label="Upload product image">':'')+'</div></div>';
-  const tabs=[['general','General Information'],['sales','Sales'],['purchase','Purchase'],['inventory','Inventory']];
+   '<div class="gr-inv-hero-photo">'+(editable?'<button type="button" class="gr-inv-photo-target" data-inv-photo-trigger title="Click to upload or replace product image" aria-label="Click to upload product image">':'<div class="gr-inv-photo-target">')+(image?'<img alt="'+esc(item.name)+'" src="'+esc(image)+'" onerror="this.hidden=true">':'<div class="gr-inv-product-placeholder">+ Add image</div>')+(editable?'<span class="gr-inv-photo-hint">✎ Change image</span></button><input type="file" data-inv-photo accept="image/png,image/jpeg,image/webp" style="display:none" aria-label="Upload product image">':'</div>')+'</div></div>';
+  const tabs=[['general','General Information'],...(item.saleable?[['sales','Sales']]:[]),...(item.purchasable?[['purchase','Purchase']]:[]),['inventory','Inventory']];
   let body='';
   if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
    field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
@@ -233,7 +232,7 @@
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})};});
   const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
-  S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{S.detailTab=b.dataset.invDetailTab;draw()});
+  S.root.querySelectorAll('[data-inv-detail-tab]').forEach(b=>b.onclick=()=>{const item=currentItem();if((b.dataset.invDetailTab==='sales'&&!item?.saleable)||(b.dataset.invDetailTab==='purchase'&&!item?.purchasable))return;S.detailTab=b.dataset.invDetailTab;draw()});
   S.root.querySelectorAll('[data-inv-detail-action]').forEach(b=>b.onclick=()=>{const dest=b.dataset.invDetailAction;if(dest==='warehouses'){S.detailTab='inventory';draw()}else{S.focus=null;S.tab=dest;layout();draw()}});
   S.root.querySelector('[data-inv-back]')?.addEventListener('click',()=>{S.focus=null;draw()});
   S.root.querySelectorAll('[data-inv-operations]').forEach(b=>b.onclick=()=>S.ctx.openOperations());
@@ -269,6 +268,7 @@
   const flag=input.dataset.invFlag;
   if(!['saleable','purchasable'].includes(flag))throw Error('Invalid product setting');
   const changes={[flag]:input.checked};
+  if(!input.checked&&S.detailTab===(flag==='saleable'?'sales':'purchase'))S.detailTab='general';
   await updateItem(item,changes);
  }
  async function savePhoto(input){
@@ -286,6 +286,7 @@
    if(error)throw Error('Image upload failed: '+error.message);
   }finally{S.busy=false}
   const url=storage.getPublicUrl(path).data.publicUrl;
+  if(!url)throw Error('Unable to generate product image URL');
   await updateItem(item,{image_url:url});
   notify('Product image saved and visible on inventory cards.');
  }
