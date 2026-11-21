@@ -250,3 +250,13 @@
 .gr-inventory .gr-inv-new-footer{display:flex;gap:10px;justify-content:flex-end;padding:15px}
 .gr-inventory .gr-inv-new-page .gr-inv-create-submit{background:#1764bc!important;border-color:#1764bc!important;color:white!important}
 @media(max-width:760px){.gr-inventory .gr-inv-new-hero{padding:14px;min-height:160px}.gr-inventory .gr-inv-new-photo{flex-basis:95px}.gr-inventory .gr-inv-new-photo button{width:95px;height:100px}.gr-inventory .gr-inv-new-body{padding:15px}.gr-inventory .gr-inv-new-cols{grid-template-columns:1fr;gap:8px}.gr-inventory .gr-inv-new-title{font-size:26px}.gr-inventory .gr-inv-new-tabs{padding-left:7px}}
+
+/* SKU directly under title, with conditional opening stock */
+.gr-inventory .gr-inv-new-code{width:min(570px,100%);margin:9px 0 15px 42px}
+.gr-inventory .gr-inv-new-code .gr-inv-new-field{grid-template-columns:145px minmax(0,1fr);align-items:center;margin:0}
+.gr-inventory .gr-inv-new-code input[type=text]{min-height:38px!important;font-weight:700;letter-spacing:.03em}
+.gr-inventory .gr-inv-new-opening{background:#f5f9ff!important;border:1px solid #cbdcf1;border-radius:8px;padding:10px;margin-top:10px}
+.gr-inventory .gr-inv-new-opening[hidden]{display:none!important}
+.gr-inventory .gr-inv-new-opening .gr-inv-new-field{margin:0 0 7px}
+.gr-inventory .gr-inv-new-opening .gr-inv-new-stock-hint{margin:0;line-height:1.5}
+@media(max-width:650px){.gr-inventory .gr-inv-new-code{margin-left:0}.gr-inventory .gr-inv-new-code .gr-inv-new-field{grid-template-columns:1fr;gap:4px}}

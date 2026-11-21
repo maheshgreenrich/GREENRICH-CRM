@@ -14,5 +14,5 @@ assert.ok(s.includes('data-inv-create-form'));
 assert.ok(src.includes("if(S.creating){box.innerHTML=newInventoryForm();bind();return;}"));
 assert.ok(!src.includes('showModal()'));
 assert.ok(!src.includes('data-inv-create-dialog'));
-assert.match(html,/greenrich-inventory\.js\?v=20261121-new-inventory-page-v10/);
+assert.match(html,/greenrich-inventory\.js\?v=20261121-opening-stock-sku-v11/);
 console.log('New Inventory opens full unsaved product page, not modal.');

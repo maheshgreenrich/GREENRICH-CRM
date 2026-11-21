@@ -176,7 +176,7 @@
    const initials=esc((i.name||i.code).slice(0,2).toUpperCase());
    return '<button type="button" class="gr-inv-product-card" data-inv-item="'+n+'"><span class="gr-inv-product-copy"><b>'+esc(i.name)+'</b><small>'+esc(i.code)+' · '+esc(names[i.stage])+'</small>'+
     (price!==undefined&&price!==null&&price!==''?'<strong>₹ '+fmt(price)+'</strong>':'')+
-    '<span class="gr-inv-onhand">'+qty+' <span>On Hand (aggregate)</span></span></span>'+
+    (i.material?.track_inventory===false?'':'<span class="gr-inv-onhand">'+qty+' <span>On Hand (aggregate)</span></span>')+'</span>'+
     (image?'<img loading="lazy" alt="" src="'+esc(image)+'" onerror="this.hidden=true">':'<span class="gr-inv-product-placeholder">'+initials+'</span>')+'</button>';
   }).join('');
   const list='<div class="gr-inv-scroll"><table><thead><tr><th>Code / Item</th><th>Level</th><th>Saleable</th><th>Purchasable</th><th>Aggregate stock</th><th>Verified locations</th><th></th></tr></thead><tbody>'+
@@ -203,7 +203,7 @@
   '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span>▥ 0 Sold</span><span>▤ 0 Purchased</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
   '<div class="gr-inv-new-panel"><div class="gr-inv-new-hero"><div class="gr-inv-new-titlewrap">'+
   '<label class="gr-inv-new-title">☆ <input name="name" type="text" placeholder="e.g. 25 L Home Composter" maxlength="180" required aria-label="Product Name"></label>'+
-  '<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
+  '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. GRCOM25','text',true)+'</div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
   '<small>All fields are new. The product is not created until you save.</small></div>'+
   '<div class="gr-inv-new-photo"><button type="button" data-inv-create-photo-trigger aria-label="Click to select product image"><span data-inv-create-photo-icon>📷</span><img data-inv-create-preview hidden alt="New product image preview"><small>+ Add image</small></button>'+
   '<input data-inv-create-photo type="file" accept="image/png,image/jpeg,image/webp" hidden><small>PNG, JPG, WebP · max 3 MB</small></div></div>'+
@@ -214,11 +214,12 @@
   select('product_type','Product Type',[['Goods','Goods'],['Service','Service'],['Combo','Combo']],'Goods')+
   select('invoicing_policy','Invoicing Policy',[['Ordered quantities','Ordered quantities'],['Delivered quantities','Delivered quantities']],'Ordered quantities')+
   '<label class="gr-inv-new-field"><b>Track Inventory</b><span><input type="checkbox" name="track_inventory" checked> Enabled</span></label>'+
-  '<p class="gr-inv-new-stock-hint">Quantity On Hand: Not recorded yet. Actual stock is entered separately after creation.</p></div><div>'+
+  '<div data-inv-create-stock-area class="gr-inv-new-opening">'+
+  input('opening_stock','Opening Stock Quantity','0','number')+
+  '<p class="gr-inv-new-stock-hint">Enter confirmed opening On Hand. Sales Orders never change this number. RM, IM and SFG opening balances require a separate approved warehouse / production stock count.</p></div></div><div>'+
   input('price','Sales Price (₹)','0.00','number')+input('tax','Sales Taxes (%)','0','number')+
   input('cost','Cost (₹)','0.00','number')+input('purchase_tax','Purchase Taxes (%)','0','number')+
   input('category','Category','e.g. Composting')+
-  input('code','Product Code / SKU','e.g. GRCOM25','text',true)+
   input('reference','Reference No.','Optional reference')+
   input('barcode','Barcode','Scan or enter barcode')+input('tags','Tags','Separate by comma')+'</div></div>'+
   '<div class="gr-inv-new-notes"><h4>Internal Notes</h4>'+notes('notes','Notes')+'</div></section>'+
@@ -271,8 +272,15 @@
    if(!Number.isFinite(Number(raw))||Number(raw)<0)throw Error(name+' must be non-negative');
    extra[name]=Number(raw);
   }
+  const tracks=input.track_inventory===true||input.track_inventory==='on';
+  const openingText=String(input.opening_stock??'').trim();
+  const opening=tracks&&openingText!==''?Number(openingText):0;
+  if(tracks&&openingText!==''&&(!/^[0-9]+(?:[.][0-9]{1,6})?$/.test(openingText)||!Number.isFinite(opening)))
+   throw Error('Opening stock must be a non-negative number with up to 6 decimal places');
+  if(opening>0&&!(stage==='FG'&&saleable))
+   throw Error('For raw materials, intermediates or semi-finished goods, save with 0 opening stock and record an approved warehouse or production opening count afterwards.');
   const settings={product_type:String(input.product_type||'Goods'),invoicing_policy:String(input.invoicing_policy||'Ordered quantities'),
-   track_inventory:input.track_inventory===true||input.track_inventory==='on',
+   track_inventory:tracks,
    barcode:String(input.barcode||'').trim(),tags:String(input.tags||'').split(',').map(x=>x.trim()).filter(Boolean),
    optional_products:String(input.optional_products||'').split(',').map(x=>x.trim()).filter(Boolean),
    sales_description:String(input.sales_description||'').trim(),notes:String(input.notes||'').trim(),
@@ -287,12 +295,12 @@
   // Internal FG, SFG, IM and RM stay in the manufacturing material master.
   const crm=stage==='FG'&&saleable;
   const payload=crm?
-   {id:recordId,company_id:co,name,sku:code,reference,category,uom,price,tax,stock:0,active:true,inclusive:false,
+   {id:recordId,company_id:co,name,sku:code,reference,category,uom,price,tax,stock:opening,active:true,inclusive:false,
     product_type:'Goods',source_type,saleable,purchasable,...settings}:
    {id:recordId,name,code,reference,category,uom,type:stage,status:'Draft',qty:null,
     source_type,saleable,purchasable,needs_review:true,reorder_level:null,preferred_vendor:'',
     has_job_work:source_type==='Subcontract',price,tax,...settings};
-  return {company_id:co,kind:crm?'products':'material',record_id:recordId,payload,original:crm?'crm':'ops',code,stage};
+  return {company_id:co,kind:crm?'products':'material',record_id:recordId,payload,original:crm?'crm':'ops',code,stage,opening_stock:opening};
  }
  async function createInventory(event){
   event.preventDefault();
@@ -309,6 +317,12 @@
   let entry;
   try{
    entry=prepareInventoryRecord(values,S.items,uid());
+   if(entry.opening_stock>0&&!S.ctx.can('stock','approve'))throw Error('Stock approval permission required to record opening On Hand. Save with 0 and request a stock approval.');
+   if(entry.opening_stock>0){
+    entry.payload.opening_stock_recorded_at=new Date().toISOString();
+    entry.payload.opening_stock_recorded_by=S.ctx.userId;
+    entry.payload.opening_stock_note='Explicit opening count recorded by authorised user at product creation. Warehouse verified balances remain separate.';
+   }
    if(!form.checkValidity()){form.reportValidity();return}
   }catch(err){showError(err);return}
   S.busy=true;
@@ -357,7 +371,7 @@
    const company=S.root.querySelector('[data-inv-company]');
    if(company)company.value=entry.company_id;
    draw();
-   notify(photoWarning||'New inventory item '+entry.code+' created. Opening stock has not been posted.',!!photoWarning);
+   notify(photoWarning||('New inventory item '+entry.code+' created. '+(entry.opening_stock>0?'Manual opening On Hand '+fmt(entry.opening_stock)+' '+entry.payload.uom+' recorded. Verify warehouse stock separately.':'No opening stock posted.')),!!photoWarning);
   }catch(error){showError(error)}
   finally{S.busy=false;submit.disabled=false}
  }
@@ -470,7 +484,7 @@
   const tabs=[['general','General Information'],...(item.saleable?[['sales','Sales']]:[]),...(item.purchasable?[['purchase','Purchase']]:[]),['inventory','Inventory']];
   let body='';
   if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
-   field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
+   field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+(m.track_inventory===false?'':field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit))+
    '</section><section>'+field('Sales Price',m.price??m.selling_price??m.sales_price??'Not set')+field('Sales Taxes',m.sales_tax??m.tax_rate??m.tax??'Not configured')+field('Cost',m.cost??m.cost_price??'Not recorded')+field('Purchase Taxes',m.purchase_tax||'Not configured')+
    field('Category',m.category||m.category_name)+field('Reference',m.reference||m.sku)+field('Barcode',m.barcode)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
    '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4>'+field('Internal notes',m.notes||m.description||'')+'</section>';
@@ -497,7 +511,7 @@
     '</section><section><h4>Recent stock movements</h4>'+
     table(['Action','Quantity','From → To'],recent.map(m=>'<tr><td>'+esc(m.action)+'</td><td>'+fmt(m.quantity)+' '+esc(m.uom)+'</td><td>'+esc(locName(m.from_location))+' → '+esc(locName(m.to_location))+'</td></tr>'))+'</section></div>'+
     '<p class="gr-inv-warning">Verified locations do not automatically overwrite the CRM product stock balance.</p>';
-  return toolbar+stockSummary(item,productMetrics(item,S))+'<div class="gr-inv-detail-panel">'+intro+'<div class="gr-inv-detail-tabs">'+tabs.map(([key,label])=>'<button type="button" data-inv-detail-tab="'+key+'" class="'+(key===t?'active':'')+'">'+label+'</button>').join('')+'</div><div class="gr-inv-detail-body">'+body+'</div></div>';
+  return toolbar+(m.track_inventory===false?'':stockSummary(item,productMetrics(item,S)))+'<div class="gr-inv-detail-panel">'+intro+'<div class="gr-inv-detail-tabs">'+tabs.map(([key,label])=>'<button type="button" data-inv-detail-tab="'+key+'" class="'+(key===t?'active':'')+'">'+label+'</button>').join('')+'</div><div class="gr-inv-detail-body">'+body+'</div></div>';
  }
  function table(heads,body){return '<div class="gr-inv-scroll"><table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+body.join('')+'</tbody></table></div>'}
  function warehouse(){
@@ -605,6 +619,11 @@
    };
    newPage.querySelectorAll('[data-inv-create-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.invCreateTab));
    form.elements.namedItem('saleable').onchange=form.elements.namedItem('purchasable').onchange=()=>setTab(S.createTab);
+   const track=form.elements.namedItem('track_inventory');
+   const stockArea=newPage.querySelector('[data-inv-create-stock-area]');
+   const stockField=form.elements.namedItem('opening_stock');
+   const syncStock=()=>{const enabled=!!track.checked;stockArea.hidden=!enabled;stockField.disabled=!enabled;if(!enabled)stockField.value='';};
+   track.onchange=syncStock;syncStock();
    setTab(S.createTab);
    newPage.querySelectorAll('[data-inv-create-cancel]').forEach(b=>b.onclick=()=>{
     if((form.elements.namedItem('name').value.trim()||form.elements.namedItem('code').value.trim()||
