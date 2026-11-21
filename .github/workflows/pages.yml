@@ -45,7 +45,7 @@ jobs:
           done
           python3 -m json.tool manifest.webmanifest >/dev/null
           echo "CRM and PWA files present"
-      - name: Verify Inventory JavaScript module before deployment
+      - name: Verify Inventory module before deployment
         run: |
           set -euo pipefail
           node --check greenrich-inventory.js
@@ -53,13 +53,13 @@ jobs:
           const fs = require('fs');
           const vm = require('vm');
           const window = {};
-          vm.runInNewContext(fs.readFileSync('greenrich-inventory.js', 'utf8'), {window}, {filename:'greenrich-inventory.js'});
+          vm.runInNewContext(fs.readFileSync('greenrich-inventory.js', 'utf8'), {window}, {filename: 'greenrich-inventory.js'});
           if (typeof window.GreenRichInventory?.mount !== 'function') {
-            throw new Error('Inventory module did not register window.GreenRichInventory.mount');
+            throw new Error('Inventory registration failed');
           }
           const html = fs.readFileSync('secure.html', 'utf8');
-          if (!html.includes('greenrich-inventory.js?')) throw new Error('Inventory script is missing from secure.html');
-          console.log('Inventory JS syntax, module registration and HTML reference OK');
+          if (!html.includes('greenrich-inventory.js?')) throw new Error('Inventory script missing in secure.html');
+          console.log('Inventory module syntax and registration OK');
           NODE
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -67,13 +67,22 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
-      - name: Wait for uploaded Pages artifact to be indexed
+      - name: Wait for Pages artifact indexing
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for attempt in $(seq 1 20); do
-            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id' 2>/tmp/gr-artifact-api.err | grep -Eq '^[0-9]+
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "github-pages" and .expired == false) | .id' | grep -Eq '^[0-9]+$'; then
+              echo "Pages artifact is ready."
+              exit 0
+            fi
+            echo "Waiting for GitHub artifact indexing: attempt ${attempt}/20"
+            sleep 7
+          done
+          echo "::error::Pages artifact not indexed"
+          exit 1
+      - name: Deploy CRM to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Verify live CRM and Android install files
@@ -93,42 +102,6 @@ jobs:
                node --check /tmp/gr-inventory.js &&
                grep -q 'GreenRichInventory' /tmp/gr-inventory.js &&
                grep -q '20261121-inventory-syntax-fix-v5' /tmp/gr-secure.html &&
-               grep -q 'GreenRich ONE' /tmp/gr-secure.html &&
-               grep -q 'App Install Check' /tmp/gr-check.html; then
-              echo "LIVE: CRM and Android app assets published at $base"
-              exit 0
-            fi
-            echo "Waiting for GitHub Pages to serve new release ($attempt/8)"
-            sleep 10
-          done
-          echo "::error::GitHub Pages deployed but the new CRM/PWA files are not accessible"
-          exit 1
-; then
-              echo "The github-pages artifact is indexed and ready."
-              exit 0
-            fi
-            echo "Pages artifact not yet indexed (attempt ${attempt}/20); retrying..."
-            sleep 7
-          done
-          cat /tmp/gr-artifact-api.err || true
-          echo "::error::Pages artifact is unavailable after upload; deployment cannot proceed."
-          exit 1
-      - name: Deploy CRM to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Verify live CRM and Android install files
-        env:
-          PAGES_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          set -euo pipefail
-          base="${PAGES_URL%/}"
-          for attempt in 1 2 3 4 5 6 7 8; do
-            if curl -fsSL --max-time 15 "$base/secure.html?sha=${GITHUB_SHA}" -o /tmp/gr-secure.html &&
-               curl -fsSL --max-time 15 "$base/app-install-check.html?sha=${GITHUB_SHA}" -o /tmp/gr-check.html &&
-               curl -fsSL --max-time 15 "$base/manifest.webmanifest?sha=${GITHUB_SHA}" -o /tmp/gr-manifest.json &&
-               curl -fsSL --max-time 15 "$base/greenrich-app-sw.js?sha=${GITHUB_SHA}" -o /tmp/gr-sw.js &&
-               curl -fsSL --max-time 15 "$base/greenrich-app-192.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon192.png &&
-               curl -fsSL --max-time 15 "$base/greenrich-app-512.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon512.png &&
                grep -q 'GreenRich ONE' /tmp/gr-secure.html &&
                grep -q 'App Install Check' /tmp/gr-check.html; then
               echo "LIVE: CRM and Android app assets published at $base"
