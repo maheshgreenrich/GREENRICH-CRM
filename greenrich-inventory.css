@@ -140,3 +140,19 @@
 .gr-inventory .gr-inv-inline-field textarea{min-height:68px;resize:vertical}
 .gr-inventory .gr-inv-field span{overflow-wrap:anywhere}
 @media(max-width:650px){.gr-inventory .gr-inv-notes .gr-inv-inline-field{grid-template-columns:1fr}}
+
+/* Odoo-inspired, product-specific status ribbon — white and GreenRich blue. */
+.gr-inventory .gr-inv-summary{display:flex!important;align-items:stretch;gap:0;overflow-x:auto;overscroll-behavior-inline:contain;
+  padding:0;border:1px solid #cfdef1;border-radius:10px;background:#fff!important;scrollbar-width:thin;margin:0 0 14px}
+.gr-inventory .gr-inv-metric{flex:1 0 148px;min-width:140px;padding:11px 14px;display:flex;flex-direction:column;gap:4px;
+  border-right:1px solid #d9e5f4;background:#fff;color:#174875;white-space:nowrap;line-height:1.3}
+.gr-inventory .gr-inv-metric:last-child{border-right:0}
+.gr-inventory .gr-inv-metric strong{font-size:13px;font-weight:800;color:#1658a4;display:block}
+.gr-inventory .gr-inv-metric strong span{font-size:12px;color:#496a90;font-weight:650}
+.gr-inventory .gr-inv-metric small{font-size:12px;color:#667d9d;display:block}
+.gr-inventory .gr-inv-metric-primary{background:#f2f8ff!important}
+.gr-inventory .gr-inv-metric-danger{background:#fff3f1!important}
+.gr-inventory .gr-inv-metric-danger strong,.gr-inventory .gr-inv-metric-danger small{color:#a53027!important}
+.gr-inventory .gr-inv-low-stock{display:block;padding:11px 14px;margin:0 0 12px;border:1px solid #efb4ab;
+  background:#fff3f1;color:#972b22;border-radius:9px;font-weight:700}
+@media(max-width:860px){.gr-inventory .gr-inv-summary{margin-right:0}.gr-inventory .gr-inv-metric{flex:0 0 165px}}

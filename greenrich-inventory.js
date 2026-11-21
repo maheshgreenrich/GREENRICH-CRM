@@ -9,7 +9,7 @@
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
@@ -36,6 +36,14 @@
    rows('gr_production_documents','*',q=>q.in('kind',['po','job'])),
    rows('gr_production_balances')
   ]);
+  // Sales/dispatch access is independently permissioned. An inaccessible source is
+  // unknown (—), never silently treated as zero outstanding orders.
+  const [salesResult,dispatchResult]=await Promise.allSettled([
+   rows('gr_crm_records','company_id,record_id,payload',q=>q.eq('kind','sales')),
+   rows('gr_dispatch_orders','company_id,id,source_sale_id,order_id,sku,product_name,quantity,status')
+  ]);
+  S.sales=salesResult.status==='fulfilled'?salesResult.value:null;
+  S.dispatch=dispatchResult.status==='fulfilled'?dispatchResult.value:null;
   const list=[];
   for(const r of products)list.push({company_id:r.company_id,id:r.record_id,code:r.payload.sku||r.payload.code||r.record_id,
    name:r.payload.name||'Untitled saleable product',stage:'FG',saleable:r.payload.saleable!==false,purchasable:!!r.payload.purchasable,
@@ -52,6 +60,89 @@
  }
  const getLocBalance=item=>S.balances.filter(b=>b.company_id===item.company_id&&b.item_kind===item.stage&&b.item_id===item.id)
    .reduce((sum,b)=>sum+Number(b.quantity||0),0);
+
+ // Read-only per-product indicators. Never mutate authoritative balances.
+ const metricNum=value=>value===null||value===undefined||value===''?null:
+  (Number.isFinite(Number(value))?Number(value):null);
+ const nonNegative=value=>Math.max(0,metricNum(value)??0);
+ const key=v=>String(v??'').trim().toLowerCase();
+ function matchesMetricItem(item,p={}){
+  if(!p||typeof p!=='object')return false;
+  const id=p.product_id??p.item_id;
+  const code=p.sku??p.code??p.product_code??p.material_code??p.material_id;
+  if(id!==null&&id!==undefined&&String(id)===String(item.id))return true;
+  if(code!==null&&code!==undefined&&key(code))return key(code)===key(item.code);
+  if(id!==null&&id!==undefined&&key(id))return key(id)===key(item.code);
+  const name=p.product_name??p.item_name??p.name;
+  return !!name&&key(name)===key(item.name);
+ }
+ function productMetrics(item,sources){
+  const material=item.material||{};
+  const sameCompany=r=>r.company_id===item.company_id;
+  const bomLines=(sources.bom||[]).filter(r=>sameCompany(r)&&key(r.payload?.parent_code)===key(item.code));
+  const bomCount=new Set(bomLines.map(r=>String(r.payload?.revision||'Unversioned'))).size;
+  const approvedPos=(sources.pos||[]).filter(d=>sameCompany(d)&&!['draft','cancelled','canceled','rejected','void'].includes(key(d.status)) &&
+    Array.isArray(d.payload?.lines)&&d.payload.lines.some(line=>matchesMetricItem(item,line)));
+  const pendingPO=approvedPos.reduce((sum,d)=>sum+(key(d.status)==='received'||key(d.status)==='closed'?0:
+    d.payload.lines.filter(line=>matchesMetricItem(item,line)).reduce((sub,line)=>sub+Math.max(0,nonNegative(line.quantity)-nonNegative(line.received)),0)),0);
+  const salesAvailable=Array.isArray(sources.sales);
+  const dispatchAvailable=Array.isArray(sources.dispatch);
+  const sales=salesAvailable?sources.sales.filter(r=>sameCompany(r)&&matchesMetricItem(item,r.payload||{})):[];
+  const completedSales=sales.filter(r=>['completed','delivered','fulfilled','closed'].includes(key(r.payload?.status)));
+  const pendingSales=sales.filter(r=>['pending','approved','confirmed','processing','ready to dispatch','partially dispatched','partly dispatched'].includes(key(r.payload?.status)));
+  const dispatch=dispatchAvailable?sources.dispatch.filter(d=>sameCompany(d)&&matchesMetricItem(item,d)):[];
+  const openDispatch=dispatch.filter(d=>['pending','approved','confirmed','processing','packing','packed','ready','ready to dispatch'].includes(key(d.status)));
+  const deliveredDispatch=dispatch.filter(d=>['delivered','completed'].includes(key(d.status)));
+  const saleRefs=new Set(sales.map(s=>String(s.record_id)));
+  const dispatchedSaleRefs=new Set(openDispatch.map(d=>String(d.source_sale_id||'')).filter(Boolean));
+  const sold=salesAvailable&&dispatchAvailable?completedSales.reduce((sum,r)=>sum+nonNegative(r.payload?.qty),0)+
+    deliveredDispatch.filter(d=>!d.source_sale_id||!saleRefs.has(String(d.source_sale_id))).reduce((sum,d)=>sum+nonNegative(d.quantity),0):null;
+  const outgoing=salesAvailable&&dispatchAvailable?pendingSales.filter(r=>!dispatchedSaleRefs.has(String(r.record_id))).reduce((sum,r)=>sum+nonNegative(r.payload?.qty),0)+
+    openDispatch.reduce((sum,d)=>sum+nonNegative(d.quantity),0):null;
+  const jobs=(sources.jobWork||[]).filter(sameCompany);
+  const openJobs=jobs.filter(d=>!['completed','cancelled','canceled','closed'].includes(key(d.status)));
+  const subcontractOut=openJobs.filter(j=>matchesMetricItem(item,j.payload?.material||{}))
+   .reduce((sum,j)=>sum+nonNegative(j.payload?.remaining),0);
+  const outputJobs=openJobs.filter(j=>matchesMetricItem(item,{
+    product_id:j.payload?.output_product_id,
+    code:j.payload?.output_material_code||j.payload?.output_product_code||j.payload?.output_item_code
+  }));
+  let subcontractIn=0;
+  for(const j of outputJobs){
+   const planned=metricNum(j.payload?.expected_output??j.payload?.planned_output_qty);
+   if(planned===null){subcontractIn=null;break;}
+   subcontractIn+=Math.max(0,planned-nonNegative(j.payload?.output));
+  }
+  const onHand=metricNum(item.aggregate);
+  const min=metricNum(material.min_stock??material.reorder_level??material.min_qty??material.min_level);
+  const max=metricNum(material.max_stock??material.max_level??material.maximum_stock??material.max_qty);
+  const incoming=pendingPO;
+  const forecast=onHand===null||outgoing===null?null:onHand+incoming-outgoing;
+  return {onHand,forecast,bomCount,bomLines:bomLines.length,sold,outgoing,
+   incoming,purchaseOrders:approvedPos.length,min,max,subcontractIn,subcontractOut,
+   lowStock:min!==null&&onHand!==null&&onHand<min};
+ }
+ const showMetric=(value,uom='')=>value===null||value===undefined?'—':fmt(value)+(uom?' '+esc(uom):'');
+ function stockSummary(item,metrics){
+  const unit=item.unit||'nos';
+  const chip=(name,main,sub,tip,accent='')=>'<div class="gr-inv-metric '+accent+'" title="'+esc(tip)+'" role="group" aria-label="'+esc(name)+'">'+
+   '<strong>'+main+'</strong>'+(sub?'<small>'+sub+'</small>':'')+'</div>';
+  return '<div class="gr-inv-summary" role="region" aria-label="Product inventory status">'+
+    chip('On hand and forecast',showMetric(metrics.onHand,unit)+' <span>On Hand</span>',
+      showMetric(metrics.forecast,unit)+' Forecasted','Forecast = On hand + pending approved PO receipts − unfulfilled sales and dispatches','gr-inv-metric-primary')+
+    chip('Bill of materials',showMetric(metrics.bomCount)+' <span>Bill of Materials</span>',
+      metrics.bomLines+' component lines','Count of BOM revisions for this product, not component lines')+
+    chip('Sold and outgoing',showMetric(metrics.sold)+' <span>Sold</span>',
+      showMetric(metrics.outgoing,unit)+' Outgoing','Completed sales / orders awaiting dispatch; a dash means orders data is not accessible')+
+    chip('Purchase orders',showMetric(metrics.purchaseOrders)+' <span>Purchase Orders</span>',
+      showMetric(metrics.incoming,unit)+' Incoming','Purchase orders with this exact product code; incoming excludes quantities already received')+
+    chip('Minimum and maximum','Min: '+showMetric(metrics.min),
+      'Max: '+showMetric(metrics.max),'Configured reorder minimum and maximum (dash means not configured)',metrics.lowStock?'gr-inv-metric-danger':'')+
+    chip('Subcontracting','In: '+showMetric(metrics.subcontractIn),
+      'Out: '+showMetric(metrics.subcontractOut),'Subcontract In is outstanding expected output only when recorded; Out is material still at vendor')+
+   '</div>'+
+   (metrics.lowStock?'<div class="gr-inv-low-stock" role="alert">⚠ Low stock: '+esc(item.name)+' has '+showMetric(metrics.onHand,unit)+' remaining, below the minimum of '+showMetric(metrics.min,unit)+'. Please check and replenish stock.</div>':'');
+ }
  function layout(){
   const tabs=[['catalog','Product & Material Master'],['warehouses','Warehouse Stock'],['vendors','Vendor / Job Work Stock'],['bom','Multi-level BOM'],['purchasing','Purchase Shortages'],['activity','Stock Movement Audit']];
   S.root.innerHTML='<div class="gr-inventory"><header class="gr-inv-head"><div><small>GREENRICH ONE · INVENTORY</small><h2>Inventory & Material Control</h2><p>Saleable · Purchasable · Raw material · Intermediate · Semi-finished · Final goods</p></div>'+
@@ -193,7 +284,7 @@
     '</section><section><h4>Recent stock movements</h4>'+
     table(['Action','Quantity','From → To'],recent.map(m=>'<tr><td>'+esc(m.action)+'</td><td>'+fmt(m.quantity)+' '+esc(m.uom)+'</td><td>'+esc(locName(m.from_location))+' → '+esc(locName(m.to_location))+'</td></tr>'))+'</section></div>'+
     '<p class="gr-inv-warning">Verified locations do not automatically overwrite the CRM product stock balance.</p>';
-  return toolbar+'<div class="gr-inv-detail-panel">'+intro+'<div class="gr-inv-detail-tabs">'+tabs.map(([key,label])=>'<button type="button" data-inv-detail-tab="'+key+'" class="'+(key===t?'active':'')+'">'+label+'</button>').join('')+'</div><div class="gr-inv-detail-body">'+body+'</div></div>';
+  return toolbar+stockSummary(item,productMetrics(item,S))+'<div class="gr-inv-detail-panel">'+intro+'<div class="gr-inv-detail-tabs">'+tabs.map(([key,label])=>'<button type="button" data-inv-detail-tab="'+key+'" class="'+(key===t?'active':'')+'">'+label+'</button>').join('')+'</div><div class="gr-inv-detail-body">'+body+'</div></div>';
  }
  function table(heads,body){return '<div class="gr-inv-scroll"><table><thead><tr>'+heads.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+body.join('')+'</tbody></table></div>'}
  function warehouse(){
@@ -449,5 +540,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics};
 })();

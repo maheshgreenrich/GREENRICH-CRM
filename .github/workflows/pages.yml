@@ -49,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check greenrich-inventory.js
+          node tests/inventory-product-summary.cjs
           node - <<'NODE'
           const fs = require('fs');
           const vm = require('vm');
