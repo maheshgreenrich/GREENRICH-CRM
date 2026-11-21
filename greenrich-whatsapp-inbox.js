@@ -233,6 +233,7 @@
            '<input type="text" data-grwx-variable="'+i+'" maxlength="512" placeholder="Value for {{'+(i+1)+'}}" value="'+esc((templateValues.get(selected+":"+pickedTemplate.id)||[])[i]||'')+'"></label>').join(''))+
           (pickedSpec.image?'<label>Approved template header image (JPEG or PNG required)<input type="file" id="grwx-template-image" accept="image/jpeg,image/png"></label>'+
             '<span class="grwx-template-upload-name">'+esc(templateMedia.get(selected+":"+pickedTemplate.id)?.name||'No image selected')+'</span>':'')+
+          '<button type="button" data-grwx-action="record-consent">Record customer marketing consent</button>'+ 
           '<button type="button" data-grwx-action="send-template" '+(sending?'disabled':'')+'>Send selected template</button>'+
         '</div>':'<small>Select an approved template. Pending CRM sync templates cannot be sent until their existing approved details are recorded.</small>')+
       '</section>':'')+
@@ -342,6 +343,37 @@
    if(action==='template-draft'){templateOpen=!templateOpen;chosenTemplateId='';render();return}
    if(action==='close-template'){templateOpen=false;chosenTemplateId='';render();return}
    if(action==='remove-attachment'){cleanupAttachment(attachments.get(selected));attachments.delete(selected);render();return}
+   if(action==='record-consent'){
+    const person=customers().find(x=>x.key===selected);
+    if(!ctx?.admin||!person?.connection)return settings.notify('An administrator must select a connected sender and customer.','warning');
+    const source=window.prompt('How did this customer explicitly agree to receive WhatsApp marketing from GreenRich? Enter evidence/source (e.g. signed form, website checkbox, WhatsApp message with date). Do not enter just "policy".');
+    if(source===null)return;
+    if(source.trim().length<8)return settings.notify('Enter a meaningful, verifiable consent source before saving.','warning');
+    const dateText=window.prompt('Date customer gave permission (YYYY-MM-DD). Use the actual date, not an assumed date.',new Date().toLocaleDateString('en-CA'));
+    if(dateText===null)return;
+    const dateMatch=/^\d{4}-\d{2}-\d{2}$/.test(dateText);
+    const when=dateMatch?new Date(dateText+'T12:00:00+05:30'):new Date(NaN);
+    if(!dateMatch||!Number.isFinite(when.getTime())||when>Date.now())return settings.notify('Enter a valid past or current consent date (YYYY-MM-DD).','warning');
+    const db=settings.app.db,companyId=person.connection.company_id;
+    const mobile='91'+person.number;
+    const consentRow={company_id:companyId,name:person.name||'WhatsApp customer',mobile,
+      consent_status:'opted_in',consent_source:source.trim(),consent_at:when.toISOString(),opt_out_at:null,
+      notes:'Recorded by authorized CRM administrator from customer permission evidence.'};
+    try{
+     const existing=await db.from('gr_wa_contacts').select('id,consent_status,opt_out_at')
+       .eq('company_id',companyId).in('mobile',[mobile,person.number]).limit(10);
+     if(existing.error)throw existing.error;
+     if((existing.data||[]).some(x=>x.opt_out_at||x.consent_status==='opted_out'))
+      return settings.notify('This recipient has a recorded opt-out. Review the customer’s newer explicit opt-in evidence before changing their status.','warning');
+     const found=(existing.data||[])[0];
+     const result=found?await db.from('gr_wa_contacts').update(consentRow).eq('id',found.id).eq('company_id',companyId).select('id').single():
+       await db.from('gr_wa_contacts').insert(consentRow).select('id').single();
+     if(result.error)throw result.error;
+     settings.notify('Customer marketing permission recorded for the selected sender. You may now retry the template; sending is not automatic.','success');
+     await settings.refresh?.();
+    }catch(err){settings.notify('Could not save consent: '+(err.message||String(err)),'error')}
+    return;
+   }
    if(action==='send-template'){
     if(sending)return;
     const person=customers().find(x=>x.key===selected);
