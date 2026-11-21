@@ -30,23 +30,27 @@ const companyStorage=id=>id==='grow-india'?legacyKey:legacyKey+'::'+id;
 function ensureCRMData(store){if(!Array.isArray(store.tags))store.tags=[];if(!Number.isInteger(store.orderSequence)||store.orderSequence<0)store.orderSequence=0;if(!store.invoiceSequences||typeof store.invoiceSequences!=='object')store.invoiceSequences={};return store}
 function attachSharedCustomers(store){const shared=window.GreenRichSharedCustomers?.snapshot();if(shared){store.customers=shared.customers;store.tags=shared.tags}return ensureCRMData(store)}
 function loadCompanyData(id){if(id===activeCompany)return attachSharedCustomers(data);let parsed;try{parsed=JSON.parse(localStorage.getItem(companyStorage(id))||'null')||initial()}catch{parsed=initial()}return attachSharedCustomers(parsed)}
-// Allocate newly received inventory to outstanding orders in creation order.
-// Previously allocated units remain reserved; never allocate the same unit twice.
+// SO demand changes forecast allocation, never actual product.stock.
+const needsShipment=order=>Boolean(order)&&['pending','approved','confirmed','processing','ready to dispatch','partially dispatched','partly dispatched','packing','packed'].includes(String(order.status||'').trim().toLowerCase());
 function reconcileOrderStock(copy){
  if(!Array.isArray(copy.products)||!Array.isArray(copy.sales))return;
  for(const product of copy.products){
-  let free=Math.max(0,Number(product.stock)||0);
+  let remaining=Math.max(0,Number(product.stock)||0);
   for(const order of copy.sales){
-   if(order.product_id!==product.id||!consumesStock(order))continue;
-   const quantity=Math.max(0,Number(order.qty)||0);
-   const allocated=Math.min(quantity,Math.max(0,Number(order.stock_allocated_qty??quantity)||0));
-   const need=Math.max(0,quantity-allocated);
-   const take=Math.min(free,need);
-   if(take){order.stock_allocated_qty=allocated+take;free-=take}
-   order.stock_shortage=need-take;
+   if(order.product_id!==product.id)continue;
+   if(!needsShipment(order)){
+    order.stock_allocated_qty=0;order.stock_shortage=0;
+    order.stock_status=['Cancelled','Returned'].includes(order.status)?order.status:'Not awaiting dispatch';
+    continue;
+   }
+   const qty=Math.max(0,Number(order.qty)||0);
+   const allocated=Math.min(qty,remaining);
+   remaining-=allocated;
+   order.stock_allocated_qty=allocated;
+   order.stock_shortage=qty-allocated;
    order.stock_status=order.stock_shortage?'Low Stock':'Available';
   }
-  product.stock=free;
+  // On Hand is fixed until a user edits the actual stock; do not mutate product.stock.
  }
 }
 function saveCompanyData(id,copy){
@@ -63,27 +67,18 @@ function saveCompanyData(id,copy){
 }
 const editorData=()=>loadCompanyData($('#f-company_id')?.value||activeCompany);
 const cleanPhone=v=>{const x=String(v||'').replace(/\D/g,'');return x.length>10?x.slice(-10):x};
-const consumesStock=s=>Boolean(s)&&!['Cancelled','Returned'].includes(s.status);
- // Stock delta for an active order. Cancel/return/delete releases it once.
- function adjustStockForSale(copy,old,next){
-  // Preserve historical allocations: old records consumed their full quantity.
-  const previous=old&&consumesStock(old)?copy.products.find(p=>p.id===old.product_id):null;
-  const current=next&&consumesStock(next)?copy.products.find(p=>p.id===next.product_id):null;
-  const oldAllocated=previous?Number(old.stock_allocated_qty??old.qty):0;
-  if(previous&&(!Number.isFinite(oldAllocated)||oldAllocated<0))throw Error('Existing order allocation invalid; ask Admin to review.');
-  if(current&&(!Number.isFinite(Number(current.stock))||!Number.isInteger(Number(next.qty))||Number(next.qty)<1))throw Error('Invalid stock or quantity.');
-  if(previous)previous.stock=Number(previous.stock)+oldAllocated;
-  if(current){
-   const available=Math.max(0,Number(current.stock));
-   const allocated=Math.min(available,Number(next.qty));
-   current.stock=available-allocated;
-   next.stock_allocated_qty=allocated;
-   next.stock_shortage=Math.max(0,Number(next.qty)-allocated);
-   next.stock_status=next.stock_shortage?'Low Stock':'Available';
-  }else if(next){
-   next.stock_allocated_qty=0;next.stock_shortage=0;next.stock_status='Not applicable';
-  }
+// Sales Order edits only change projected demand and order shortage metadata.
+function adjustStockForSale(copy,old,next){
+ if(!next)return;
+ if(!needsShipment(next)){
+  next.stock_allocated_qty=0;next.stock_shortage=0;
+  next.stock_status=['Cancelled','Returned'].includes(next.status)?next.status:'Not awaiting dispatch';
+  return;
  }
+ if(!Number.isInteger(Number(next.qty))||Number(next.qty)<1)throw Error('Invalid Sales Order quantity');
+ if(!copy.products.some(p=>p.id===next.product_id))throw Error('Sales Order product missing');
+ next.stock_allocated_qty=0;next.stock_shortage=0;next.stock_status='Awaiting forecast calculation';
+}
 
 function validateCustomer(store,person,ignore,configured=false){
  const email=String(person.email||'').trim().toLowerCase();
@@ -875,7 +870,7 @@ async function saveEditor(event){
     sku:product.sku,hsn:product.hsn||'',channel_name:channel.name,customer_name:customer.name,status
    });
   ['new_name','new_email','new_mobile','new_mobile2','new_address1','new_address2','new_city','new_state','new_pincode','new_gstin','new_type','new_source','new_notes','new_tag_ids'].forEach(k=>delete row[k]);
-  // Product stock was already reserved or released once above.
+  // Only forecast demand is updated here; actual On Hand remains unchanged.
  }else if(editing==='products'){
   try{Object.assign(row,window.GreenRichProductBOM.collect(form))}catch(error){return toast(error.message,'error')}
   row.price=Number(row.price);row.tax=Number(row.tax);row.stock=Number(row.stock);
@@ -1018,7 +1013,7 @@ async function removeRecord(k,id){
  if(k==='sales'&&!isVoidedSale(item))return toast('Cancel this sales order first. Delete becomes available after cancellation.','error');
   if(k==='sales'&&item.invoice_status==='Issued')return toast('Issued invoices cannot be deleted. Contact Accounts for a credit note or authorised correction.');
   if(k==='sales'&&window.GreenRichSalesOps?.isApproved?.(owner,id))return toast('Approved orders cannot be deleted after dispatch handoff.');
-  if(k==='sales'&&consumesStock(item)){try{adjustStockForSale(copy,item,null)}catch(error){return toast(error.message,'error')}}
+  // Cancelled Sales Order deletion cannot alter physical On Hand.
  copy[k]=copy[k].filter(r=>r.id!==id);
  if(saveCompanyData(owner,copy)){render();toast('Record deleted')}
 }
@@ -1036,7 +1031,7 @@ async function importSales(file){
   if(file.name.toLowerCase().endsWith('.csv'))rows=parseCsv(await file.text());
   else{if(!window.XLSX)throw Error('Excel library unavailable. Export as CSV.');const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}
   if(rows.length>10000)throw Error('Maximum 10,000 rows per import');
-  let count=0,invalid=0,duplicates=0,stockSkipped=0;
+  let count=0,invalid=0,duplicates=0;
   const copy=JSON.parse(JSON.stringify(data));ensureCRMData(copy);
   const normDate=v=>{if(v instanceof Date)return v.toISOString().slice(0,10);let s=String(v||'').trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):''};
   for(const r of rows){
@@ -1046,17 +1041,17 @@ async function importSales(file){
    const qty=Number(get('quantity','qty')),unit=Number(get('unit price','price')),inc=String(get('tax inclusive','price includes tax')).toLowerCase();
    if(!d||!c||!p||p.active===false||!Number.isInteger(qty)||qty<1||!Number.isFinite(unit)||unit<0){invalid++;continue}
    if(order&&copy.sales.some(s=>s.order_id===order&&s.channel_id===c.id&&s.product_id===p.id)){duplicates++;continue}
-   if(!Number.isInteger(Number(p.stock))||Number(p.stock)<qty){stockSkipped++;continue}
+   // Open orders can exceed actual stock; forecast will display the shortage.
    const inclusive=inc?['yes','true','inclusive','1'].includes(inc):p.inclusive,tax=Number(p.tax)||0,calc=getCalc(qty,unit,tax,inclusive);
    const customer=String(get('customer','customer name')).trim(),cr=copy.customers.find(x=>x.name.toLowerCase()===customer.toLowerCase());
    const internal=nextOrderId(copy,activeCompany);
    copy.sales.push({id:uid(),date:d,order_id:order,internal_order_id:internal,invoice_number:window.GreenRichInvoices.nextInvoiceId(copy,activeCompany,date()),invoice_date:date(),invoice_status:'Draft',shipping_gst_rate:0,shipping_tax_amount:0,company_id:activeCompany,channel_id:c.id,channel_name:c.name,customer_id:cr?.id||'',customer_name:customer,product_id:p.id,product_name:p.name,sku:p.sku,hsn:p.hsn||'',qty,unit_price:unit,tax_rate:tax,inclusive,taxable:calc.base,tax_amount:calc.gst,total:calc.total,shipping_charge:0,status:String(get('order status','status')||'Completed'),notes:String(get('notes')||'')});
-   if(consumesStock(copy.sales[copy.sales.length-1]))p.stock-=qty;
+   // No stock mutation when importing orders.
    count++;
   }
   if(!saveCompanyData(activeCompany,copy))return;
   render();
-  toast('Imported '+count+' sales; '+invalid+' invalid, '+duplicates+' duplicate, '+stockSkipped+' insufficient stock. Internal IDs assigned.');
+  toast('Imported '+count+' sales; '+invalid+' invalid, '+duplicates+' duplicate. On Hand unchanged; SO demand affects Forecast.');
  }catch(error){toast('Import error: '+error.message)}
  finally{$('#upload-sales').value=''}
 }
