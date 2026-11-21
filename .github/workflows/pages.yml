@@ -51,6 +51,7 @@ jobs:
           node --check greenrich-inventory.js
           node tests/inventory-product-summary.cjs
           node tests/inventory-product-sku-reference.cjs
+          node tests/inventory-new-product.cjs
           node tests/crm-onhand-forecast.cjs
           node - <<'NODE'
           const fs = require('fs');

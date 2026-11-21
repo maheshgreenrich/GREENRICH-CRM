@@ -180,3 +180,33 @@
  .gr-inventory .gr-inv-identifier{flex-wrap:wrap;gap:4px 7px}
  .gr-inventory .gr-inv-identifier input[type=text]{width:145px!important}
 }
+
+/* Add Inventory dialog – blue/white theme, constrained form and mobile-friendly actions */
+.gr-inventory .gr-inv-add-new{background:#1764bc!important;color:#fff!important;border-color:#1764bc!important;font-weight:750;padding:10px 16px!important}
+.gr-inventory .gr-inv-add-new:hover{background:#0f4e99!important}
+.gr-inventory .gr-inv-catalog-actions{flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.gr-inventory .gr-inv-create-dialog{position:fixed;inset:0;max-height:min(90vh,880px);width:min(720px,calc(100vw - 28px));max-width:720px;box-sizing:border-box;
+ margin:auto;padding:0;border-radius:14px;border:1px solid #cbdcf3;background:#fff!important;color:#17375d!important;box-shadow:0 20px 75px #001b384a;overflow:auto;color-scheme:light}
+.gr-inventory .gr-inv-create-dialog::backdrop{background:#061b35a8}
+.gr-inventory .gr-inv-create-dialog form{display:block;background:#fff!important;color:#153357!important;padding:22px}
+.gr-inventory .gr-inv-create-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid #dfebf8;padding-bottom:12px}
+.gr-inventory .gr-inv-create-head h3{margin:0;color:#123b71;font-size:22px}
+.gr-inventory .gr-inv-create-head p{margin:3px 0 0;color:#627b9c}
+.gr-inventory .gr-inv-create-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-top:16px;align-items:end}
+.gr-inventory .gr-inv-create-fields>label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:13px;font-weight:700;color:#264b73}
+.gr-inventory .gr-inv-create-fields label span em{font-style:normal;color:#b53236}
+.gr-inventory .gr-inv-create-fields input:not([type=checkbox]),.gr-inventory .gr-inv-create-fields select{
+ width:100%;min-height:40px;border:1px solid #bbd1ea!important;border-radius:8px;padding:8px 10px!important;background:#fff!important;color:#183d6b!important
+}
+.gr-inventory .gr-inv-create-checkbox{display:flex!important;flex-direction:row!important;align-items:center!important;gap:9px!important;min-height:40px}
+.gr-inventory .gr-inv-create-checkbox input[type=checkbox]{width:18px!important;height:18px!important;appearance:auto!important;accent-color:#1764bc!important;margin:0!important}
+.gr-inventory .gr-inv-create-sales{display:contents}
+.gr-inventory .gr-inv-create-sales[hidden]{display:none!important}
+.gr-inventory .gr-inv-create-sales label{display:flex;flex-direction:column;gap:5px}
+.gr-inventory .gr-inv-create-note{margin:16px 0 0;padding:10px 12px;border-radius:7px;background:#eef5ff;color:#456989;font-size:12px;line-height:1.5}
+.gr-inventory .gr-inv-create-error{padding:10px;background:#fff1ef;border:1px solid #f2beb8;color:#9d2721;border-radius:7px}
+.gr-inventory .gr-inv-create-footer{display:flex;justify-content:flex-end;gap:9px;margin-top:18px;border-top:1px solid #e1ebf7;padding-top:14px}
+.gr-inventory .gr-inv-create-submit{background:#1764bc!important;color:#fff!important;border-color:#1764bc!important}
+.gr-inventory .gr-inv-create-submit:disabled{opacity:.5;cursor:wait}
+@media(max-width:650px){.gr-inventory .gr-inv-catalog-head{flex-wrap:wrap}.gr-inventory .gr-inv-catalog-actions{justify-content:flex-start}
+.gr-inventory .gr-inv-create-dialog form{padding:16px}.gr-inventory .gr-inv-create-fields{grid-template-columns:1fr}}

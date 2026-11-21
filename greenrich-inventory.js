@@ -182,11 +182,113 @@
    (items.map((i,n)=>'<tr><td><strong>'+esc(i.code)+'</strong><small>'+esc(i.name)+'</small></td><td>'+esc(i.stage)+'</td><td>'+(i.saleable?'Yes':'—')+'</td><td>'+(i.purchasable?'Yes':'—')+
    '</td><td>'+(i.aggregate===null||i.aggregate===undefined?'Not recorded':fmt(i.aggregate)+' '+esc(i.unit))+'</td><td>'+fmt(getLocBalance(i))+' '+esc(i.unit)+'</td><td><button data-inv-item="'+n+'">View</button></td></tr>').join('')||
    '<tr><td colspan="7">No products found.</td></tr>')+'</tbody></table></div>';
-  return '<div class="gr-inv-catalog-head"><div><h3>Products</h3><small>'+selected+' products · '+S.items.filter(inScope).length+' total in selected company</small></div><div class="gr-inv-catalog-actions"><button type="button" data-inv-view="cards" class="'+(S.view==='cards'?'active':'')+'" aria-label="Card view">▦ Cards</button><button type="button" data-inv-view="list" class="'+(S.view==='list'?'active':'')+'" aria-label="List view">☷ List</button></div></div>'+
+  return '<div class="gr-inv-catalog-head"><div><h3>Products</h3><small>'+selected+' products · '+S.items.filter(inScope).length+' total in selected company</small></div><div class="gr-inv-catalog-actions">'+(S.ctx.can('stock','create')?'<button type="button" class="gr-inv-add-new" data-inv-create-open>+ Add New Inventory</button>':'')+'<button type="button" data-inv-view="cards" class="'+(S.view==='cards'?'active':'')+'" aria-label="Card view">▦ Cards</button><button type="button" data-inv-view="list" class="'+(S.view==='list'?'active':'')+'" aria-label="List view">☷ List</button></div></div>'+
    '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search products by name, code or stage" aria-label="Search products"></div>'+
    '<div class="gr-inv-stats">'+stages.map(k=>'<article><small>'+names[k]+'</small><strong>'+kindCount(k)+'</strong></article>').join('')+'</div>'+
    (S.view==='list'?list:'<div class="gr-inv-product-grid">'+(cards||'<p>No products found.</p>')+'</div>')+
-   '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>';
+   '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>'+newInventoryForm();
+ }
+
+ function newInventoryForm(){
+  const choices=S.ctx.companies.map(id=>'<option value="'+esc(id)+'"'+((S.scope==='all'?S.ctx.companies[0]:S.scope)===id?' selected':'')+'>'+esc(companyName(id))+'</option>').join('');
+  const input=(name,label,placeholder='',type='text',required=false)=>'<label><span>'+label+'</span><input name="'+name+'" type="'+type+'" placeholder="'+esc(placeholder)+'"'+(required?' required':'')+(type==='number'?' min="0" step="0.01"':'')+'></label>';
+  return '<dialog class="gr-inv-create-dialog" data-inv-create-dialog aria-label="Add New Inventory Product">'+
+   '<form data-inv-create-form method="dialog" novalidate><div class="gr-inv-create-head"><div><h3>Add New Inventory</h3><p>Create a new product or material in the selected company.</p></div><button type="button" data-inv-create-close aria-label="Close">✕</button></div>'+
+   '<div class="gr-inv-create-fields">'+
+   '<label><span>Company <em>*</em></span><select name="company_id" required>'+choices+'</select></label>'+
+   '<label><span>Inventory Level <em>*</em></span><select name="stage" data-inv-create-stage required><option value="FG">Final / Saleable (FG)</option><option value="SFG">Semi-finished (SFG)</option><option value="IM">Intermediate (IM)</option><option value="RM">Raw Material (RM)</option></select></label>'+
+   input('name','Product / Material Name *','e.g. 25 L Home Composter','text',true)+
+   input('code','Product Code / SKU *','e.g. GRCOM25','text',true)+
+   input('reference','Reference No. (optional)','Internal reference')+
+   input('category','Category (optional)','e.g. Compost Bin')+
+   '<label><span>Unit of Measure <em>*</em></span><select name="uom" required><option value="nos">nos (pieces)</option><option value="kg">kg</option><option value="g">g</option><option value="ltr">litres</option><option value="m">metres</option><option value="set">set</option></select></label>'+
+   '<label><span>Manufacturing Source</span><select name="source_type"><option value="Make">Manufacture in factory</option><option value="Buy">Purchase from vendor</option><option value="Subcontract">Vendor job work / subcontract</option></select></label>'+
+   '<label class="gr-inv-create-checkbox"><input type="checkbox" name="saleable" data-inv-create-sale checked><span>Sales / Saleable</span></label>'+
+   '<label class="gr-inv-create-checkbox"><input type="checkbox" name="purchasable" data-inv-create-buy><span>Purchase / Purchasable</span></label>'+
+   '<div data-inv-create-sales-fields class="gr-inv-create-sales">'+input('price','Sales Price (₹)','0.00','number')+
+   input('tax','Sales Tax (%)','0','number')+'</div>'+
+   '</div><p class="gr-inv-create-note">New saleable products start with 0 On Hand. Raw materials and manufactured components start without an opening quantity. Stock is changed only by an authorised count, receipt or adjustment; creating an item never posts a movement.</p>'+
+   '<p data-inv-create-error class="gr-inv-create-error" role="alert" hidden></p>'+
+   '<div class="gr-inv-create-footer"><button type="button" data-inv-create-close>Cancel</button><button type="submit" class="gr-inv-create-submit">Save Product</button></div></form></dialog>';
+ }
+ function prepareInventoryRecord(input,existing,recordId){
+  const co=String(input.company_id||'').trim();
+  const name=String(input.name||'').trim();
+  const code=String(input.code||'').trim().toUpperCase();
+  const stage=String(input.stage||'');
+  const uom=String(input.uom||'').trim();
+  const reference=String(input.reference||'').trim();
+  const category=String(input.category||'').trim();
+  const saleable=!!input.saleable,purchasable=!!input.purchasable;
+  const source_type=String(input.source_type||'Make');
+  if(!co)throw Error('Select a company');
+  if(!name||name.length>180)throw Error('Enter a product name (maximum 180 characters)');
+  if(!/^[A-Z0-9][A-Z0-9._\/-]{0,63}$/.test(code))throw Error('Enter a valid product code (1–64 characters, no spaces)');
+  if(!stages.includes(stage))throw Error('Choose a valid inventory level');
+  if(!['nos','kg','g','ltr','m','set'].includes(uom))throw Error('Choose a valid unit of measure');
+  if(!['Make','Buy','Subcontract'].includes(source_type))throw Error('Choose a valid manufacturing source');
+  if(reference.length>100||category.length>120)throw Error('Reference or category is too long');
+  if((existing||[]).some(x=>x.company_id===co&&String(x.code||'').trim().toUpperCase()===code))
+   throw Error('Product code '+code+' already exists in the selected company');
+  const price=Number(input.price||0),tax=Number(input.tax||0);
+  if(!Number.isFinite(price)||price<0||!Number.isFinite(tax)||tax<0||tax>100)throw Error('Sales Price must be non-negative and Tax between 0 and 100');
+  // FG products sold to customers use the existing CRM product master.
+  // Internal FG, SFG, IM and RM stay in the manufacturing material master.
+  const crm=stage==='FG'&&saleable;
+  const payload=crm?
+   {id:recordId,company_id:co,name,sku:code,reference,category,uom,price,tax,stock:0,active:true,inclusive:false,
+    product_type:'Goods',source_type,saleable,purchasable}:
+   {id:recordId,name,code,reference,category,uom,type:stage,status:'Draft',qty:null,
+    source_type,saleable,purchasable,needs_review:true,reorder_level:null,preferred_vendor:'',
+    has_job_work:source_type==='Subcontract'};
+  return {company_id:co,kind:crm?'products':'material',record_id:recordId,payload,original:crm?'crm':'ops',code,stage};
+ }
+ async function createInventory(event){
+  event.preventDefault();
+  const form=event.currentTarget;
+  if(S.busy)return;
+  const errorBox=form.querySelector('[data-inv-create-error]');
+  const showError=error=>{errorBox.textContent=error.message||String(error);errorBox.hidden=false};
+  errorBox.hidden=true;
+  if(!S.ctx.can('stock','create'))return showError(Error('You do not have permission to create inventory products'));
+  const values=Object.fromEntries(new FormData(form));
+  values.saleable=form.elements.namedItem('saleable')?.checked===true;
+  values.purchasable=form.elements.namedItem('purchasable')?.checked===true;
+  if(!S.ctx.companies.includes(values.company_id))return showError(Error('Company access denied'));
+  let entry;
+  try{
+   entry=prepareInventoryRecord(values,S.items,uid());
+   if(!form.checkValidity()){form.reportValidity();return}
+  }catch(err){showError(err);return}
+  S.busy=true;
+  const submit=form.querySelector('[type="submit"]');
+  submit.disabled=true;
+  try{
+   // Refresh duplicate detection from both product repositories, not just the displayed list.
+   const [crm,ops]=await Promise.all([
+    S.ctx.db.from('gr_crm_records').select('payload').eq('company_id',entry.company_id).eq('kind','products'),
+    S.ctx.db.from('gr_ops_records').select('payload').eq('company_id',entry.company_id).eq('kind','material')
+   ]);
+   if(crm.error)throw Error('Product list verification failed: '+crm.error.message);
+   if(ops.error)throw Error('Material list verification failed: '+ops.error.message);
+   const found=[...(crm.data||[]),...(ops.data||[])].some(r=>String(r.payload?.sku||r.payload?.code||'').toUpperCase()===entry.code);
+   if(found)throw Error('Product code '+entry.code+' already exists in this company. Choose another code.');
+   const table=entry.original==='crm'?'gr_crm_records':'gr_ops_records';
+   const {data,error}=await S.ctx.db.from(table).insert({
+    company_id:entry.company_id,kind:entry.kind,record_id:entry.record_id,payload:entry.payload
+   }).select('record_id');
+   if(error)throw Error(error.message);
+   if(!data?.length)throw Error('Product was not created. Check user permissions.');
+   await load();
+   S.scope=entry.company_id;
+   S.filter='';
+   S.tab='catalog';S.focus={id:entry.record_id,co:entry.company_id,original:entry.original};S.detailTab='general';
+   const company=S.root.querySelector('[data-inv-company]');
+   if(company)company.value=entry.company_id;
+   draw();
+   notify('New inventory item '+entry.code+' created successfully. Opening stock has not been posted.');
+  }catch(error){showError(error)}
+  finally{S.busy=false;submit.disabled=false}
  }
  const scopedItems=()=>S.items.filter(inScope).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
 
@@ -410,6 +512,23 @@
    const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
   S.root.querySelectorAll('[data-inv-view]').forEach(b=>b.onclick=()=>{S.view=b.dataset.invView;draw()});
+  const createDialog=S.root.querySelector('[data-inv-create-dialog]');
+  S.root.querySelector('[data-inv-create-open]')?.addEventListener('click',()=>{
+   if(createDialog&&typeof createDialog.showModal==='function')createDialog.showModal();
+  });
+  createDialog?.querySelectorAll('[data-inv-create-close]').forEach(b=>b.onclick=()=>createDialog.close());
+  const createForm=createDialog?.querySelector('[data-inv-create-form]');
+  if(createForm){
+   createForm.onsubmit=e=>void createInventory(e);
+   const stageField=createForm.querySelector('[data-inv-create-stage]'),sales=createForm.querySelector('[data-inv-create-sale]'),buy=createForm.querySelector('[data-inv-create-buy]');
+   const saleFields=createForm.querySelector('[data-inv-create-sales-fields]');
+   const syncStage=()=>{
+    if(stageField.value==='RM'&&!buy.checked)buy.checked=true;
+    saleFields.hidden=stageField.value!=='FG'||!sales.checked;
+   };
+   stageField.onchange=syncStage;sales.onchange=syncStage;buy.onchange=syncStage;syncStage();
+   createDialog.addEventListener('click',e=>{if(e.target===createDialog)createDialog.close()});
+  }
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})});
   const productCodeInput=S.root.querySelector('[data-inv-product-code]');
   if(productCodeInput){
@@ -600,5 +719,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord};
 })();
