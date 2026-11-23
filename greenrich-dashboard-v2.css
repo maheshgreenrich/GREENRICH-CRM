@@ -320,3 +320,6 @@
 #content .gr2-bar-row:is(:hover,:focus-visible) .gr2-bar-track i{filter:brightness(1.2);transform:scaleY(1.15)}
 #content .gr2-bar-track i{transition:transform .2s ease,filter .2s ease;transform-origin:left center}
 @media(prefers-reduced-motion:reduce){#content .gr2-hoverable,#content .gr2-bar-track i{transition:none!important;transform:none!important}}
+
+#content .gr2-interactive-tag{display:inline-block;vertical-align:middle;margin-left:8px;padding:5px 8px;border-radius:999px;background:#dcfce7;color:#08754d;font-size:10px;font-weight:800;letter-spacing:.05em;white-space:nowrap}
+@media(max-width:600px){#content .gr2-interactive-tag{margin-top:6px;margin-left:0}}
