@@ -94,6 +94,59 @@
  };
  const trend=(rows,from,to,period,previousTotal,orders)=>charts.revenueTrend(charts.daily(rows,r=>dateKey(r.date||r.order_date||r.created_at),r=>number(r.total),from,to),{total:sum(rows,'total'),orders,previousTotal,period});
  const columns=(items,formatter=fmt)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,10),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-columns">'+rows.map(([k,v],i)=>'<div class="gr2-column gr2-hoverable" tabindex="0" data-tip="'+e(k)+' · '+e(formatter(v))+'"><span>'+e(formatter(v))+'</span><div class="gr2-column-track"><i style="height:'+(number(v)===0?0:Math.max(3,number(v)/max*100))+'%;background:'+C[i%C.length]+'"></i></div><small title="'+e(k)+'">'+e(k)+'</small></div>').join('')+'</div>':note('No matching revenue records')};
+
+ /* Four reference-style KPI sparklines, using only date-stamped authorized CRM records. */
+ const gr6Day=value=>{
+  const d=dateKey(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(d)?Date.parse(d+'T00:00:00Z'):NaN;
+ };
+ const gr6Series=(rows,dateFn,valueFn,from,to,percentage=false)=>{
+  const DAY=86400000;
+  const dated=rows.map(row=>({row,time:gr6Day(dateFn(row))})).filter(item=>Number.isFinite(item.time));
+  const start=from?Date.parse(from+'T00:00:00Z'):(dated.length?Math.min(...dated.map(item=>item.time)):Date.parse(today()+'T00:00:00Z'));
+  const end=to?Date.parse(to+'T00:00:00Z'):Date.parse(today()+'T00:00:00Z');
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return [];
+  const days=Math.max(1,Math.floor((end-start)/DAY)+1),count=Math.min(14,days);
+  const buckets=Array.from({length:count},(_,i)=>{
+   const time=start+Math.floor((i*days)/count)*DAY;
+   return {date:new Date(time).toISOString().slice(0,10),sum:0,count:0};
+  });
+  for(const item of dated){
+   if(item.time<start||item.time>end)continue;
+   const index=Math.min(count-1,Math.floor(((item.time-start)/DAY)/days*count));
+   buckets[index].sum+=number(valueFn(item.row));
+   buckets[index].count++;
+  }
+  return buckets.map(bucket=>({date:bucket.date,value:percentage?(bucket.count?bucket.sum/bucket.count*100:0):bucket.sum}));
+ };
+ const gr6Delta=(current,previous,points=false)=>{
+  if(previous===null||previous===undefined)return {label:'—',detail:'No comparable period',kind:'neutral'};
+  if(previous===0&&current>0&&!points)return {label:'New',detail:'vs previous period',kind:'positive'};
+  if(previous===0&&current===0)return {label:'0.0%',detail:'vs previous period',kind:'neutral'};
+  const difference=points?current-previous:(current-previous)/previous*100;
+  return {label:(difference>0?'+':'')+difference.toFixed(1)+(points?' pp':'%'),detail:'vs previous period',kind:difference>0?'positive':difference<0?'negative':'neutral'};
+ };
+ const gr6Spark=(points,index,format)=>{
+  const data=points.length?points:[{date:today(),value:0}];
+  const highest=Math.max(1,...data.map(p=>number(p.value)));
+  const x1=3,x2=142,yTop=7,yBottom=58;
+  const coords=data.map((p,i)=>({...p,x:data.length===1?(x1+x2)/2:x1+i*(x2-x1)/(data.length-1),y:yBottom-Math.max(0,number(p.value))/highest*(yBottom-yTop)}));
+  const curve=coords.map((p,i)=>{
+   if(!i)return 'M '+p.x.toFixed(2)+' '+p.y.toFixed(2);
+   const prev=coords[i-1],mid=(prev.x+p.x)/2;
+   return ' C '+mid.toFixed(2)+' '+prev.y.toFixed(2)+' '+mid.toFixed(2)+' '+p.y.toFixed(2)+' '+p.x.toFixed(2)+' '+p.y.toFixed(2);
+  }).join('');
+  const fill=curve+' L '+coords[coords.length-1].x.toFixed(2)+' '+yBottom+' L '+coords[0].x.toFixed(2)+' '+yBottom+' Z';
+  const grad='gr6-fill-'+index;
+  const hits=coords.map((p,i)=>{
+   const half=data.length===1?(x2-x1)/2:(x2-x1)/(data.length-1)/2;
+   const start=Math.max(x1,p.x-half),end=Math.min(x2,p.x+half);
+   const value=format(p.value);
+   return '<rect class="gr6-spark-hit" x="'+start.toFixed(2)+'" y="0" width="'+Math.max(1,end-start).toFixed(2)+'" height="66" fill="transparent" data-gr6-date="'+e(p.date)+'" data-gr6-value="'+e(value)+'" data-gr6-x="'+p.x.toFixed(2)+'" data-gr6-y="'+p.y.toFixed(2)+'"><title>'+e(p.date+' · '+value)+'</title></rect>';
+  }).join('');
+  return '<div class="gr6-spark-box"><svg class="gr6-spark" viewBox="0 0 145 67" aria-hidden="true" focusable="false"><defs><linearGradient id="'+grad+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".34"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><path class="gr6-spark-area" d="'+fill+'" fill="url(#'+grad+')"/><path class="gr6-spark-line" d="'+curve+'"/><line class="gr6-spark-guide" x1="0" x2="0" y1="4" y2="58"/><circle class="gr6-spark-dot" cx="0" cy="0" r="4.1"/>'+hits+'</svg><span class="gr6-spark-tip" hidden><span class="gr6-spark-tip-date"></span><strong class="gr6-spark-tip-value"></strong></span></div>';
+ };
+
  function filters(){
   const p=val('#gr2-period')||'month',from=p==='custom'?val('#gr2-from'):periodStart(p),to=p==='custom'?val('#gr2-to'):p==='all'?'':today();
   return {period:p,from,to,company:val('#gr2-company')||'all',source:val('#gr2-source')||'all',channel:val('#gr2-channel')||'all',tag:val('#gr2-tag')||'all',product:val('#gr2-product')||'all',person:val('#gr2-person')||'all',stage:val('#gr2-stage')||'all',order:val('#gr2-order')||'all',dispatch:val('#gr2-dispatch')||'all',type:val('#gr2-type')||'all'};
