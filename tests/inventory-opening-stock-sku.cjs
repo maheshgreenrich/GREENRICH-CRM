@@ -17,5 +17,5 @@ assert.equal(make(base,[],'id').payload.stock,23);
 assert.equal(make({...base,track_inventory:false},[],'id').payload.stock,0);
 assert.throws(()=>make({...base,opening_stock:'-5'},[],'id'),/Opening stock/);
 assert.throws(()=>make({...base,stage:'RM',saleable:false,opening_stock:'5'},[],'id'),/approved warehouse/);
-assert.match(html,/greenrich-inventory\.js\?v=20261123-independent-sku-material-type-v15/);
+assert.match(html,/greenrich-inventory\.js\?v=20261123-material-full-text-v16/);
 console.log('PASS SKU, conditional stock, opening count rules');

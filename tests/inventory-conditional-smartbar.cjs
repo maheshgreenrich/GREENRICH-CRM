@@ -29,5 +29,5 @@ assert.ok(blank.includes('data-inv-new-stat="purchases"'));
 assert.ok(script.includes("form.elements.namedItem('saleable').onchange=syncSalePurchase"));
 assert.ok(script.includes("form.elements.namedItem('purchasable').onchange=syncSalePurchase"));
 assert.ok(script.includes('await updateItem(item,changes)'));
-assert.match(html,/greenrich-inventory[.]js[?]v=20261123-independent-sku-material-type-v15/);
+assert.match(html,/greenrich-inventory[.]js[?]v=20261123-material-full-text-v16/);
 console.log('PASS 4 Sales/Purchase combinations: conditional Sold and Purchase stats; stock unchanged.');

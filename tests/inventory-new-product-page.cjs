@@ -15,5 +15,5 @@ assert.ok(!s.includes('name="reference"'));
 assert.ok(src.includes("if(S.creating){box.innerHTML=newInventoryForm();bind();return;}"));
 assert.ok(!src.includes('showModal()'));
 assert.ok(!src.includes('data-inv-create-dialog'));
-assert.match(html,/greenrich-inventory\.js\?v=20261123-independent-sku-material-type-v15/);
+assert.match(html,/greenrich-inventory\.js\?v=20261123-material-full-text-v16/);
 console.log('New Inventory opens full unsaved product page, not modal.');
