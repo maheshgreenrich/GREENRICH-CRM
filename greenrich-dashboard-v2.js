@@ -45,14 +45,14 @@
  const listBars=(items,colors=C,formatter=fmt,limit=7)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,limit),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-bars">'+rows.map(([key,value],i)=>'<div class="gr2-bar-row gr2-hoverable" tabindex="0" data-tip="'+e(key)+' · '+e(formatter(value))+'"><div class="gr2-bar-line"><span title="'+e(key)+'">'+e(key)+'</span><b>'+e(formatter(value))+'</b></div><div class="gr2-bar-track"><i style="width:'+(number(value)===0?0:Math.max(2,number(value)/max*100))+'%;background:'+colors[i%colors.length]+'"></i></div></div>').join('')+'</div>':note('No matching data for these filters')};
  const donut=(items,formatter=fmt)=>{const all=items.filter(x=>number(x[1])>0),nonzero=all.length>8?[...all.slice(0,7),['Other',sum(all.slice(7),x=>x[1])]]:all,total=sum(nonzero,x=>x[1]);let angle=0;const stops=nonzero.map(([_,v],i)=>{const start=angle;angle+=number(v)/total*100;return C[i%C.length]+' '+start+'% '+angle+'%'}).join(',');
   return total?'<div class="gr2-donut-wrap"><div class="gr2-donut" style="background:conic-gradient('+stops+')"><div><b>'+formatter(total)+'</b><small>Total</small></div></div><div class="gr2-legend">'+nonzero.map(([name,value],i)=>'<div class="gr2-donut-entry gr2-hoverable" tabindex="0" data-tip="'+e(name)+' · '+e(formatter(value))+' · '+(number(value)/total*100).toFixed(1)+'%" data-slice="'+i+'"><i style="background:'+C[i%C.length]+'"></i><span>'+e(name)+'</span><strong>'+formatter(value)+'</strong></div>').join('')+'</div></div>':note('No records for the selected period')};
- const trend=(rows,from,to)=>charts.series(charts.daily(rows,r=>dateKey(r.date||r.order_date||r.created_at),r=>number(r.total),from,to),{area:true,yLabel:'Revenue (₹)',xLabel:'Date'})+'<div class="gr2-under"><span>Selected period revenue</span><strong>'+money(sum(rows,'total'))+'</strong></div>';
+ const trend=(rows,from,to,period,previousTotal,orders)=>charts.revenueTrend(charts.daily(rows,r=>dateKey(r.date||r.order_date||r.created_at),r=>number(r.total),from,to),{total:sum(rows,'total'),orders,previousTotal,period});
  const columns=(items,formatter=fmt)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,10),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-columns">'+rows.map(([k,v],i)=>'<div class="gr2-column gr2-hoverable" tabindex="0" data-tip="'+e(k)+' · '+e(formatter(v))+'"><span>'+e(formatter(v))+'</span><div class="gr2-column-track"><i style="height:'+(number(v)===0?0:Math.max(3,number(v)/max*100))+'%;background:'+C[i%C.length]+'"></i></div><small title="'+e(k)+'">'+e(k)+'</small></div>').join('')+'</div>':note('No matching revenue records')};
  function filters(){
   const p=val('#gr2-period')||'month',from=p==='custom'?val('#gr2-from'):periodStart(p),to=p==='custom'?val('#gr2-to'):p==='all'?'':today();
   return {period:p,from,to,company:val('#gr2-company')||'all',source:val('#gr2-source')||'all',channel:val('#gr2-channel')||'all',tag:val('#gr2-tag')||'all',product:val('#gr2-product')||'all',person:val('#gr2-person')||'all',stage:val('#gr2-stage')||'all',order:val('#gr2-order')||'all',dispatch:val('#gr2-dispatch')||'all',type:val('#gr2-type')||'all'};
  }
- function filtered(){
-  const f=filters(),co=x=>f.company==='all'||x.company_id===f.company;
+ function filtered(overrides){
+  const f={...filters(),...(overrides||{})},co=x=>f.company==='all'||x.company_id===f.company;
   const checkCustomer=x=>f.type==='all'||x.type===f.type;
   const customerIds=new Set(records.customers.filter(checkCustomer).map(x=>x.id));
   const matchLead=l=>co(l)&&(f.source==='all'||l.source===f.source)&&(f.tag==='all'||(l.tag_ids||[]).includes(f.tag))&&
@@ -133,8 +133,20 @@
    return {name:p.full_name||'Employee',all:mine.length,won:mine.filter(l=>l.stage==='Won').length,
     orderValue:sum(sale.filter(x=>orders.has(x.company_id+'|'+x.id)),'total')};
   }).filter(x=>x.all).sort((a,b)=>b.orderValue-a.orderValue||b.won-a.won||b.all-a.all).slice(0,8);
+  // Compare against the immediately preceding period using the same access and business filters.
+  // No percentage is invented when there is no comparable historical revenue.
+  const previousRevenue=(()=>{
+   if(!f.from||!f.to)return null;
+   const start=Date.parse(f.from+'T00:00:00Z'),end=Date.parse(f.to+'T00:00:00Z');
+   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
+   const duration=end-start+86400000;
+   const priorFrom=new Date(start-duration).toISOString().slice(0,10);
+   const priorTo=new Date(start-86400000).toISOString().slice(0,10);
+   const previousSales=filtered({from:priorFrom,to:priorTo}).sales.filter(s=>!['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase()));
+   return sum(previousSales,'total');
+  })();
   const content={
-   day_sales:()=>panel('day_sales','Area chart · sales order value by day or month',trend(sale,f.from,f.to)),
+   day_sales:()=>panel('day_sales','Interactive revenue analytics · hover or focus any date for exact values',trend(sale,f.from,f.to,f.period,previousRevenue,orderCount)),
    channel_sales:()=>panel('channel_sales','Revenue distribution by recorded order channel',donut(group(sale,s=>s.channel_name||s.channel,s=>s.total),money)),
    sales:()=>panel('sales','Filtered sales orders and amount',label('Revenue',money(sum(sale,'total')))+label('Order count',fmt(orderCount))+label('Units sold',fmt(sum(sale,s=>s.qty||s.quantity)))+label('Average order',orderCount?money(sum(sale,'total')/orderCount):'₹0')+'<h4 class="gr3-subheading">Order value distribution</h4>'+charts.histogram(charts.orderTotals(sale))),
    company_sales:()=>panel('company_sales','Both GreenRich companies · order values',columns(group(sale,s=>company(s.company_id),s=>s.total),money)),
@@ -314,10 +326,40 @@
    viewRoot.addEventListener('pointerout',event=>{if(event.target.closest('[data-gr3-tooltip]'))hideTip()});
    viewRoot.addEventListener('focusin',event=>{const p=event.target.closest('[data-gr3-tooltip]');if(p)showTip(p)});
    viewRoot.addEventListener('focusout',event=>{if(event.target.closest('[data-gr3-tooltip]'))hideTip()});
+   const showRevenuePoint=target=>{
+     const plot=target.closest('.gr4-plot');if(!plot)return;
+     const svg=plot.querySelector('svg'),cursor=svg?.querySelector('.gr4-cursor'),dot=svg?.querySelector('.gr4-active-dot'),tip=plot.querySelector('.gr4-tooltip');
+     if(!svg||!cursor||!dot||!tip)return;
+     const x=Number(target.dataset.gr4X),y=Number(target.dataset.gr4Y);
+     if(!Number.isFinite(x)||!Number.isFinite(y))return;
+     cursor.setAttribute('x1',String(x));cursor.setAttribute('x2',String(x));
+     dot.setAttribute('cx',String(x));dot.setAttribute('cy',String(y));
+     plot.classList.add('gr4-is-hovered');
+     const parsed=target.dataset.gr4Date||'';
+     let pretty=parsed;
+     if(/^\d{4}-\d{2}-\d{2}$/.test(parsed)){const date=new Date(parsed+'T12:00:00Z');pretty=date.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}
+     tip.querySelector('.gr4-tooltip-date').textContent=pretty;
+     tip.querySelector('.gr4-tooltip-value').textContent=target.dataset.gr4Value||'₹0';
+     const svgBox=svg.getBoundingClientRect(),plotBox=plot.getBoundingClientRect();
+     const posX=(x/980)*svgBox.width+svgBox.left-plotBox.left;
+     const posY=(y/360)*svgBox.height+svgBox.top-plotBox.top;
+     const tipWidth=184,clampedX=Math.min(Math.max(tipWidth/2+6,posX),Math.max(tipWidth/2+6,plotBox.width-tipWidth/2-6));
+     const below=posY<125;
+     tip.style.left=clampedX+'px';tip.style.top=(below?posY+18:posY-17)+'px';
+     tip.classList.toggle('gr4-tip-below',below);tip.hidden=false;
+   };
+   const hideRevenuePoint=()=>{const plot=viewRoot.querySelector('.gr4-plot');if(plot){plot.classList.remove('gr4-is-hovered');const tip=plot.querySelector('.gr4-tooltip');if(tip)tip.hidden=true}};
+   viewRoot.addEventListener('pointerover',event=>{const p=event.target.closest('.gr4-hover-zone');if(p)showRevenuePoint(p)});
+   viewRoot.addEventListener('pointermove',event=>{const p=event.target.closest('.gr4-hover-zone');if(p)showRevenuePoint(p)},{passive:true});
+   viewRoot.addEventListener('pointerout',event=>{const p=event.target.closest('.gr4-hover-zone');if(p&&!event.relatedTarget?.closest?.('.gr4-hover-zone'))hideRevenuePoint()});
+   viewRoot.addEventListener('focusin',event=>{const p=event.target.closest('.gr4-hover-zone');if(p)showRevenuePoint(p)});
+   viewRoot.addEventListener('focusout',event=>{if(event.target.closest('.gr4-hover-zone'))hideRevenuePoint()});
+   viewRoot.addEventListener('click',event=>{const p=event.target.closest('.gr4-hover-zone');if(p)showRevenuePoint(p)});
    viewRoot.addEventListener('pointermove',event=>{const rect=viewRoot.getBoundingClientRect();viewRoot.style.setProperty('--gr2-cursor-x',((event.clientX-rect.left)/Math.max(1,rect.width)*100).toFixed(1)+'%');viewRoot.style.setProperty('--gr2-cursor-y',Math.max(0,event.clientY-rect.top)+'px')},{passive:true});
   if(cfg.companyIds?.length===1){query('#gr2-company').value=cfg.companyIds[0];query('#gr2-company').disabled=true}
   else if((cfg.companyIds||[]).includes(cfg.selectedCompany))query('#gr2-company').value=cfg.selectedCompany;
   host.addEventListener('change',event=>{
+   if(event.target.matches('.gr4-period-select')){query('#gr2-period').value=event.target.value;if(event.target.value==='custom')query('#gr2-advanced').open=true;draw();return}
    if(!event.target.matches('.gr2-filter input,.gr2-filter select'))return;
    if(['gr2-from','gr2-to'].includes(event.target.id))query('#gr2-period').value='custom';
    draw();
