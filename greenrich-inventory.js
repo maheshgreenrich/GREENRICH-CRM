@@ -749,7 +749,7 @@
     p_expected_code:item.code,p_material_type:materialType,p_material_text:text
    });
    if(error)throw Error(error.message);
-   if(data?.sku!==item.code||data?.material_type!==materialType||data?.material_text!==text)
+   if(String(data?.sku||'').toUpperCase()!==String(item.code).toUpperCase()||data?.material_type!==materialType||data?.material_text!==text)
     throw Error('Material details could not be saved; SKU was not changed.');
    item.stage=materialType;
    item.material={...item.material,material_type:materialType,material_text:text,material_full_text:data.material_full_text};
