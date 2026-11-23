@@ -6,7 +6,7 @@ const s=w.GreenRichInventory.renderNewInventoryPage({companies:['grow-india'],co
 assert.ok(s.includes('class="gr-inv-new-page"'));
 assert.ok(!s.includes('<dialog'));
 for(const key of ['general','sales','purchase','inventory'])assert.ok(s.includes('data-inv-create-tab="'+key+'"'));
-for(const key of ['name','code','stage','material_suffix','category','price','tax','cost','company_id','uom','source_type'])
+for(const key of ['name','code','stage','category','price','tax','cost','company_id','uom','source_type'])
  assert.ok(s.includes('name="'+key+'"'));
 assert.ok(s.includes('data-inv-create-photo-trigger'));
 assert.ok(s.includes('data-inv-create-cancel'));
@@ -15,5 +15,5 @@ assert.ok(!s.includes('name="reference"'));
 assert.ok(src.includes("if(S.creating){box.innerHTML=newInventoryForm();bind();return;}"));
 assert.ok(!src.includes('showModal()'));
 assert.ok(!src.includes('data-inv-create-dialog'));
-assert.match(html,/greenrich-inventory\.js\?v=20261123-material-type-filter-v14/);
+assert.match(html,/greenrich-inventory\.js\?v=20261123-independent-sku-material-type-v15/);
 console.log('New Inventory opens full unsaved product page, not modal.');

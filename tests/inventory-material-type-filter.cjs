@@ -4,50 +4,41 @@ const source=fs.readFileSync('greenrich-inventory.js','utf8');
 const html=fs.readFileSync('secure.html','utf8');
 const window={};vm.runInNewContext(source,{window},{filename:'greenrich-inventory.js'});
 const app=window.GreenRichInventory;
-assert.equal(app.formatMaterialCode('SFG','001'),'SFG001');
-assert.equal(app.formatMaterialCode('FG','100'),'FG100');
-assert.equal(app.formatMaterialCode('IM','002'),'IM002');
-assert.equal(app.formatMaterialCode('RM','004'),'RM004');
-assert.throws(()=>app.formatMaterialCode('FG',''),/suffix/);
-assert.throws(()=>app.formatMaterialCode('SFG','001 bad'),/suffix/);
-assert.throws(()=>app.formatMaterialCode('RW','001'),/valid Material Type/);
-assert.equal(app.materialSuffixFromCode('SFG001','SFG'),'001');
-assert.equal(app.materialSuffixFromCode('IM-001','IM'),'001');
-assert.equal(app.materialSuffixFromCode('GRCOM25','FG'),'');
-const original={id:'sku1',original:'crm',company_id:'grow-india',code:'GRCOM25',stage:'FG',name:'Composter 25 L',unit:'nos',material:{}};
-const detailed=app.renderProductIdentifiers(original,true);
-for(const marker of ['data-inv-material-type','data-inv-material-suffix','data-inv-material-preview','data-inv-material-apply']){
- assert(detailed.includes(marker),'Material selector not found: '+marker);
+const item={id:'prod1',original:'crm',company_id:'grow-india',code:'FG001JB',stage:'FG',name:'Composter',unit:'nos',material:{sku:'FG001JB'}};
+const detailed=app.renderProductIdentifiers(item,true);
+assert(detailed.includes('data-inv-product-code'));
+assert(detailed.includes('data-inv-material-type'));
+assert(detailed.includes('value="FG001JB"'));
+assert(detailed.includes('<option value="FG" selected>FG</option>'));
+assert(!detailed.includes('Code Suffix'));
+assert(!detailed.includes('Result:'));
+assert(!detailed.includes('Save Code & Type'));
+for(const stage of ['FG','SFG','IM','RM']){
+ const variant=app.renderProductIdentifiers({...item,stage},true);
+ assert(variant.includes('value="FG001JB"'),'SKU must not follow material type');
+ assert(variant.includes('<option value="'+stage+'" selected>'+stage+'</option>'));
 }
-assert(!detailed.includes('Reference No.'));
-assert(detailed.includes('data-inv-product-code'),'Manual SKU editing must continue');
 const newForm=app.renderNewInventoryPage({companies:['grow-india'],companyName:()=> 'Greenrich Grow India'},'grow-india');
 assert(newForm.includes('name="stage" data-inv-create-material-type'));
-assert(newForm.includes('name="material_suffix" data-inv-create-material-suffix'));
 assert(newForm.includes('name="code"'));
-assert(!newForm.includes('name="reference"'));
-const record=app.prepareInventoryRecord({
- company_id:'grow-india',name:'Hinge plate',code:app.formatMaterialCode('SFG','001'),stage:'SFG',
- uom:'nos',source_type:'Make',saleable:false,purchasable:false,track_inventory:true
-},[],'record-1');
+assert(!newForm.includes('name="material_suffix"'));
+assert(!newForm.includes('data-inv-new-code-preview'));
+assert(!newForm.includes('Code Suffix'));
+assert(!newForm.includes('Result:'));
+const record=app.prepareInventoryRecord({company_id:'grow-india',name:'Composter',code:'FG001JB',stage:'SFG',uom:'nos',source_type:'Make',saleable:false,purchasable:false,track_inventory:true},[],'record-1');
+assert.equal(record.code,'FG001JB');
 assert.equal(record.stage,'SFG');
-assert.equal(record.code,'SFG001');
-assert.equal(record.kind,'material');
+assert.equal(record.payload.code,'FG001JB');
 assert.equal(record.payload.material_type,'SFG');
 assert.equal(record.payload.type,'SFG');
 assert.equal(record.payload.qty,null);
-assert.equal(app.validateProductCodeChange(original,'SFG001',{items:[original]}),'SFG001');
-assert.throws(()=>app.validateProductCodeChange(original,'SFG001',{
- items:[original,{id:'other',original:'ops',company_id:'grow-india',code:'SFG001'}]
-}),/already exists/);
-assert(source.includes("S.materialFilter==='all'||i.stage===S.materialFilter"));
-assert(source.includes('data-inv-material-filter'));
-assert(source.includes("materialFilter.onchange=()=>{S.materialFilter=materialFilter.value;draw()}"));
-assert(source.includes("r.payload.material_type||'FG'"));
-assert(source.includes('type(p.material_type||stage),stockKind:stage'));
-assert(source.includes('item.stockKind||item.stage'));
-assert(source.includes(".rpc('gr_inventory_set_material_identity'"));
-assert(source.includes('p_material_type:materialType'));
-assert(source.includes('await load();'));
-assert.match(html,/greenrich-inventory\.js\?v=20261123-material-type-filter-v14/);
-console.log('PASS: SKU SFG001 generation, material type editing/filtering, duplicate guard, stock ledger identity kept.');
+assert.equal(app.validateProductCodeChange(item,'GRCOM25653',{items:[item]}),'GRCOM25653');
+assert.throws(()=>app.validateProductCodeChange(item,'GRCOM25653',{items:[item,{id:'dupe',company_id:'grow-india',original:'ops',code:'GRCOM25653'}]}),/already exists/);
+assert(source.includes('p_expected_code:item.code,p_new_code:item.code,p_material_type:materialType'),'Material Type must preserve SKU');
+assert(source.includes(".rpc('gr_inventory_rename_sku'"),'Separate SKU editing must remain enabled');
+assert(source.includes('if(pendingSkuSave)await pendingSkuSave'),'SKU saving and type saving should not race');
+assert(!source.includes('data-inv-material-suffix'));
+assert(!source.includes('formatMaterialCode'));
+assert(source.includes("S.materialFilter==='all'||i.stage===S.materialFilter"),'Main page type filter must remain');
+assert.match(html,/greenrich-inventory[.]js[?]v=20261123-independent-sku-material-type-v15/);
+console.log('PASS: independent SKU and Material Type; suffix and result removed; filter and unique SKU kept.');

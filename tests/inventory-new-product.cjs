@@ -27,7 +27,7 @@ assert.equal(subcontract.payload.has_job_work,true);
 assert.throws(()=>make({...base,code:'GRCOM25'},[{code:'GRCOM25',company_id:'grow-india'}],'id-4'),/already exists/);
 assert.throws(()=>make({...base,code:'bad code'},[],'id-4'),/valid product code/);
 assert.throws(()=>make({...base,price:'-1'},[],'id-4'),/Sales Price/);
-assert.match(html,/greenrich-inventory\.js\?v=20261123-material-type-filter-v14/);
+assert.match(html,/greenrich-inventory\.js\?v=20261123-independent-sku-material-type-v15/);
 assert.ok(script.includes('data-inv-create-open'));
 assert.ok(script.includes('data-inv-create-form'));
 assert.ok(script.includes('createInventory(event)'));

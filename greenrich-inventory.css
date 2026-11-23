@@ -265,25 +265,14 @@
 .gr-inventory .gr-inv-identifier input[data-inv-product-code]{border:1px solid #a9c9ed!important;background:#f8fbff!important}
 .gr-inventory .gr-inv-identifier input[data-inv-product-code]:focus{border-color:#1764bc!important;outline:2px solid #1764bc!important}
 
-/* Material Type + generated SKU controls and catalog filter, Greenrich blue/white. */
+/* Independent Material Type and Product SKU, blue-and-white Inventory controls. */
 .gr-inventory .gr-inv-type-filter{display:inline-flex;align-items:center;gap:9px;color:#305779;font-weight:700;font-size:13px}
 .gr-inventory .gr-inv-type-filter select{border:1px solid #bfd5f2!important;background:#fff!important;border-radius:7px;min-height:40px;padding:7px 12px;color:#154d91!important}
 .gr-inventory .gr-inv-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .gr-inventory .gr-inv-controls>input[type=search]{min-width:min(360px,100%);flex:0 1 410px}
 .gr-inventory .gr-inv-product-identifiers{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px}
-.gr-inventory .gr-inv-material-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 13px}
-.gr-inventory .gr-inv-material-row select,.gr-inventory .gr-inv-material-row input{
- min-height:35px;border:1px solid #bfd5f2!important;border-radius:7px;background:#fff!important;color:#154579!important;padding:5px 9px!important
-}
-.gr-inventory .gr-inv-material-row input{width:112px!important}
-.gr-inventory .gr-inv-material-result{color:#5d7695;font-size:12px}
-.gr-inventory .gr-inv-material-result output{font-weight:750;color:#165bad;font-size:14px}
-.gr-inventory .gr-inv-material-apply{background:#1764bc!important;color:#fff!important;border-color:#1764bc!important;font-weight:700}
-.gr-inventory .gr-inv-material-apply:disabled{opacity:.5;cursor:not-allowed}
+.gr-inventory .gr-inv-identifier select{min-height:35px;border:1px solid #bfd5f2!important;border-radius:7px;background:#fff!important;color:#154579!important;padding:5px 9px!important}
 .gr-inventory .gr-inv-new-material{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin:5px 0 15px 43px}
 .gr-inventory .gr-inv-new-material label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:#355a7f}
-.gr-inventory .gr-inv-new-material select,.gr-inventory .gr-inv-new-material input{border:1px solid #bfd5f2!important;border-radius:7px;background:#fff!important;color:#154579!important;padding:8px;min-height:36px}
-.gr-inventory .gr-inv-new-material input{width:120px}
-.gr-inventory .gr-inv-new-material>span{font-size:12px;color:#567a9f}
-.gr-inventory .gr-inv-new-material output{font-size:14px;font-weight:800;color:#165bad}
+.gr-inventory .gr-inv-new-material select{border:1px solid #bfd5f2!important;border-radius:7px;background:#fff!important;color:#154579!important;padding:8px;min-height:36px}
 @media(max-width:680px){.gr-inventory .gr-inv-new-material{margin-left:0}.gr-inventory .gr-inv-product-identifiers{align-items:flex-start}.gr-inventory .gr-inv-type-filter{width:100%}}

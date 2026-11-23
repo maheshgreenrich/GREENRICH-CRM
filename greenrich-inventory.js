@@ -8,17 +8,6 @@
  const fmt=x=>Number(x||0).toLocaleString('en-IN',{maximumFractionDigits:6});
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
- const materialSuffixFromCode=(code,stage)=>{
-  const prefix=new RegExp('^'+stage+'[-_]?', 'i');
-  return prefix.test(String(code||''))?String(code).replace(prefix,''):'';
- };
- const formatMaterialCode=(stage,suffix)=>{
-  if(!stages.includes(stage))throw Error('Choose a valid Material Type');
-  const part=String(suffix??'').trim().toUpperCase();
-  if(!/^[A-Z0-9._\/-]{1,60}$/.test(part)||stage.length+part.length>64)
-   throw Error('Enter a valid material suffix (letters, numbers, -, _, . or /)');
-  return stage+part;
- };
  const uid=()=>crypto.randomUUID();
  const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',materialFilter:'all',view:'cards',detailTab:'general',creating:false,createTab:'general',newPhotoUrl:null,busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
@@ -229,7 +218,8 @@
   '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span data-inv-new-stat="sales">▥ 0 Sold · 0 Outgoing</span><span data-inv-new-stat="purchases">▤ 0 Purchase Orders · 0 Incoming</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
   '<div class="gr-inv-new-panel"><div class="gr-inv-new-hero"><div class="gr-inv-new-titlewrap">'+
   '<label class="gr-inv-new-title">☆ <input name="name" type="text" placeholder="e.g. 25 L Home Composter" maxlength="180" required aria-label="Product Name"></label>'+
-  '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. SFG001','text',true)+'</div>'+'<div class="gr-inv-new-material"><label><span>Material Type</span><select name="stage" data-inv-create-material-type>'+stages.map(t=>'<option value="'+t+'">'+t+'</option>').join('')+'</select></label>'+'<label><span>Code Suffix</span><input name="material_suffix" data-inv-create-material-suffix maxlength="60" placeholder="e.g. 001" autocomplete="off"></label>'+'<span>Result: <output data-inv-new-code-preview>Enter suffix</output></span></div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
+  '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. GRCOM25','text',true)+'</div>'+
+  '<div class="gr-inv-new-material"><label><span>Material Type</span><select name="stage" data-inv-create-material-type>'+stages.map(t=>'<option value="'+t+'">'+t+'</option>').join('')+'</select></label></div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
   '<small>All fields are new. The product is not created until you save.</small></div>'+
   '<div class="gr-inv-new-photo"><button type="button" data-inv-create-photo-trigger aria-label="Click to select product image"><span data-inv-create-photo-icon>📷</span><img data-inv-create-preview hidden alt="New product image preview"><small>+ Add image</small></button>'+
   '<input data-inv-create-photo type="file" accept="image/png,image/jpeg,image/webp" hidden><small>PNG, JPG, WebP · max 3 MB</small></div></div>'+
@@ -403,19 +393,13 @@
 
  function renderProductIdentifiers(item,canEdit){
   const code=String(item.code||''),stage=item.stage||'FG';
-  const suffix=materialSuffixFromCode(code,stage);
   const sku='<label class="gr-inv-identifier"><span>Product Code / SKU</span>'+
    (canEdit?'<input type="text" data-inv-product-code maxlength="64" spellcheck="false" aria-label="Product Code / SKU" value="'+esc(code)+'">':
     '<strong>'+esc(code||'—')+'</strong>')+'</label>';
-  const material='<div class="gr-inv-material-row"><label class="gr-inv-identifier"><span>Material Type</span>'+
-   (canEdit?'<select data-inv-material-type aria-label="Material Type">'+stages.map(t=>
-    '<option value="'+t+'"'+(stage===t?' selected':'')+'>'+t+'</option>').join('')+'</select>':
-    '<strong>'+esc(stage)+'</strong>')+'</label>'+
-   (canEdit?'<label class="gr-inv-identifier"><span>Code Suffix</span>'+
-    '<input type="text" data-inv-material-suffix aria-label="Material Code Suffix" maxlength="60" placeholder="e.g. 001" value="'+esc(suffix)+'"></label>'+
-    '<span class="gr-inv-material-result">Result: <output data-inv-material-preview>'+esc(suffix?stage+suffix:code)+'</output></span>'+
-    '<button type="button" class="gr-inv-material-apply" data-inv-material-apply disabled>Save Code & Type</button>':'')+
-    '</div>';
+  const material='<label class="gr-inv-identifier"><span>Material Type</span>'+
+   (canEdit?'<select data-inv-material-type aria-label="Material Type">'+
+      stages.map(t=>'<option value="'+t+'"'+(t===stage?' selected':'')+'>'+t+'</option>').join('')+'</select>':
+      '<strong>'+esc(stage)+'</strong>')+'</label>';
   return '<div class="gr-inv-product-identifiers">'+sku+material+'</div>';
  }
  function validateProductCodeChange(item,newCode,sources=S){
@@ -645,25 +629,6 @@
    form.elements.namedItem('saleable').onchange=syncSalePurchase;
    form.elements.namedItem('purchasable').onchange=syncSalePurchase;
    syncNewStatus();
-   const newMaterialType=form.elements.namedItem('stage');
-   const newSuffix=form.elements.namedItem('material_suffix');
-   const newCode=form.elements.namedItem('code');
-   const newPreview=newPage.querySelector('[data-inv-new-code-preview]');
-   const refreshMaterialCode=()=>{
-    if(!newSuffix.value.trim()){newPreview.textContent=newCode.value.trim()||'Enter suffix';return}
-    try{
-     const generated=formatMaterialCode(newMaterialType.value,newSuffix.value);
-     newCode.value=generated;
-     newPreview.textContent=generated;
-    }catch(error){newPreview.textContent=error.message}
-   };
-   newMaterialType.onchange=refreshMaterialCode;
-   newSuffix.oninput=refreshMaterialCode;
-   newCode.oninput=()=>{
-    if(newSuffix.value.trim()&&newCode.value!==newPreview.textContent)newSuffix.value='';
-    newPreview.textContent=newCode.value.trim()||'Enter suffix';
-   };
-   refreshMaterialCode();
    const track=form.elements.namedItem('track_inventory');
    const stockArea=newPage.querySelector('[data-inv-create-stock-area]');
    const stockField=form.elements.namedItem('opening_stock');
@@ -692,6 +657,7 @@
    };
   }
   S.root.querySelectorAll('[data-inv-flag]').forEach(input=>input.onchange=()=>{input.disabled=true;void saveFlags(input).catch(err=>{draw();notify(err.message,true)})});
+  let pendingSkuSave=null;
   const productCodeInput=S.root.querySelector('[data-inv-product-code]');
   if(productCodeInput){
    productCodeInput.dataset.initial=productCodeInput.value;
@@ -699,32 +665,26 @@
     if(event.key==='Escape'){productCodeInput.value=productCodeInput.dataset.initial;productCodeInput.blur()}
     if(event.key==='Enter'){event.preventDefault();productCodeInput.blur()}
    });
-   productCodeInput.onchange=()=>void saveProductCode(productCodeInput).catch(err=>{productCodeInput.disabled=false;notify(err.message,true)});
+   productCodeInput.onchange=()=>{const promise=saveProductCode(productCodeInput);pendingSkuSave=promise;void promise.catch(err=>{productCodeInput.disabled=false;notify(err.message,true)}).finally(()=>{if(pendingSkuSave===promise)pendingSkuSave=null})};
   }
   const typeSelect=S.root.querySelector('[data-inv-material-type]');
-  const suffixInput=S.root.querySelector('[data-inv-material-suffix]');
-  const applyMaterial=S.root.querySelector('[data-inv-material-apply]');
-  const materialPreview=S.root.querySelector('[data-inv-material-preview]');
-  if(typeSelect&&suffixInput&&applyMaterial&&materialPreview){
-   const refreshMaterial=()=>{
-    const item=currentItem();if(!item)return;
-    try{
-     const next=suffixInput.value.trim()?formatMaterialCode(typeSelect.value,suffixInput.value):item.code;
-     materialPreview.textContent=next;
-     applyMaterial.disabled=S.busy||(next===item.code&&typeSelect.value===item.stage);
-    }catch(error){materialPreview.textContent=error.message;applyMaterial.disabled=true}
+  if(typeSelect){
+   typeSelect.onchange=()=>{
+    const selectedType=typeSelect.value;
+    const current=currentItem();
+    if(!current)return;
+    typeSelect.disabled=true;
+    void (async()=>{
+     // If the user just edited the separate SKU input, finish that save first.
+     if(pendingSkuSave)await pendingSkuSave;
+     const item=currentItem();
+     if(!item||item.id!==current.id)throw Error('Product changed. Refresh and retry.');
+     await saveMaterialType(item,selectedType);
+    })().catch(error=>{
+     if(typeSelect.isConnected){typeSelect.value=currentItem()?.stage||current.stage;typeSelect.disabled=false}
+     notify(error.message,true);
+    });
    };
-   typeSelect.onchange=refreshMaterial;
-   suffixInput.oninput=refreshMaterial;
-   suffixInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();if(!applyMaterial.disabled)applyMaterial.click()}};
-   applyMaterial.onclick=()=>{
-    const item=currentItem();if(!item)return;
-    let next;
-    try{next=suffixInput.value.trim()?formatMaterialCode(typeSelect.value,suffixInput.value):item.code}
-    catch(error){return notify(error.message,true)}
-    void saveMaterialIdentity(item,next,typeSelect.value).catch(error=>{applyMaterial.disabled=false;notify(error.message,true)});
-   };
-   refreshMaterial();
   }
   const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
   S.root.querySelectorAll('[data-inv-edit]').forEach(el=>{
@@ -747,23 +707,24 @@
  function currentItem(){
   return S.items.find(i=>S.focus&&i.company_id===S.focus.co&&i.id===S.focus.id&&i.original===S.focus.original);
  }
- async function saveMaterialIdentity(item,code,materialType){
-  const next=validateProductCodeChange(item,code);
-  if(!stages.includes(materialType))throw Error('Invalid Material Type');
+ async function saveMaterialType(item,materialType){
+  if(!stages.includes(materialType))throw Error('Material Type must be FG, SFG, IM or RM');
+  if(materialType===item.stage)return;
   if(S.busy||!S.ctx.can('stock','edit'))throw Error('Inventory edit permission required');
   if(!S.ctx.companies.includes(item.company_id))throw Error('Company access denied');
   S.busy=true;
   try{
+   // Both SKU args deliberately remain unchanged: Material Type never creates or renames a SKU.
    const {data,error}=await S.ctx.db.rpc('gr_inventory_set_material_identity',{
     p_company:item.company_id,p_origin:item.original,p_record_id:item.id,
-    p_expected_code:item.code,p_new_code:next,p_material_type:materialType
+    p_expected_code:item.code,p_new_code:item.code,p_material_type:materialType
    });
    if(error)throw Error(error.message);
-   if(data?.sku!==next||data?.material_type!==materialType)
-    throw Error('Unable to save SKU and Material Type');
+   if(data?.sku!==item.code||data?.material_type!==materialType)
+    throw Error('Material Type could not be saved. Product SKU was not changed.');
    await load();
    draw();
-   notify('Material Type '+materialType+' saved. Product SKU: '+next);
+   notify('Material Type updated to '+materialType+'. Product SKU remains '+item.code+'.');
   }finally{S.busy=false}
  }
  async function saveProductCode(input){
@@ -944,5 +905,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics,productStatusVisibility,renderProductStatus:stockSummary,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm,formatMaterialCode,materialSuffixFromCode};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,productStatusVisibility,renderProductStatus:stockSummary,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm};
 })();
