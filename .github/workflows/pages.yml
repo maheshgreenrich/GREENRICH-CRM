@@ -116,6 +116,14 @@ jobs:
                curl -fsSL --max-time 15 "$base/greenrich-app-sw.js?sha=${GITHUB_SHA}" -o /tmp/gr-sw.js &&
                curl -fsSL --max-time 15 "$base/greenrich-app-192.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon192.png &&
                curl -fsSL --max-time 15 "$base/greenrich-app-512.png?sha=${GITHUB_SHA}" -o /tmp/gr-icon512.png &&
+               curl -fsSL --max-time 15 "$base/greenrich-dashboard-v2.js?sha=${GITHUB_SHA}" -o /tmp/gr-dashboard-v2.js &&
+               curl -fsSL --max-time 15 "$base/greenrich-dashboard-v2.css?sha=${GITHUB_SHA}" -o /tmp/gr-dashboard-v2.css &&
+               curl -fsSL --max-time 15 "$base/greenrich-dashboard-charts.js?sha=${GITHUB_SHA}" -o /tmp/gr-dashboard-charts.js &&
+               node --check /tmp/gr-dashboard-v2.js &&
+               node --check /tmp/gr-dashboard-charts.js &&
+               cmp -s greenrich-dashboard-v2.js /tmp/gr-dashboard-v2.js &&
+               cmp -s greenrich-dashboard-v2.css /tmp/gr-dashboard-v2.css &&
+               cmp -s greenrich-dashboard-charts.js /tmp/gr-dashboard-charts.js &&
                curl -fsSL --max-time 15 "$base/greenrich-inventory.js?sha=${GITHUB_SHA}" -o /tmp/gr-inventory.js &&
                node --check /tmp/gr-inventory.js &&
                grep -q 'GreenRichInventory' /tmp/gr-inventory.js &&
@@ -123,7 +131,7 @@ jobs:
                cmp -s secure.html /tmp/gr-secure.html &&
                grep -q 'GreenRich ONE' /tmp/gr-secure.html &&
                grep -q 'App Install Check' /tmp/gr-check.html; then
-              echo "LIVE: CRM and Android app assets published at $base"
+              echo "LIVE: CRM, interactive dashboard and Android app assets verified at $base"
               exit 0
             fi
             echo "Waiting for GitHub Pages to serve new release ($attempt/8)"
