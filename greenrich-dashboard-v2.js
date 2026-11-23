@@ -245,7 +245,7 @@
      {label:'Current',detail:'Stock snapshot',kind:'neutral'},[],fmt);
   }
   const cardIcon=kind=>kind==='orders'?'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M2 4h3l2.2 11h11.5l2.3-8H6"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>':charts.icon(kind==='revenue'?'sales':kind);
-  const cardsMarkup=kpiCards.map((card,i)=>{
+  const renderMetricCard=(card,i)=>{
    const arrow=card.change.kind==='negative'?'↘':card.change.kind==='positive'?'↗':'—';
    const description=card.name+' '+card.value+'. '+card.change.label+' '+card.change.detail+'. View details.';
    return '<button type="button" class="gr6-card" data-gr6-kind="'+e(card.kind)+'" data-gr6-tone="'+e(card.tone)+'" data-gr6-delta="'+e(card.change.kind)+'" data-widget-target="'+e(card.target)+'" aria-label="'+e(description)+'">'+
@@ -254,16 +254,45 @@
     '<strong class="gr6-card-number">'+e(card.value)+'</strong>'+
     '<span class="gr6-card-change"><strong class="gr6-badge"><span aria-hidden="true">'+arrow+'</span> '+e(card.change.label)+'</strong><span class="gr6-change-period">'+e(card.change.detail)+'</span></span>'+
     gr6Spark(card.series,i,card.format)+'</button>';
-  }).join('');
-  query('#gr2-digest').innerHTML=kpiCards.length?'<div class="gr6-kpi-row" style="--gr6-count:'+kpiCards.length+'">'+cardsMarkup+'</div>':'';
-  const operational=[
-   ['Follow-ups due',fmt(due.length),'followups','rose'],
-   ['Dispatch queue',fmt(awaiting.length),'dispatch','sky'],
-   ['Present days',fmt(f.attendance.filter(a=>/present|in|worked/i.test(a.status||'')).length),'attendance','green'],
-   ['Stock alerts',fmt(f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length),'stock','amber']
-  ].filter(k=>canId(k[2]));
-  query('#gr2-kpis').innerHTML=operational.map(([name,v,id,color])=>'<button type="button" class="gr2-kpi gr2-hoverable gr2-kpi-aligned" data-color="'+e(color)+'" data-widget-target="'+e(id)+'" aria-label="'+e(name)+' · '+e(v)+' · View details"><span class="gr2-kpi-head"><span class="gr2-kpi-name">'+e(name)+'</span><span class="gr2-kpi-symbol">'+charts.icon(id)+'</span></span><strong>'+e(v)+'</strong><span class="gr2-kpi-sub">'+e(f.period==='all'?'All accessible records':f.from&&f.to?f.from+' — '+f.to:'Current filter')+'</span><span class="gr2-kpi-action">View details ↗</span></button>').join('');
-   const approved=sale.filter(s=>!!f.dispatch.find(d=>d.company_id===s.company_id&&d.source_sale_id===s.id)||s.approval_status==='Approved');
+  };
+  query('#gr2-digest').innerHTML=kpiCards.length?'<div class="gr6-kpi-row" style="--gr6-count:'+kpiCards.length+'">'+kpiCards.map(renderMetricCard).join('')+'</div>':'';
+  const operational=[];
+  if(has('followups')){
+   const priorDue=prior?prior.followups.filter(l=>new Date(l.next_followup_at).valueOf()<=Date.now()).length:null;
+   operational.push({
+    name:'Follow-ups due',value:fmt(due.length),target:'followups',tone:'rose',kind:'followups',
+    change:gr6Delta(due.length,priorDue),series:gr6Series(due,l=>l.next_followup_at,()=>1,f.from,f.to),format:fmt
+   });
+  }
+  if(has('dispatch')){
+   const priorQueue=prior?prior.dispatch.filter(d=>!['Delivered','Shipped','Cancelled'].includes(d.status)).length:null;
+   operational.push({
+    name:'Dispatch queue',value:fmt(awaiting.length),target:'dispatch',tone:'sky',kind:'dispatch',
+    change:gr6Delta(awaiting.length,priorQueue),
+    series:gr6Series(awaiting,d=>d.order_date||d.approved_at,()=>1,f.from,f.to),format:fmt
+   });
+  }
+  if(has('attendance')){
+   const present=f.attendance.filter(a=>/present|in|worked/i.test(a.status||''));
+   const previousPresent=prior?prior.attendance.filter(a=>/present|in|worked/i.test(a.status||'')).length:null;
+   operational.push({
+    name:'Present days',value:fmt(present.length),target:'attendance',tone:'green',kind:'attendance',
+    change:gr6Delta(present.length,previousPresent),
+    series:gr6Series(present,a=>a.date||a.attendance_date,()=>1,f.from,f.to),format:fmt
+   });
+  }
+  if(has('stock')){
+   const low=f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length;
+   const stockPoints=f.products.filter(p=>p.stock!=null&&Number.isFinite(Number(p.stock))).slice(0,10).map(p=>({date:p.name||p.sku||'Product',value:Math.max(0,number(p.stock))}));
+   operational.push({
+    name:'Stock alerts',value:fmt(low),target:'stock',tone:'amber',kind:'stock',
+    change:{label:'Live stock',detail:'Stock by product · current',kind:'neutral'},
+    series:stockPoints,format:fmt
+   });
+  }
+  // One consistent card system across rows, with unique SVG gradient IDs.
+  query('#gr2-kpis').innerHTML=operational.length?'<div class="gr6-kpi-row gr6-secondary-row" style="--gr6-count:'+operational.length+'">'+operational.map((card,i)=>renderMetricCard(card,kpiCards.length+i)).join('')+'</div>':'';
+     const approved=sale.filter(s=>!!f.dispatch.find(d=>d.company_id===s.company_id&&d.source_sale_id===s.id)||s.approval_status==='Approved');
   const pending=sale.filter(s=>!approved.includes(s));
   const stages=['New','Contacted','Qualified','Quotation','Won','Lost'];
   const stageCounts=stages.map(x=>[x,f.leads.filter(l=>l.stage===x).length]);
