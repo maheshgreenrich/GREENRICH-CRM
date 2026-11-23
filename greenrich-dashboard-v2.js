@@ -434,6 +434,30 @@
    '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-digest" id="gr2-digest"></div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Salesperson sales value uses Won leads linked to order IDs. Data refreshes automatically and when CRM changes are received.</div></div>';
   viewRoot=host.querySelector('.gr2');
    viewRoot.dataset.gdTheme='light';
+
+   // Delegated sparkline hover: each mini graph inspects actual per-date CRM values.
+   const gr6Highlight=hit=>{
+     const box=hit.closest('.gr6-spark-box');if(!box)return;
+     const line=box.querySelector('.gr6-spark-guide'),dot=box.querySelector('.gr6-spark-dot'),tip=box.querySelector('.gr6-spark-tip');
+     if(!line||!dot||!tip)return;
+     const x=Number(hit.dataset.gr6X),y=Number(hit.dataset.gr6Y);
+     if(!Number.isFinite(x)||!Number.isFinite(y))return;
+     line.setAttribute('x1',String(x));line.setAttribute('x2',String(x));
+     dot.setAttribute('cx',String(x));dot.setAttribute('cy',String(y));
+     box.classList.add('gr6-hovering');
+     const date=hit.dataset.gr6Date||'';
+     const parsed=/^\d{4}-\d{2}-\d{2}$/.test(date)?new Date(date+'T12:00:00Z'):null;
+     tip.querySelector('.gr6-spark-tip-date').textContent=parsed?parsed.toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'UTC'}):date;
+     tip.querySelector('.gr6-spark-tip-value').textContent=hit.dataset.gr6Value||'0';
+     tip.style.left=Math.max(35,Math.min(72,x/145*100))+'%';
+     tip.hidden=false;
+   };
+   const gr6Clear=box=>{if(!box)return;box.classList.remove('gr6-hovering');const t=box.querySelector('.gr6-spark-tip');if(t)t.hidden=true};
+   viewRoot.addEventListener('pointerover',event=>{const hit=event.target.closest('.gr6-spark-hit');if(hit)gr6Highlight(hit)});
+   viewRoot.addEventListener('pointermove',event=>{const hit=event.target.closest('.gr6-spark-hit');if(hit)gr6Highlight(hit)},{passive:true});
+   viewRoot.addEventListener('pointerout',event=>{const hit=event.target.closest('.gr6-spark-hit');if(hit&&!event.relatedTarget?.closest?.('.gr6-spark-hit'))gr6Clear(hit.closest('.gr6-spark-box'))});
+   viewRoot.addEventListener('focusin',event=>{const card=event.target.closest('.gr6-card');if(card){const hit=card.querySelector('.gr6-spark-hit:last-of-type');if(hit)gr6Highlight(hit)}});
+   viewRoot.addEventListener('focusout',event=>{const card=event.target.closest('.gr6-card');if(card)gr6Clear(card.querySelector('.gr6-spark-box'))});
    viewRoot.addEventListener('click',event=>{
      const modeButton=event.target.closest('[data-gr5-mode]');
      if(modeButton){channelDisplayMode=modeButton.dataset.gr5Mode==='orders'?'orders':'revenue';draw();return}
