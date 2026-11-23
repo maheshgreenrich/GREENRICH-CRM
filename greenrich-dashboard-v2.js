@@ -45,6 +45,53 @@
  const listBars=(items,colors=C,formatter=fmt,limit=7)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,limit),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-bars">'+rows.map(([key,value],i)=>'<div class="gr2-bar-row gr2-hoverable" tabindex="0" data-tip="'+e(key)+' · '+e(formatter(value))+'"><div class="gr2-bar-line"><span title="'+e(key)+'">'+e(key)+'</span><b>'+e(formatter(value))+'</b></div><div class="gr2-bar-track"><i style="width:'+(number(value)===0?0:Math.max(2,number(value)/max*100))+'%;background:'+colors[i%colors.length]+'"></i></div></div>').join('')+'</div>':note('No matching data for these filters')};
  const donut=(items,formatter=fmt)=>{const all=items.filter(x=>number(x[1])>0),nonzero=all.length>8?[...all.slice(0,7),['Other',sum(all.slice(7),x=>x[1])]]:all,total=sum(nonzero,x=>x[1]);let angle=0;const stops=nonzero.map(([_,v],i)=>{const start=angle;angle+=number(v)/total*100;return C[i%C.length]+' '+start+'% '+angle+'%'}).join(',');
   return total?'<div class="gr2-donut-wrap"><div class="gr2-donut" style="background:conic-gradient('+stops+')"><div><b>'+formatter(total)+'</b><small>Total</small></div></div><div class="gr2-legend">'+nonzero.map(([name,value],i)=>'<div class="gr2-donut-entry gr2-hoverable" tabindex="0" data-tip="'+e(name)+' · '+e(formatter(value))+' · '+(number(value)/total*100).toFixed(1)+'%" data-slice="'+i+'"><i style="background:'+C[i%C.length]+'"></i><span>'+e(name)+'</span><strong>'+formatter(value)+'</strong></div>').join('')+'</div></div>':note('No records for the selected period')};
+
+ // Channel revenue and distinct orders are calculated from the same authorized
+ // filtered sales records as the dashboard; chart values are never mock data.
+ let channelDisplayMode='revenue';
+ const channelColors=['#356bec','#f6a249','#16a18c','#9667e7','#ec7596','#5a9ec9','#d4a149','#7889ae'];
+ const channelChart=(sales)=>{
+  const map=new Map();
+  sales.forEach(order=>{
+   const name=String(order.channel_name||order.channel||'Unspecified').trim()||'Unspecified';
+   if(!map.has(name))map.set(name,{name,revenue:0,orders:new Set()});
+   const row=map.get(name);
+   row.revenue+=number(order.total);
+   row.orders.add(String(order.company_id||'')+'|'+String(order.internal_order_id||order.order_id||order.id||'Unknown'));
+  });
+  const aggregate=[...map.values()].map(row=>({name:row.name,revenue:Math.max(0,row.revenue),orders:row.orders.size}));
+  const metric=channelDisplayMode==='orders'?'orders':'revenue';
+  aggregate.sort((a,b)=>b[metric]-a[metric]||a.name.localeCompare(b.name));
+  const ranked=aggregate.length>8?[...aggregate.slice(0,7),{name:'Other channels',revenue:sum(aggregate.slice(7),'revenue'),orders:sum(aggregate.slice(7),'orders')}]:aggregate;
+  const allRevenue=sum(aggregate,'revenue'),allOrders=countUnique(sales,row=>String(row.company_id||'')+'|'+String(row.internal_order_id||row.order_id||row.id||'Unknown'));
+  const allValues=metric==='revenue'?allRevenue:sum(aggregate,'orders');
+  const shownTotal=metric==='revenue'?money(allRevenue):fmt(allOrders);
+  const buttons='<div class="gr5-channel-switch" role="group" aria-label="Sales channel chart metric">'+
+   [['revenue','Revenue'],['orders','Orders']].map(([type,label])=>'<button type="button" data-gr5-mode="'+type+'" aria-pressed="'+String(metric===type)+'">'+label+'</button>').join('')+'</div>';
+  if(!ranked.length||allValues<=0)return '<div class="gr5-channel"><div class="gr5-channel-toolbar"><div class="gr5-channel-overview"><span>Channel overview</span><strong>'+shownTotal+'</strong><small>Across '+fmt(aggregate.length)+' sales channels</small></div>'+buttons+'</div><div class="gr5-channel-empty">No recorded '+(metric==='orders'?'orders':'revenue')+' for these filters.</div></div>';
+  const circumference=2*Math.PI*82;let offset=0;
+  const chartSlices=ranked.map((row,i)=>{
+   const value=number(row[metric]),ratio=allValues>0?value/allValues:0,length=Math.max(0,Math.min(circumference,ratio*circumference));
+   const item='<circle class="gr5-channel-slice" cx="120" cy="120" r="82" fill="none" stroke="'+channelColors[i%channelColors.length]+'" stroke-width="25" stroke-dasharray="'+length.toFixed(4)+' '+Math.max(0,circumference-length).toFixed(4)+'" stroke-dashoffset="'+(-offset).toFixed(4)+'" transform="rotate(-90 120 120)" data-gr5-channel-index="'+i+'" tabindex="0" role="button" aria-label="'+e(row.name)+' · '+e(metric==='revenue'?money(value):fmt(value)+' orders')+' · '+(ratio*100).toFixed(1)+'%"><title>'+e(row.name)+': '+e(metric==='revenue'?money(value):fmt(value)+' orders')+'</title></circle>';
+   offset+=length;return item;
+  }).join('');
+  const list=ranked.map((row,i)=>{
+   const value=number(row[metric]),share=allValues>0?value/allValues*100:0;
+   const displayValue=metric==='revenue'?money(value):fmt(value)+' orders';
+   return '<button type="button" class="gr5-channel-item" data-gr5-channel-index="'+i+'" data-gr5-channel-name="'+e(row.name)+'" data-gr5-channel-value="'+e(displayValue)+'" data-gr5-channel-share="'+share.toFixed(1)+'%" aria-label="'+e(row.name)+' '+e(displayValue)+' '+share.toFixed(1)+' percent of total">'+
+    '<span class="gr5-channel-item-head"><span class="gr5-channel-name"><i style="--gr5-color:'+channelColors[i%channelColors.length]+'"></i>'+e(row.name)+'</span><strong>'+e(displayValue)+'</strong></span>'+
+    '<span class="gr5-channel-meter"><i style="--gr5-color:'+channelColors[i%channelColors.length]+';width:'+share.toFixed(2)+'%"></i></span>'+
+    '<span class="gr5-channel-share">'+share.toFixed(1)+'% of '+(metric==='revenue'?'revenue':'orders')+'</span></button>';
+  }).join('');
+  const winner=ranked[0];
+  return '<div class="gr5-channel" data-gr5-channel-mode="'+metric+'"><div class="gr5-channel-toolbar">'+
+   '<div class="gr5-channel-overview"><span>Channel overview</span><strong>'+shownTotal+'</strong><small>Across '+fmt(aggregate.length)+' sales channel'+(aggregate.length===1?'':'s')+'</small></div>'+buttons+'</div>'+
+   '<div class="gr5-channel-chart"><div class="gr5-channel-ringwrap">'+
+   '<svg class="gr5-channel-ring" viewBox="0 0 240 240" role="group" aria-label="Interactive sales channels, hover over coloured ring segments to inspect the channel"><circle cx="120" cy="120" r="82" fill="none" stroke="#edf1f8" stroke-width="25"/>'+chartSlices+'</svg>'+
+   '<div class="gr5-channel-center" aria-live="polite"><span class="gr5-channel-center-name">All channels</span><strong class="gr5-channel-center-value">'+shownTotal+'</strong><small class="gr5-channel-center-share">100% of '+(metric==='revenue'?'revenue':'orders')+'</small></div></div>'+
+   '<div class="gr5-channel-breakdown"><div class="gr5-channel-breakdown-title"><span>Channel performance</span><small>'+fmt(ranked.length)+' categories</small></div>'+list+'</div></div>'+
+   '<div class="gr5-channel-insight"><span class="gr5-channel-insight-dot"></span><span>Top channel: <strong>'+e(winner.name)+'</strong> · '+e(metric==='revenue'?money(winner.revenue):fmt(winner.orders)+' orders')+'</span></div></div>';
+ };
  const trend=(rows,from,to,period,previousTotal,orders)=>charts.revenueTrend(charts.daily(rows,r=>dateKey(r.date||r.order_date||r.created_at),r=>number(r.total),from,to),{total:sum(rows,'total'),orders,previousTotal,period});
  const columns=(items,formatter=fmt)=>{const rows=items.filter(x=>number(x[1])>=0).slice(0,10),max=Math.max(1,...rows.map(x=>number(x[1])));return rows.length?'<div class="gr2-columns">'+rows.map(([k,v],i)=>'<div class="gr2-column gr2-hoverable" tabindex="0" data-tip="'+e(k)+' · '+e(formatter(v))+'"><span>'+e(formatter(v))+'</span><div class="gr2-column-track"><i style="height:'+(number(v)===0?0:Math.max(3,number(v)/max*100))+'%;background:'+C[i%C.length]+'"></i></div><small title="'+e(k)+'">'+e(k)+'</small></div>').join('')+'</div>':note('No matching revenue records')};
  function filters(){
@@ -147,7 +194,7 @@
   })();
   const content={
    day_sales:()=>panel('day_sales','Interactive revenue analytics · hover or focus any date for exact values',trend(sale,f.from,f.to,f.period,previousRevenue,orderCount)),
-   channel_sales:()=>panel('channel_sales','Revenue distribution by recorded order channel',donut(group(sale,s=>s.channel_name||s.channel,s=>s.total),money)),
+   channel_sales:()=>panel('channel_sales','Interactive channel mix · revenue and order distribution',channelChart(sale)),
    sales:()=>panel('sales','Filtered sales orders and amount',label('Revenue',money(sum(sale,'total')))+label('Order count',fmt(orderCount))+label('Units sold',fmt(sum(sale,s=>s.qty||s.quantity)))+label('Average order',orderCount?money(sum(sale,'total')/orderCount):'₹0')+'<h4 class="gr3-subheading">Order value distribution</h4>'+charts.histogram(charts.orderTotals(sale))),
    company_sales:()=>panel('company_sales','Both GreenRich companies · order values',columns(group(sale,s=>company(s.company_id),s=>s.total),money)),
    leads:()=>panel('leads','Lead creation date · recorded marketing source',
@@ -306,10 +353,45 @@
   viewRoot=host.querySelector('.gr2');
    viewRoot.dataset.gdTheme='light';
    viewRoot.addEventListener('click',event=>{
+     const modeButton=event.target.closest('[data-gr5-mode]');
+     if(modeButton){channelDisplayMode=modeButton.dataset.gr5Mode==='orders'?'orders':'revenue';draw();return}
+     const channelButton=event.target.closest('.gr5-channel-item,.gr5-channel-slice');
+     if(channelButton){const panel=channelButton.closest('.gr2-panel-channel_sales');if(panel){const current=panel.dataset.gr5Pinned;const id=channelButton.dataset.gr5ChannelIndex;panel.dataset.gr5Pinned=current===id?'':id;focusChannel(panel,panel.dataset.gr5Pinned)}return}
      const quick=event.target.closest('[data-gr2-quick]');
      if(quick){query('#gr2-period').value=quick.dataset.gr2Quick;draw();return}
      const target=event.target.closest('[data-widget-target]');
      if(target){const panel=viewRoot.querySelector('.gr2-panel[data-widget="'+target.dataset.widgetTarget+'"]');if(panel){panel.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});panel.classList.add('gr2-attention');setTimeout(()=>panel.classList.remove('gr2-attention'),1300)}}
+   });
+
+   const focusChannel=(panel,id)=>{
+     if(!panel)return;
+     const root=panel.querySelector('.gr5-channel'),value=root?.querySelector('.gr5-channel-center-value'),name=root?.querySelector('.gr5-channel-center-name'),share=root?.querySelector('.gr5-channel-center-share');
+     if(!root||!value||!name||!share)return;
+     root.querySelectorAll('[data-gr5-channel-index]').forEach(item=>item.classList.toggle('gr5-selected',String(item.dataset.gr5ChannelIndex)===String(id)));
+     root.classList.toggle('gr5-is-focused',id!==''&&id!=null);
+     const item=id===''||id==null?null:root.querySelector('.gr5-channel-item[data-gr5-channel-index="'+id+'"]');
+     if(!item){
+      const overview=root.querySelector('.gr5-channel-overview strong');
+      name.textContent='All channels';value.textContent=overview?.textContent||'—';share.textContent='100% of '+(channelDisplayMode==='orders'?'orders':'revenue');
+     }else{
+      name.textContent=item.dataset.gr5ChannelName||'Channel';value.textContent=item.dataset.gr5ChannelValue||'—';share.textContent=item.dataset.gr5ChannelShare||'';
+     }
+   };
+   viewRoot.addEventListener('pointerover',event=>{
+     const target=event.target.closest('.gr5-channel-item,.gr5-channel-slice');
+     if(target){const panel=target.closest('.gr2-panel-channel_sales');if(panel&&!panel.dataset.gr5Pinned)focusChannel(panel,target.dataset.gr5ChannelIndex)}
+   });
+   viewRoot.addEventListener('pointerout',event=>{
+     const target=event.target.closest('.gr5-channel-item,.gr5-channel-slice');
+     if(target){const panel=target.closest('.gr2-panel-channel_sales');if(panel&&!panel.dataset.gr5Pinned&&!event.relatedTarget?.closest?.('.gr5-channel-item,.gr5-channel-slice'))focusChannel(panel,'')}
+   });
+   viewRoot.addEventListener('focusin',event=>{
+     const target=event.target.closest('.gr5-channel-item,.gr5-channel-slice');
+     if(target){const panel=target.closest('.gr2-panel-channel_sales');if(panel&&!panel.dataset.gr5Pinned)focusChannel(panel,target.dataset.gr5ChannelIndex)}
+   });
+   viewRoot.addEventListener('focusout',event=>{
+     const target=event.target.closest('.gr5-channel-item,.gr5-channel-slice');
+     if(target){const panel=target.closest('.gr2-panel-channel_sales');if(panel&&!panel.dataset.gr5Pinned)focusChannel(panel,'')}
    });
    viewRoot.addEventListener('keydown',event=>{const card=event.target.closest('.gr2-feature-main[data-widget-target]');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();card.click()}});
    const hideTip=()=>{const tip=viewRoot.querySelector('.gr2-chart-hover-tip');if(tip)tip.hidden=true;viewRoot.querySelectorAll('.gr3-guideline').forEach(line=>line.style.opacity='0')};
