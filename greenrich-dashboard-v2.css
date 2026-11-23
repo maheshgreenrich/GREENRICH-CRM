@@ -1376,3 +1376,116 @@
  #content .gr2 .gr6-card{transition:none!important}
  #content .gr2 .gr6-card:is(:hover,:focus-visible){transform:none!important}
 }
+
+
+/* KPI v7: royal blue revenue gradient, consistent card construction and
+   metric-specific mini chart colours across both dashboard rows. */
+#content .gr2 .gr6-card[data-gr6-kind=revenue]{
+ --gr6-ink:#fff;
+ --gr6-muted:#d8e6ff;
+ --gr6-edge:#4b70de;
+ --gr6-card-bg:linear-gradient(128deg,#142e91 0%,#234bc4 48%,#4777e7 100%);
+ --gr6-spark:#7ef0fa;
+ background:linear-gradient(128deg,#142e91 0%,#234bc4 48%,#4777e7 100%)!important;
+ box-shadow:0 9px 27px #1b42b52c!important;
+ border-color:#436add!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-icon{
+ background:#ffffff24!important;
+ color:#cffdff!important;
+ border:1px solid #ffffff27!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-card-name,
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-change-period{
+ color:#d5e4ff!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-options{color:#dae6ff!important}
+#content .gr2 .gr6-card[data-gr6-kind=revenue]:is(:hover,:focus-visible){
+ border-color:#84c4fb!important;
+ box-shadow:0 17px 38px #1939a64b!important;
+}
+#content .gr2 .gr6-card:focus-visible{outline:3px solid #8bafff!important}
+#content .gr2 .gr6-card[data-gr6-kind=orders]{
+ --gr6-card-bg:#f7f9ff;--gr6-edge:#e1e8fa;
+ --gr6-spark:#5377ea;
+ background:#f7f9ff!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=customers]{
+ --gr6-card-bg:#faf7ff;--gr6-edge:#e9e1f7;
+ --gr6-spark:#9463d7;
+ background:#faf7ff!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=conversion]{
+ --gr6-card-bg:#f5fbf8;--gr6-edge:#d9efe6;
+ --gr6-spark:#1caa84;
+ background:#f5fbf8!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=followups]{
+ --gr6-card-bg:#fff7fb;--gr6-edge:#f4e1ec;
+ --gr6-spark:#d55c95;
+ background:#fff7fb!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=dispatch]{
+ --gr6-card-bg:#f5faff;--gr6-edge:#dbeafb;
+ --gr6-spark:#388ac8;
+ background:#f5faff!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=attendance]{
+ --gr6-card-bg:#f4fbf6;--gr6-edge:#dcefe2;
+ --gr6-spark:#23936e;
+ background:#f4fbf6!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=stock]{
+ --gr6-card-bg:#fffbf2;--gr6-edge:#f3e7cc;
+ --gr6-spark:#cb9a2e;
+ background:#fffbf2!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=orders] .gr6-icon{background:#e9efff!important;color:#5077d9!important}
+#content .gr2 .gr6-card[data-gr6-kind=customers] .gr6-icon{background:#efe6ff!important;color:#9064cf!important}
+#content .gr2 .gr6-card[data-gr6-kind=conversion] .gr6-icon{background:#e0f6ed!important;color:#208f70!important}
+#content .gr2 .gr6-card[data-gr6-kind=followups] .gr6-icon{background:#fce5f0!important;color:#c95784!important}
+#content .gr2 .gr6-card[data-gr6-kind=dispatch] .gr6-icon{background:#e3f0ff!important;color:#2f83ba!important}
+#content .gr2 .gr6-card[data-gr6-kind=attendance] .gr6-icon{background:#e3f5e9!important;color:#298d69!important}
+#content .gr2 .gr6-card[data-gr6-kind=stock] .gr6-icon{background:#fff0d9!important;color:#bf902e!important}
+#content .gr2 .gr6-card .gr6-icon{border:1px solid transparent!important}
+#content .gr2 .gr6-card .gr6-spark-box{color:var(--gr6-spark)!important}
+#content .gr2 .gr6-card .gr6-spark-line{
+ stroke:currentColor!important;
+ filter:drop-shadow(0 2px 3px #4057902b)!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-spark-line{
+ filter:drop-shadow(0 2px 4px #7ef0fa66)!important;
+}
+#content .gr2 .gr6-card .gr6-spark-guide,
+#content .gr2 .gr6-card .gr6-spark-dot{stroke:currentColor!important}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-spark-dot{fill:#193ca8!important}
+/* One identical 4-card grid component on both rows. No orphan grid column. */
+#content .gr2 .gr2-kpis:has(> .gr6-secondary-row){
+ display:block!important;
+ width:100%!important;
+ grid-template-columns:none!important;
+ margin:0!important;
+ padding:0!important;
+ background:transparent!important;
+}
+#content .gr2 .gr2-kpis>.gr6-secondary-row{
+ width:100%!important;
+ grid-column:1/-1!important;
+ align-items:stretch!important;
+ gap:15px!important;
+}
+#content .gr2 .gr6-secondary-row>.gr6-card{
+ min-height:214px!important;
+}
+#content .gr2 .gr6-secondary-row .gr6-card-number{color:var(--gr6-ink)!important}
+#content .gr2 .gr6-secondary-row .gr6-card-name,
+#content .gr2 .gr6-secondary-row .gr6-change-period{color:var(--gr6-muted)!important}
+#content .gr2 .gr6-secondary-row .gr6-card-change{min-height:29px}
+@media(max-width:1170px){
+ #content .gr2 .gr2-kpis>.gr6-secondary-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}
+ #content .gr2 .gr6-secondary-row>.gr6-card{min-height:203px!important}
+}
+@media(max-width:600px){
+ #content .gr2 .gr2-kpis>.gr6-secondary-row{grid-template-columns:1fr!important;gap:12px!important}
+ #content .gr2 .gr6-secondary-row>.gr6-card{min-height:193px!important}
+}
