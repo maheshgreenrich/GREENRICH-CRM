@@ -222,7 +222,7 @@
   const addCard=(name,value,target,tone,kind,change,series,format)=>kpiCards.push({name,value,target,tone,kind,change,series,format});
   if(has('sales')){
    const revenue=sum(sale,'total');
-   addCard('Total Revenue',money(revenue),'day_sales','amber','revenue',gr6Delta(revenue,previousRevenue),
+   addCard('Total Revenue',money(revenue),has('day_sales')?'day_sales':'sales','amber','revenue',gr6Delta(revenue,previousRevenue),
      gr6Series(sale,s=>s.date||s.order_date||s.created_at,s=>number(s.total),f.from,f.to),money);
    addCard('Total Orders',fmt(orderCount),'sales','peach','orders',
      gr6Delta(orderCount,prior?countUnique(priorSale,orderKey):null),
