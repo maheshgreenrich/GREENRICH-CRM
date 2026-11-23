@@ -8,8 +8,19 @@
  const fmt=x=>Number(x||0).toLocaleString('en-IN',{maximumFractionDigits:6});
  const stages=['FG','SFG','IM','RM'],names={FG:'Final / Saleable',SFG:'Semi-finished',IM:'Intermediate',RM:'Raw Material / Purchasable'};
  const type=x=>x==='RW'?'RM':stages.includes(x)?x:'RM';
+ const materialSuffixFromCode=(code,stage)=>{
+  const prefix=new RegExp('^'+stage+'[-_]?', 'i');
+  return prefix.test(String(code||''))?String(code).replace(prefix,''):'';
+ };
+ const formatMaterialCode=(stage,suffix)=>{
+  if(!stages.includes(stage))throw Error('Choose a valid Material Type');
+  const part=String(suffix??'').trim().toUpperCase();
+  if(!/^[A-Z0-9._\/-]{1,60}$/.test(part)||stage.length+part.length>64)
+   throw Error('Enter a valid material suffix (letters, numbers, -, _, . or /)');
+  return stage+part;
+ };
  const uid=()=>crypto.randomUUID();
- const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',view:'cards',detailTab:'general',creating:false,createTab:'general',newPhotoUrl:null,busy:false};
+ const S={root:null,ctx:null,tab:'catalog',scope:'',items:[],bom:[],locations:[],balances:[],movements:[],pos:[],jobWork:[],sales:null,dispatch:null,requisitions:[],prodBalances:[],focus:null,filter:'',materialFilter:'all',view:'cards',detailTab:'general',creating:false,createTab:'general',newPhotoUrl:null,busy:false};
  const locName=id=>S.locations.find(x=>x.id===id)?.name||'—';
  const inScope=x=>S.scope==='all'||x.company_id===S.scope;
  const companyName=id=>S.ctx.companyName(id);
@@ -46,19 +57,19 @@
   S.dispatch=dispatchResult.status==='fulfilled'?dispatchResult.value:null;
   const list=[];
   for(const r of products)list.push({company_id:r.company_id,id:r.record_id,code:r.payload.sku||r.payload.code||r.record_id,
-   name:r.payload.name||'Untitled saleable product',stage:'FG',saleable:r.payload.saleable!==false,purchasable:!!r.payload.purchasable,
+   name:r.payload.name||'Untitled saleable product',stage:type(r.payload.material_type||'FG'),stockKind:'FG',saleable:r.payload.saleable!==false,purchasable:!!r.payload.purchasable,
    unit:r.payload.uom||'nos',aggregate:r.payload.stock,material:r.payload,original:'crm'});
   for(const r of materials.filter(x=>x.kind==='material')){
    const p=r.payload||{};const stage=type(p.type),id=r.record_id;
    const overlap=list.some(i=>i.company_id===r.company_id&&i.code.trim().toLowerCase()===String(p.code||'').trim().toLowerCase());
-   list.push({company_id:r.company_id,id,code:p.code||id,name:p.name||id,stage,saleable:typeof p.saleable==='boolean'?p.saleable:stage==='FG',
+   list.push({company_id:r.company_id,id,code:p.code||id,name:p.name||id,stage:type(p.material_type||stage),stockKind:stage,saleable:typeof p.saleable==='boolean'?p.saleable:stage==='FG',
     purchasable:typeof p.purchasable==='boolean'?p.purchasable:stage==='RM'||p.source_type==='Buy',unit:p.uom||'nos',aggregate:aggregates.find(x=>x.company_id===r.company_id&&x.material_id===id)?.quantity??null,
     material:p,original:'ops',overlap});
   }
   S.items=list;S.bom=materials.filter(x=>x.kind==='bom');S.requisitions=materials.filter(x=>x.kind==='requisition');S.locations=locations;
   S.balances=balances;S.movements=movements;S.pos=docs.filter(x=>x.kind==='po');S.jobWork=docs.filter(x=>x.kind==='job');S.prodBalances=aggregates;
  }
- const getLocBalance=item=>S.balances.filter(b=>b.company_id===item.company_id&&b.item_kind===item.stage&&b.item_id===item.id)
+ const getLocBalance=item=>S.balances.filter(b=>b.company_id===item.company_id&&b.item_kind===(item.stockKind||item.stage)&&b.item_id===item.id)
    .reduce((sum,b)=>sum+Number(b.quantity||0),0);
 
  // Read-only per-product indicators. Never mutate authoritative balances.
@@ -199,7 +210,7 @@
    '</td><td>'+(i.aggregate===null||i.aggregate===undefined?'Not recorded':fmt(i.aggregate)+' '+esc(i.unit))+'</td><td>'+fmt(getLocBalance(i))+' '+esc(i.unit)+'</td><td><button data-inv-item="'+n+'">View</button></td></tr>').join('')||
    '<tr><td colspan="7">No products found.</td></tr>')+'</tbody></table></div>';
   return '<div class="gr-inv-catalog-head"><div><h3>Products</h3><small>'+selected+' products · '+S.items.filter(inScope).length+' total in selected company</small></div><div class="gr-inv-catalog-actions">'+(S.ctx.can('stock','create')?'<button type="button" class="gr-inv-add-new" data-inv-create-open>+ Add New Inventory</button>':'')+'<button type="button" data-inv-view="cards" class="'+(S.view==='cards'?'active':'')+'" aria-label="Card view">▦ Cards</button><button type="button" data-inv-view="list" class="'+(S.view==='list'?'active':'')+'" aria-label="List view">☷ List</button></div></div>'+
-   '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search products by name, code or stage" aria-label="Search products"></div>'+
+   '<div class="gr-inv-controls"><input type="search" data-inv-search value="'+esc(S.filter)+'" placeholder="Search products by name, code or stage" aria-label="Search products">'+'<label class="gr-inv-type-filter"><span>Material Type</span><select data-inv-material-filter aria-label="Filter inventory by material type"><option value="all"'+(S.materialFilter==='all'?' selected':'')+'>All Materials</option>'+stages.map(stage=>'<option value="'+stage+'"'+(S.materialFilter===stage?' selected':'')+'>'+stage+' — '+esc(names[stage])+'</option>').join('')+'</select></label></div>'+
    '<div class="gr-inv-stats">'+stages.map(k=>'<article><small>'+names[k]+'</small><strong>'+kindCount(k)+'</strong></article>').join('')+'</div>'+
    (S.view==='list'?list:'<div class="gr-inv-product-grid">'+(cards||'<p>No products found.</p>')+'</div>')+
    '<p class="gr-inv-footnote">On-hand figures are from existing aggregate records. Verified warehouse balances are kept separate until reconciled.</p>';
@@ -218,7 +229,7 @@
   '<div class="gr-inv-new-stats"><span>⚗ Bill of Materials 0</span><span data-inv-new-stat="sales">▥ 0 Sold · 0 Outgoing</span><span data-inv-new-stat="purchases">▤ 0 Purchase Orders · 0 Incoming</span><span>↻ Reordering Rules 0</span><span>⇄ In: 0 · Out: 0</span></div>'+
   '<div class="gr-inv-new-panel"><div class="gr-inv-new-hero"><div class="gr-inv-new-titlewrap">'+
   '<label class="gr-inv-new-title">☆ <input name="name" type="text" placeholder="e.g. 25 L Home Composter" maxlength="180" required aria-label="Product Name"></label>'+
-  '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. GRCOM25','text',true)+'</div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
+  '<div class="gr-inv-new-code">'+input('code','Product Code / SKU','e.g. SFG001','text',true)+'</div>'+'<div class="gr-inv-new-material"><label><span>Material Type</span><select name="stage" data-inv-create-material-type>'+stages.map(t=>'<option value="'+t+'">'+t+'</option>').join('')+'</select></label>'+'<label><span>Code Suffix</span><input name="material_suffix" data-inv-create-material-suffix maxlength="60" placeholder="e.g. 001" autocomplete="off"></label>'+'<span>Result: <output data-inv-new-code-preview>Enter suffix</output></span></div>'+'<div class="gr-inv-new-flags"><label><input type="checkbox" name="saleable" checked> Sales</label><label><input type="checkbox" name="purchasable" checked> Purchase</label></div>'+
   '<small>All fields are new. The product is not created until you save.</small></div>'+
   '<div class="gr-inv-new-photo"><button type="button" data-inv-create-photo-trigger aria-label="Click to select product image"><span data-inv-create-photo-icon>📷</span><img data-inv-create-preview hidden alt="New product image preview"><small>+ Add image</small></button>'+
   '<input data-inv-create-photo type="file" accept="image/png,image/jpeg,image/webp" hidden><small>PNG, JPG, WebP · max 3 MB</small></div></div>'+
@@ -235,7 +246,6 @@
   input('price','Sales Price (₹)','0.00','number')+input('tax','Sales Taxes (%)','0','number')+
   input('cost','Cost (₹)','0.00','number')+input('purchase_tax','Purchase Taxes (%)','0','number')+
   input('category','Category','e.g. Composting')+
-  input('reference','Reference No.','Optional reference')+
   input('barcode','Barcode','Scan or enter barcode')+input('tags','Tags','Separate by comma')+'</div></div>'+
   '<div class="gr-inv-new-notes"><h4>Internal Notes</h4>'+notes('notes','Notes')+'</div></section>'+
   '<section data-inv-create-pane="sales" hidden><div class="gr-inv-new-cols"><div><h4>Upsell & Cross-Sell</h4>'+input('optional_products','Optional Products','Product codes separated by comma')+'</div>'+
@@ -248,7 +258,6 @@
   '<p class="gr-inv-create-note">Purchase Orders require an approved vendor in Vendor Master.</p></section>'+
   '<section data-inv-create-pane="inventory" hidden><div class="gr-inv-new-cols"><div><h4>Logistics</h4>'+
   '<label class="gr-inv-new-field"><b>Company *</b><select name="company_id" required>'+companies+'</select></label>'+
-  select('stage','Inventory Level',[['FG','Final / Saleable'],['SFG','Semi-Finished'],['IM','Intermediate'],['RM','Raw Material']],'FG')+
   select('uom','Unit of Measure',[['nos','nos'],['kg','kg'],['g','g'],['ltr','litres'],['m','metres'],['set','set']],'nos')+
   select('source_type','Manufacturing Source',[['Make','Own Factory'],['Buy','Purchase from Vendor'],['Subcontract','Vendor Job Work']],'Make')+
   input('responsible','Responsible','Employee')+input('weight','Weight (kg)','0','number')+
@@ -267,7 +276,7 @@
   const code=String(input.code||'').trim().toUpperCase();
   const stage=String(input.stage||'');
   const uom=String(input.uom||'').trim();
-  const reference=String(input.reference||'').trim();
+  const reference='';
   const category=String(input.category||'').trim();
   const saleable=!!input.saleable,purchasable=!!input.purchasable;
   const source_type=String(input.source_type||'Make');
@@ -310,9 +319,9 @@
   // Internal FG, SFG, IM and RM stay in the manufacturing material master.
   const crm=stage==='FG'&&saleable;
   const payload=crm?
-   {id:recordId,company_id:co,name,sku:code,reference,category,uom,price,tax,stock:opening,active:true,inclusive:false,
+   {id:recordId,company_id:co,name,sku:code,reference,material_type:stage,category,uom,price,tax,stock:opening,active:true,inclusive:false,
     product_type:'Goods',source_type,saleable,purchasable,...settings}:
-   {id:recordId,name,code,reference,category,uom,type:stage,status:'Draft',qty:null,
+   {id:recordId,name,code,reference,material_type:stage,category,uom,type:stage,status:'Draft',qty:null,
     source_type,saleable,purchasable,needs_review:true,reorder_level:null,preferred_vendor:'',
     has_job_work:source_type==='Subcontract',price,tax,...settings};
   return {company_id:co,kind:crm?'products':'material',record_id:recordId,payload,original:crm?'crm':'ops',code,stage,opening_stock:opening};
@@ -390,20 +399,24 @@
   }catch(error){showError(error)}
   finally{S.busy=false;submit.disabled=false}
  }
- const scopedItems=()=>S.items.filter(inScope).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
+ const scopedItems=()=>S.items.filter(inScope).filter(i=>S.materialFilter==='all'||i.stage===S.materialFilter).filter(i=>!S.filter||[i.code,i.name,i.stage].join(' ').toLowerCase().includes(S.filter.toLowerCase()));
 
  function renderProductIdentifiers(item,canEdit){
-  const code=String(item.code||'');
-  const reference=String(item.material?.reference||'');
-  const control=(key,label,value,placeholder,maxLength)=>{
-   return '<label class="gr-inv-identifier"><span>'+esc(label)+'</span>'+
-    (canEdit?'<input type="text" '+key+' maxlength="'+maxLength+'" aria-label="'+esc(label)+'" spellcheck="false" value="'+esc(value)+'" placeholder="'+esc(placeholder)+'">':
-      '<strong>'+esc(value||'—')+'</strong>')+'</label>';
-  };
-  return '<div class="gr-inv-product-identifiers">'+
-   control('data-inv-product-code','Product Code / SKU',code,'Enter product code',64)+
-   control('data-inv-edit="reference"','Reference No.',reference,'Optional reference number',100)+
-   '</div>';
+  const code=String(item.code||''),stage=item.stage||'FG';
+  const suffix=materialSuffixFromCode(code,stage);
+  const sku='<label class="gr-inv-identifier"><span>Product Code / SKU</span>'+
+   (canEdit?'<input type="text" data-inv-product-code maxlength="64" spellcheck="false" aria-label="Product Code / SKU" value="'+esc(code)+'">':
+    '<strong>'+esc(code||'—')+'</strong>')+'</label>';
+  const material='<div class="gr-inv-material-row"><label class="gr-inv-identifier"><span>Material Type</span>'+
+   (canEdit?'<select data-inv-material-type aria-label="Material Type">'+stages.map(t=>
+    '<option value="'+t+'"'+(stage===t?' selected':'')+'>'+t+'</option>').join('')+'</select>':
+    '<strong>'+esc(stage)+'</strong>')+'</label>'+
+   (canEdit?'<label class="gr-inv-identifier"><span>Code Suffix</span>'+
+    '<input type="text" data-inv-material-suffix aria-label="Material Code Suffix" maxlength="60" placeholder="e.g. 001" value="'+esc(suffix)+'"></label>'+
+    '<span class="gr-inv-material-result">Result: <output data-inv-material-preview>'+esc(suffix?stage+suffix:code)+'</output></span>'+
+    '<button type="button" class="gr-inv-material-apply" data-inv-material-apply disabled>Save Code & Type</button>':'')+
+    '</div>';
+  return '<div class="gr-inv-product-identifiers">'+sku+material+'</div>';
  }
  function validateProductCodeChange(item,newCode,sources=S){
   const code=String(newCode||'').trim().toUpperCase();
@@ -423,7 +436,7 @@
   if(!item)return '<p>Product not found</p>';
   const m=item.material||{}, amounts=S.locations.filter(x=>x.company_id===item.company_id);
   const edges=S.bom.filter(x=>x.company_id===item.company_id&&[item.code,...(Array.isArray(m.sku_aliases)?m.sku_aliases:[])].some(code=>String(x.payload.parent_code||'').toLowerCase()===String(code).toLowerCase()));
-  const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===item.stage&&x.item_id===item.id).slice(0,15);
+  const recent=S.movements.filter(x=>x.company_id===item.company_id&&x.item_kind===(item.stockKind||item.stage)&&x.item_id===item.id).slice(0,15);
   const t=(S.detailTab==='sales'&&!item.saleable)||(S.detailTab==='purchase'&&!item.purchasable)?'general':(S.detailTab||'general'), image=m.image_url||m.image||m.photo_url||'';
   const editable=S.ctx.can('stock','edit');
   const inlineFields={
@@ -487,7 +500,7 @@
   if(t==='general')body='<div class="gr-inv-detail-columns gr-inv-odoo-general"><section>'+
    field('Product Type',m.product_type||'Goods')+field('Invoicing Policy',m.invoicing_policy||'Delivered quantities')+field('Track Inventory',m.track_inventory===false?'No':'Yes')+(m.track_inventory===false?'':field('Quantity On Hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit))+
    '</section><section>'+field('Sales Price',m.price??m.selling_price??m.sales_price??'Not set')+field('Sales Taxes',m.sales_tax??m.tax_rate??m.tax??'Not configured')+field('Cost',m.cost??m.cost_price??'Not recorded')+field('Purchase Taxes',m.purchase_tax||'Not configured')+
-   field('Category',m.category||m.category_name)+field('Reference',m.reference||m.sku)+field('Barcode',m.barcode)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
+   field('Category',m.category||m.category_name)+field('Barcode',m.barcode)+field('Tags',Array.isArray(m.tags)?m.tags.join(', '):m.tags)+
    '</section></div><section class="gr-inv-notes"><h4>Internal notes</h4>'+field('Internal notes',m.notes||m.description||'')+'</section>';
   if(t==='sales')body='<div class="gr-inv-detail-columns"><section><h4>Sales settings</h4>'+
     field('Can be sold',item.saleable?'Yes':'No')+field('Sales price',m.price??m.selling_price??m.sales_price??'Not set')+
@@ -506,7 +519,7 @@
     field('Aggregate on hand',item.aggregate===null||item.aggregate===undefined?'Not recorded':fmt(item.aggregate)+' '+item.unit)+
     field('Verified in locations',fmt(getLocBalance(item))+' '+item.unit)+'</section>'+
     '<section><h4>Warehouse balances</h4>'+
-    table(['Location','Verified stock'],amounts.map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+fmt(S.balances.find(b=>b.company_id===item.company_id&&b.location_id===l.id&&b.item_id===item.id&&b.item_kind===item.stage)?.quantity||0)+' '+esc(item.unit)+'</td></tr>'))+
+    table(['Location','Verified stock'],amounts.map(l=>'<tr><td>'+esc(l.name)+'</td><td>'+fmt(S.balances.find(b=>b.company_id===item.company_id&&b.location_id===l.id&&b.item_id===item.id&&b.item_kind===(item.stockKind||item.stage))?.quantity||0)+' '+esc(item.unit)+'</td></tr>'))+
     '</section></div><div class="gr-inv-detail-columns"><section><h4>Bill of materials</h4>'+
     table(['Component','Quantity','Revision'],edges.map(b=>'<tr><td>'+esc(b.payload.child_code)+'</td><td>'+esc(b.payload.qty)+' '+esc(b.payload.uom)+'</td><td>'+esc(b.payload.revision)+'</td></tr>'))+
     '</section><section><h4>Recent stock movements</h4>'+
@@ -531,7 +544,7 @@
   const balances=S.balances.filter(inScope);
   return '<div class="gr-inv-stats">'+locs.filter(x=>x.kind==='warehouse'||x.kind==='marketplace').map(l=>'<article><small>'+esc(l.name)+'</small><strong>'+S.balances.filter(b=>b.location_id===l.id).length+' SKUs</strong></article>').join('')+'</div>'+
    '<h4>Location-wise verified on-hand quantity</h4>'+table(['Warehouse','Item / Stage','Quantity','UOM'],balances.map(b=>{
-    const i=items.find(x=>x.company_id===b.company_id&&x.id===b.item_id&&x.stage===b.item_kind);
+    const i=items.find(x=>x.company_id===b.company_id&&x.id===b.item_id&&(x.stockKind||x.stage)===b.item_kind);
     return '<tr><td>'+esc(locName(b.location_id))+'</td><td>'+esc(i?.code||b.item_id)+' · '+esc(b.item_kind)+'</td><td>'+fmt(b.quantity)+'</td><td>'+esc(b.uom)+'</td></tr>'}))+
    (canEdit?form:'<p>Warehouse movements require stock edit permission.</p>');
  }
@@ -594,6 +607,7 @@
  }
  function bind(){
   const input=S.root.querySelector('[data-inv-search]');if(input)input.oninput=e=>{S.filter=e.target.value;const pos=input.selectionStart;draw();const next=S.root.querySelector('[data-inv-search]');if(next){next.focus();next.setSelectionRange(pos,pos)}};
+  const materialFilter=S.root.querySelector('[data-inv-material-filter]');if(materialFilter)materialFilter.onchange=()=>{S.materialFilter=materialFilter.value;draw()};
   S.root.querySelectorAll('[data-inv-item]').forEach(b=>b.onclick=()=>{
    const item=scopedItems()[Number(b.dataset.invItem)];if(item){S.focus={id:item.id,co:item.company_id,original:item.original};S.detailTab='general';draw()}
   });
@@ -631,6 +645,25 @@
    form.elements.namedItem('saleable').onchange=syncSalePurchase;
    form.elements.namedItem('purchasable').onchange=syncSalePurchase;
    syncNewStatus();
+   const newMaterialType=form.elements.namedItem('stage');
+   const newSuffix=form.elements.namedItem('material_suffix');
+   const newCode=form.elements.namedItem('code');
+   const newPreview=newPage.querySelector('[data-inv-new-code-preview]');
+   const refreshMaterialCode=()=>{
+    if(!newSuffix.value.trim()){newPreview.textContent=newCode.value.trim()||'Enter suffix';return}
+    try{
+     const generated=formatMaterialCode(newMaterialType.value,newSuffix.value);
+     newCode.value=generated;
+     newPreview.textContent=generated;
+    }catch(error){newPreview.textContent=error.message}
+   };
+   newMaterialType.onchange=refreshMaterialCode;
+   newSuffix.oninput=refreshMaterialCode;
+   newCode.oninput=()=>{
+    if(newSuffix.value.trim()&&newCode.value!==newPreview.textContent)newSuffix.value='';
+    newPreview.textContent=newCode.value.trim()||'Enter suffix';
+   };
+   refreshMaterialCode();
    const track=form.elements.namedItem('track_inventory');
    const stockArea=newPage.querySelector('[data-inv-create-stock-area]');
    const stockField=form.elements.namedItem('opening_stock');
@@ -668,6 +701,31 @@
    });
    productCodeInput.onchange=()=>void saveProductCode(productCodeInput).catch(err=>{productCodeInput.disabled=false;notify(err.message,true)});
   }
+  const typeSelect=S.root.querySelector('[data-inv-material-type]');
+  const suffixInput=S.root.querySelector('[data-inv-material-suffix]');
+  const applyMaterial=S.root.querySelector('[data-inv-material-apply]');
+  const materialPreview=S.root.querySelector('[data-inv-material-preview]');
+  if(typeSelect&&suffixInput&&applyMaterial&&materialPreview){
+   const refreshMaterial=()=>{
+    const item=currentItem();if(!item)return;
+    try{
+     const next=suffixInput.value.trim()?formatMaterialCode(typeSelect.value,suffixInput.value):item.code;
+     materialPreview.textContent=next;
+     applyMaterial.disabled=S.busy||(next===item.code&&typeSelect.value===item.stage);
+    }catch(error){materialPreview.textContent=error.message;applyMaterial.disabled=true}
+   };
+   typeSelect.onchange=refreshMaterial;
+   suffixInput.oninput=refreshMaterial;
+   suffixInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();if(!applyMaterial.disabled)applyMaterial.click()}};
+   applyMaterial.onclick=()=>{
+    const item=currentItem();if(!item)return;
+    let next;
+    try{next=suffixInput.value.trim()?formatMaterialCode(typeSelect.value,suffixInput.value):item.code}
+    catch(error){return notify(error.message,true)}
+    void saveMaterialIdentity(item,next,typeSelect.value).catch(error=>{applyMaterial.disabled=false;notify(error.message,true)});
+   };
+   refreshMaterial();
+  }
   const photo=S.root.querySelector('[data-inv-photo]');S.root.querySelector('[data-inv-photo-trigger]')?.addEventListener('click',()=>photo?.click());if(photo)photo.onchange=()=>void savePhoto(photo).catch(err=>notify(err.message,true));
   S.root.querySelectorAll('[data-inv-edit]').forEach(el=>{
     el.dataset.initial=el.value;
@@ -688,6 +746,25 @@
 
  function currentItem(){
   return S.items.find(i=>S.focus&&i.company_id===S.focus.co&&i.id===S.focus.id&&i.original===S.focus.original);
+ }
+ async function saveMaterialIdentity(item,code,materialType){
+  const next=validateProductCodeChange(item,code);
+  if(!stages.includes(materialType))throw Error('Invalid Material Type');
+  if(S.busy||!S.ctx.can('stock','edit'))throw Error('Inventory edit permission required');
+  if(!S.ctx.companies.includes(item.company_id))throw Error('Company access denied');
+  S.busy=true;
+  try{
+   const {data,error}=await S.ctx.db.rpc('gr_inventory_set_material_identity',{
+    p_company:item.company_id,p_origin:item.original,p_record_id:item.id,
+    p_expected_code:item.code,p_new_code:next,p_material_type:materialType
+   });
+   if(error)throw Error(error.message);
+   if(data?.sku!==next||data?.material_type!==materialType)
+    throw Error('Unable to save SKU and Material Type');
+   await load();
+   draw();
+   notify('Material Type '+materialType+' saved. Product SKU: '+next);
+  }finally{S.busy=false}
  }
  async function saveProductCode(input){
   const item=currentItem();
@@ -842,7 +919,7 @@
   event.preventDefault();if(S.busy)return;
   const fd=new FormData(event.target),co=String(fd.get('company')),kind=String(fd.get('action'));
   if(!S.ctx.companies.includes(co))throw Error('Company access denied');
-  const item=S.items.find(i=>i.company_id===co&&[i.company_id,i.stage,i.id].join('|')===fd.get('item'));
+  const item=S.items.find(i=>i.company_id===co&&[i.company_id,i.stockKind||i.stage,i.id].join('|')===fd.get('item'));
   if(!item)throw Error('Choose a product belonging to this company');
   if(kind==='verified_count'&&!S.ctx.can('stock','approve'))throw Error('Stock approval permission required for physical count');
   const quantity=Number(fd.get('quantity')),from=String(fd.get('from_location')),to=String(fd.get('to_location'));
@@ -854,7 +931,7 @@
   S.busy=true;const button=event.target.querySelector('[type=submit]');button.disabled=true;
   try{
    const {data,error}=await S.ctx.db.rpc('gr_inventory_location_action',{p_company:co,p_action:kind,p_input:{
-    item_kind:item.stage,item_id:item.id,item_code:item.code,uom:item.unit,quantity,
+    item_kind:(item.stockKind||item.stage),item_id:item.id,item_code:item.code,uom:item.unit,quantity,
     from_location:kind==='transfer'?from:null,to_location:to,
     reference:String(fd.get('reference')||''),notes:String(fd.get('notes')||'')
    },p_request:uid()});
@@ -867,5 +944,5 @@
   root.innerHTML='<div class="gr-inventory">Loading Inventory…</div>';
   try{await load();layout();draw()}catch(e){root.innerHTML='<div class="gr-inventory"><h2>Inventory</h2><p>Could not load inventory: '+esc(e.message)+'</p><button data-retry>Retry</button></div>';root.querySelector('[data-retry]').onclick=()=>void mount(root,context)}
  }
- window.GreenRichInventory={mount,computeProductMetrics:productMetrics,productStatusVisibility,renderProductStatus:stockSummary,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm};
+ window.GreenRichInventory={mount,computeProductMetrics:productMetrics,productStatusVisibility,renderProductStatus:stockSummary,renderProductIdentifiers,validateProductCodeChange,prepareInventoryRecord,renderNewInventoryPage:newInventoryForm,formatMaterialCode,materialSuffixFromCode};
 })();

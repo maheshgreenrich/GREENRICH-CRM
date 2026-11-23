@@ -52,6 +52,7 @@ jobs:
           node tests/inventory-product-summary.cjs
           node tests/inventory-conditional-smartbar.cjs
           node tests/inventory-product-sku-reference.cjs
+          node tests/inventory-material-type-filter.cjs
           node tests/inventory-new-product.cjs
           node tests/inventory-new-product-page.cjs
           node tests/inventory-opening-stock-sku.cjs

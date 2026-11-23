@@ -7,7 +7,9 @@ const item={id:'item-1',original:'crm',company_id:'grow-india',code:'GRCOM25',ma
 const edit=renderProductIdentifiers(item,true);
 assert.match(edit,/Product Code \/ SKU/);
 assert.match(edit,/value="GRCOM25"/);
-assert.match(edit,/data-inv-edit="reference"/);
+assert.match(edit,/data-inv-material-type/);
+assert.match(edit,/data-inv-material-suffix/);
+assert.doesNotMatch(edit,/Reference No\./);
 assert.equal(validateProductCodeChange(item,'grcom25',{items:[item]}),'GRCOM25');
 assert.equal(validateProductCodeChange(item,' grcom25653 ',{items:[item]}),'GRCOM25653');
 assert.throws(()=>validateProductCodeChange(item,'',{items:[item]}),/1–64/);
@@ -24,5 +26,5 @@ assert.equal(validateProductCodeChange(item,'GRCOM25653',{
 assert.equal(validateProductCodeChange(item,'GRCOM25653',{items:[item],sales:null,dispatch:null}),'GRCOM25653');
 assert.ok(script.includes(".rpc('gr_inventory_rename_sku'"),'SKU renaming must use atomic database function');
 assert.ok(script.includes('await load();'),'New code should be refreshed after save');
-assert.match(html,/greenrich-inventory\.js\?v=20261121-sku-rename-only-duplicate-v12/);
+assert.match(html,/greenrich-inventory\.js\?v=20261123-material-type-filter-v14/);
 console.log('PASS: SKU can change with linked documents; duplicate current codes rejected; atomic SKU save.');
