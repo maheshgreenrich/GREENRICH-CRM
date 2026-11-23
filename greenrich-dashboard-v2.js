@@ -292,6 +292,31 @@
    (cfg.canExport?'<button class="gr2-excel" id="gr2-excel" type="button">↓ Export Excel</button><button class="gr2-pdf" id="gr2-pdf" type="button">↓ Export PDF</button>':'')+'</div></div>'+
    '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-digest" id="gr2-digest"></div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Salesperson sales value uses Won leads linked to order IDs. Data refreshes automatically and when CRM changes are received.</div></div>';
   viewRoot=host.querySelector('.gr2');
+   const setTheme=dark=>{viewRoot.dataset.gdTheme=dark?'dark':'light';const b=viewRoot.querySelector('#gr2-theme-toggle');b.setAttribute('aria-pressed',String(dark));b.textContent=dark?'☼ Light mode':'☾ Dark mode'};
+   setTheme(false);
+   viewRoot.addEventListener('click',event=>{
+     const quick=event.target.closest('[data-gr2-quick]');
+     if(quick){query('#gr2-period').value=quick.dataset.gr2Quick;draw();return}
+     if(event.target.closest('#gr2-theme-toggle')){setTheme(viewRoot.dataset.gdTheme!=='dark');return}
+     const target=event.target.closest('[data-widget-target]');
+     if(target){const panel=viewRoot.querySelector('.gr2-panel[data-widget="'+target.dataset.widgetTarget+'"]');if(panel){panel.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});panel.classList.add('gr2-attention');setTimeout(()=>panel.classList.remove('gr2-attention'),1300)}}
+   });
+   viewRoot.addEventListener('keydown',event=>{const card=event.target.closest('.gr2-feature-main[data-widget-target]');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();card.click()}});
+   const hideTip=()=>{const tip=viewRoot.querySelector('.gr2-chart-hover-tip');if(tip)tip.hidden=true;viewRoot.querySelectorAll('.gr3-guideline').forEach(line=>line.style.opacity='0')};
+   const showTip=(target,evt)=>{const panel=target.closest('.gr2-panel'),svg=target.closest('svg');if(!panel)return;
+     let tip=viewRoot.querySelector('.gr2-chart-hover-tip');if(!tip){tip=document.createElement('div');tip.className='gr2-chart-hover-tip';tip.hidden=true;viewRoot.appendChild(tip)}
+     tip.textContent=target.dataset.gr3Tooltip||target.getAttribute('aria-label')||'';
+     tip.hidden=false;
+     const t=target.getBoundingClientRect(),outer=viewRoot.getBoundingClientRect(),x=evt?.clientX??(t.left+t.width/2),y=evt?.clientY??t.top;
+     tip.style.left=Math.min(Math.max(105,x-outer.left),Math.max(110,outer.width-105))+'px';tip.style.top=Math.max(8,y-outer.top-56)+'px';
+     if(svg&&target.dataset.gr3X){const line=svg.querySelector('.gr3-guideline');if(line){line.setAttribute('x1',target.dataset.gr3X);line.setAttribute('x2',target.dataset.gr3X);line.style.opacity='1'}}
+   };
+   viewRoot.addEventListener('pointerover',event=>{const point=event.target.closest('[data-gr3-tooltip]');if(point)showTip(point,event)});
+   viewRoot.addEventListener('pointermove',event=>{const point=event.target.closest('[data-gr3-tooltip]');if(point)showTip(point,event)});
+   viewRoot.addEventListener('pointerout',event=>{if(event.target.closest('[data-gr3-tooltip]'))hideTip()});
+   viewRoot.addEventListener('focusin',event=>{const p=event.target.closest('[data-gr3-tooltip]');if(p)showTip(p)});
+   viewRoot.addEventListener('focusout',event=>{if(event.target.closest('[data-gr3-tooltip]'))hideTip()});
+   viewRoot.addEventListener('pointermove',event=>{const rect=viewRoot.getBoundingClientRect();viewRoot.style.setProperty('--gr2-cursor-x',((event.clientX-rect.left)/Math.max(1,rect.width)*100).toFixed(1)+'%');viewRoot.style.setProperty('--gr2-cursor-y',Math.max(0,event.clientY-rect.top)+'px')},{passive:true});
   if(cfg.companyIds?.length===1){query('#gr2-company').value=cfg.companyIds[0];query('#gr2-company').disabled=true}
   else if((cfg.companyIds||[]).includes(cfg.selectedCompany))query('#gr2-company').value=cfg.selectedCompany;
   host.addEventListener('change',event=>{
