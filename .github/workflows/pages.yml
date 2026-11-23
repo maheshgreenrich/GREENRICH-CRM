@@ -78,6 +78,28 @@ jobs:
           grep -q 'gr3-hover-zone' greenrich-dashboard-charts.js
           grep -q 'gr2-feature-main' greenrich-dashboard-v2.css
           grep -q 'command-center-v1' secure.html
+          grep -q 'revenueChart=20261123-violet-curve-v4' secure.html
+          grep -q 'gr4-revenue' greenrich-dashboard-v2.css
+          node - <<'NODE'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const window={};
+          vm.runInNewContext(fs.readFileSync('greenrich-dashboard-charts.js','utf8'),{window},{filename:'greenrich-dashboard-charts.js'});
+          const charts=window.GreenRichDashboardCharts;
+          assert.equal(typeof charts.revenueTrend,'function');
+          const testCases=[
+            {items:[['2026-11-01',5000],['2026-11-02',0],['2026-11-03',10000]],total:15000,orders:2,previousTotal:7500},
+            {items:[['2026-11-01',0],['2026-11-02',0]],total:0,orders:0,previousTotal:0},
+            {items:[['2026-11-01',800]],total:800,orders:1,previousTotal:null},
+            {items:[],total:0,orders:0,previousTotal:null}
+          ];
+          for(const t of testCases){
+            const html=charts.revenueTrend(t.items,{total:t.total,orders:t.orders,previousTotal:t.previousTotal});
+            assert(!/NaN|Infinity/.test(html),'Chart produced invalid SVG coordinates');
+            assert(html.includes('Total orders:'),'Chart lost CRM order summary');
+            if(t.items.length)assert(html.includes('gr4-hover-zone')&&html.includes('gr4-line'),'Chart lacks hover SVG');
+          }
+          console.log('Interactive revenue curve, zero-sales and empty-state checks passed');
+          NODE
           echo 'Dashboard JavaScript syntax and interactive assets verified'
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
