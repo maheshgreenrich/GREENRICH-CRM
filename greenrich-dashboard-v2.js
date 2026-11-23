@@ -202,26 +202,67 @@
   const due=f.followups.filter(l=>new Date(l.next_followup_at).valueOf()<=Date.now());
   const awaiting=f.dispatch.filter(d=>!['Delivered','Shipped','Cancelled'].includes(d.status));
   const canId=id=>has(id);
-  const kpis=[
-   ['Revenue',money(sum(sale,'total')),'sales','blue'],
-   ['Sales orders',fmt(orderCount),'sales','teal'],
-   ['Customers',fmt(f.customers.length),'customers','violet'],
-   ['Won conversion',pct(won.length,f.leads.length),'conversion','orange'],
+  const previousWindow=(()=>{
+   if(!f.from||!f.to)return null;
+   const start=Date.parse(f.from+'T00:00:00Z'),end=Date.parse(f.to+'T00:00:00Z');
+   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
+   const length=end-start+86400000;
+   return {from:new Date(start-length).toISOString().slice(0,10),to:new Date(start-86400000).toISOString().slice(0,10)};
+  })();
+  const prior=previousWindow?filtered(previousWindow):null;
+  const priorSale=prior?prior.sales.filter(s=>!['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase())):[];
+  const previousRevenue=prior?sum(priorSale,'total'):null;
+  const orderKey=row=>String(row.company_id||'')+'|'+String(row.internal_order_id||row.order_id||row.id);
+  const uniqueOrders=rows=>[...new Map(rows.map(row=>[orderKey(row),row])).values()];
+  const newCustomers=f.customers.filter(c=>inRange(c.created_at,f.from,f.to));
+  const priorNewCustomers=prior?prior.customers.filter(c=>inRange(c.created_at,previousWindow.from,previousWindow.to)):[];
+  const rate=f.leads.length?won.length/f.leads.length*100:0;
+  const previousRate=prior&&prior.leads.length?prior.leads.filter(l=>l.stage==='Won').length/prior.leads.length*100:null;
+  const kpiCards=[];
+  const addCard=(name,value,target,tone,kind,change,series,format)=>kpiCards.push({name,value,target,tone,kind,change,series,format});
+  if(has('sales')){
+   const revenue=sum(sale,'total');
+   addCard('Total Revenue',money(revenue),'day_sales','amber','revenue',gr6Delta(revenue,previousRevenue),
+     gr6Series(sale,s=>s.date||s.order_date||s.created_at,s=>number(s.total),f.from,f.to),money);
+   addCard('Total Orders',fmt(orderCount),'sales','peach','orders',
+     gr6Delta(orderCount,prior?countUnique(priorSale,orderKey):null),
+     gr6Series(uniqueOrders(sale),s=>s.date||s.order_date||s.created_at,()=>1,f.from,f.to),fmt);
+  }
+  if(has('customers')){
+   addCard('New Customers',fmt(newCustomers.length),'customers','gold','customers',
+     gr6Delta(newCustomers.length,prior?priorNewCustomers.length:null),
+     gr6Series(newCustomers,c=>c.created_at,()=>1,f.from,f.to),fmt);
+  }
+  if(has('conversion')){
+   addCard('Conversion Rate',rate.toFixed(1)+'%','conversion','coral','conversion',
+     gr6Delta(rate,previousRate,true),
+     gr6Series(f.leads,l=>l.created_at||l.date,l=>l.stage==='Won'?1:0,f.from,f.to,true),
+     v=>number(v).toFixed(1)+'%');
+  }
+  if(!kpiCards.length&&has('stock')){
+   const low=f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length;
+   addCard('Stock Alerts',fmt(low),'stock','gold','stock',
+     {label:'Current',detail:'Stock snapshot',kind:'neutral'},[],fmt);
+  }
+  const cardIcon=kind=>kind==='orders'?'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><path d="M2 4h3l2.2 11h11.5l2.3-8H6"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>':charts.icon(kind==='revenue'?'sales':kind);
+  const cardsMarkup=kpiCards.map((card,i)=>{
+   const arrow=card.change.kind==='negative'?'↘':card.change.kind==='positive'?'↗':'—';
+   const description=card.name+' '+card.value+'. '+card.change.label+' '+card.change.detail+'. View details.';
+   return '<button type="button" class="gr6-card" data-gr6-kind="'+e(card.kind)+'" data-gr6-tone="'+e(card.tone)+'" data-gr6-delta="'+e(card.change.kind)+'" data-widget-target="'+e(card.target)+'" aria-label="'+e(description)+'">'+
+    '<span class="gr6-card-head"><span class="gr6-icon">'+cardIcon(card.kind)+'</span><span class="gr6-options" aria-hidden="true">⋮</span></span>'+
+    '<span class="gr6-card-name">'+e(card.name)+'</span>'+
+    '<strong class="gr6-card-number">'+e(card.value)+'</strong>'+
+    '<span class="gr6-card-change"><strong class="gr6-badge"><span aria-hidden="true">'+arrow+'</span> '+e(card.change.label)+'</strong><span class="gr6-change-period">'+e(card.change.detail)+'</span></span>'+
+    gr6Spark(card.series,i,card.format)+'</button>';
+  }).join('');
+  query('#gr2-digest').innerHTML=kpiCards.length?'<div class="gr6-kpi-row" style="--gr6-count:'+kpiCards.length+'">'+cardsMarkup+'</div>':'';
+  const operational=[
    ['Follow-ups due',fmt(due.length),'followups','rose'],
    ['Dispatch queue',fmt(awaiting.length),'dispatch','sky'],
    ['Present days',fmt(f.attendance.filter(a=>/present|in|worked/i.test(a.status||'')).length),'attendance','green'],
    ['Stock alerts',fmt(f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length),'stock','amber']
   ].filter(k=>canId(k[2]));
-  query('#gr2-kpis').innerHTML=kpis.map(([name,v,_,color],i)=>'<button type="button" class="gr2-kpi gr2-hoverable gr2-kpi-aligned" data-color="'+color+'" data-widget-target="'+e(_)+'" aria-label="'+e(name)+' · '+e(v)+' · View details"><span class="gr2-kpi-head"><span class="gr2-kpi-name">'+e(name)+'</span><span class="gr2-kpi-symbol">'+charts.icon(_)+'</span></span><strong>'+e(v)+'</strong><span class="gr2-kpi-sub">'+e(f.period==='all'?'All accessible records':f.from&&f.to?f.from+' — '+f.to:'Current filter')+'</span><span class="gr2-kpi-action">View details ↗</span></button>').join('')||note('Your administrator has not enabled dashboard widgets for this role.');
-  const summaryStats=[];
-   if(has('sales'))summaryStats.push({name:'Total sales revenue',value:money(sum(sale,'total')),detail:'From '+fmt(orderCount)+' recorded sales '+(orderCount===1?'order':'orders'),target:'sales',tone:'teal'});
-   if(has('leads'))summaryStats.push({name:'Lead enquiries',value:fmt(f.leads.length),detail:fmt(won.length)+' won · '+pct(won.length,f.leads.length)+' conversion',target:'leads',tone:'blue'});
-   if(has('followups'))summaryStats.push({name:'Follow-ups due',value:fmt(due.length),detail:due.length?'Needs attention':'All caught up',target:'followups',tone:'amber'});
-   if(has('stock')){const low=f.products.filter(p=>p.stock!=null&&number(p.stock)<=5).length;summaryStats.push({name:'Low stock products',value:fmt(low),detail:low?'Current stock alerts':'No low-stock alerts',target:'stock',tone:'violet'})}
-   if(!summaryStats.length&&has('customers'))summaryStats.push({name:'Total customers',value:fmt(f.customers.length),detail:'CRM customer records',target:'customers',tone:'blue'});
-   if(!summaryStats.length&&has('attendance'))summaryStats.push({name:'Present days',value:fmt(f.attendance.filter(a=>/present|in|worked/i.test(a.status||'')).length),detail:'Selected reporting period',target:'attendance',tone:'teal'});
-   query('#gr2-digest').innerHTML=summaryStats.length?'<div class="gr2-summary-heading"><span class="gr2-summary-eyebrow"><i aria-hidden="true"></i> BUSINESS AT A GLANCE</span><span class="gr2-summary-period">'+e(f.period==='all'?'All available dates':f.from&&f.to?f.from+' — '+f.to:'Selected period')+'</span></div><div class="gr2-summary-cards" style="--gr2-cards:'+summaryStats.length+'">'+
-     summaryStats.map((item,i)=>'<button type="button" class="gr2-summary-card" data-tone="'+e(item.tone)+'" data-widget-target="'+e(item.target)+'" aria-label="'+e(item.name)+': '+e(item.value)+'. '+e(item.detail)+'. View dashboard details."><span class="gr2-summary-card-top"><span class="gr2-summary-card-name">'+e(item.name)+'</span><span class="gr2-summary-card-arrow" aria-hidden="true">↗</span></span><strong class="gr2-summary-card-value">'+e(item.value)+'</strong><span class="gr2-summary-card-footer"><span class="gr2-summary-card-detail">'+e(item.detail)+'</span><span class="gr2-summary-card-action">Explore</span></span></button>').join('')+'</div>':'';
+  query('#gr2-kpis').innerHTML=operational.map(([name,v,id,color])=>'<button type="button" class="gr2-kpi gr2-hoverable gr2-kpi-aligned" data-color="'+e(color)+'" data-widget-target="'+e(id)+'" aria-label="'+e(name)+' · '+e(v)+' · View details"><span class="gr2-kpi-head"><span class="gr2-kpi-name">'+e(name)+'</span><span class="gr2-kpi-symbol">'+charts.icon(id)+'</span></span><strong>'+e(v)+'</strong><span class="gr2-kpi-sub">'+e(f.period==='all'?'All accessible records':f.from&&f.to?f.from+' — '+f.to:'Current filter')+'</span><span class="gr2-kpi-action">View details ↗</span></button>').join('');
    const approved=sale.filter(s=>!!f.dispatch.find(d=>d.company_id===s.company_id&&d.source_sale_id===s.id)||s.approval_status==='Approved');
   const pending=sale.filter(s=>!approved.includes(s));
   const stages=['New','Contacted','Qualified','Quotation','Won','Lost'];
@@ -233,18 +274,6 @@
    return {name:p.full_name||'Employee',all:mine.length,won:mine.filter(l=>l.stage==='Won').length,
     orderValue:sum(sale.filter(x=>orders.has(x.company_id+'|'+x.id)),'total')};
   }).filter(x=>x.all).sort((a,b)=>b.orderValue-a.orderValue||b.won-a.won||b.all-a.all).slice(0,8);
-  // Compare against the immediately preceding period using the same access and business filters.
-  // No percentage is invented when there is no comparable historical revenue.
-  const previousRevenue=(()=>{
-   if(!f.from||!f.to)return null;
-   const start=Date.parse(f.from+'T00:00:00Z'),end=Date.parse(f.to+'T00:00:00Z');
-   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
-   const duration=end-start+86400000;
-   const priorFrom=new Date(start-duration).toISOString().slice(0,10);
-   const priorTo=new Date(start-86400000).toISOString().slice(0,10);
-   const previousSales=filtered({from:priorFrom,to:priorTo}).sales.filter(s=>!['cancelled','canceled','returned'].includes(String(s.status||s.approval_status||'').trim().toLowerCase()));
-   return sum(previousSales,'total');
-  })();
   const content={
    day_sales:()=>panel('day_sales','Interactive revenue analytics · hover or focus any date for exact values',trend(sale,f.from,f.to,f.period,previousRevenue,orderCount)),
    channel_sales:()=>panel('channel_sales','Interactive channel mix · revenue and order distribution',channelChart(sale)),
