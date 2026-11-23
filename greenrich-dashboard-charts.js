@@ -63,7 +63,7 @@
   const step=Math.max(1,Math.ceil(target/pow)*pow);
   const ceiling=step*4;
   const coords=values.map(([key,val],i)=>({key,val,x:values.length===1?(L+R)/2:L+plotW*i/(values.length-1),y:B-Math.min(1,val/ceiling)*plotH}));
-  const tangent=(a,b)=>Math.sign(a)===Math.sign(b)?2*a*b/(a+b):0;
+  const tangent=(a,b)=>a&&b&&Math.sign(a)===Math.sign(b)?2*a*b/(a+b):0;
   const slopes=coords.slice(1).map((p,i)=>(p.y-coords[i].y)/(p.x-coords[i].x));
   const smooth=coords.map((p,i)=>i===0?'M '+p.x.toFixed(2)+' '+p.y.toFixed(2):(()=>{
    const before=coords[i-1],dx=p.x-before.x;
