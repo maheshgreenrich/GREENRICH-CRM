@@ -311,3 +311,12 @@
 @media(max-width:830px){#content .gr2{gap:13px}#content .gr2-panels{grid-template-columns:minmax(0,1fr)}#content .gr2-panels>.gr2-panel{grid-column:1/-1!important}#content .gr2-panel{padding:18px}#content .gr2-chart-scroll{overflow-x:auto}}
 @media(max-width:480px){#content .gr2-heading{padding:18px}#content .gr2-panel{padding:16px}#content .gr2-kpi{padding:15px;min-height:120px}#content .gr2-mini{width:100%;margin:0 0 9px}#content .gr2-donut-wrap{justify-content:center}}
 @media(prefers-reduced-motion:reduce){#content .gr2-panel{transition:none}}
+
+/* Hover analytics for the active BI v2 dashboard */
+#content .gr2-hoverable{position:relative;outline-offset:3px;transition:transform .2s ease,box-shadow .2s ease,background .2s ease;cursor:crosshair}
+#content .gr2-hoverable:is(:hover,:focus-visible){transform:translateY(-2px);box-shadow:0 10px 24px #2346751b;background-color:#f1f6ff}
+#content .gr2-hoverable:focus-visible{outline:2px solid #3869e9}
+#content .gr2-hoverable[data-tip]:is(:hover,:focus-visible):after{content:attr(data-tip);position:absolute;z-index:30;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#152d54;color:white;border-radius:8px;padding:8px 10px;white-space:nowrap;max-width:85vw;font:600 11px/1.4 Inter,system-ui,sans-serif;box-shadow:0 8px 20px #17335855;pointer-events:none}
+#content .gr2-bar-row:is(:hover,:focus-visible) .gr2-bar-track i{filter:brightness(1.2);transform:scaleY(1.15)}
+#content .gr2-bar-track i{transition:transform .2s ease,filter .2s ease;transform-origin:left center}
+@media(prefers-reduced-motion:reduce){#content .gr2-hoverable,#content .gr2-bar-track i{transition:none!important;transform:none!important}}
