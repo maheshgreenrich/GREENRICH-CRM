@@ -68,6 +68,17 @@ jobs:
           if (!html.includes('greenrich-inventory.js?')) throw new Error('Inventory script missing in secure.html');
           console.log('Inventory module syntax and registration OK');
           NODE
+      - name: Validate interactive dashboard assets
+        run: |
+          set -euo pipefail
+          node --check greenrich-dashboard.js
+          node --check greenrich-dashboard-v2.js
+          node --check greenrich-dashboard-charts.js
+          grep -q 'gr2-digest' greenrich-dashboard-v2.js
+          grep -q 'gr3-hover-zone' greenrich-dashboard-charts.js
+          grep -q 'gr2-feature-main' greenrich-dashboard-v2.css
+          grep -q 'command-center-v1' secure.html
+          echo 'Dashboard JavaScript syntax and interactive assets verified'
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload complete CRM site
