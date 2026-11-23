@@ -569,3 +569,259 @@
 #content .gr2 .gr3-chart,
 #content .gr2 .gr2-chart-scroll{background:#fff!important}
 #content .gr2 .gr2-disclaimer{color:#677586!important}
+
+
+/* Revenue Trend V4 — white surface, premium violet smooth graph.
+   Deliberately scoped to the sales chart only, preserving the all-white CRM. */
+#content .gr2 .gr2-panels>.gr2-panel-day_sales{
+ grid-column:1/-1!important;
+ background:#fff!important;
+ border:1px solid #e4e8f2!important;
+ box-shadow:0 5px 25px rgba(43,36,74,.035)!important;
+ border-radius:25px!important;
+ padding:26px clamp(18px,3vw,35px)!important;
+ overflow:visible!important;
+}
+#content .gr2 .gr2-panel-day_sales .gr2-panel-title{
+ margin-bottom:10px;
+ padding-right:265px;
+}
+#content .gr2 .gr2-panel-day_sales .gr2-panel-title h3{
+ color:#202a42!important;
+ font-size:24px!important;
+ font-weight:820!important;
+ letter-spacing:-.045em!important;
+}
+#content .gr2 .gr2-panel-day_sales .gr2-panel-title p{
+ color:#798095!important;
+ font-size:12px!important;
+}
+#content .gr2 .gr2-panel-day_sales .gr2-panel-icon{
+ background:#fff!important;
+ border:1px solid #ddd6ee!important;
+ color:#9d57e9!important;
+ width:42px;height:42px;flex-basis:42px;
+ border-radius:12px!important;
+}
+#content .gr2 .gr4-revenue{
+ position:relative;
+ color:#24233b;
+ font-family:Inter,ui-sans-serif,system-ui,sans-serif;
+ font-variant-numeric:tabular-nums;
+}
+#content .gr2 .gr4-controls{
+ position:absolute;
+ top:-67px;right:58px;z-index:5;
+ display:flex;align-items:center;gap:12px;
+}
+#content .gr2 .gr4-picker{display:block;position:relative}
+#content .gr2 .gr4-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+#content .gr2 .gr4-period-select{
+ background:#fff!important;
+ color:#352d4e!important;
+ font:700 12px Inter,system-ui,sans-serif;
+ border:1px solid #ddd7e8!important;
+ border-radius:12px;padding:10px 32px 10px 12px;
+ min-height:43px;
+ box-shadow:0 2px 9px #554b7510!important;
+ outline-offset:3px;cursor:pointer;
+ max-width:180px;
+}
+#content .gr2 .gr4-period-select:focus-visible{outline:2px solid #ad6af5}
+#content .gr2 .gr4-chart-key{
+ display:flex;gap:6px;align-items:center;
+ font-weight:750;font-size:10px;color:#82639b;
+ white-space:nowrap;
+}
+#content .gr2 .gr4-chart-key i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#a45bed;box-shadow:0 0 0 4px #a45bed16}
+#content .gr2 .gr4-metrics{
+ display:grid;grid-template-columns:minmax(0,1.18fr) minmax(0,1fr);
+ gap:20px;align-items:center;
+ padding:15px 0 16px;
+ margin:0 0 13px;
+}
+#content .gr2 .gr4-total{min-width:0}
+#content .gr2 .gr4-metric-caption{
+ display:block;color:#64718a;font-size:12px;font-weight:650;
+}
+#content .gr2 .gr4-total-value{
+ font-size:clamp(32px,3.8vw,55px);
+ letter-spacing:-.068em;
+ line-height:1.1;
+ font-weight:850;
+ color:#20233d;
+ margin:7px 0 8px;
+ overflow-wrap:anywhere;
+}
+#content .gr2 .gr4-change{
+ display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+ font-size:11px;color:#7c8394;
+}
+#content .gr2 .gr4-change strong{
+ font-size:13px;font-weight:830;color:#138b66;
+}
+#content .gr2 .gr4-change.negative strong,
+#content .gr2 .gr4-change-number.negative{color:#c44766!important}
+#content .gr2 .gr4-change.neutral strong,
+#content .gr2 .gr4-change-number.neutral{color:#8d7c9f!important}
+#content .gr2 .gr4-facts{
+ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;
+ border-left:1px solid #e8e6f0;
+ padding-left:20px;min-width:0;
+}
+#content .gr2 .gr4-facts>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+#content .gr2 .gr4-facts span{font-size:11px;font-weight:650;color:#7b8191}
+#content .gr2 .gr4-facts strong{font-size:clamp(14px,1.65vw,20px);font-weight:820;letter-spacing:-.03em;overflow-wrap:anywhere}
+#content .gr2 .gr4-high{color:#5274cc}
+#content .gr2 .gr4-low{color:#c38b2c}
+#content .gr2 .gr4-change-number{color:#138b66}
+#content .gr2 .gr4-chart-scroll{overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:#dbd5e6 transparent}
+#content .gr2 .gr4-plot{
+ position:relative;
+ min-width:580px;
+ width:100%;
+ margin-top:2px;
+ background:#fff!important;
+ border-radius:15px;
+}
+#content .gr2 .gr4-svg{
+ display:block;
+ width:100%;
+ height:auto;
+ overflow:visible;
+ background:#fff!important;
+ user-select:none;
+ touch-action:pan-y;
+}
+#content .gr2 .gr4-grid{
+ stroke:#dadbe7;
+ stroke-dasharray:3 8;
+ stroke-width:1;
+ vector-effect:non-scaling-stroke;
+ pointer-events:none;
+}
+#content .gr2 .gr4-axis-name{
+ fill:#626d87!important;
+ font-size:16px!important;
+ font-weight:680;
+}
+#content .gr2 .gr4-tick,
+#content .gr2 .gr4-date,
+#content .gr2 .gr4-axis-bottom{
+ fill:#82879a!important;
+ font:600 13px Inter,system-ui,sans-serif!important;
+}
+#content .gr2 .gr4-date{font-size:13px!important}
+#content .gr2 .gr4-line{
+ fill:none;
+ stroke:#a052e9;
+ stroke-width:3.2;
+ stroke-linecap:round;
+ stroke-linejoin:round;
+ vector-effect:non-scaling-stroke;
+ pointer-events:none;
+ filter:drop-shadow(0px 2px 3px #a052e93c);
+ animation:gr4-reveal .9s cubic-bezier(.2,.9,.3,1) both;
+}
+#content .gr2 .gr4-area{pointer-events:none;animation:gr4-fade .7s ease both}
+#content .gr2 .gr4-positive-dot{
+ fill:#fff;stroke:#a25aee;stroke-width:3;
+ vector-effect:non-scaling-stroke;
+ pointer-events:none;
+ filter:drop-shadow(0 1px 3px #a052e949);
+}
+#content .gr2 .gr4-cursor{
+ stroke:#a25aec;stroke-width:1.5;stroke-dasharray:5 6;
+ vector-effect:non-scaling-stroke;
+ opacity:0;pointer-events:none;
+}
+#content .gr2 .gr4-active-dot{
+ stroke:#a25aec;stroke-width:3.5;
+ fill:#fff;vector-effect:non-scaling-stroke;
+ opacity:0;pointer-events:none;
+ filter:drop-shadow(0 2px 4px #a052e95e);
+}
+#content .gr2 .gr4-is-hovered .gr4-cursor,
+#content .gr2 .gr4-is-hovered .gr4-active-dot{opacity:1}
+#content .gr2 .gr4-hover-zone{
+ cursor:crosshair;
+ outline:none;
+}
+#content .gr2 .gr4-hover-zone:focus-visible{fill:#a25aec0d;stroke:#a25aec;stroke-width:1}
+#content .gr2 .gr4-tooltip{
+ pointer-events:none;
+ position:absolute;z-index:15;
+ min-width:175px;max-width:210px;
+ padding:11px 13px;
+ background:#fff!important;
+ border:1px solid #d4bbea;
+ border-radius:12px;
+ color:#3c3552;
+ box-shadow:0 10px 32px #51436c33;
+ transform:translate(-50%,-100%);
+ white-space:nowrap;
+ font:600 12px/1.5 Inter,system-ui,sans-serif;
+}
+#content .gr2 .gr4-tooltip.gr4-tip-below{transform:translate(-50%,0)}
+#content .gr2 .gr4-tooltip[hidden]{display:none!important}
+#content .gr2 .gr4-tooltip-date{
+ display:block;font-size:11px;font-weight:750;color:#8a61b6;
+ margin-bottom:3px;
+}
+#content .gr2 .gr4-tooltip strong{font-size:14px;color:#38245d}
+#content .gr2 .gr4-footer{
+ display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:20px;
+ border-top:1px solid #e9e8f0;
+ margin-top:10px;padding-top:13px;
+}
+#content .gr2 .gr4-table{min-width:140px}
+#content .gr2 .gr4-table .gr3-data{
+ border:0;margin:0!important;padding:0;min-width:0;
+ background:#fff!important;
+}
+#content .gr2 .gr4-table .gr3-data summary{
+ display:inline-flex;align-items:center;
+ color:#9b54e5!important;
+ font-size:12px;font-weight:780;
+ padding:3px 0;
+}
+#content .gr2 .gr4-order-facts{
+ display:flex;justify-content:flex-end;flex-wrap:wrap;align-items:center;gap:20px;
+ padding:8px 0;color:#677184;font-size:12px;
+}
+#content .gr2 .gr4-order-facts span+span{
+ border-left:1px solid #d5d3e0;
+ padding-left:20px;
+}
+#content .gr2 .gr4-order-facts strong{
+ color:#313044;font-weight:850;font-size:14px;
+}
+#content .gr2 .gr4-empty{
+ min-height:220px;display:grid;place-items:center;
+ color:#778097;font-size:12px;padding:24px;
+ border:1px dashed #e9ddf8;
+ border-radius:13px;background:#fff!important;
+}
+@keyframes gr4-reveal{from{opacity:.15;stroke-dasharray:1 1;stroke-dashoffset:1}to{opacity:1;stroke-dasharray:1 0;stroke-dashoffset:0}}
+@keyframes gr4-fade{from{opacity:0}to{opacity:1}}
+@media(min-width:831px){
+ #content .gr2 .gr2-panels>.gr2-panel-day_sales{grid-column:1/-1!important}
+}
+@media(max-width:1020px){
+ #content .gr2 .gr4-metrics{grid-template-columns:1fr;gap:10px}
+ #content .gr2 .gr4-facts{border-left:0;border-top:1px solid #e8e6f0;padding-left:0;padding-top:15px}
+}
+@media(max-width:740px){
+ #content .gr2 .gr2-panel-day_sales .gr2-panel-title{padding-right:0}
+ #content .gr2 .gr4-controls{position:static;justify-content:flex-start;flex-wrap:wrap;margin-bottom:14px}
+ #content .gr2 .gr4-chart-key{font-size:11px}
+ #content .gr2 .gr4-metrics{padding:3px 0 12px}
+ #content .gr2 .gr4-total-value{font-size:38px}
+ #content .gr2 .gr4-facts{gap:8px}
+ #content .gr2 .gr4-facts strong{font-size:15px}
+ #content .gr2 .gr4-order-facts{justify-content:flex-start;gap:11px}
+ #content .gr2 .gr4-order-facts span+span{padding-left:11px}
+}
+@media(prefers-reduced-motion:reduce){
+ #content .gr2 .gr4-line,#content .gr2 .gr4-area{animation:none!important}
+}
