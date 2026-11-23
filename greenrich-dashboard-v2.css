@@ -493,3 +493,79 @@
 #content .gr2[data-gd-theme=dark] .gr2-bar-row:is(:hover,:focus-visible),#content .gr2[data-gd-theme=dark] .gr2-legend>div:is(:hover,:focus-visible){background:#ffffff18!important}
 #content .gr2[data-gd-theme=dark] .gr2-disclaimer,#content .gr2[data-gd-theme=dark] .gr2-foot{color:#d5c7b8!important}
 #content .gr2[data-gd-theme=dark] .gr2 .gr2-table th{background:#51453e!important}
+
+
+/* White-only dashboard surfaces — requested 2026-11-23.
+   Keep chart strokes, status icons and controls distinguishable, but remove
+   decorative gradients, colored glass and any background tint. */
+#content .gr2,
+#content .gr2[data-gd-theme="dark"]{
+  background:#fff!important;
+  background-image:none!important;
+  color:#253047!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+}
+#content .gr2::before,
+#content .gr2::after,
+#content .gr2-heading::after{display:none!important}
+#content .gr2 .gr2-heading,
+#content .gr2 .gr2-toolbar,
+#content .gr2 .gr2-panel,
+#content .gr2 .gr2-feature-main,
+#content .gr2 .gr2-feature-mini,
+#content .gr2 .gr2-mini,
+#content .gr2 .gr2-loading,
+#content .gr2 .gr2-empty,
+#content .gr2 .gr2-period-pills,
+#content .gr2 .gr2-kpi:nth-child(n),
+#content .gr2 .gr2-donut>div,
+#content .gr2 .gr2-legend>div,
+#content .gr2 .gr2-bar-row,
+#content .gr2 .gr2-filter select,
+#content .gr2 .gr2-filter input{
+  background:#fff!important;
+  background-image:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  box-shadow:none!important;
+  border-color:#e5e9f0!important;
+}
+#content .gr2 .gr2-heading,
+#content .gr2 .gr2-toolbar,
+#content .gr2 .gr2-panel,
+#content .gr2 .gr2-feature-main,
+#content .gr2 .gr2-feature-mini,
+#content .gr2 .gr2-kpi:nth-child(n){border:1px solid #e5e9f0!important}
+#content .gr2 .gr2-feature-strokes{display:none!important}
+#content .gr2 .gr2-feature-main{color:#233246!important}
+#content .gr2 .gr2-feature-main strong,
+#content .gr2 .gr2-feature-main p,
+#content .gr2 .gr2-feature-main>div:nth-child(2)>span,
+#content .gr2 .gr2-feature-top,
+#content .gr2 .gr2-signal,
+#content .gr2 .gr2-feature-arrow{color:#233246!important}
+#content .gr2 .gr2-signal i{background:#159872!important;box-shadow:none!important}
+#content .gr2 .gr2-feature-arrow{background:#fff!important;border:1px solid #e5e9f0!important}
+#content .gr2 .gr2-heading h2,
+#content .gr2 .gr2-panel-title h3,
+#content .gr2 .gr2-kpi strong,
+#content .gr2 .gr2-feature-mini b{color:#233246!important}
+#content .gr2 .gr2-feature-mini span,
+#content .gr2 .gr2-feature-mini small,
+#content .gr2 .gr2-kpi-name,
+#content .gr2 .gr2-kpi-sub,
+#content .gr2 .gr2-toolbar-heading span,
+#content .gr2 .gr2-filter label{color:#606e80!important}
+#content .gr2 .gr2-kpi-symbol,
+#content .gr2 .gr2-panel-icon{background:#fff!important;border:1px solid #e5e9f0!important;color:#276d67!important;box-shadow:none!important}
+#content .gr2 .gr2-period-pills button[aria-pressed="true"]{background:#fff!important;color:#22354a!important;box-shadow:inset 0 0 0 2px #2d695e!important}
+#content .gr2 .gr2-period-pills button:is(:hover,:focus-visible),
+#content .gr2 .gr2-feature-mini:is(:hover,:focus-visible),
+#content .gr2 .gr2-kpi:is(:hover,:focus-visible),
+#content .gr2 .gr2-legend>div:is(:hover,:focus-visible),
+#content .gr2 .gr2-bar-row:is(:hover,:focus-visible){background:#fff!important;box-shadow:0 4px 14px #26324612!important}
+#content .gr2 .gr2-donut>div{box-shadow:0 0 0 4px #fff!important}
+#content .gr2 .gr3-chart,
+#content .gr2 .gr2-chart-scroll{background:#fff!important}
+#content .gr2 .gr2-disclaimer{color:#677586!important}
