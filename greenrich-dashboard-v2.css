@@ -1049,3 +1049,15 @@
 @media(prefers-reduced-motion:reduce){
  #content .gr2 .gr2-summary-card,#content .gr2 .gr2-kpis>.gr2-kpi-aligned{transition:none!important;transform:none!important}
 }
+
+
+/* Avoid orphaned cards and unused white gaps when permissions show fewer KPIs. */
+@media(min-width:541px) and (max-width:1199px){
+ #content .gr2 .gr2-summary-cards:has(> .gr2-summary-card:only-child){grid-template-columns:1fr!important}
+}
+@media(min-width:781px) and (max-width:1199px){
+ #content .gr2 .gr2-summary-cards:has(> .gr2-summary-card:nth-child(3):last-child){grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media(min-width:541px) and (max-width:780px){
+ #content .gr2 .gr2-summary-cards:has(> .gr2-summary-card:nth-child(3):last-child)>.gr2-summary-card:last-child{grid-column:1/-1}
+}
