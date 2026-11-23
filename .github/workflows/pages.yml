@@ -84,6 +84,9 @@ jobs:
           grep -q 'gr6-spark-hit' greenrich-dashboard-v2.js
           grep -q 'gr6-kpi-row' greenrich-dashboard-v2.css
           grep -q 'metricCards=20261123-reference-four-v1' secure.html
+          grep -q 'gr6-secondary-row' greenrich-dashboard-v2.js
+          grep -q 'linear-gradient(128deg,#142e91' greenrich-dashboard-v2.css
+          grep -q 'kpiPalette=20261123-royal-blue-multicolour-v1' secure.html
           node - <<'NODE'
           const fs=require('fs'),vm=require('vm'),assert=require('assert');
           const window={};
