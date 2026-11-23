@@ -532,7 +532,7 @@
   const locs=S.locations.filter(inScope),items=S.items.filter(inScope),canEdit=S.ctx.can('stock','edit'),canApprove=S.ctx.can('stock','approve');
   const form='<form data-inv-form class="gr-inv-form"><h4>Verified physical count / Internal transfer</h4>'+
    '<div class="gr-inv-grid">'+choice('company','Company',S.ctx.companies.map(x=>[x,companyName(x)]),S.scope==='all'?'':S.scope)+
-   choice('item','Product / Material',items.map(x=>[x.company_id+'|'+x.stage+'|'+x.id,x.code+' · '+x.name+' ['+x.stage+']']))+
+   choice('item','Product / Material',items.map(x=>[x.company_id+'|'+(x.stockKind||x.stage)+'|'+x.id,x.code+' · '+x.name+' ['+x.stage+']']))+
    choice('action','Movement',[['verified_count','Verified physical count (Admin / Approver)'],['transfer','Transfer between locations']])+
    choice('from_location','From warehouse (transfer only)',locs.map(x=>[x.id,x.name]),'',false)+
    choice('to_location','To warehouse',locs.map(x=>[x.id,x.name]))+
