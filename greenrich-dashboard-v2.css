@@ -1228,3 +1228,151 @@
 @media(prefers-reduced-motion:reduce){
  #content .gr2 .gr5-channel-slice,#content .gr2 .gr5-channel-item,#content .gr2 .gr5-channel-meter i{transition:none!important;transform:none!important}
 }
+
+
+/* KPI snapshot v6: four compact analytics cards modeled after the supplied
+   dashboard reference. The surrounding GreenRich CRM background remains white. */
+#content .gr2 .gr2-digest:has(.gr6-kpi-row){display:block!important;margin:0!important;padding:0!important;min-width:0;background:#fff!important}
+#content .gr2 .gr6-kpi-row{
+ display:grid!important;grid-template-columns:repeat(var(--gr6-count,4),minmax(0,1fr))!important;
+ gap:15px!important;align-items:stretch;width:100%;min-width:0;
+}
+#content .gr2 .gr6-card{
+ --gr6-ink:#1b1c1d;--gr6-muted:#72777a;--gr6-edge:#ececec;--gr6-card-bg:#f8f8f8;--gr6-spark:#f5a342;
+ appearance:none;display:flex;flex-direction:column;align-items:stretch;
+ position:relative;isolation:isolate;box-sizing:border-box;text-align:left;
+ min-width:0;width:100%;height:100%;min-height:214px;padding:20px 22px 18px;
+ border:1px solid var(--gr6-edge)!important;
+ border-radius:21px!important;
+ color:var(--gr6-ink)!important;
+ background:var(--gr6-card-bg)!important;
+ box-shadow:0 6px 20px rgba(18,25,35,.055)!important;
+ cursor:pointer;overflow:visible!important;
+ font-family:Inter,ui-sans-serif,system-ui,sans-serif;
+ transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue]{
+ --gr6-ink:#fff;--gr6-muted:#b7b7b7;--gr6-edge:#2f2f2f;--gr6-card-bg:#1d1d1d;--gr6-spark:#f1a834;
+ box-shadow:0 8px 26px rgba(10,12,15,.16)!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=orders]{--gr6-card-bg:#f8f8f8;--gr6-spark:#f5a25e}
+#content .gr2 .gr6-card[data-gr6-kind=customers]{--gr6-card-bg:#fafafa;--gr6-spark:#efc352}
+#content .gr2 .gr6-card[data-gr6-kind=conversion]{--gr6-card-bg:#f8f8f8;--gr6-spark:#f2a16d}
+#content .gr2 .gr6-card:is(:hover,:focus-visible){
+ transform:translateY(-4px)!important;
+ border-color:#d5d5d5!important;
+ box-shadow:0 15px 32px rgba(24,28,34,.13)!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue]:is(:hover,:focus-visible){
+ border-color:#c1843b!important;
+ box-shadow:0 16px 34px rgba(24,28,34,.22)!important;
+}
+#content .gr2 .gr6-card:focus-visible{outline:3px solid #edb65a!important;outline-offset:3px}
+#content .gr2 .gr6-card-head{display:flex;align-items:flex-start;justify-content:space-between;min-height:40px;gap:10px}
+#content .gr2 .gr6-icon{
+ display:grid;place-items:center;flex:none;width:44px;height:44px;
+ border-radius:13px;
+ background:#f1f1f1!important;color:#1f2326!important;
+ box-shadow:none!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-icon{background:#34312a!important;color:#f6b24e!important}
+#content .gr2 .gr6-card[data-gr6-kind=customers] .gr6-icon{background:#fff2e2!important;color:#e68c24!important}
+#content .gr2 .gr6-card[data-gr6-kind=conversion] .gr6-icon{background:#fff0e7!important;color:#db8758!important}
+#content .gr2 .gr6-icon svg{width:23px;height:23px;stroke-width:1.9}
+#content .gr2 .gr6-options{font-size:23px;color:var(--gr6-muted)!important;line-height:1;transform:translateY(-2px)}
+#content .gr2 .gr6-card-name{
+ display:block;margin:13px 0 3px;
+ font-size:12px!important;font-weight:700!important;letter-spacing:-.008em;
+ color:var(--gr6-muted)!important;
+ line-height:1.4;white-space:normal;
+}
+#content .gr2 .gr6-card-number{
+ display:block;position:relative;z-index:1;
+ max-width:calc(100% - 112px);
+ font-size:clamp(25px,2.3vw,37px)!important;
+ letter-spacing:-.057em!important;line-height:1.16!important;
+ font-weight:850!important;
+ font-variant-numeric:tabular-nums;
+ color:var(--gr6-ink)!important;
+ overflow-wrap:anywhere;
+ padding-top:3px;
+}
+#content .gr2 .gr6-card-change{
+ display:flex;flex-wrap:wrap;align-items:center;gap:7px;position:relative;z-index:2;
+ margin-top:auto;padding-top:18px;line-height:1.35;
+}
+#content .gr2 .gr6-badge{
+ display:inline-flex;align-items:center;gap:3px;padding:4px 7px;
+ border-radius:999px;
+ background:#dff8e9!important;
+ color:#0b9566!important;
+ font-size:10px!important;font-weight:850!important;white-space:nowrap;
+}
+#content .gr2 .gr6-card[data-gr6-delta=negative] .gr6-badge{
+ background:#fde5e5!important;color:#c34045!important;
+}
+#content .gr2 .gr6-card[data-gr6-delta=neutral] .gr6-badge{
+ background:#e9e9e9!important;color:#74777c!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue] .gr6-badge{
+ background:#11372d!important;color:#22d998!important;
+}
+#content .gr2 .gr6-card[data-gr6-kind=revenue][data-gr6-delta=negative] .gr6-badge{
+ background:#492529!important;color:#ff8989!important;
+}
+#content .gr2 .gr6-change-period{
+ color:var(--gr6-muted)!important;font-size:10px!important;font-weight:650!important;
+}
+#content .gr2 .gr6-spark-box{
+ position:absolute;right:17px;top:92px;z-index:2;
+ width:min(43%,146px);aspect-ratio:145/67;
+ color:var(--gr6-spark);touch-action:pan-y;
+}
+#content .gr2 .gr6-spark{display:block;width:100%;height:auto;overflow:visible}
+#content .gr2 .gr6-spark-line{
+ fill:none;stroke:currentColor;stroke-width:2.8;
+ stroke-linecap:round;stroke-linejoin:round;
+ filter:drop-shadow(0 2px 2px rgba(244,156,42,.22));
+ vector-effect:non-scaling-stroke;pointer-events:none;
+}
+#content .gr2 .gr6-spark-area{pointer-events:none}
+#content .gr2 .gr6-spark-hit{cursor:crosshair}
+#content .gr2 .gr6-spark-guide{
+ opacity:0;stroke:currentColor;stroke-width:1.2;
+ stroke-dasharray:4 4;pointer-events:none;
+ vector-effect:non-scaling-stroke;
+}
+#content .gr2 .gr6-spark-dot{
+ opacity:0;fill:#fff;stroke:currentColor;stroke-width:2.7;
+ pointer-events:none;vector-effect:non-scaling-stroke;
+}
+#content .gr2 .gr6-spark-box.gr6-hovering .gr6-spark-guide,
+#content .gr2 .gr6-spark-box.gr6-hovering .gr6-spark-dot{opacity:1}
+#content .gr2 .gr6-spark-tip{
+ display:flex;flex-direction:column;align-items:flex-start;
+ position:absolute;z-index:5;top:-9px;left:50%;
+ transform:translate(-50%,-100%);
+ min-width:105px;max-width:150px;padding:7px 10px;
+ background:#262629!important;color:#fff!important;border-radius:9px;
+ white-space:nowrap;pointer-events:none;
+ box-shadow:0 6px 18px rgba(0,0,0,.23);
+}
+#content .gr2 .gr6-spark-tip[hidden]{display:none!important}
+#content .gr2 .gr6-spark-tip-date{font-size:10px;color:#bdc1c8!important}
+#content .gr2 .gr6-spark-tip-value{font-size:12px;color:#fff!important}
+#content .gr2 .gr6-kpi-row~.gr2-kpis{margin-top:4px}
+@media(max-width:1170px){
+ #content .gr2 .gr6-kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important}
+ #content .gr2 .gr6-card{min-height:203px}
+ #content .gr2 .gr6-card-number{font-size:clamp(27px,3vw,34px)!important}
+}
+@media(max-width:600px){
+ #content .gr2 .gr6-kpi-row{grid-template-columns:1fr!important}
+ #content .gr2 .gr6-card{min-height:193px;padding:17px 19px}
+ #content .gr2 .gr6-card-number{font-size:30px!important}
+ #content .gr2 .gr6-spark-box{right:18px;top:87px;width:135px}
+}
+@media(prefers-reduced-motion:reduce){
+ #content .gr2 .gr6-card{transition:none!important}
+ #content .gr2 .gr6-card:is(:hover,:focus-visible){transform:none!important}
+}
