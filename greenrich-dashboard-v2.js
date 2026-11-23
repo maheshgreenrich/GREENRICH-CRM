@@ -273,7 +273,7 @@
  async function mount(container,cfg){
   stop();host=container;client=cfg.db;config=cfg;records=emptyRecords();visible=W.map(x=>x[0]);staff=[];stamp='';errors={};
   host.innerHTML='<div class="gr2"><div class="gr2-heading"><div><span class="gr2-eyebrow"><i></i> GREENRICH ONE · BUSINESS INTELLIGENCE</span><h2>GreenRich Command Center <span class="gr2-interactive-tag">GLASS · LIVE</span></h2><p>Explore your business in motion — interactive sales, leads, inventory and operational intelligence</p></div><div class="gr2-heading-end"><span class="gr2-live"><i></i> Connected CRM</span><small id="gr2-stamp">Loading data…</small></div></div>'+
-   '<div class="gr2-top-controls"><div class="gr2-period-pills" role="group" aria-label="Quick date filters"><button type="button" data-gr2-quick="today">Today</button><button type="button" data-gr2-quick="week">This week</button><button type="button" data-gr2-quick="month">This month</button><button type="button" data-gr2-quick="last90">90 days</button><button type="button" data-gr2-quick="all">All time</button></div><button type="button" class="gr2-theme-switch" id="gr2-theme-toggle" aria-pressed="false" aria-label="Switch dashboard color theme">☾ Dark mode</button></div>'+ 
+   '<div class="gr2-top-controls"><div class="gr2-period-pills" role="group" aria-label="Quick date filters"><button type="button" data-gr2-quick="today">Today</button><button type="button" data-gr2-quick="week">This week</button><button type="button" data-gr2-quick="month">This month</button><button type="button" data-gr2-quick="last90">90 days</button><button type="button" data-gr2-quick="all">All time</button></div></div>'+ 
    '<div class="gr2-toolbar"><div class="gr2-toolbar-heading"><strong>Dashboard filters</strong><span id="gr2-summary">Current month</span></div><div class="gr2-filter gr2-quick">'+
    '<label>Reporting period<select id="gr2-period"><option value="today">Today</option><option value="week">This week</option><option value="month" selected>This month</option><option value="last30">Last 30 days</option><option value="last90">Last 90 days</option><option value="all">All time</option><option value="custom">Custom range</option></select></label>'+
    '<label>Company<select id="gr2-company"><option value="all">All assigned companies</option>'+(cfg.companyIds||[]).map(id=>'<option value="'+e(id)+'">'+e(company(id))+'</option>').join('')+'</select></label>'+
@@ -292,12 +292,10 @@
    (cfg.canExport?'<button class="gr2-excel" id="gr2-excel" type="button">↓ Export Excel</button><button class="gr2-pdf" id="gr2-pdf" type="button">↓ Export PDF</button>':'')+'</div></div>'+
    '<div id="gr2-loading" class="gr2-loading">Loading authorized, real-time CRM information…</div><div class="gr2-digest" id="gr2-digest"></div><div class="gr2-kpis" id="gr2-kpis"></div><div class="gr2-panels" id="gr2-content"></div><div class="gr2-disclaimer">Figures reflect records you are permitted to view. Date filters use lead creation date and sales order date; follow-ups use their due date. Stock is current, and attendance belongs to employees rather than individual companies. Salesperson sales value uses Won leads linked to order IDs. Data refreshes automatically and when CRM changes are received.</div></div>';
   viewRoot=host.querySelector('.gr2');
-   const setTheme=dark=>{viewRoot.dataset.gdTheme=dark?'dark':'light';const b=viewRoot.querySelector('#gr2-theme-toggle');b.setAttribute('aria-pressed',String(dark));b.textContent=dark?'☼ Light mode':'☾ Dark mode'};
-   setTheme(false);
+   viewRoot.dataset.gdTheme='light';
    viewRoot.addEventListener('click',event=>{
      const quick=event.target.closest('[data-gr2-quick]');
      if(quick){query('#gr2-period').value=quick.dataset.gr2Quick;draw();return}
-     if(event.target.closest('#gr2-theme-toggle')){setTheme(viewRoot.dataset.gdTheme!=='dark');return}
      const target=event.target.closest('[data-widget-target]');
      if(target){const panel=viewRoot.querySelector('.gr2-panel[data-widget="'+target.dataset.widgetTarget+'"]');if(panel){panel.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});panel.classList.add('gr2-attention');setTimeout(()=>panel.classList.remove('gr2-attention'),1300)}}
    });
