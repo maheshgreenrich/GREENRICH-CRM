@@ -80,6 +80,10 @@ jobs:
           grep -q 'command-center-v1' secure.html
           grep -q 'revenueChart=20261123-violet-curve-v4' secure.html
           grep -q 'gr4-revenue' greenrich-dashboard-v2.css
+          grep -q 'gr6-card' greenrich-dashboard-v2.js
+          grep -q 'gr6-spark-hit' greenrich-dashboard-v2.js
+          grep -q 'gr6-kpi-row' greenrich-dashboard-v2.css
+          grep -q 'metricCards=20261123-reference-four-v1' secure.html
           node - <<'NODE'
           const fs=require('fs'),vm=require('vm'),assert=require('assert');
           const window={};
